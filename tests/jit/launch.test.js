@@ -100,7 +100,7 @@ ${launch}
         await run(.enabled("debugger"), setsFlag: false, expectedError: "JIT didn't turn on")
         await run(.enabled("debugger"), cancel: true)
         await run(.enabled("debugger"), airFails: true,
-                  expectedError: "Minecraft couldn't start. Check the launcher log for details.")
+                  expectedError: "Minecraft couldn't start. Check the launcher log.")
         print("Cofre launch: 11 checks passed")
     }
 }

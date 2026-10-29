@@ -242,20 +242,31 @@
                         }
                         try Task.checkCancellation()
                         NSLog("[Cofre] launch JIT ready; starting Air")
-                        self.air.launchProfile(instanceID, accountID: accountID) { stage in
-                            if stage == "failed" {
+                        // Air downloads Java, libraries, assets and mods in one task (stages 2–5), then takes over the
+                        // window with its game screen. "downloading:<fraction>", "running", "failed:<message>".
+                        self.air.launchProfile(instanceID, accountID: accountID) { event in
+                            let parts = event.split(separator: ":", maxSplits: 1).map(String.init)
+                            let value = parts.count > 1 ? parts[1] : ""
+                            switch parts.first ?? "" {
+                            case "downloading":
+                                let f = min(max(Double(value) ?? 0, 0), 0.999) * 4
+                                continuation.yield(
+                                    LaunchProgress(
+                                        stage: 2 + Int(f), of: 8, title: "Downloading", fraction: f - f.rounded(.down)))
+                            case "running":
+                                continuation.yield(LaunchProgress(stage: 8, of: 8, title: "In game", finished: true))
+                                continuation.finish()
+                            case "failed":
                                 continuation.finish(
                                     throwing: NSError(
                                         domain: "CofreAir", code: 1,
-                                        userInfo: [NSLocalizedDescriptionKey: "Minecraft couldn't start. Check the launcher log for details."]))
-                                return
+                                        userInfo: [
+                                            NSLocalizedDescriptionKey: value.isEmpty
+                                                ? "Minecraft couldn't start. Check the launcher log." : value
+                                        ]))
+                            default: break
                             }
-                            continuation.yield(
-                                LaunchProgress(
-                                    stage: stage == "running" ? 8 : 2, of: 8, title: stage, finished: stage == "running")
-                            )
                         }
-                        continuation.finish()
                     } catch {
                         continuation.finish(throwing: error)
                     }

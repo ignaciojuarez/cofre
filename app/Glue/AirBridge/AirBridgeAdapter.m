@@ -1,7 +1,9 @@
 #import "AirBridgeAdapter.h"
 #import "CustomControlsViewController.h"
+#import "DownloadTaskManager.h"
 #import "JavaLauncher.h"
 #import "LauncherPreferences.h"
+#import "MinecraftResourceDownloadTask.h"
 #import "ModItem.h"
 #import "ModService.h"
 #import "ModpackExportService.h"
@@ -10,6 +12,7 @@
 #import "PLProfiles.h"
 #import "ServerItem.h"
 #import "ServerService.h"
+#import "UIKit+hook.h"
 #import "WorldItem.h"
 #import "WorldService.h"
 #import "authenticator/BaseAuthenticator.h"
@@ -19,6 +22,7 @@
 #import "installer/NeoForgeVersionFetcher.h"
 #import "installer/modpack/CurseForgeAPI.h"
 #import "installer/modpack/ModrinthAPI.h"
+#import "ios_uikit_bridge.h"
 #import "utils.h"
 #import <AuthenticationServices/AuthenticationServices.h>
 
@@ -33,10 +37,61 @@ static NSError *CofreAirError(NSString *message) {
 @property(nonatomic, strong, nullable) ASWebAuthenticationSession *authSession;
 @end
 
+extern NSMutableArray<NSDictionary *> *remoteVersionList;
+
+// Air fills remoteVersionList from its own launcher screens, which Cofre never
+// shows; load it the same way once. Offline it stays empty and Air falls back
+// to local files.
+static void CofreLoadVersionList(void (^done)(void)) {
+  if (remoteVersionList.count > 2) {
+    done();
+    return;
+  }
+  NSString *url =
+      [getPrefObject(@"general.download_source") isEqual:@"bmclapi"]
+          ? @"https://bmclapi2.bangbang93.com/mc/game/version_manifest_v2.json"
+          : @"https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
+  [[NSURLSession.sharedSession
+        dataTaskWithURL:[NSURL URLWithString:url]
+      completionHandler:^(NSData *data, NSURLResponse *response,
+                          NSError *error) {
+        NSDictionary *json = data ? [NSJSONSerialization JSONObjectWithData:data
+                                                                    options:0
+                                                                      error:nil]
+                                  : nil;
+        dispatch_async(dispatch_get_main_queue(), ^{
+          remoteVersionList = [NSMutableArray arrayWithArray:@[
+            @{@"id" : @"latest-release", @"type" : @"release"},
+            @{@"id" : @"latest-snapshot", @"type" : @"snapshot"}
+          ]];
+          if ([json[@"versions"] isKindOfClass:NSArray.class]) {
+            [remoteVersionList addObjectsFromArray:json[@"versions"]];
+            setPrefObject(@"internal.latest_version", json[@"latest"]);
+          }
+          done();
+        });
+      }] resume];
+}
+
 @implementation CofreAirBridgeAdapter
 - (instancetype)init {
   if ((self = [super init])) {
     _profiles = [PLProfiles current];
+    // Cofre shows its own progress: stop Air's download tasks from popping up
+    // their progress page. The notification is posted, synchronously, just
+    // before Air checks autoPresentDetail.
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      [NSNotificationCenter.defaultCenter
+          addObserverForName:DownloadTaskManagerDidUpdateTaskNotification
+                      object:nil
+                       queue:nil
+                  usingBlock:^(NSNotification *note) {
+                    DownloadTaskItem *item =
+                        note.userInfo[DownloadTaskManagerTaskKey];
+                    item.autoPresentDetail = NO;
+                  }];
+    });
     NSLog(@"[Cofre] AirBridge connected profiles=%lu",
           (unsigned long)_profiles.profiles.count);
   }
@@ -729,21 +784,83 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
     @"jvmArgs" : getPrefObject(@"javaArgs") ?: @""
   };
 }
+// Air's Play flow (LauncherNavigationController launchMinecraft:): download the
+// version's files, then hand the window to SurfaceViewController, which starts
+// the JVM on a background queue. Cofre has already turned on JIT. Progress:
+// "downloading:<fraction>", "running", or "failed:<message>".
 - (void)launchProfile:(NSString *)profile
             accountID:(NSString *)accountID
              progress:(void (^)(NSString *))progress {
   [_profiles setSelectedProfileName:profile];
-  if (progress)
-    progress(@"preparing");
-  NSDictionary *p = [_profiles selectedProfile];
-  NSString *version = p[@"lastVersionId"];
-  NSLog(@"[Cofre] launch profile=%@ version=%@", profile, version);
-  if (progress)
-    progress(@"starting");
-  int rc = launchJVM(accountID, p, 0, 0, 8);
-  NSLog(@"[Cofre] launch result=%d", rc);
-  if (progress)
-    progress(rc == 0 ? @"running" : @"failed");
+  if (accountID.length &&
+      ![[BaseAuthenticator.current authData][@"accountId"] isEqual:accountID]) {
+    BaseAuthenticator *saved = [BaseAuthenticator loadSavedName:accountID];
+    if (saved)
+      BaseAuthenticator.current = saved;
+  }
+  if (!BaseAuthenticator.current) {
+    progress(@"failed:Sign in to your Minecraft account first.");
+    return;
+  }
+  NSString *versionID = _profiles.selectedProfile[@"lastVersionId"];
+  NSLog(@"[Cofre] launch profile=%@ version=%@", profile, versionID);
+  CofreLoadVersionList(^{
+    NSDictionary *version =
+        [remoteVersionList
+            filteredArrayUsingPredicate:[NSPredicate
+                                            predicateWithFormat:@"(id == %@)",
+                                                                versionID]]
+                .firstObject
+            ?: @{@"id" : versionID ?: @"", @"type" : @"custom"};
+    MinecraftResourceDownloadTask *task = [MinecraftResourceDownloadTask new];
+    __block BOOL failed = NO;
+    task.handleError = ^{
+      dispatch_async(dispatch_get_main_queue(), ^{
+        failed = YES;
+      });
+    };
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+      [task downloadVersion:version];
+    });
+    // Same completion test as Air's progress observer, polled.
+    [NSTimer
+        scheduledTimerWithTimeInterval:0.25
+                               repeats:YES
+                                 block:^(NSTimer *timer) {
+                                   if (failed) {
+                                     [timer invalidate];
+                                     NSLog(@"[Cofre] launch download failed");
+                                     progress(
+                                         @"failed:Couldn't download the game "
+                                         @"files. Check your connection and "
+                                         @"the launcher log.");
+                                     return;
+                                   }
+                                   NSProgress *total = task.progress;
+                                   task.textProgress.completedUnitCount =
+                                       total.totalUnitCount *
+                                       total.fractionCompleted;
+                                   if (!task.textProgress.finished) {
+                                     progress([NSString
+                                         stringWithFormat:
+                                             @"downloading:%.3f",
+                                             total.fractionCompleted]);
+                                     return;
+                                   }
+                                   [timer invalidate];
+                                   if (!task.metadata) {
+                                     progress(@"failed:Air couldn't read this "
+                                              @"version's files.");
+                                     return;
+                                   }
+                                   NSLog(
+                                       @"[Cofre] launch files ready; starting "
+                                       @"the game");
+                                   UIKit_launchMinecraftSurfaceVC(
+                                       UIWindow.mainWindow, task.metadata);
+                                   progress(@"running");
+                                 }];
+  });
 }
 - (void)searchProjects:(NSDictionary *)filters
                 source:(NSInteger)source
