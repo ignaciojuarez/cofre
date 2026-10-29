@@ -61,19 +61,19 @@ public final class CofreBackendAdapter: NSObject, CofreBackend {
     public func addServer(instanceID: String, name: String, address: String) async throws -> ServerSummary { var e: NSError?; guard air.addServer(address, name: name, forProfile: instanceID, error: &e) else { throw e ?? unavailable("server addition") }; return ServerSummary(id: address, name: name, address: address) }
     public func createInstance(name: String, version: String, loader: Loader, ownFolder: Bool, fabricAPI: Bool) async throws -> InstanceSummary { try await createInstance(name: name, version: version, loader: loader) }
     public func preferences(instanceID: String?) async throws -> GamePreferences {
-        var p = GamePreferences(); p.autoRAM = getPref("java.auto_ram") as? Bool ?? true
+        var p = GamePreferences(); p.autoRAM = air.preferenceObject("java.auto_ram") as? Bool ?? true
         p.ramMB = Int(air.preferencesForProfile(instanceID ?? air.profiles.selectedProfileName)["ramMB"] as? Int ?? 4096)
-        p.envVariables = parseEnv(getPref("java.env_variables") as? String ?? "")
-        p.shaderCacheMB = getPref("mobileglues.max_glsl_cache_size") as? Int ?? 512
-        p.multidraw = "\(getPref("mobileglues.multidraw_mode") as? Int ?? 0)"
-        p.computeShaders = getPref("mobileglues.enable_ext_compute_shader") as? Bool ?? true
+        p.envVariables = parseEnv(air.preferenceObject("java.env_variables") as? String ?? "")
+        p.shaderCacheMB = air.preferenceObject("mobileglues.max_glsl_cache_size") as? Int ?? 512
+        p.multidraw = "\(air.preferenceObject("mobileglues.multidraw_mode") as? Int ?? 0)"
+        p.computeShaders = air.preferenceObject("mobileglues.enable_ext_compute_shader") as? Bool ?? true
         return p
     }
     public func setPreferences(_ preferences: GamePreferences, instanceID: String?) async throws {
-        setPref("java.env_variables", preferences.envVariables.map { "\($0.key)=\($0.value)" }.joined(separator: " "))
-        setPref("mobileglues.max_glsl_cache_size", preferences.shaderCacheMB)
-        setPref("mobileglues.multidraw_mode", preferences.multidraw == "Auto" ? 0 : (Int(preferences.multidraw) ?? 0))
-        setPref("mobileglues.enable_ext_compute_shader", preferences.computeShaders)
+        air.setPreferenceObject("java.env_variables", value: preferences.envVariables.map { "\($0.key)=\($0.value)" }.joined(separator: " "))
+        air.setPreferenceObject("mobileglues.max_glsl_cache_size", value: preferences.shaderCacheMB)
+        air.setPreferenceObject("mobileglues.multidraw_mode", value: preferences.multidraw == "Auto" ? 0 : (Int(preferences.multidraw) ?? 0))
+        air.setPreferenceObject("mobileglues.enable_ext_compute_shader", value: preferences.computeShaders)
     }
 
     public func installed(_ kind: ContentKind, instanceID: String) async throws -> [InstalledItem] { try await callback { done in self.air.modsForProfile(instanceID) { done($0) } }.compactMap { d in let x=d as? [String:Any] ?? [:]; guard let id=x["id"] as? String ?? x["name"] as? String else { return nil }; return InstalledItem(id:id,name:x["name"] as? String ?? id,version:x["version"] as? String ?? "",enabled:x["enabled"] as? Bool ?? true,kind:kind) } }
@@ -123,8 +123,6 @@ public final class CofreBackendAdapter: NSObject, CofreBackend {
         d.set(setup.vpn.isReady, forKey: "cofre.setup.vpn")
         d.set(setup.jit.isReady, forKey: "cofre.setup.jit")
     }
-    private func getPref(_ key: String) -> Any? { UserDefaults.standard.object(forKey: key) }
-    private func setPref(_ key: String, _ value: Any) { UserDefaults.standard.set(value, forKey: key) }
     private func parseEnv(_ value: String) -> [String: String] { Dictionary(uniqueKeysWithValues: value.split(separator: " ").compactMap { p in let a = p.split(separator: "=", maxSplits: 1); return a.count == 2 ? (String(a[0]), String(a[1])) : nil }) }
     private func unavailable(_ name: String) -> CofreBackendError { .unavailable(name) }
     private func unavailableStream<T>(_ name: String) -> AsyncThrowingStream<T, Error> { AsyncThrowingStream { continuation in continuation.finish(throwing: unavailable(name)) } }
