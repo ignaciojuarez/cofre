@@ -17,7 +17,9 @@ assert ae.get('com.apple.developer.kernel.extended-virtual-addressing') is True
 assert 'packet-tunnel-provider' in te.get('com.apple.developer.networking.networkextension', [])
 assert ae.get('application-identifier') == team+'.'+bundle
 assert te.get('application-identifier') == team+'.'+bundle+'.tunnel'
-assert 'OLD_DEVICE_UDID' in plistlib.loads(subprocess.check_output(['security','cms','-D','-i',str(app_profile)]))['ProvisionedDevices']
+device=os.environ.get('RELAY_DEVICE_ID','')
+if device and device not in plistlib.loads(subprocess.check_output(['security','cms','-D','-i',str(app_profile)]))['ProvisionedDevices']:
+    raise SystemExit('device is not provisioned')
 info=plistlib.loads((app/'Info.plist').read_bytes()); info['CFBundleIdentifier']=bundle
 if not appex.exists(): raise SystemExit('missing appex')
 appex_info=plistlib.loads((appex/'Info.plist').read_bytes())
