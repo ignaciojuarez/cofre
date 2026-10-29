@@ -16,8 +16,20 @@ public struct LaunchScreen: View {
             LaunchStages()
         }
         .background(Color.cofre.page.ignoresSafeArea())
-        .onKeyPress(.escape) { Task { await store.cancelLaunch() }; nav.showingLaunch = false; return .handled }
+        .background {
+            // Esc: a hidden cancel button works even when nothing has focus.
+            Button("Cancel launch") { Task { await store.cancelLaunch() }; nav.showingLaunch = false }
+                .keyboardShortcut(.cancelAction).opacity(0).allowsHitTesting(false).accessibilityHidden(true)
+        }
+        .onChange(of: store.launch?.stage) { _, stage in
+            // VoiceOver hears progress at most every 2 s (spec §2 #13).
+            guard let p = store.launch, let stage, Date.now.timeIntervalSince(lastAnnouncement) >= 2 || p.finished else { return }
+            lastAnnouncement = .now
+            AccessibilityNotification.Announcement(p.finished ? String(localized: "In game")
+                                                   : String(localized: "Step \(stage) of \(p.of), \(p.title)")).post()
+        }
     }
+    @State private var lastAnnouncement = Date.distantPast
 }
 
 private struct LaunchHero: View {
@@ -60,7 +72,10 @@ private struct LaunchStages: View {
     @Environment(\.widthClass) private var width
     @State private var showLog = false
 
-    static let stageNames = ["JIT", "Java 21", "Libraries", "Assets", "Mods", "Renderer · MobileGlues", "First frame", "In game"]
+    private var stageNames: [String] {
+        let java = store.activeInstance?.javaVersion.map { "Java \($0)" } ?? "Java"
+        return ["JIT", java, "Libraries", "Assets", "Mods", "Renderer", "First frame", "In game"]
+    }
 
     var body: some View {
         let p = store.launch
@@ -68,7 +83,7 @@ private struct LaunchStages: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
                     ListSection("Stages", spacing: 4) {
-                        ForEach(Array(Self.stageNames.enumerated()), id: \.offset) { i, name in
+                        ForEach(Array(stageNames.enumerated()), id: \.offset) { i, name in
                             let n = i + 1, cur = p?.stage ?? 0
                             let state: CheckState = n < cur || p?.finished == true ? .ready : n == cur ? (store.launchError != nil ? .failed("") : .checking) : .unknown
                             Row(name, leading: { StatusMark(state: state).frame(width: 14) }, trailing: {
@@ -77,7 +92,17 @@ private struct LaunchStages: View {
                             .dimmed(state == .unknown)
                         }
                     }
-                    if let err = store.launchError { Banner(err, icon: .cross, tone: .danger) }
+                    if let err = store.launchError {
+                        Banner(err, icon: .cross, tone: .danger)
+                        // A next step, not just the message: JIT first, memory second.
+                        HStack(spacing: 8) {
+                            BlockButton("Test JIT", icon: .bolt) {
+                                close(); nav.section = .settings; nav.settingsPane = .jitJava
+                                Task { await store.testJIT() }
+                            }
+                            BlockButton("Lower memory") { close(); nav.section = .settings; nav.settingsPane = .game }
+                        }
+                    }
                     if width != .compact {
                         ListSection("Log") { LogView(lines: store.launchLog).frame(minHeight: 180) }
                     }
@@ -95,7 +120,7 @@ private struct LaunchStages: View {
                         }
                     }
                     if p?.finished == true || store.launchError != nil {
-                        BlockButton("Close", role: .primary) { store.launch = nil; nav.showingLaunch = false }
+                        BlockButton("Close", role: .primary) { close() }
                     } else {
                         BlockButton("Cancel") { Task { await store.cancelLaunch(); nav.showingLaunch = false } }
                             .keyboardShortcut(".", modifiers: .command)
@@ -111,5 +136,7 @@ private struct LaunchStages: View {
             }
         }
     }
+
+    private func close() { store.launch = nil; nav.showingLaunch = false }
 }
 #endif

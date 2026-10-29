@@ -10,13 +10,21 @@ public final class CofreStore {
 
     // Setup
     public var setup = SetupState()
-    public var setupDismissed = false
+    /// `true` once the first `setupState()` returns. Until then the root shows a neutral splash, not the wizard.
+    public private(set) var setupLoaded = false
+    /// Saved: setup finished once. After that, live failures show as a banner on Play, never the wizard again.
+    public var setupCompleted: Bool { didSet { defaults.set(setupCompleted, forKey: Keys.completed) } }
+    /// Saved: the wizard step the user was on (0 welcome … 7 ready), so a cold start resumes there.
+    public var setupStep: Int? { didSet { defaults.set(setupStep, forKey: Keys.step) } }
+    /// Set when the key came from a picked file (AirDrop fallback), so S04 can say to delete that copy.
+    public var pairingFromFile = false
     public var jitSteps: [JITStep] = []
     public var jitTesting = false
     public var signing: SigningInfo?
     public var device: DeviceInfo?
 
     // Library
+    public private(set) var libraryLoaded = false
     public var instances: [InstanceSummary] = []
     public var activeInstanceID: String?
     public var worlds: [WorldSummary] = []
@@ -29,6 +37,7 @@ public final class CofreStore {
     public var query = ProjectQuery()
     public var results: [ProjectSummary] = []
     public var searching = false
+    public var searchError: String?
     public var versions: [String: [ProjectVersion]] = [:]
     public var dependencies: [String: [ProjectDependency]] = [:]
     public var installed: [ContentKind: [InstalledItem]] = [:]
@@ -48,21 +57,56 @@ public final class CofreStore {
     public var curseForgeKey: String?
     public var theme = CofreTheme.current
     public var lastError: String?
+    /// A destructive action waiting for the one shared confirmation alert (root view).
+    public var pendingConfirmation: Confirmation?
     /// Set by the hosting controller so window-level UIKit state follows X07.
     @ObservationIgnored public var onThemeChange: ((CofreTheme) -> Void)?
+    @ObservationIgnored private let defaults: UserDefaults
 
-    public init(services: CofreServices) { self.services = services }
+    private enum Keys {
+        static let completed = "cofre.setup.completed"
+        static let step = "cofre.setup.step"
+    }
+
+    /// `defaults` holds the setup progress; tests and the preview host pass their own suite.
+    public init(services: CofreServices, defaults: UserDefaults = .standard) {
+        self.services = services
+        self.defaults = defaults
+        setupCompleted = defaults.bool(forKey: Keys.completed)
+        setupStep = defaults.object(forKey: Keys.step) as? Int
+    }
+
+    public var capabilities: BackendCapabilities { backend.capabilities }
+    public func can(_ c: BackendCapabilities) -> Bool { capabilities.contains(c) }
 
     public var activeInstance: InstanceSummary? { instances.first { $0.id == activeInstanceID } ?? instances.first }
     public var activeAccount: Account? { accounts.first { $0.isActive } ?? accounts.first }
     public var updateCount: Int { activeInstance?.updatesAvailable ?? 0 }
     public var isJITReady: Bool { setup.jit.isReady }
-    public var showsSetup: Bool { !setup.isComplete && !setupDismissed }
+    /// The wizard shows only for users who never finished it, once their state has loaded. It stays up through
+    /// S08 Ready even when every check passes mid-flow; `finishSetup()` (Play) or a complete state at load ends it.
+    public var showsSetup: Bool { setupLoaded && !setupCompleted }
+    @available(*, deprecated, renamed: "setupCompleted")
+    public var setupDismissed: Bool { get { setupCompleted } set { setupCompleted = newValue } }
+
+    /// Where a cold start opens the wizard: the saved step, unless that step's check has passed since.
+    public var resumeStep: Int {
+        guard let saved = setupStep else { return 0 }
+        guard (1...6).contains(saved) else { return saved == 7 ? (setup.isComplete ? 7 : firstOpenStep) : saved }
+        return setup.all[saved - 1].isReady ? firstOpenStep : saved
+    }
+
+    /// The first check that isn't ready (1…6), or 7 (Ready) when all pass.
+    public var firstOpenStep: Int { (setup.all.firstIndex { !$0.isReady } ?? 6) + 1 }
+
+    public func finishSetup() { setupCompleted = true; setupStep = nil }
 
     // MARK: Loading
 
     public func start() async {
         setup = await backend.setupState()
+        if setup.isComplete { setupCompleted = true }
+        setupLoaded = true
         signing = await backend.signingInfo()
         device = await backend.deviceInfo()
         await refreshLibrary()
@@ -77,6 +121,7 @@ public final class CofreStore {
             self.accounts = try await self.backend.accounts()
             self.preferences = try await self.backend.preferences(instanceID: nil)
         }
+        libraryLoaded = true
         if activeInstanceID == nil { activeInstanceID = instances.first?.id }
         await loadActiveInstance()
     }
@@ -107,7 +152,7 @@ public final class CofreStore {
     // MARK: Setup
 
     public func importPairing(_ data: Data) {
-        do { try backend.importPairing(data); setup.pairing = .ready } catch { setup.pairing = .failed(error.localizedDescription) }
+        do { try backend.importPairing(data); pairingFromFile = true; setup.pairing = .ready } catch { setup.pairing = .failed(error.localizedDescription) }
     }
 
     public func startVPN() async {
@@ -123,11 +168,18 @@ public final class CofreStore {
             for try await step in backend.testJIT() {
                 if let i = jitSteps.firstIndex(where: { $0.kind == step.kind }) { jitSteps[i] = step }
             }
+            try Task.checkCancellation()
             setup.jit = .ready
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         } catch {
+            if let i = jitSteps.firstIndex(where: { $0.state == .checking }) { jitSteps[i].state = .failed(error.localizedDescription) }
             setup.jit = .failed(error.localizedDescription)
         }
+    }
+
+    /// The step that failed in the last JIT test, for the next-step hint.
+    public var failedJITStep: JITStep.Kind? {
+        jitSteps.first { $0.state.isFailed }?.kind
     }
 
     public func signIn() async {
@@ -137,6 +189,28 @@ public final class CofreStore {
             accounts.removeAll { $0.id == a.id }; accounts.insert(a, at: 0)
             setup.account = .ready
         } catch { setup.account = .failed(error.localizedDescription) }
+    }
+
+    // MARK: Worlds and servers (GAP-13)
+
+    public func deleteWorld(_ w: WorldSummary) async {
+        guard let inst = activeInstance?.id else { return }
+        await run { try await self.backend.deleteWorld(instanceID: inst, worldID: w.id); self.worlds.removeAll { $0.id == w.id } }
+    }
+
+    public func backUpWorld(_ w: WorldSummary) async -> URL? {
+        guard let inst = activeInstance?.id else { return nil }
+        var url: URL?
+        await run { url = try await self.backend.backUpWorld(instanceID: inst, worldID: w.id) }
+        return url
+    }
+
+    public func addServer(name: String, address: String) async {
+        guard let inst = activeInstance?.id, !address.isEmpty else { return }
+        await run {
+            let s = try await self.backend.addServer(instanceID: inst, name: name.isEmpty ? address : name, address: address)
+            self.servers.append(s)
+        }
     }
 
     public func removeAccount(_ a: Account) async {
@@ -172,10 +246,14 @@ public final class CofreStore {
 
     // MARK: Instances
 
-    public func createInstance(name: String, version: String, loader: Loader, loaderVersion: String?) async -> InstanceSummary? {
+    /// Returns `nil` and sets `lastError` on failure, so the sheet can stay open.
+    public func createInstance(name: String, version: String, loader: Loader, loaderVersion: String?,
+                               ownFolder: Bool = true, fabricAPI: Bool = true) async -> InstanceSummary? {
         var made: InstanceSummary?
         await run {
-            let i = try await self.backend.createInstance(name: name, version: version, loader: loader)
+            let i = self.can(.createOptions)
+                ? try await self.backend.createInstance(name: name, version: version, loader: loader, ownFolder: ownFolder, fabricAPI: fabricAPI)
+                : try await self.backend.createInstance(name: name, version: version, loader: loader)
             if let v = loaderVersion, loader != .vanilla, !loader.usesAirInstaller {
                 try await self.backend.installLoader(instanceID: i.id, loader: loader, version: v)
             }
@@ -214,7 +292,9 @@ public final class CofreStore {
 
     public func search() async {
         searching = true; defer { searching = false }
-        await run { self.results = try await self.backend.search(self.query) }
+        do { results = try await backend.search(query); searchError = nil }
+        catch is CancellationError {}
+        catch { results = []; searchError = error.localizedDescription }
     }
 
     public func loadProject(_ id: String) async {
@@ -312,8 +392,33 @@ public final class CofreStore {
                                    textHex: UIColor.cofre.ink.hexString())
     }
 
+    /// Runs the pending confirmation's action.
+    public func confirm(_ c: Confirmation) async {
+        switch c {
+        case .deleteInstance(let i): await delete(i.id)
+        case .deleteWorld(let w): await deleteWorld(w)
+        case .removeAccount(let a): await removeAccount(a)
+        }
+    }
+
     private func run(_ body: @escaping () async throws -> Void) async {
         do { try await body() } catch { lastError = error.localizedDescription }
     }
+}
+
+/// Destructive actions confirmed by the root view's alert, whichever menu, swipe or button started them.
+public enum Confirmation: Identifiable, Equatable {
+    case deleteInstance(InstanceSummary), deleteWorld(WorldSummary), removeAccount(Account)
+    public var id: String {
+        switch self {
+        case .deleteInstance(let i): "instance-\(i.id)"
+        case .deleteWorld(let w): "world-\(w.id)"
+        case .removeAccount(let a): "account-\(a.id)"
+        }
+    }
+}
+
+extension CheckState {
+    var isFailed: Bool { if case .failed = self { true } else { self == .blocked } }
 }
 #endif

@@ -89,8 +89,10 @@ struct GameSettingsContent: View {
         let ram = prefBinding(store, instanceID, \.ramMB)
         ListSection("Memory", spacing: 4) {
             ToggleRow("Auto RAM", isOn: prefBinding(store, instanceID, \.autoRAM))
+            Text("Cofre picks a safe amount automatically.").cofreFont(.label).foregroundStyle(Color.cofre.muted)
+                .padding(.horizontal, 2)
             BlockSlider("Memory", value: Binding(get: { Double(ram.wrappedValue) }, set: { ram.wrappedValue = Int($0) }),
-                        in: 1024...Double(p.deviceRAMMB), step: 256, note: "Keep ≤ 75%",
+                        in: 1024...Double(p.deviceRAMMB), step: 256, note: "Closes while loading? Lower this.",
                         accessibilityValue: { "\(Int($0)) megabytes" }) { "\(Fmt.mb(Int($0))) of \(p.deviceRAMMB / 1024) GB" }
                 .disabled(p.autoRAM)
         }
@@ -126,9 +128,6 @@ struct GameSettingsContent: View {
 
 struct RendererContent: View {
     @Environment(CofreStore.self) private var store
-    @State private var shaderCache = 512
-    @State private var multidraw = "Auto"
-    @State private var compute = true
     var body: some View {
         let current = prefBinding(store, nil, \.renderer)
         ListSection(spacing: 4) {
@@ -143,16 +142,20 @@ struct RendererContent: View {
                 .buttonStyle(RowButtonStyle())
             }
         }
-        ListSection("MobileGlues", spacing: 4) {
-            HStack {
-                Text("Shader cache").cofreFont(.rowTitle).foregroundStyle(Color.cofre.ink); Spacer()
-                SelectButton("Shader cache", selection: $shaderCache, options: [256, 512, 1024].map { ($0, "\($0) MB") }).compactStyle()
-            }.padding(.horizontal, 11).frame(minHeight: 44).block(.panel)
-            HStack {
-                Text("Multidraw").cofreFont(.rowTitle).foregroundStyle(Color.cofre.ink); Spacer()
-                SelectButton("Multidraw", selection: $multidraw, options: ["Auto", "Indirect", "Off"].map { ($0, $0) }).compactStyle()
-            }.padding(.horizontal, 11).frame(minHeight: 44).block(.panel)
-            ToggleRow("Compute shaders", isOn: $compute)
+        if store.can(.rendererTuning) {
+            ListSection("MobileGlues", spacing: 4) {
+                HStack {
+                    Text("Shader cache").cofreFont(.rowTitle).foregroundStyle(Color.cofre.ink); Spacer()
+                    SelectButton("Shader cache", selection: prefBinding(store, nil, \.shaderCacheMB),
+                                 options: [256, 512, 1024].map { ($0, "\($0) MB") }).compactStyle()
+                }.padding(.horizontal, 11).frame(minHeight: 44).block(.panel)
+                HStack {
+                    Text("Multidraw").cofreFont(.rowTitle).foregroundStyle(Color.cofre.ink); Spacer()
+                    SelectButton("Multidraw", selection: prefBinding(store, nil, \.multidraw),
+                                 options: ["Auto", "Indirect", "Off"].map { ($0, $0) }).compactStyle()
+                }.padding(.horizontal, 11).frame(minHeight: 44).block(.panel)
+                ToggleRow("Compute shaders", isOn: prefBinding(store, nil, \.computeShaders))
+            }
         }
     }
 }
@@ -174,7 +177,7 @@ struct ControlsContent: View {
             }.padding(.horizontal, 11).frame(minHeight: 44).block(.panel)
             if controller {
                 ToggleRow("Gyro aim", isOn: prefBinding(store, nil, \.gyroAim))
-                HintStrip()
+                if store.can(.controllerNavigation) { HintStrip() }
             } else {
                 ToggleRow("Gyro aim", isOn: prefBinding(store, nil, \.gyroAim))
                 ToggleRow("Virtual mouse", isOn: prefBinding(store, nil, \.virtualMouse))
@@ -193,9 +196,9 @@ struct ControlsEditorContent: View {
     @Environment(CofreStore.self) private var store
     @Environment(NavModel.self) private var nav
     var body: some View {
-        Text("Drag and resize buttons. Air's editor opens full screen with Cofre's colors.").cofreFont(.body).foregroundStyle(Color.cofre.inkSoft)
+        Text("Drag and resize buttons. Opens full screen.").cofreFont(.body).foregroundStyle(Color.cofre.inkSoft)
         if store.services.airScreens == nil {
-            Banner("Air's controls editor isn't connected in this build.", icon: .cmd, tone: .warn)
+            Banner("The controls editor isn't available yet.", icon: .cmd, tone: .warn)
         }
         BlockButton("Open controls editor", icon: .cmd, role: .primary) { nav.showingAirScreen = .controlsEditor }
             .keyboardShortcut("k", modifiers: [.command, .shift])
@@ -219,6 +222,7 @@ struct JITJavaContent: View {
         } else {
             Banner("JIT isn't ready. Run the test to see which step fails.", icon: .bolt, tone: .danger) { Badge("Off", tone: .danger) }
         }
+        JITFailure()
         ListSection(spacing: 4) {
             if let d = store.device { Row("Device", trailing: { Meta("\(d.jitMode) · \(d.model)") }) }
             Row("Local VPN", trailing: { Badge(s.vpn.isReady ? "On" : "Off", tone: s.vpn.isReady ? .success : .danger) })
@@ -226,19 +230,23 @@ struct JITJavaContent: View {
             Row("Disk image", trailing: { Badge(s.jit.isReady ? "Mounted" : "—", tone: s.jit.isReady ? .success : .neutral) })
         }
         if store.jitTesting || !store.jitSteps.isEmpty { JITStepRows() }
-        if !s.pairing.isReady { PairingGuide() }
+        if !s.pairing.isReady { PairingGuide() } else if store.pairingFromFile { DeleteCopyNote() }
         HStack(spacing: 8) {
             BlockButton("Test JIT", isLoading: store.jitTesting) { Task { await store.testJIT() } }
                 .keyboardShortcut("j", modifiers: [.command, .option])
             BlockButton("I have a file") { choosingPairing = true }
         }
+        NeverShareBanner()
         ListSection("Java", spacing: 4) {
             Row("Runtime", trailing: { Meta(store.preferences.java == "auto" ? "Auto per version" : store.preferences.java) })
             Row("Installed", trailing: {
                 HStack(spacing: 4) { ForEach(store.javaRuntimes) { Badge("\($0.major)", tone: $0.installed ? .neutral : .warn) } }
             })
             Field("JVM arguments", text: prefBinding(store, nil, \.jvmArgs), prompt: "-XX:+UseG1GC", kind: .mono)
-            Row("Env variables", trailing: { Meta("2 set") })
+            if store.can(.envVariables) {
+                let n = store.preferences.envVariables.count
+                Row("Env variables", trailing: { Meta(n == 0 ? String(localized: "None") : String(localized: "\(n) set")) })
+            }
         }
         .fileImporter(isPresented: $choosingPairing, allowedContentTypes: UTType.pairingFiles + [.data]) { r in
             if let (_, data) = readPicked(r.map { [$0] }) { store.importPairing(data) }
@@ -255,7 +263,7 @@ struct AccountsDataContent: View {
         ListSection(spacing: 4) {
             ForEach(store.accounts) { a in
                 Row(a.name, subtitle: a.isActive ? "\(a.kind) · active" : a.kind, leading: { PixelIcon(.head, size: 26) }, trailing: {
-                    BlockButton("Remove", role: .ghostDestructive, size: .small) { Task { await store.removeAccount(a) } }
+                    BlockButton("Remove", role: .ghostDestructive, size: .small) { store.pendingConfirmation = .removeAccount(a) }
                 })
             }
             BlockButton("Add account", icon: .head) { Task { await store.signIn() } }
@@ -273,8 +281,13 @@ struct AccountsDataContent: View {
         ListSection("CurseForge key", spacing: 4) {
             Field("CurseForge key", text: $key, prompt: "Paste your key", kind: .secure, trailingNote: "Keychain")
                 .onSubmit { store.setCurseForgeKey(key) }
-            Text("Your own key. Never bundled.").cofreFont(.label).foregroundStyle(Color.cofre.muted)
+            HStack(spacing: 8) {
+                Text("Your own key. Never bundled.").cofreFont(.label).foregroundStyle(Color.cofre.muted)
+                Spacer()
+                BlockButton("Save", size: .small) { store.setCurseForgeKey(key) }.disabled(key == (store.curseForgeKey ?? ""))
+            }
         }
+        .onAppear { key = store.curseForgeKey ?? "" }
         if let s = store.storage {
             ListSection("Storage · \(Fmt.bytes(s.total) ?? "")", spacing: 8) {
                 StorageBar(usage: s)
@@ -319,13 +332,14 @@ private struct StorageBar: View {
 struct LogsContent: View {
     @Environment(CofreStore.self) private var store
     @State private var kind = LogKind.latest
-    @State private var exported: URL?
+    @State private var sharing = false
     var body: some View {
         Segmented("Log", selection: $kind, options: [(.latest, "Latest"), (.crash, "Crash"), (.launcher, "Launcher")])
         LogView(lines: store.logs[kind] ?? []).frame(height: 300)
-            .task(id: kind) { await store.streamLog(kind); exported = await store.exportLog(kind) }
-        if let exported {
-            ShareLink(item: exported) { Text("Share log") }.buttonStyle(.block(.primary))
+            .task(id: kind) { await store.streamLog(kind) }
+        // Exports on tap: a live log stream never ends, so nothing can wait for it.
+        BlockButton("Share log", role: .primary, isLoading: sharing) {
+            Task { sharing = true; if let url = await store.exportLog(kind) { presentShareSheet(url) }; sharing = false }
         }
         HStack(spacing: 8) {
             BlockButton("Copy") {
@@ -372,15 +386,17 @@ struct LookContent: View {
                 }
             }
             .padding(.horizontal, 11).block(.panel)
-            Row("App icon · background", trailing: { Meta("Pixel ›") })
-            Row("Language", trailing: { Meta("English ›") })
+            // No handlers yet (GAP-13): shown only when the backend supports them.
+            if store.can(.appIcon) { Row("App icon · background", trailing: { Meta("Pixel") }) }
+            if store.can(.language) { Row("Language", trailing: { Meta("English") }) }
         }
-        ListSection("Play together", spacing: 4) {
-            Row("LAN room", trailing: { Meta("Terracotta ›") })
+        if store.can(.lanRoom) {
+            ListSection("Play together", spacing: 4) {
+                Row("LAN room", trailing: { Meta("Terracotta") })
+            }
         }
         ListSection("Extras", spacing: 4) {
             ToggleRow("AirPlay fullscreen", isOn: prefBinding(store, nil, \.airPlayFullscreen))
-            ToggleRow("Microphone", isOn: prefBinding(store, nil, \.microphone))
             ToggleRow("Capes (Cosmetica)", isOn: prefBinding(store, nil, \.capes))
             ToggleRow("Check for updates", isOn: prefBinding(store, nil, \.checkUpdates))
         }
@@ -405,7 +421,9 @@ struct AboutContent: View {
         }
         ListSection("Licenses", spacing: 4) {
             Row("Air", subtitle: "GPL-3.0")
+            Row("Amethyst", subtitle: "GPL-3.0")
             Row("StikJIT", subtitle: "MPL-2.0")
+            Row("idevice", subtitle: "MIT")
             Button { showingOFL = true } label: { ValueRow("Pixelify Sans · Geist · Geist Mono", value: "OFL 1.1") }.buttonStyle(RowButtonStyle())
         }
         Text("Unofficial. Not an official Minecraft product, and not approved by or associated with Mojang or Microsoft.")

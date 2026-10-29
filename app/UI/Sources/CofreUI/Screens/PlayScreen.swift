@@ -27,7 +27,15 @@ public struct PlayHomePane: View {
         VStack(spacing: 0) {
             ColumnHeader("Play") { AccountChip() }
             PaneScroll {
-                if let inst = store.activeInstance {
+                if store.setupCompleted, store.setup.pairing.isFailed {
+                    // Setup finished once: a live failure is a banner here, never the wizard again.
+                    Banner("Your pairing key is missing. Run the Mac step again.", icon: .key, tone: .danger) {
+                        BlockButton("Fix", size: .small) { nav.section = .settings; nav.settingsPane = .jitJava }
+                    }
+                }
+                if !store.libraryLoaded {
+                    Row("Loading instances…", leading: { Spinner() })
+                } else if let inst = store.activeInstance {
                     if inst.updatesAvailable > 0 {
                         Banner("\(inst.updatesAvailable) mod updates for \(inst.name)", icon: .book) {
                             BlockButton("Review", size: .small) { nav.section = .mods; nav.mod = .installed }
@@ -37,7 +45,7 @@ public struct PlayHomePane: View {
                     controls(inst)
                     AdaptiveGrid(minItem: 120) {
                         Stat(store.isJITReady ? "OK" : "Off", label: "JIT · auto", tone: store.isJITReady ? .success : .danger)
-                        Stat("\(store.preferences.ramMB / 1024) GB", label: "Memory")
+                        Stat(store.preferences.autoRAM ? "Auto" : "\(store.preferences.ramMB / 1024) GB", label: "Memory")
                         Stat("\(Int(store.preferences.resolution * 100))%", label: "Resolution")
                         Stat("\(store.preferences.fpsCap)", label: "FPS cap")
                     }
@@ -53,7 +61,7 @@ public struct PlayHomePane: View {
                             }
                         }
                     }
-                    HintStrip()
+                    if store.can(.controllerNavigation) { HintStrip() }
                 } else {
                     EmptyState("No instances yet", message: "Make one, or import a modpack.", icon: .grass) {
                         BlockButton("New instance", role: .primary) { nav.sheet = .newInstance }
@@ -109,30 +117,44 @@ public struct PlayHomePane: View {
     }
 }
 
+/// Worlds and servers. New worlds are made in game, so there's no "+ New" here.
 public struct WorldsPane: View {
     @Environment(CofreStore.self) private var store
+    @State private var addingServer = false
+    @State private var serverName = ""
+    @State private var serverAddress = ""
     public init() {}
     public var body: some View {
         VStack(spacing: 0) {
-            ColumnHeader("Worlds") { BlockButton("+ New", size: .small) {} }
+            ColumnHeader("Worlds")
             PaneScroll(spacing: 5) {
                 if store.worlds.isEmpty {
                     EmptyState("No worlds yet", message: "Play once and your worlds show up here.", icon: .grass)
                 } else {
                     WorldRows(worlds: store.worlds)
                 }
-                ListSection("Servers") {
-                    ForEach(store.servers) { s in
-                        Row(s.name, subtitle: s.detail ?? s.address) {
-                            PixelIcon(.cmd, size: 26)
-                        } trailing: {
-                            if let ms = s.pingMS { Meta("\(ms) ms", tone: ms < 100 ? .success : .warn) }
+                if !store.servers.isEmpty {
+                    ListSection("Servers") {
+                        ForEach(store.servers) { s in
+                            Row(s.name, subtitle: s.detail ?? s.address) {
+                                PixelIcon(.cmd, size: 26)
+                            } trailing: {
+                                if let ms = s.pingMS { Meta("\(ms) ms", tone: ms < 100 ? .success : .warn) }
+                            }
                         }
                     }
+                    .padding(.top, 6)
                 }
-                .padding(.top, 6)
-                BlockButton("+ Add server") {}
+                if store.can(.addServer) {
+                    BlockButton("+ Add server") { serverName = ""; serverAddress = ""; addingServer = true }
+                }
             }
+        }
+        .alert("Add server", isPresented: $addingServer) {
+            TextField("Name", text: $serverName)
+            TextField("Address", text: $serverAddress).textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
+            Button("Add") { Task { await store.addServer(name: serverName, address: serverAddress) } }
+            Button("Cancel", role: .cancel) {}
         }
     }
 }

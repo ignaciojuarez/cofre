@@ -110,7 +110,8 @@ public struct Account: Identifiable, Hashable, Sendable {
 
 /// Everything X01–X07 edit. Existing CofreKit fields first; the rest map to Air prefs (see Requirements GAP-12).
 public struct GamePreferences: Equatable, Sendable {
-    public var ramMB = 4096, autoRAM = false, deviceRAMMB = 8192
+    /// `autoRAM` is on by default: Cofre (the backend) picks a safe amount. `ramMB` applies only when it's off.
+    public var ramMB = 4096, autoRAM = true, deviceRAMMB = 8192
     public var renderer = "auto", resolution = 1.0, fsr = true, fsrMode = FSRMode.ultra
     public var java = "auto", jvmArgs = ""
     public var fpsOverlay = true, vsync = false, fpsCap = 60, muteWithSwitch = true, microphone = false
@@ -118,6 +119,9 @@ public struct GamePreferences: Equatable, Sendable {
     public var controllerLayout = "Default", touchLayout = "Default"
     public var downloadSource = DownloadSource.official, verifyFiles = true
     public var airPlayFullscreen = true, capes = false, checkUpdates = true
+    /// Shown only with `BackendCapabilities.envVariables` / `.rendererTuning` (GAP-13).
+    public var envVariables: [String: String] = [:]
+    public var shaderCacheMB = 512, multidraw = "Auto", computeShaders = true
     public init() {}
 
     public enum FSRMode: String, CaseIterable, Sendable { case off, ultra, quality, performance }
@@ -176,11 +180,23 @@ public struct ProjectSummary: Identifiable, Hashable, Sendable {
     public var loaders: [Loader], clientSide: Bool
     public var fits: Bool, installed: Bool
     public var source: ProjectSource
+    /// The project's web page, for Share. `nil` falls back to `fallbackPageURL`.
+    public var pageURL: URL?
     public init(id: String, title: String, author: String, summary: String, iconURL: URL? = nil, iconTintHex: UInt32? = nil, downloads: Int,
-                updated: Date? = nil, loaders: [Loader], clientSide: Bool = false, fits: Bool, installed: Bool = false, source: ProjectSource = .modrinth) {
+                updated: Date? = nil, loaders: [Loader], clientSide: Bool = false, fits: Bool, installed: Bool = false, source: ProjectSource = .modrinth,
+                pageURL: URL? = nil) {
         self.id = id; self.title = title; self.author = author; self.summary = summary; self.iconURL = iconURL; self.iconTintHex = iconTintHex
         self.downloads = downloads; self.updated = updated; self.loaders = loaders; self.clientSide = clientSide; self.fits = fits
-        self.installed = installed; self.source = source
+        self.installed = installed; self.source = source; self.pageURL = pageURL
+    }
+
+    /// Modrinth resolves project IDs and slugs. CurseForge has no ID URL, so it gets a search for the title.
+    public var fallbackPageURL: URL? {
+        switch source {
+        case .modrinth: URL(string: "https://modrinth.com/project/\(id)")
+        case .curseforge:
+            URL(string: "https://www.curseforge.com/minecraft/search?search=\(title.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? id)")
+        }
     }
 }
 
@@ -278,7 +294,10 @@ enum Fmt {
         case 0: return "today"
         case 1: return "yesterday"
         case ..<7: return "\(days) days ago"
-        default: return "last week"
+        case ..<14: return "last week"
+        case ..<31: return "\(days / 7) weeks ago"
+        case ..<365: return days < 61 ? "last month" : "\(days / 30) months ago"
+        default: return "over a year ago"
         }
     }
     static func mb(_ n: Int) -> String { n.formatted(.number.grouping(.automatic)) + " MB" }

@@ -15,7 +15,7 @@ public protocol SetupService: AnyObject {
     func setupUpdates() -> AsyncStream<SetupState>
     /// Re-runs every check and publishes through `setupUpdates()`.
     func recheckSetup() async
-    /// S02 "Open Settings" (deep link to Privacy & Security).
+    /// S02 "Open Settings app". Public API can only open the Settings app, not Privacy & Security.
     @MainActor func openDeveloperModeSettings()
     /// `PairingStore.hasPairing()` / `.importPairing(_:)` / `.deletePairing()`
     func hasPairing() -> Bool
@@ -58,7 +58,7 @@ public protocol AccountService: AnyObject {
 /// Everything the UI needs from one object. The logic agent writes one adapter around CofreKit that conforms.
 public typealias CofreBackend = SetupService & LibraryService & ContentService & AccountService
     & LaunchControl & LogSource & InstanceActions & VersionCatalog & ProjectCatalog & InstallProgressSource
-    & JITTester & SigningInfoSource & SystemCatalog & AirAppearance
+    & JITTester & SigningInfoSource & SystemCatalog & AirAppearance & OptionalActions
 
 /// What the shell hands to `CofreUI.makeRootViewController(services:)`.
 public struct CofreServices {

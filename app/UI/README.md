@@ -82,12 +82,40 @@ One adapter conforming to `CofreBackend` (typealias in `Facade/Services.swift`),
 
 `MockBackend` implements all of it with the mockups' sample data and is the reference for expected values.
 
+## Facade changes for the backend
+
+All additive (2026-10-29). Every new member has a default, so `CofreBackendAdapter` compiles unchanged.
+
+| Change | Where | Default | What the backend can do |
+|---|---|---|---|
+| `OptionalActions` added to `CofreBackend` (GAP-13) | Requirements.swift | Nothing supported; actions throw `UnsupportedAction` | Implement what works, then report it in `capabilities` |
+| `capabilities: BackendCapabilities` | Requirements.swift | `[]`, which hides every control below | Turn on a flag only once its action works |
+| `deleteWorld(instanceID:worldID:)` | Requirements.swift | throws | `.deleteWorld`: world context menu → Delete (always confirmed) |
+| `backUpWorld(instanceID:worldID:) -> URL` | Requirements.swift | throws | `.backUpWorld`: zip URL for the share sheet |
+| `addServer(instanceID:name:address:) -> ServerSummary` | Requirements.swift | throws | `.addServer`: "+ Add server" (native alert with two fields) |
+| `createInstance(name:version:loader:ownFolder:fabricAPI:)` | Requirements.swift | Calls the 3-argument `createInstance` | `.createOptions`: shows the "Own folder" and "Add Fabric API" switches in P04 |
+| `.envVariables`, `.rendererTuning` | Requirements.swift | hidden | Map `GamePreferences.envVariables`, `shaderCacheMB`, `multidraw`, `computeShaders` to Air prefs |
+| `.controllerNavigation` | Requirements.swift | hidden | Turn on once `ControllerFocusBridge` drives the launcher; shows the A/B/Y hint strip |
+| `.appIcon`, `.language`, `.lanRoom` | Requirements.swift | hidden | X07 rows; no handlers yet |
+| `GamePreferences.autoRAM` now defaults to `true` | Models.swift | — | Pick a safe amount when it's on. The UI says "Cofre picks a safe amount automatically" |
+| `GamePreferences.envVariables`, `shaderCacheMB`, `multidraw`, `computeShaders` | Models.swift | `[:]`, 512, "Auto", `true` | GAP-12 pref keys |
+| `ProjectSummary.pageURL: URL?` | Models.swift | `nil` → `fallbackPageURL` (Modrinth project, CurseForge search) | The project's web page, used by M02 Share |
+| `CofreStore(services:defaults:)` | CofreStore.swift | `.standard` | UI-only. Saves setup progress under `cofre.setup.completed` and `cofre.setup.step` |
+
+Semantics the UI now relies on:
+
+- **Setup.** The first frame waits for `setupState()` only for users who never finished setup. Everyone else goes straight to the shell. After `finishSetup()`, the wizard never returns: a missing key (`pairing` `.failed`/`.blocked`) shows as a banner on Play. A `SetupState` where every check is ready at load skips the wizard.
+- **Auto-advance.** When the current step's check turns `.ready` (through `setupUpdates()`, `importPairing`, `startVPN` or `testJIT`), the wizard moves to the next check that isn't ready. S06 starts `testJIT()` by itself. Report `devMode` and `trust` as soon as you can; `.unknown` shows "Checking".
+- **JIT failures.** Throw from `testJIT()` while the failing `JITStep` is `.checking`, or yield it as `.failed`. The UI maps the step to a next step (pairing → run the Mac step, vpn → other VPNs, diskImage → Wi-Fi, debugger → Developer Mode).
+- **Search errors.** Throw from `search(_:)` when offline; M01 shows "Can't reach Modrinth · Try again".
+- **Links.** `CofreLinks.pairing` is `https://ignaciojuarez.github.io/cofre/pair/` (GitHub Pages from `docs/`). A test keeps every link on `CofreLinks.allowedHosts`.
+
 ## Build, test, preview
 
 ```sh
 cd app/UI
 xcodebuild -scheme CofreUI -destination 'generic/platform=iOS Simulator' build
-xcodebuild test -scheme CofreUI -destination 'platform=iOS Simulator,id=<shared UDID>'   # 11 tests
+xcodebuild test -scheme CofreUI -destination 'platform=iOS Simulator,id=<shared UDID>'   # 18 tests
 swift test                     # macOS: the 2 AppKit token and font tests
 
 cd PreviewHost                 # regenerate with `xcodegen` after editing project.yml
@@ -104,7 +132,6 @@ Screenshots: `cofre-design/system/screens/`.
 ## Known gaps
 
 - Menu-bar commands (`buildMenu` forward) and `ControllerFocusBridge` aren't built. Shortcuts are SwiftUI `keyboardShortcut`s.
-- Some rows have no facade yet and are display-only: world back up / open folder, new world, add server, env variables,
-  language, app icon, LAN room, MobileGlues shader cache / multidraw.
+- Controls with no working backend are hidden behind `BackendCapabilities` (see above). Worlds have no "+ New": worlds are made in game.
 - Switch thumb animates linearly over 120 ms, not in 3 steps.
 - Light theme passes contrast tests but has no screenshots yet.

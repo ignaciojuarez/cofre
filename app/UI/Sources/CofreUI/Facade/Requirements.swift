@@ -95,6 +95,63 @@ public protocol AirAppearance: AnyObject {
     func applyAirAppearance(accentHex: String, cardHex: String, textHex: String)
 }
 
+// MARK: GAP-13 · Capabilities and optional actions (addition, not in §4.2)
+/// Controls the backend can't do yet stay hidden. The backend reports what it supports; every member has a
+/// default (nothing supported, actions throw), so adapters written before this compile unchanged.
+public struct BackendCapabilities: OptionSet, Sendable {
+    public let rawValue: Int
+    public init(rawValue: Int) { self.rawValue = rawValue }
+    /// World context menu: Delete (with confirmation) → `deleteWorld`.
+    public static let deleteWorld = BackendCapabilities(rawValue: 1 << 0)
+    /// World context menu: Back up → `backUpWorld`, then the share sheet.
+    public static let backUpWorld = BackendCapabilities(rawValue: 1 << 1)
+    /// Worlds pane "+ Add server" → `addServer`.
+    public static let addServer = BackendCapabilities(rawValue: 1 << 2)
+    /// X04 "Env variables" row, from `GamePreferences.envVariables`.
+    public static let envVariables = BackendCapabilities(rawValue: 1 << 3)
+    /// P04 "Own folder" and "Add Fabric API" → `createInstance(name:version:loader:ownFolder:fabricAPI:)`.
+    public static let createOptions = BackendCapabilities(rawValue: 1 << 4)
+    /// X02 MobileGlues shader cache, multidraw and compute shaders (`GamePreferences.shaderCacheMB` and friends).
+    public static let rendererTuning = BackendCapabilities(rawValue: 1 << 5)
+    /// Controller navigation in the launcher (`ControllerFocusBridge`). Shows the A/B/Y hint strip.
+    public static let controllerNavigation = BackendCapabilities(rawValue: 1 << 6)
+    /// X07 rows: app icon, language, LAN room. No handlers exist yet.
+    public static let appIcon = BackendCapabilities(rawValue: 1 << 7)
+    public static let language = BackendCapabilities(rawValue: 1 << 8)
+    public static let lanRoom = BackendCapabilities(rawValue: 1 << 9)
+}
+
+public protocol OptionalActions: AnyObject {
+    var capabilities: BackendCapabilities { get }
+    func deleteWorld(instanceID: String, worldID: String) async throws
+    /// A file URL (zip) for the share sheet.
+    func backUpWorld(instanceID: String, worldID: String) async throws -> URL
+    func addServer(instanceID: String, name: String, address: String) async throws -> ServerSummary
+    func createInstance(name: String, version: String, loader: Loader, ownFolder: Bool, fabricAPI: Bool) async throws -> InstanceSummary
+}
+
+public struct UnsupportedAction: LocalizedError {
+    public let name: String
+    public var errorDescription: String? { "\(name) isn't available in this build." }
+}
+
+public extension OptionalActions {
+    var capabilities: BackendCapabilities { [] }
+    func deleteWorld(instanceID: String, worldID: String) async throws { throw UnsupportedAction(name: "Deleting worlds") }
+    func backUpWorld(instanceID: String, worldID: String) async throws -> URL { throw UnsupportedAction(name: "World backups") }
+    func addServer(instanceID: String, name: String, address: String) async throws -> ServerSummary { throw UnsupportedAction(name: "Adding servers") }
+    func createInstance(name: String, version: String, loader: Loader, ownFolder: Bool, fabricAPI: Bool) async throws -> InstanceSummary {
+        throw UnsupportedAction(name: "Creating instances")
+    }
+}
+
+public extension OptionalActions where Self: LibraryService {
+    /// Default for full backends: ignores both options and calls the base `createInstance`.
+    func createInstance(name: String, version: String, loader: Loader, ownFolder: Bool, fabricAPI: Bool) async throws -> InstanceSummary {
+        try await createInstance(name: name, version: version, loader: loader)
+    }
+}
+
 // MARK: GAP-12 · Extended preferences (addition, not in §4.2)
 // `GamePreferences` has more fields than `CofrePreferences` (autoRAM, fsrMode, fpsOverlay, vsync, fpsCap,
 // mute, mic, gyro, virtual mouse, hotbar swipe, TouchController, button scale, layouts, download source,

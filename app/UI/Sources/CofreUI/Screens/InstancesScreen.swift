@@ -37,32 +37,27 @@ public struct InstancesListPane: View {
             VStack(spacing: 8) {
                 Field("Search", text: $search, kind: .search)
                 if dropTargeted {
-                    DropZone("Drop to import", detail: ".mrpack · .zip · new instance", glyph: .chest, types: [.mrpack, .zip], onDrop: { _ in }, onChoose: {})
+                    // The drop itself is handled by the list's onDrop below.
+                    DropZone("Drop to import", detail: ".mrpack · .zip · new instance", glyph: .chest, types: [.mrpack, .zip],
+                             onDrop: { _ in }, onChoose: { pickingPack = true })
                 }
             }
             .padding(.horizontal, width == .compact ? 16 : 20).padding(.bottom, 4)
-            BlockList {
-                ForEach(shown) { inst in
-                    let selected = width != .compact && (nav.instance ?? store.instances.first?.id) == inst.id
-                    Button { nav.instance = inst.id } label: {
-                        Row(inst.name, isSelected: selected) {
-                            HStack(spacing: 6) {
-                                Badge(loader: inst.loader, version: inst.gameVersion)
-                                Text(verbatim: inst.sizeLine).cofreFont(.caption).foregroundStyle(Color.cofre.muted).lineLimit(1)
-                            }
-                        } leading: {
-                            InstanceGlyph(icon: inst.icon, size: 30)
-                        } trailing: {
-                            InstanceMenu(instance: inst) { Meta("⋯").frame(minWidth: 30, minHeight: 44) }
-                        }
-                        .rowStyle(.big)
+            Group {
+                if !store.libraryLoaded {
+                    Row("Loading instances…", leading: { Spinner() }).padding(.horizontal, width == .compact ? 16 : 20)
+                    Spacer(minLength: 0)
+                } else if store.instances.isEmpty {
+                    EmptyState("No instances yet", message: "Make one, or import a modpack.", icon: .grass) {
+                        BlockButton("New instance", role: .primary) { nav.sheet = .newInstance }
                     }
-                    .buttonStyle(RowButtonStyle())
-                    .contextMenu { InstanceMenuItems(instance: inst) }
-                    .swipeActions { Button("Delete", role: .destructive) { Task { await store.delete(inst.id) } } }
-                    .blockListRow(horizontal: width == .compact ? 16 : 20)
+                } else if shown.isEmpty {
+                    EmptyState("No matches", message: "Try another name.", icon: .book)
+                } else {
+                    list(shown)
                 }
             }
+            .frame(maxHeight: .infinity, alignment: .top)
             .onDrop(of: [.mrpack, .zip], isTargeted: $dropTargeted) { providers in
                 _ = providers.first?.loadFileRepresentation(for: .zip) { url, _, _ in
                     if let url { let copy = FileManager.default.temporaryDirectory.appendingPathComponent(url.lastPathComponent)
@@ -81,6 +76,31 @@ public struct InstancesListPane: View {
         }
         .fileImporter(isPresented: $pickingPack, allowedContentTypes: [.mrpack, .zip]) { r in
             if case .success(let url) = r { store.importPack(url); nav.sheet = .importPack }
+        }
+    }
+
+    private func list(_ shown: [InstanceSummary]) -> some View {
+        BlockList {
+            ForEach(shown) { inst in
+                let selected = width != .compact && (nav.instance ?? store.instances.first?.id) == inst.id
+                Button { nav.instance = inst.id } label: {
+                    Row(inst.name, isSelected: selected) {
+                        HStack(spacing: 6) {
+                            Badge(loader: inst.loader, version: inst.gameVersion)
+                            Text(verbatim: inst.sizeLine).cofreFont(.caption).foregroundStyle(Color.cofre.muted).lineLimit(1)
+                        }
+                    } leading: {
+                        InstanceGlyph(icon: inst.icon, size: 30)
+                    } trailing: {
+                        InstanceMenu(instance: inst) { Meta("⋯").frame(minWidth: 44, minHeight: 44).contentShape(Rectangle()) }
+                    }
+                    .rowStyle(.big)
+                }
+                .buttonStyle(RowButtonStyle())
+                .contextMenu { InstanceMenuItems(instance: inst) }
+                .swipeActions { Button("Delete", role: .destructive) { store.pendingConfirmation = .deleteInstance(inst) } }
+                .blockListRow(horizontal: width == .compact ? 16 : 20)
+            }
         }
     }
 }
@@ -104,8 +124,8 @@ struct InstanceMenuItems: View {
         Button("Play") { startLaunch(store, nav, instanceID: instance.id) }
         Button("Edit") { nav.instance = instance.id; nav.section = .instances }
         Button("Duplicate") { Task { await store.duplicate(instance.id) } }
-        Button("Export .mrpack") { Task { _ = await store.export(instance.id) } }
-        Button("Delete", role: .destructive) { Task { await store.delete(instance.id) } }
+        Button("Export .mrpack") { Task { if let url = await store.export(instance.id) { presentShareSheet(url) } } }
+        Button("Delete", role: .destructive) { store.pendingConfirmation = .deleteInstance(instance) }
     }
 }
 
@@ -117,7 +137,6 @@ public struct InstanceDetailPane: View {
     @Environment(NavModel.self) private var nav
     @Environment(\.widthClass) private var width
     @State private var tab = 0
-    @State private var confirmDelete = false
     @State private var exported: URL?
 
     public init(id: String) { self.id = id }
@@ -129,11 +148,12 @@ public struct InstanceDetailPane: View {
                     InstanceMenu(instance: inst) {
                         Text(verbatim: "⋯").cofreFont(.buttonS).foregroundStyle(Color.cofre.ink)
                             .padding(.horizontal, 10).frame(minHeight: 30).block(.button, lip: 3)
+                            .contentShape(Rectangle().inset(by: -7))
                     }
                     BlockButton("Play", icon: .play, role: .primary, size: .small) { startLaunch(store, nav, instanceID: inst.id) }
                 }
                 PaneScroll {
-                    PixelScene(seed: UInt32(abs(inst.id.hashValue) % 50), pixels: .init(width: 200, height: 70))
+                    PixelScene(seed: inst.stableSeed, pixels: .init(width: 200, height: 70))
                         .frame(height: width == .compact ? 110 : 150).clipped()
                         .overlay(alignment: .bottomLeading) { InstanceGlyph(icon: inst.icon, size: 40).shadow(color: .black, radius: 0, y: 2).padding(14) }
                         .overlay { Rectangle().strokeBorder(Color.cofre.outline, lineWidth: 2) }
@@ -150,9 +170,6 @@ public struct InstanceDetailPane: View {
                 }
             }
             .task(id: id) { if store.activeInstanceID != id { await store.selectInstance(id) }; await store.loadPreferences(for: id) }
-            .confirmationDialog("Delete \(inst.name)?", isPresented: $confirmDelete, titleVisibility: .visible) {
-                Button("Delete instance", role: .destructive) { Task { await store.delete(inst.id); nav.instance = nil } }
-            } message: { Text("Worlds and mods in its folder are removed too.") }
         } else {
             DetailPlaceholder()
         }
@@ -173,12 +190,13 @@ public struct InstanceDetailPane: View {
             Button { nav.section = .settings; nav.settingsPane = .renderer } label: {
                 ValueRow("Renderer", value: store.renderers.first { $0.id == prefs.renderer }?.name ?? prefs.renderer, accent: true)
             }.buttonStyle(RowButtonStyle())
-            Button { tab = 3 } label: { ValueRow("Memory", value: Fmt.mb(prefs.ramMB)) }.buttonStyle(RowButtonStyle())
-            ToggleRow("Own folder", isOn: .constant(inst.ownFolder))
+            Button { tab = 3 } label: { ValueRow("Memory", value: prefs.autoRAM ? String(localized: "Auto") : Fmt.mb(prefs.ramMB)) }
+                .buttonStyle(RowButtonStyle())
         }
         BlockButton("Export .mrpack") { Task { exported = await store.export(inst.id) } }
         BlockButton("Duplicate") { Task { await store.duplicate(inst.id) } }.keyboardShortcut("d", modifiers: .command)
-        BlockButton("Delete instance", role: .ghostDestructive) { confirmDelete = true }.keyboardShortcut(.delete, modifiers: .command)
+        BlockButton("Delete instance", role: .ghostDestructive) { store.pendingConfirmation = .deleteInstance(inst) }
+            .keyboardShortcut(.delete, modifiers: .command)
         if let exported { ShareLink(item: exported) { Text("Share export").cofreFont(.button) }.buttonStyle(.block()) }
     }
 }
@@ -199,6 +217,11 @@ private struct FlowBadges: View {
     }
 }
 
+extension InstanceSummary {
+    /// Same art on every launch (`hashValue` is seeded per process).
+    var stableSeed: UInt32 { id.unicodeScalars.reduce(UInt32(7)) { ($0 &* 31 &+ $1.value) } % 50 }
+}
+
 // MARK: P04 New instance
 
 public struct NewInstanceSheet: View {
@@ -208,6 +231,8 @@ public struct NewInstanceSheet: View {
     @State private var name = "Survival+"
     @State private var kind = VersionKind.release
     @State private var versions: [GameVersion] = []
+    @State private var versionsFailed = false
+    @State private var versionsAttempt = 0
     @State private var version = "1.21.1"
     @State private var loader = Loader.fabric
     @State private var loaderVersions: [String] = []
@@ -226,7 +251,13 @@ public struct NewInstanceSheet: View {
                     SectionLabel("Name")
                     Field("Name", text: $name)
                     SectionLabel("Version")
-                    SelectButton("Version", selection: $version, options: versions.map { ($0.id, $0.id) })
+                    if versionsFailed {
+                        Banner("Couldn't load versions", icon: .cross, tone: .danger) {
+                            BlockButton("Try again", size: .small) { versionsAttempt += 1 }
+                        }
+                    } else {
+                        SelectButton("Version", selection: $version, options: versions.map { ($0.id, $0.id) })
+                    }
                     Segmented("Version type", selection: $kind, options: [(.release, "Release"), (.snapshot, "Snap"), (.old, "Old")], size: .small)
                     SectionLabel("Loader")
                     AdaptiveGrid(minItem: 96, maxColumns: 3) {
@@ -242,12 +273,14 @@ public struct NewInstanceSheet: View {
                             }
                             .padding(.horizontal, 11).frame(minHeight: 44).block(.panel)
                         }
-                        ToggleRow("Own folder", isOn: $ownFolder)
-                        if loader == .fabric || loader == .quilt { ToggleRow("Add Fabric API", isOn: $fabricAPI) }
-                        Row("Java", trailing: { Meta("Auto · 21") })
+                        if store.can(.createOptions) {
+                            ToggleRow("Own folder", isOn: $ownFolder)
+                            if loader == .fabric || loader == .quilt { ToggleRow("Add Fabric API", isOn: $fabricAPI) }
+                        }
+                        Row("Java", trailing: { Meta("Auto") })
                     }
                     if loader.usesAirInstaller {
-                        Banner("\(loader.displayName) installs with Air's installer next.", icon: .book, tone: .accent)
+                        Banner("\(loader.displayName) installs in the next step.", icon: .book, tone: .accent)
                     }
                     BlockButton("Create", role: .primary, isLoading: creating) { create() }
                         .disabled(name.isEmpty || version.isEmpty)
@@ -256,8 +289,10 @@ public struct NewInstanceSheet: View {
                 .padding(16)
             }
         }
-        .task(id: kind) {
-            versions = (try? await store.backend.gameVersions(kind)) ?? []
+        .task(id: "\(kind.rawValue)-\(versionsAttempt)") {
+            do { versions = try await store.backend.gameVersions(kind); versionsFailed = false }
+            catch is CancellationError { return }
+            catch { versions = []; versionsFailed = true }
             if !versions.contains(where: { $0.id == version }) { version = versions.first?.id ?? "" }
         }
         .task(id: "\(loader.rawValue)-\(version)") {
@@ -284,10 +319,12 @@ public struct NewInstanceSheet: View {
     private func create() {
         creating = true
         Task {
-            let made = await store.createInstance(name: name, version: version, loader: loader, loaderVersion: loaderVersion)
+            let made = await store.createInstance(name: name, version: version, loader: loader, loaderVersion: loaderVersion,
+                                                  ownFolder: ownFolder, fabricAPI: fabricAPI)
             creating = false
-            dismiss()
+            // On failure the sheet stays open; the error shows in the banner.
             if let made {
+                dismiss()
                 nav.instance = made.id; nav.section = .instances
                 if loader.usesAirInstaller, store.services.airScreens != nil { nav.showingAirScreen = .forgeInstaller(made.id) }
             }

@@ -53,7 +53,15 @@ public struct ModsBrowserPane: View {
                 EmptyState("Needs a CurseForge key", message: "Add your own key in Accounts & data. It's never bundled.", icon: .key) {
                     BlockButton("Add key", role: .primary) { nav.section = .settings; nav.settingsPane = .accounts }
                 }
-            } else if store.results.isEmpty && !store.searching {
+            } else if let err = store.searchError, store.results.isEmpty, !store.searching {
+                EmptyState("Can't reach \(store.query.source.displayName)", message: "Check your connection, then try again.", icon: .cross) {
+                    BlockButton("Try again", role: .primary) { Task { await store.search() } }
+                }
+                .accessibilityHint(Text(verbatim: err))
+            } else if store.results.isEmpty && store.searching {
+                Row("Searching…", leading: { Spinner() }).padding(.horizontal, width == .compact ? 16 : 20)
+                Spacer(minLength: 0)
+            } else if store.results.isEmpty {
                 EmptyState("No results", message: "Try another name, or turn off Fits.", icon: .book)
             } else {
                 BlockList {
@@ -97,8 +105,8 @@ public struct ModPagePane: View {
         let versions = store.versions[id] ?? []
         let chosen = versionID ?? versions.first(where: \.fits)?.id
         VStack(spacing: 0) {
-            ColumnHeader("") {
-                if let url = p?.iconURL ?? URL(string: "https://modrinth.com/mod/\(id)") {
+            ColumnHeader(p?.title ?? "") {
+                if let url = p.flatMap({ $0.pageURL ?? $0.fallbackPageURL }) {
                     ShareLink(item: url) { Text("Share") }.buttonStyle(.block(size: .small))
                 }
             }
@@ -141,6 +149,8 @@ public struct ModPagePane: View {
                     }
                     if p.installed {
                         Banner("Installed in \(store.activeInstance?.name ?? "")", icon: .check, tone: .success)
+                    } else if store.versions[id] == nil {
+                        Row("Loading versions…", leading: { Spinner() })
                     } else {
                         let name = versions.first { $0.id == chosen }?.name ?? ""
                         BlockButton("Install \(name)", role: .primary, isLoading: store.installing.contains(id)) {
@@ -189,10 +199,13 @@ public struct InstalledPane: View {
                 }
             }
             .padding(.horizontal, width == .compact ? 16 : 20).padding(.bottom, 4)
-            if items.isEmpty {
-                EmptyState("Nothing here yet", message: "Get mods, or drop .jar and .zip files here.", icon: .chest) {
-                    BlockButton("Import pack", icon: .chest) { nav.sheet = .importPack }
+            if all.isEmpty {
+                EmptyState(kind == .mods ? "No mods yet" : "Nothing here yet", message: "Get them in Get mods.", icon: .chest) {
+                    // On wider windows Get mods is already beside this pane.
+                    if width == .compact { BlockButton("Get mods", role: .primary) { nav.mod = nil } }
                 }
+            } else if items.isEmpty {
+                EmptyState("No matches", message: "Try another name.", icon: .book)
             } else {
                 BlockList {
                     ForEach(items) { item in

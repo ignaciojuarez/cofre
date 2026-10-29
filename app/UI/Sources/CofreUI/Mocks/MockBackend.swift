@@ -10,6 +10,12 @@ public final class MockBackend: CofreBackend, @unchecked Sendable {
     public var accountList = [Account(id: "steve", name: "Steve_42", kind: "Microsoft", isActive: true)]
     /// Seconds between simulated launch/test steps. 0 makes streams finish immediately.
     public var stepDelay: Double
+    /// GAP-13. Empty like today's production backend, so screenshots show what ships. Tests turn flags on.
+    public var capabilities: BackendCapabilities = []
+    /// Makes `search` throw, for the offline state.
+    public var offline = false
+    private var worldList: [String: [WorldSummary]] = [:]
+    private var extraServers: [ServerSummary] = []
     private var cfKey: String? = "cf_live_••••3f9a"
     private let (setupStream, setupContinuation) = AsyncStream<SetupState>.makeStream()
 
@@ -72,6 +78,7 @@ public final class MockBackend: CofreBackend, @unchecked Sendable {
     }
     public func installLoader(instanceID: String, loader: Loader, version: String) async throws {}
     public func worlds(instanceID: String) async throws -> [WorldSummary] {
+        if let list = worldList[instanceID] { return list }
         let now = Date(), t = PixelArtColors.oreTints
         return [
             WorldSummary(id: "w1", name: "Ironwood", mode: "Survival", playTime: "41 h", lastPlayed: now.addingTimeInterval(-7200)),
@@ -82,7 +89,7 @@ public final class MockBackend: CofreBackend, @unchecked Sendable {
     }
     public func servers(instanceID: String) async throws -> [ServerSummary] {
         [ServerSummary(id: "s1", name: "friends.cofre.lan", address: "10.0.0.4", detail: "LAN · 3/8 online", pingMS: 24),
-         ServerSummary(id: "s2", name: "play.example.net", address: "play.example.net", detail: "1.21.1 · 112/500", pingMS: 140)]
+         ServerSummary(id: "s2", name: "play.example.net", address: "play.example.net", detail: "1.21.1 · 112/500", pingMS: 140)] + extraServers
     }
     public func preferences(instanceID: String?) async throws -> GamePreferences { prefs }
     public func setPreferences(_ preferences: GamePreferences, instanceID: String?) async throws { if instanceID == nil { prefs = preferences } }
@@ -208,6 +215,7 @@ public final class MockBackend: CofreBackend, @unchecked Sendable {
         ]
     }()
     public func search(_ query: ProjectQuery) async throws -> [ProjectSummary] {
+        if offline { throw URLError(.notConnectedToInternet) }
         let q = query.text.lowercased()
         return Self.projects.filter { q.isEmpty || $0.title.lowercased().contains(q) }.map { var p = $0; p.source = query.source; return p }
     }
@@ -271,7 +279,7 @@ public final class MockBackend: CofreBackend, @unchecked Sendable {
     public func signingInfo() async -> SigningInfo? {
         SigningInfo(team: "Ignacio J.", expires: Calendar.current.date(from: DateComponents(year: 2027, month: 10, day: 28))!, deviceRegistered: true)
     }
-    public func appInfo() -> AppInfo { AppInfo(version: "1.0", airVersion: "5.1", sourceURL: URL(string: "https://github.com/")!) }
+    public func appInfo() -> AppInfo { AppInfo(version: "1.0", airVersion: "5.1", sourceURL: URL(string: "https://github.com/ignaciojuarez/cofre")!) }
 
     // MARK: GAP-09 SystemCatalog
     public func renderers() async -> [RendererOption] {
@@ -288,6 +296,27 @@ public final class MockBackend: CofreBackend, @unchecked Sendable {
     public func clearCache() async throws {}
     public func curseForgeKey() -> String? { cfKey }
     public func setCurseForgeKey(_ key: String?) throws { cfKey = key }
+
+    // MARK: GAP-13 OptionalActions
+    public func deleteWorld(instanceID: String, worldID: String) async throws {
+        var list = try await worlds(instanceID: instanceID)
+        list.removeAll { $0.id == worldID }
+        worldList[instanceID] = list
+    }
+    public func backUpWorld(instanceID: String, worldID: String) async throws -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(worldID).zip")
+        try Data().write(to: url); return url
+    }
+    public func addServer(instanceID: String, name: String, address: String) async throws -> ServerSummary {
+        let s = ServerSummary(id: UUID().uuidString, name: name, address: address)
+        extraServers.append(s); return s
+    }
+    public func createInstance(name: String, version: String, loader: Loader, ownFolder: Bool, fabricAPI: Bool) async throws -> InstanceSummary {
+        var i = try await createInstance(name: name, version: version, loader: loader)
+        i.ownFolder = ownFolder
+        if let n = instanceList.firstIndex(where: { $0.id == i.id }) { instanceList[n] = i }
+        return i
+    }
 
     // MARK: GAP-11 AirAppearance
     public private(set) var lastAppearance: (String, String, String)?

@@ -2,41 +2,58 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-// S01–S08. Six checks, one per `SetupState` field. Each step checks itself and moves on when it passes.
-// CenteredCard: full screen on compact, a 560 pt card over a scene on regular.
+// S01–S08. Six checks, one per `SetupState` field. Each step checks itself and moves on when it passes:
+// Developer Mode, key found, VPN allowed and JIT OK advance on their own, and the JIT test starts by itself.
+// The step is saved, so a cold start resumes there. CenteredCard: full screen on compact, a 560 pt card on regular.
 
 public struct SetupFlow: View {
     @Environment(CofreStore.self) private var store
     @State private var step: Int
+    /// Set by "Do Step 3 first" on Developer Mode, so finishing the Mac step comes back to it.
+    @State private var returnTo: Int?
     private let startAt: Int?
 
     static let stepNames: [LocalizedStringKey] = ["Dev Mode", "Trust", "Pairing", "VPN", "JIT", "Account"]
 
-    /// `startAt`: 0 = welcome, 1…6 = checks, 7 = ready. `nil` resumes at the first check that isn't ready.
+    /// `startAt`: 0 = welcome, 1…6 = checks, 7 = ready. `nil` uses `CofreStore.resumeStep`.
     public init(startAt: Int? = nil) { self.startAt = startAt; _step = State(initialValue: startAt ?? 0) }
 
     public var body: some View {
         CenteredCard(scene: UInt32(7 + step)) {
             Group {
                 switch step {
-                case 0: WelcomeStep(next: { go(firstOpen) })
-                case 1: DevModeStep(step: $step)
-                case 2: TrustStep(step: $step)
-                case 3: PairingStep(step: $step)
-                case 4: VPNStep(step: $step)
-                case 5: JITTestStep(step: $step)
-                case 6: AccountStep(step: $step)
+                case 0: WelcomeStep(next: { step = store.firstOpenStep })
+                case 1: DevModeStep(step: $step, next: next, macStepFirst: { returnTo = 1; step = 3 })
+                case 2: TrustStep(step: $step, next: next)
+                case 3: PairingStep(step: $step, next: next)
+                case 4: VPNStep(step: $step, next: next)
+                case 5: JITTestStep(step: $step, next: next)
+                case 6: AccountStep(step: $step, next: next)
                 default: ReadyStep()
                 }
             }
             .transition(.opacity)
         }
         .animation(.easeInOut(duration: 0.15), value: step)
-        .onAppear { if startAt == nil, store.setup.readyCount > 0 { step = firstOpen } }
+        .onAppear { if startAt == nil { step = store.resumeStep } }
+        .onChange(of: step, initial: true) { store.setupStep = step }
+        .onChange(of: store.setup) { old, new in
+            // Auto-advance when the current step's check turns ready, after a beat so the check is seen.
+            let from = step
+            guard (1...6).contains(from), !old.all[from - 1].isReady, new.all[from - 1].isReady else { return }
+            Task {
+                try? await Task.sleep(for: .milliseconds(700))
+                if step == from { next() }
+            }
+        }
     }
 
-    private var firstOpen: Int { (store.setup.all.firstIndex { !$0.isReady } ?? 6) + 1 }
-    private func go(_ s: Int) { step = s }
+    /// The next check that isn't ready, after this one (or back to Developer Mode after "Do Step 3 first").
+    private func next() {
+        if let r = returnTo, !store.setup.all[r - 1].isReady { returnTo = nil; step = r; return }
+        returnTo = nil
+        step = (step..<6).first { !store.setup.all[$0].isReady }.map { $0 + 1 } ?? 7
+    }
 }
 
 /// Header shared by S02–S07: back, counter, StepBar, icon, kicker, title, lede.
@@ -89,7 +106,8 @@ private struct WelcomeStep: View {
             Text("Java Edition. In your pocket.").cofreFont(.display).foregroundStyle(Color.cofre.ink).accessibilityAddTraits(.isHeader)
             Text("Mods, packs, shaders. All on this device.").cofreFont(.body).foregroundStyle(Color.cofre.muted)
             AdaptiveGrid(minItem: 90, maxColumns: 3) {
-                Stat("6", label: "Checks"); Stat("5", label: "Minutes"); Stat("1×", label: "Computer")
+                // Same numbers as the site and README.
+                Stat("4", label: "Steps"); Stat("10", label: "Minutes"); Stat("1×", label: "Mac visit")
             }
             BlockButton("Set up", role: .primary, size: .large, action: next).keyboardShortcut(.defaultAction)
             Text("Unofficial. Not from Mojang or Microsoft.").cofreFont(.label).foregroundStyle(Color.cofre.muted)
@@ -102,23 +120,38 @@ private struct WelcomeStep: View {
 
 private struct DevModeStep: View {
     @Binding var step: Int
+    let next: () -> Void, macStepFirst: () -> Void
     @Environment(CofreStore.self) private var store
+    @Environment(\.scenePhase) private var scenePhase
     var body: some View {
-        let on = store.setup.devMode.isReady
+        let s = store.setup.devMode
         StepHeader(index: 1, glyph: .shield, kicker: "Developer Mode", title: "Turn on Developer Mode", lede: nil, step: $step)
-        Row("Developer Mode", trailing: { Badge(on ? "On" : "Off", tone: on ? .success : .danger) })
+            .onChange(of: scenePhase) { _, phase in
+                // Back from Settings: check again without a tap.
+                if phase == .active { Task { await store.backend.recheckSetup() } }
+            }
+        Row("Developer Mode", trailing: {
+            switch s {
+            case .ready: Badge("On", tone: .success)
+            case .unknown, .checking: Badge("Checking")
+            default: Badge("Off", tone: .danger)
+            }
+        })
         ListSection(spacing: 4) {
-            Row("Open Settings", leading: { RowIndex(1) }, trailing: { Chevron() })
-            Row("Privacy & Security", leading: { RowIndex(2) }, trailing: { Chevron() })
+            Row("Open the Settings app", leading: { RowIndex(1) })
+            Row("Privacy & Security", leading: { RowIndex(2) })
             Row("Developer Mode → On", leading: { RowIndex(3) })
-            Row("Restart → Turn On", leading: { RowIndex(4) })
+            Row("Restart → Turn On (or Enable)", leading: { RowIndex(4) })
         }
-        Text("No toggle yet? Do the Mac step first, then come back.").cofreFont(.secondary).foregroundStyle(Color.cofre.muted)
-        if on {
-            BlockButton("Next", role: .primary) { step += 1 }.keyboardShortcut(.defaultAction)
+        Text("No switch? Do Step 3 · Connect to a Mac, then come back.").cofreFont(.secondary).foregroundStyle(Color.cofre.muted)
+        if s.isReady {
+            BlockButton("Next", role: .primary, action: next).keyboardShortcut(.defaultAction)
         } else {
-            BlockButton("Open Settings", role: .primary) { store.backend.openDeveloperModeSettings() }
-            BlockButton("Check again") { Task { await store.backend.recheckSetup() } }
+            BlockButton("Open Settings app", role: .primary) { store.backend.openDeveloperModeSettings() }
+            HStack(spacing: 8) {
+                BlockButton("Do Step 3 first", action: macStepFirst)
+                BlockButton("Check again") { Task { await store.backend.recheckSetup() } }
+            }
         }
     }
 }
@@ -127,6 +160,7 @@ private struct DevModeStep: View {
 
 private struct TrustStep: View {
     @Binding var step: Int
+    let next: () -> Void
     @Environment(CofreStore.self) private var store
     var body: some View {
         let s = store.signing
@@ -135,8 +169,8 @@ private struct TrustStep: View {
             Row("Installed", leading: { PixelIcon(.check, size: 14) }, trailing: { Meta("OK", tone: .success) })
             Row("Device registered", leading: { StatusMark(state: s?.deviceRegistered == true ? .ready : .unknown) },
                 trailing: { Meta(s?.deviceRegistered == true ? "Yes" : "—") })
-            Row("Signed by", leading: { PixelIcon(.check, size: 14) }, trailing: { Meta(s?.team ?? "—") })
-            Row("Works until", leading: { PixelIcon(.check, size: 14) },
+            Row("Signed by", leading: { StatusMark(state: s == nil ? .unknown : .ready) }, trailing: { Meta(s?.team ?? "—") })
+            Row("Works until", leading: { StatusMark(state: s == nil ? .unknown : .ready) },
                 trailing: { Meta(s.map { $0.expires.formatted(date: .abbreviated, time: .omitted) } ?? "—") })
         }
         VStack(alignment: .leading, spacing: 4) {
@@ -144,7 +178,7 @@ private struct TrustStep: View {
             Text("Settings › General › VPN & Device Management › Trust").cofreFont(.code).foregroundStyle(Color.cofre.muted)
         }
         .padding(12).frame(maxWidth: .infinity, alignment: .leading).block(.well)
-        BlockButton("Next", role: .primary) { step += 1 }.keyboardShortcut(.defaultAction)
+        BlockButton("Next", role: .primary, action: next).keyboardShortcut(.defaultAction)
     }
 }
 
@@ -152,6 +186,7 @@ private struct TrustStep: View {
 
 private struct PairingStep: View {
     @Binding var step: Int
+    let next: () -> Void
     @Environment(CofreStore.self) private var store
     @Environment(\.widthClass) private var width
     @State private var choosing = false
@@ -162,26 +197,41 @@ private struct PairingStep: View {
                    lede: "Run one command on a Mac with this device plugged in. The key comes straight here.", step: $step)
         if ok {
             Banner("Key found", icon: .check, tone: .success)
+            if store.pairingFromFile { DeleteCopyNote() }
         } else {
             PairingGuide()
         }
         if case .failed(let msg) = store.setup.pairing { Banner(msg, icon: .cross, tone: .danger) }
+        NeverShareBanner()
         HStack(spacing: 8) {
             if width > .compact { BlockButton("Back") { step -= 1 }.frame(width: 140) }
             if ok {
-                BlockButton("Next", role: .primary) { step += 1 }.keyboardShortcut(.defaultAction)
+                BlockButton("Next", role: .primary, action: next).keyboardShortcut(.defaultAction)
             } else {
                 BlockButton("I have a file", icon: .paper, role: .ghost, fullWidth: false) { choosing = true }
                 Spacer(minLength: 0)
             }
         }
-        HStack(spacing: 10) {
-            Text("Stays on this device. Never share it.").cofreFont(.label).foregroundStyle(Color.cofre.muted)
-            if width > .compact { Spacer(); KeyHint("↩", "continue"); KeyHint("esc", "back") }
-        }
         .fileImporter(isPresented: $choosing, allowedContentTypes: UTType.pairingFiles + [.data]) { r in
             if let (_, data) = readPicked(r.map { [$0] }) { store.importPairing(data) }
         }
+        if width > .compact {
+            HStack(spacing: 10) { Spacer(); KeyHint("↩", "continue"); KeyHint("esc", "back") }
+        }
+    }
+}
+
+/// "Never share this file." Visible wherever the pairing file can be picked: S04, X04 (Llave has its own).
+struct NeverShareBanner: View {
+    var body: some View {
+        Banner("Never share this file. It's a key to your iPhone.", icon: .shield, tone: .warn)
+    }
+}
+
+/// After importing from Files (AirDrop fallback): the copy in Downloads should go.
+struct DeleteCopyNote: View {
+    var body: some View {
+        Text("Now delete the copy in Files → Downloads.").cofreFont(.secondary).foregroundStyle(Color.cofre.inkSoft)
     }
 }
 
@@ -189,25 +239,31 @@ private struct PairingStep: View {
 
 private struct VPNStep: View {
     @Binding var step: Int
+    let next: () -> Void
     @Environment(CofreStore.self) private var store
     var body: some View {
         let s = store.setup.vpn
-        StepHeader(index: 4, glyph: .shield, kicker: "Local VPN", title: "Allow local VPN", lede: "Lets Cofre reach this device's debugger.", step: $step)
+        StepHeader(index: 4, glyph: .shield, kicker: "Local VPN", title: "Allow local VPN",
+                   lede: "Lets Cofre turn on JIT by talking to this iPhone. Nothing leaves the phone.", step: $step)
         HStack(spacing: 6) {
-            node("App"); arrow; node("Loop"); arrow; node("10.7.0.1")
+            node("Cofre"); arrow; node("This iPhone")
         }
         .padding(12).frame(maxWidth: .infinity).block(.well)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Traffic goes from the app to a loopback tunnel at 10.7.0.1"))
+        .accessibilityLabel(Text("Cofre talks to this iPhone. Nothing leaves the phone."))
         ListSection(spacing: 4) {
             Row("Leaves device", trailing: { Meta("Never", tone: .success) })
             Row("Browsing", trailing: { Meta("Untouched", tone: .success) })
         }
-        if case .failed(let msg) = s { Banner(msg, icon: .cross, tone: .danger) }
+        if case .failed(let msg) = s {
+            Banner(msg, icon: .cross, tone: .danger)
+            Text("Turn off other VPNs (work, ad blocker), then try again.").cofreFont(.secondary).foregroundStyle(Color.cofre.inkSoft)
+        }
         if s.isReady {
-            BlockButton("Next", role: .primary) { step += 1 }.keyboardShortcut(.defaultAction)
+            BlockButton("Next", role: .primary, action: next).keyboardShortcut(.defaultAction)
         } else {
             BlockButton("Allow VPN", role: .primary, isLoading: s == .checking) { Task { await store.startVPN() } }
+            Text("When iOS asks, tap Allow and enter your passcode.").cofreFont(.secondary).foregroundStyle(Color.cofre.muted)
         }
     }
     private func node(_ t: LocalizedStringKey) -> some View {
@@ -220,19 +276,38 @@ private struct VPNStep: View {
 
 private struct JITTestStep: View {
     @Binding var step: Int
+    let next: () -> Void
     @Environment(CofreStore.self) private var store
     var body: some View {
-        let ready = store.setup.jit.isReady
-        StepHeader(index: 5, glyph: .bolt, kicker: "JIT test", title: ready ? "JIT works" : "Testing JIT", lede: nil, step: $step)
+        let s = store.setup.jit
+        StepHeader(index: 5, glyph: .bolt, kicker: "JIT test", title: s.isReady ? "JIT works" : s.isFailed ? "JIT didn't turn on" : "Testing JIT",
+                   lede: "Runs by itself. Needs Wi-Fi, or Airplane Mode for a moment.", step: $step)
+            .task {
+                // Starts by itself; the button below is only for retries.
+                // Unstructured, so leaving the step doesn't cancel a test halfway.
+                if !store.setup.jit.isReady && !store.jitTesting { Task { await store.testJIT() } }
+            }
         JITStepRows()
-        if ready, let d = store.device {
+        if s.isReady, let d = store.device {
             Banner("Ready · \(d.jitMode) · \(d.model) · \(d.os)", icon: .bolt, tone: .success) { Badge("JIT", tone: .success) }
         }
-        if case .failed(let msg) = store.setup.jit { Banner(msg, icon: .cross, tone: .danger) }
-        if ready {
-            BlockButton("Next", role: .primary) { step += 1 }.keyboardShortcut(.defaultAction)
-        } else {
-            BlockButton("Test JIT", role: .primary, isLoading: store.jitTesting) { Task { await store.testJIT() } }
+        JITFailure()
+        if s.isReady {
+            BlockButton("Next", role: .primary, action: next).keyboardShortcut(.defaultAction)
+        } else if s.isFailed {
+            BlockButton("Try again", role: .primary, isLoading: store.jitTesting) { Task { await store.testJIT() } }
+        }
+    }
+}
+
+/// A failed JIT test: the message plus what to do for the step that failed (S06, X04).
+struct JITFailure: View {
+    @Environment(CofreStore.self) private var store
+    var body: some View {
+        if case .failed(let msg) = store.setup.jit {
+            Banner(msg, icon: .cross, tone: .danger)
+            Text(JITStep.Kind.hint(for: store.failedJITStep)).cofreFont(.secondary).foregroundStyle(Color.cofre.inkSoft)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }
@@ -260,6 +335,17 @@ extension JITStep.Kind {
         switch self { case .pairing: "Pairing"; case .vpn: "Local VPN"; case .diskImage: "Disk image"
         case .debugger: "Debugger"; case .region: "JIT region"; case .detach: "Detach" }
     }
+    /// The next step for a failed test, by the step that failed.
+    static func hint(for kind: Self?) -> String {
+        switch kind {
+        case .pairing: String(localized: "Your key may be old. Run the Mac step again: \(CofreLinks.short(CofreLinks.pairing))")
+        case .vpn: String(localized: "Turn off other VPNs (work, ad blocker), then try again.")
+        case .diskImage: String(localized: "Connect to Wi-Fi. After a restart, JIT needs internet once.")
+        case .debugger: String(localized: "Check Developer Mode is on: Settings → Privacy & Security.")
+        case .region, .detach: String(localized: "Close Cofre fully, open it again, then try again.")
+        case nil: String(localized: "Use Wi-Fi, or Airplane Mode for a moment, and turn off other VPNs. Then try again.")
+        }
+    }
     var doneText: String {
         switch self { case .pairing: "Valid"; case .vpn: "On"; case .diskImage: "Mounted"; case .debugger: "Attached"; case .region: "64 MB"; case .detach: "Done" }
     }
@@ -269,6 +355,7 @@ extension JITStep.Kind {
 
 private struct AccountStep: View {
     @Binding var step: Int
+    let next: () -> Void
     @Environment(CofreStore.self) private var store
     var body: some View {
         let s = store.setup.account
@@ -279,7 +366,7 @@ private struct AccountStep: View {
         }
         if case .failed(let msg) = s { Banner(msg, icon: .cross, tone: .danger) }
         Text("Game files download from Mojang. Never bundled, never shared.").cofreFont(.secondary).foregroundStyle(Color.cofre.muted)
-        BlockButton("Finish", role: .primary) { step += 1 }.disabled(!s.isReady).keyboardShortcut(.defaultAction)
+        BlockButton("Finish", role: .primary, action: next).disabled(!s.isReady).keyboardShortcut(.defaultAction)
     }
 }
 
@@ -302,7 +389,7 @@ private struct ReadyStep: View {
             }
         }
         Banner("Tip: iOS updates break pairing. Settings › General › Software Update › Automatic Updates: Off.", icon: .book, tone: .warn)
-        BlockButton("Play", icon: .play, role: .primary, size: .large) { store.setupDismissed = true }
+        BlockButton("Play", icon: .play, role: .primary, size: .large) { store.finishSetup() }
             .keyboardShortcut(.defaultAction)
     }
 }

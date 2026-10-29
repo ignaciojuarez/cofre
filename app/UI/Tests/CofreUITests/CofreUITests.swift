@@ -17,19 +17,24 @@ final class CofreUITests: XCTestCase {
         XCTAssertEqual(WidthClass.resolve(sizeClass: .regular, width: 1376), .expanded)
     }
 
-    // §1.1: every text pair passes WCAG AA (4.5:1) in both themes.
+    // §1.1: every text pair passes WCAG AA (4.5:1) in both themes, for every X07 accent.
     func testTextContrastPassesAA() {
-        let c = UIColor.cofre
-        let pairs: [(String, UIColor, UIColor)] = [
-            ("ink/page", c.ink, c.page), ("muted/panel", c.muted, c.panel), ("muted/side", c.muted, c.side),
-            ("accent/panel", c.accent, c.panel), ("onFace/face", c.onFace, c.face),
-            ("success/panel", c.success, c.panel), ("warn/panel", c.warn, c.panel), ("danger/panel", c.danger, c.panel),
-        ]
-        for style in [UIUserInterfaceStyle.dark, .light] {
-            let tc = UITraitCollection(userInterfaceStyle: style)
-            for (name, fg, bg) in pairs {
-                let ratio = contrast(fg.resolvedColor(with: tc), bg.resolvedColor(with: tc))
-                XCTAssertGreaterThanOrEqual(ratio, 4.5, "\(name) in \(style == .dark ? "dark" : "light") is \(ratio)")
+        let saved = CofreTheme.current
+        defer { CofreTheme.current = saved }
+        for accent in AccentFamily.all {
+            CofreTheme.current.accent = accent
+            let c = UIColor.cofre
+            let pairs: [(String, UIColor, UIColor)] = [
+                ("ink/page", c.ink, c.page), ("muted/panel", c.muted, c.panel), ("muted/side", c.muted, c.side),
+                ("accent/panel", c.accent, c.panel), ("onFace/face", c.onFace, c.face),
+                ("success/panel", c.success, c.panel), ("warn/panel", c.warn, c.panel), ("danger/panel", c.danger, c.panel),
+            ]
+            for style in [UIUserInterfaceStyle.dark, .light] {
+                let tc = UITraitCollection(userInterfaceStyle: style)
+                for (name, fg, bg) in pairs {
+                    let ratio = contrast(fg.resolvedColor(with: tc), bg.resolvedColor(with: tc))
+                    XCTAssertGreaterThanOrEqual(ratio, 4.5, "\(accent.name) \(name) in \(style == .dark ? "dark" : "light") is \(ratio)")
+                }
             }
         }
     }
@@ -57,7 +62,15 @@ final class CofreUITests: XCTestCase {
         let macFile = try XCTUnwrap(UTType(filenameExtension: "mobiledevicepairing"))
         XCTAssertTrue(UTType.pairingFiles.contains { macFile.conforms(to: $0) })
         XCTAssertTrue(UTType.pairingFiles.contains { UTType.xmlPropertyList.conforms(to: $0) })
-        XCTAssertEqual(CofreLinks.short(CofreLinks.pairing), "cofre.site/pair")
+        XCTAssertEqual(CofreLinks.short(CofreLinks.pairing), "ignaciojuarez.github.io/cofre/pair")
+    }
+
+    // Users paste what these pages show into Terminal: every link must stay on a host we control.
+    func testLinksStayOnAllowedHosts() {
+        for url in CofreLinks.all {
+            XCTAssertEqual(url.scheme, "https", url.absoluteString)
+            XCTAssertTrue(CofreLinks.allowedHosts.contains(url.host() ?? ""), url.absoluteString)
+        }
     }
 
     func testMockLaunchStreamFinishes() async throws {
@@ -69,7 +82,8 @@ final class CofreUITests: XCTestCase {
     }
 
     func testStoreLoadsAndRunsJITTest() async {
-        let store = CofreStore(services: CofreServices(backend: MockBackend(setupComplete: false, stepDelay: 0)))
+        let store = CofreStore(services: CofreServices(backend: MockBackend(setupComplete: false, stepDelay: 0)), defaults: freshDefaults())
+        XCTAssertFalse(store.showsSetup, "no wizard before setup state loads")
         await store.start()
         XCTAssertEqual(store.instances.count, 5)
         XCTAssertEqual(store.activeInstance?.name, "Survival+")
@@ -77,6 +91,81 @@ final class CofreUITests: XCTestCase {
         await store.testJIT()
         XCTAssertTrue(store.setup.jit.isReady)
         XCTAssertTrue(store.jitSteps.allSatisfy { $0.state.isReady })
+    }
+
+    // Setup resumes where the user left off, and never shows again once finished.
+    func testSetupProgressPersists() async {
+        let defaults = freshDefaults()
+        let mock = MockBackend(setupComplete: false, stepDelay: 0)
+        let first = CofreStore(services: CofreServices(backend: mock), defaults: defaults)
+        await first.start()
+        XCTAssertEqual(first.resumeStep, 0, "first open shows Welcome")
+        XCTAssertEqual(first.firstOpenStep, 3, "Dev Mode and Trust pass in the mock")
+        first.setupStep = 4
+
+        let second = CofreStore(services: CofreServices(backend: mock), defaults: defaults)
+        await second.start()
+        XCTAssertEqual(second.resumeStep, 4, "cold start resumes at the saved step")
+        mock.state.vpn = .ready
+        let third = CofreStore(services: CofreServices(backend: mock), defaults: defaults)
+        await third.start()
+        XCTAssertEqual(third.resumeStep, 3, "a passed step resumes at the first open check")
+
+        third.finishSetup()
+        let done = CofreStore(services: CofreServices(backend: mock), defaults: defaults)
+        XCTAssertTrue(done.setupCompleted, "known before the first frame, so no wizard flash")
+        XCTAssertFalse(done.showsSetup)
+        await done.start()
+        XCTAssertFalse(done.showsSetup, "live checks failing after setup don't bring the wizard back")
+    }
+
+    func testCompleteBackendSkipsWizard() async {
+        let store = CofreStore(services: .mock(), defaults: freshDefaults())
+        await store.start()
+        XCTAssertTrue(store.setupCompleted)
+        XCTAssertFalse(store.showsSetup)
+    }
+
+    // Every Delete goes through one confirmation; nothing is removed until it's confirmed.
+    func testDeleteWaitsForConfirmation() async throws {
+        let store = CofreStore(services: CofreServices(backend: MockBackend(stepDelay: 0)), defaults: freshDefaults())
+        await store.start()
+        let inst = try XCTUnwrap(store.instances.last)
+        store.pendingConfirmation = .deleteInstance(inst)
+        XCTAssertTrue(store.instances.contains(inst))
+        await store.confirm(.deleteInstance(inst))
+        XCTAssertFalse(store.instances.contains { $0.id == inst.id })
+    }
+
+    // Controls without a backend stay hidden: the default reports nothing, and actions throw instead of pretending.
+    func testCapabilitiesDefaultToNothing() async throws {
+        let mock = MockBackend(stepDelay: 0)
+        let store = CofreStore(services: CofreServices(backend: mock), defaults: freshDefaults())
+        XCTAssertFalse(store.can(.deleteWorld))
+        XCTAssertFalse(store.can(.controllerNavigation))
+        XCTAssertEqual(MinimalActions().capabilities, [])
+        do { try await MinimalActions().deleteWorld(instanceID: "a", worldID: "b"); XCTFail("should throw") } catch {}
+
+        mock.capabilities = [.deleteWorld]
+        await store.start()
+        let world = try XCTUnwrap(store.worlds.first)
+        await store.confirm(.deleteWorld(world))
+        XCTAssertFalse(store.worlds.contains(world))
+    }
+
+    func testOfflineSearchShowsError() async {
+        let mock = MockBackend(stepDelay: 0); mock.offline = true
+        let store = CofreStore(services: CofreServices(backend: mock), defaults: freshDefaults())
+        await store.search()
+        XCTAssertNotNil(store.searchError)
+        XCTAssertTrue(store.results.isEmpty)
+    }
+
+    func testAgoLongCoversMonths() {
+        let now = Date()
+        XCTAssertEqual(Fmt.agoLong(now.addingTimeInterval(-10 * 86400), now: now), "last week")
+        XCTAssertEqual(Fmt.agoLong(now.addingTimeInterval(-90 * 86400), now: now), "3 months ago")
+        XCTAssertEqual(Fmt.agoLong(now.addingTimeInterval(-400 * 86400), now: now), "over a year ago")
     }
 
     func testUpdateAllClearsUpdates() async {
@@ -107,7 +196,8 @@ final class CofreUITests: XCTestCase {
         for section in NavModel.Section.allCases {
             for (sizeClass, size) in sizes {
                 let nav = NavModel(); nav.section = section
-                let store = CofreStore(services: .mock())
+                let store = CofreStore(services: .mock(), defaults: freshDefaults())
+                store.finishSetup()
                 let host = UIHostingController(rootView: CofreRootView(store: store, nav: nav))
                 host.traitOverrides.horizontalSizeClass = sizeClass
                 let window = UIWindow(frame: CGRect(origin: .zero, size: size))
@@ -128,6 +218,13 @@ final class CofreUITests: XCTestCase {
         XCTAssertTrue(vc is UIHostingController<CofreRootView>)
     }
 
+    private func freshDefaults() -> UserDefaults {
+        let name = "cofre.tests.\(UUID().uuidString)"
+        let d = UserDefaults(suiteName: name)!
+        d.removePersistentDomain(forName: name)
+        return d
+    }
+
     private func contrast(_ a: UIColor, _ b: UIColor) -> Double {
         func lum(_ c: UIColor) -> Double {
             var r: CGFloat = 0, g: CGFloat = 0, bl: CGFloat = 0, al: CGFloat = 0
@@ -139,4 +236,6 @@ final class CofreUITests: XCTestCase {
         return (max(l1, l2) + 0.05) / (min(l1, l2) + 0.05)
     }
 }
+/// An `OptionalActions` conformer that implements nothing, to check the defaults.
+private final class MinimalActions: OptionalActions {}
 #endif

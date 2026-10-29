@@ -78,9 +78,13 @@ struct WorldRows: View {
             }
             .contextMenu {
                 Button("Play") { startLaunch(store, nav) }
-                Button("Back up") {}
-                Button("Open folder") {}
-                Button("Delete", role: .destructive) {}
+                // Only what the backend can do (GAP-13). Delete always asks first.
+                if store.can(.backUpWorld) {
+                    Button("Back up") { Task { if let url = await store.backUpWorld(w) { presentShareSheet(url) } } }
+                }
+                if store.can(.deleteWorld) {
+                    Button("Delete", role: .destructive) { store.pendingConfirmation = .deleteWorld(w) }
+                }
             }
         }
     }
@@ -127,6 +131,42 @@ struct InstalledRows: View {
     }
 }
 
+/// The system share sheet for a file, from anywhere (menus can't host a `ShareLink`).
+@MainActor func presentShareSheet(_ url: URL) {
+    guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first(where: { $0.activationState == .foregroundActive }),
+          var top = scene.keyWindow?.rootViewController else { return }
+    while let next = top.presentedViewController { top = next }
+    let sheet = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+    sheet.popoverPresentationController?.sourceView = top.view
+    sheet.popoverPresentationController?.sourceRect = CGRect(x: top.view.bounds.midX, y: top.view.bounds.midY, width: 0, height: 0)
+    sheet.popoverPresentationController?.permittedArrowDirections = []
+    top.present(sheet, animated: true)
+}
+
+extension Confirmation {
+    var title: Text {
+        switch self {
+        case .deleteInstance(let i): Text("Delete \(i.name)?")
+        case .deleteWorld(let w): Text("Delete \(w.name)?")
+        case .removeAccount(let a): Text("Remove \(a.name)?")
+        }
+    }
+    var message: Text {
+        switch self {
+        case .deleteInstance: Text("Worlds and mods in its folder are removed too.")
+        case .deleteWorld: Text("It's removed from this device. This can't be undone.")
+        case .removeAccount: Text("You can sign in again any time.")
+        }
+    }
+    var actionTitle: LocalizedStringKey {
+        switch self {
+        case .deleteInstance: "Delete instance"
+        case .deleteWorld: "Delete world"
+        case .removeAccount: "Remove"
+        }
+    }
+}
+
 /// Reads a picked file with security scope.
 func readPicked(_ result: Result<[URL], Error>) -> (URL, Data)? {
     guard case .success(let urls) = result, let url = urls.first else { return nil }
@@ -153,7 +193,7 @@ struct PairingGuide: View {
         ListSection(spacing: 4) {
             Row("Plug into a Mac with a cable", leading: { RowIndex(1) })
             Row("Run one command on the Mac", leading: { RowIndex(2) })
-            Row("Unlock, tap Trust, wait for Done", leading: { RowIndex(3) })
+            Row("Unlock, tap Trust, enter your passcode", leading: { RowIndex(3) })
         }
         ViewThatFits(in: .horizontal) {
             HStack(spacing: 12) { link; Spacer(minLength: 0); share }

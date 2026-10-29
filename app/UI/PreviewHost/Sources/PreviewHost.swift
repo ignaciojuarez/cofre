@@ -36,7 +36,10 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         default: break
         }
 
-        let store = CofreStore(services: services)
+        // Fresh setup progress every launch, so a finished run doesn't hide `-screen setup`.
+        let defaults = UserDefaults(suiteName: "app.cofre.ui.previewhost.setup")!
+        defaults.removePersistentDomain(forName: "app.cofre.ui.previewhost.setup")
+        let store = CofreStore(services: services, defaults: defaults)
         if screen == "launch" { store.play("survival") }
         let setupStep = args.object(forKey: "setupStep") != nil ? args.integer(forKey: "setupStep") : nil
         let root = UIHostingController(rootView: CofreRootView(store: store, nav: nav, setupStart: setupStep))

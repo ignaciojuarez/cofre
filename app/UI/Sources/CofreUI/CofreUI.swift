@@ -27,31 +27,46 @@ public enum CofreUI {
 }
 #endif
 
-/// Web pages the UI links to. The domain is a placeholder until the site is published.
+/// Web pages the UI links to: the setup site on GitHub Pages (`docs/` in the Cofre repo).
+/// Only hosts in `allowedHosts`; a unit test fails otherwise, because users paste what these pages show into Terminal.
 public enum CofreLinks {
+    public static let allowedHosts: Set<String> = ["ignaciojuarez.github.io"]
+    /// The setup site. Step 1 is how to get Cofre.
+    public static let site = URL(string: "https://ignaciojuarez.github.io/cofre/")!
     /// The one Mac command that puts the pairing key into Cofre over the cable, with its steps.
-    public static let pairing = URL(string: "https://cofre.site/pair")!
+    public static let pairing = URL(string: "https://ignaciojuarez.github.io/cofre/pair/")!
+    public static let all = [site, pairing]
 
-    /// "cofre.site/pair": a URL without its scheme, for display.
-    public static func short(_ url: URL) -> String { (url.host() ?? "") + url.path() }
+    /// "ignaciojuarez.github.io/cofre/pair": host and path without the scheme or trailing slash, for display.
+    public static func short(_ url: URL) -> String {
+        var s = (url.host() ?? "") + url.path()
+        while s.hasSuffix("/") { s.removeLast() }
+        return s
+    }
 }
 
 #if canImport(UIKit)
-/// Root view: setup wizard until every check passes, then the adaptive shell. Launch, sheets and Air's
-/// UIKit screens are presented from here so every section shares them.
+/// Root view: a neutral splash until setup state loads, the wizard for users who never finished it, then the
+/// adaptive shell. Users who finished once go straight to the shell on the first frame. Launch, sheets,
+/// confirmations and Air's UIKit screens are presented from here so every section shares them.
 public struct CofreRootView: View {
     @State private var store: CofreStore
     @State private var nav: NavModel
     private let setupStart: Int?
 
+    /// `setupStart` forces the wizard at that step (preview host); `nil` resumes where the user left off.
     @MainActor public init(store: CofreStore, nav: NavModel? = nil, setupStart: Int? = nil) {
         _store = State(initialValue: store); _nav = State(initialValue: nav ?? NavModel()); self.setupStart = setupStart
     }
 
     public var body: some View {
         Group {
-            if store.showsSetup {
+            if !store.setupCompleted, let setupStart {
                 SetupFlow(startAt: setupStart)
+            } else if !store.setupCompleted && !store.setupLoaded {
+                SplashView()
+            } else if store.showsSetup {
+                SetupFlow(startAt: store.resumeStep)
             } else {
                 AdaptiveShell(nav: nav) { section in
                     switch section {
@@ -65,6 +80,15 @@ public struct CofreRootView: View {
         }
         .id(store.theme.accent.id)
         .overlay(alignment: .top) { errorBanner }
+        .alert(store.pendingConfirmation?.title ?? Text(verbatim: ""), isPresented: confirming, presenting: store.pendingConfirmation) { c in
+            Button(c.actionTitle, role: .destructive) {
+                Task {
+                    await store.confirm(c)
+                    if case .deleteInstance(let i) = c, nav.instance == i.id { nav.instance = nil }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { c in c.message }
         .background { commands }
         .fullScreenTakeover(isPresented: $nav.showingLaunch) { LaunchScreen().environment(store).environment(nav) }
         .blockSheet(item: $nav.sheet) { sheet in
@@ -95,6 +119,10 @@ public struct CofreRootView: View {
         .task { await store.start() }
     }
 
+    private var confirming: Binding<Bool> {
+        Binding(get: { store.pendingConfirmation != nil }, set: { if !$0 { store.pendingConfirmation = nil } })
+    }
+
     @ViewBuilder private var errorBanner: some View {
         if let err = store.lastError {
             Banner(err, icon: .cross, tone: .danger) { BlockButton("OK", size: .small) { store.lastError = nil } }
@@ -113,6 +141,16 @@ public struct CofreRootView: View {
             Button("Show log") { nav.section = .settings; nav.settingsPane = .logs }.keyboardShortcut("l", modifiers: .command)
         }
         .opacity(0).allowsHitTesting(false).accessibilityHidden(true)
+    }
+}
+
+/// First frame for users who haven't finished setup, while their saved state loads. No wizard flash.
+private struct SplashView: View {
+    var body: some View {
+        AppIcon(size: 64)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(PageBackground())
+            .accessibilityLabel(Text(verbatim: "Cofre"))
     }
 }
 #endif
