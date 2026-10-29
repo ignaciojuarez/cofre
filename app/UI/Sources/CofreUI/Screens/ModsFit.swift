@@ -1,39 +1,76 @@
 #if canImport(UIKit)
     import SwiftUI
 
-    // Mods on an instance that can't run them. Vanilla leads M01 with "Make a mods instance"; "Get" on a mod the
-    // active instance can't run opens the misfit sheet: get it in an instance that runs it, or make one.
+    // Mods works on one instance that runs mods (`store.modsInstance`). The header's switcher picks it, or makes a new
+    // one; with none at all, M01 is only the hero.
 
-    /// M01 on Vanilla: popular mod icons over the one action. Never names a loader; P04 picks one.
-    struct ModsHero: View {
+    /// M01 header: "For Survival+ · Fabric 1.21.1 ▾". A native menu of the modded instances, then New mods instance.
+    /// Picking one also selects it in Play.
+    struct ModsInstanceSwitcher: View {
+        let current: InstanceSummary
         @Environment(CofreStore.self) private var store
         @Environment(NavModel.self) private var nav
 
         var body: some View {
+            Menu {
+                ForEach(store.moddedInstances) { i in
+                    Button {
+                        Task { await store.selectInstance(i.id) }
+                    } label: {
+                        if i.id == current.id {
+                            Label { Text(verbatim: i.name) } icon: { Image(systemName: "checkmark") }
+                        } else {
+                            Text(verbatim: i.name)
+                        }
+                        Text(verbatim: i.loaderLabel)
+                    }
+                }
+                Divider()
+                Button("New mods instance", systemImage: "plus") { nav.newModsInstance(store) }
+            } label: {
+                HStack(spacing: 8) {
+                    Text("For").cofreFont(.label).foregroundStyle(Color.cofre.muted)
+                    Text(verbatim: current.name).cofreFont(.rowTitle).foregroundStyle(Color.cofre.ink).lineLimit(1)
+                    Spacer(minLength: 4)
+                    Text(verbatim: "\(current.loaderLabel) ▾").cofreFont(.label).foregroundStyle(Color.cofre.muted)
+                        .lineLimit(1).layoutPriority(1)
+                }
+                .padding(.horizontal, 12).padding(.bottom, 2)
+                .frame(minHeight: 44)
+                .block(.button, lip: 4)
+            }
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .blockPointer()
+            .blockFocusRing()
+            .accessibilityLabel(Text("Mods for"))
+            .accessibilityValue(Text(verbatim: "\(current.name), \(current.loaderLabel)"))
+        }
+    }
+
+    /// M01 with no instance that runs mods: popular mod icons over the one action. Never names a loader; P04 picks one.
+    struct ModsHero: View {
+        @Environment(CofreStore.self) private var store
+        @Environment(NavModel.self) private var nav
+        @State private var popular: [ProjectSummary] = []
+
+        var body: some View {
             VStack(spacing: 14) {
-                collage(Array(store.results.prefix(6)))
+                collage(Array((popular.isEmpty ? MockBackend.projects : popular).prefix(6)))
                 VStack(spacing: 6) {
-                    Text("This instance can't run mods").cofreFont(.title2).foregroundStyle(Color.cofre.ink)
+                    Text("Play with mods").cofreFont(.title2).foregroundStyle(Color.cofre.ink)
                         .multilineTextAlignment(.center).accessibilityAddTraits(.isHeader)
-                    Text("Make a mods instance to play with these.").cofreFont(.secondary)
+                    Text("Mods run in their own instance. Make one to start.").cofreFont(.secondary)
                         .foregroundStyle(Color.cofre.muted).multilineTextAlignment(.center)
                 }
                 .padding(.horizontal, 12)
-                VStack(spacing: 8) {
-                    BlockButton("Make a mods instance", role: .primary, size: .large) {
-                        store.newInstancePlan = store.planNewInstance()
-                        nav.sheet = .newInstance
-                    }
-                    if let other = store.moddedInstance {
-                        BlockButton("Switch to \(other.name)", role: .ghost) {
-                            Task { await store.selectInstance(other.id) }
-                        }
-                    }
-                }
-                .padding(.horizontal, 14)
+                BlockButton("Make a mods instance", role: .primary, size: .large) { nav.newModsInstance(store) }
+                    .padding(.horizontal, 14)
             }
             .padding(.bottom, 14)
             .block(.panel)
+            // Popular mods for any instance. Offline, the sample set stands in (tinted ores until icons load).
+            .task { popular = (try? await store.backend.search(ProjectQuery())) ?? [] }
         }
 
         /// Mod icons floating over a dusk scene, tilted like stickers.
@@ -62,48 +99,11 @@
         }
     }
 
-    /// "Get" on a mod the active instance can't run. One primary: get it in an instance that runs it, or make one.
-    struct MisfitSheet: View {
-        let misfit: ModMisfit
-        @Environment(CofreStore.self) private var store
-        @Environment(\.dismiss) private var dismiss
-
-        var body: some View {
-            let p = misfit.project
-            VStack(spacing: 14) {
-                ProjectIcon(project: p, size: 72).padding(.top, 24)
-                VStack(spacing: 6) {
-                    Text("\(p.title) needs another instance").cofreFont(.title2).foregroundStyle(Color.cofre.ink)
-                        .multilineTextAlignment(.center).accessibilityAddTraits(.isHeader)
-                    Text(reason).cofreFont(.secondary).foregroundStyle(Color.cofre.muted)
-                        .multilineTextAlignment(.center)
-                }
-                VStack(spacing: 8) {
-                    if let other = misfit.fitting {
-                        BlockButton("Get it in \(other.name)", role: .primary, size: .large) {
-                            Task { await store.install(p, in: other) }
-                        }
-                        BlockButton("Make a new instance") { make() }
-                    } else {
-                        BlockButton("Make an instance for it", role: .primary, size: .large) { make() }
-                    }
-                    BlockButton("Cancel", role: .ghost) { dismiss() }
-                }
-            }
-            .padding(.horizontal, 20).padding(.bottom, 16)
-            .frame(maxWidth: .infinity)
-        }
-
-        private var reason: String {
-            misfit.instance.loader == .vanilla
-                ? String(localized: "\(misfit.instance.name) can't run mods.")
-                : String(localized: "It doesn't work with \(misfit.instance.loaderLabel).")
-        }
-
-        /// Opens P04 pre-filled once this sheet is gone (the Mods section's `onDismiss`).
-        private func make() {
-            store.newInstancePlan = misfit.plan
-            store.misfit = nil
+    extension NavModel {
+        /// P04 pre-filled for mods, from the hero or the switcher. It stays in Mods on the new instance.
+        func newModsInstance(_ store: CofreStore) {
+            store.newInstancePlan = store.planNewInstance()
+            sheet = .newInstance
         }
     }
 #endif

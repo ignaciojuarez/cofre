@@ -252,16 +252,15 @@
     }
 
     public struct ProjectQuery: Hashable, Sendable {
-        public var text: String, source: ProjectSource, kind: ContentKind, instanceID: String?, onlyFitting: Bool
+        /// Results fit `instanceID` (its game version, and its loader for mods). `nil` browses everything.
+        public var text: String, source: ProjectSource, kind: ContentKind, instanceID: String?
         public init(
-            text: String = "", source: ProjectSource = .modrinth, kind: ContentKind = .mods, instanceID: String? = nil,
-            onlyFitting: Bool = true
+            text: String = "", source: ProjectSource = .modrinth, kind: ContentKind = .mods, instanceID: String? = nil
         ) {
             self.text = text
             self.source = source
             self.kind = kind
             self.instanceID = instanceID
-            self.onlyFitting = onlyFitting
         }
     }
 

@@ -13,19 +13,22 @@
         public init() {}
         public var body: some View {
             @Bindable var nav = nav
-            @Bindable var store = store
-            AdaptiveListDetail(selection: $nav.mod, defaultSelection: width == .compact ? nil : .installed) {
-                ModsBrowserPane()
-            } detail: { route in
-                switch route {
-                case .installed: InstalledPane()
-                case .project(let id): ModPagePane(id: id)
+            if store.libraryLoaded && store.modsInstance == nil {
+                // Nothing runs mods yet: only the way to make an instance that does.
+                VStack(spacing: 0) {
+                    ColumnHeader("Get mods")
+                    PaneScroll(readable: true) { ModsHero() }
+                }
+            } else {
+                AdaptiveListDetail(selection: $nav.mod, defaultSelection: width == .compact ? nil : .installed) {
+                    ModsBrowserPane()
+                } detail: { route in
+                    switch route {
+                    case .installed: InstalledPane()
+                    case .project(let id): ModPagePane(id: id)
+                    }
                 }
             }
-            // "Make an instance for it" opens P04 once this sheet is gone.
-            .blockSheet(item: $store.misfit, hugsContent: true) {
-                if store.newInstancePlan != nil { nav.sheet = .newInstance }
-            } content: { MisfitSheet(misfit: $0).environment(store) }
         }
     }
 
@@ -37,7 +40,6 @@
 
         public var body: some View {
             @Bindable var store = store
-            let inst = store.activeInstance
             VStack(alignment: .leading, spacing: 0) {
                 ColumnHeader("Get mods") {
                     BlockButton(store.updateCount > 0 ? "Installed · \(store.updateCount)" : "Installed", size: .small)
@@ -45,6 +47,7 @@
                     .fixedSize()
                 }
                 VStack(alignment: .leading, spacing: 8) {
+                    if let inst = store.modsInstance { ModsInstanceSwitcher(current: inst) }
                     Segmented(
                         "Source", selection: $store.query.source,
                         options: [(.modrinth, "Modrinth"), (.curseforge, "CurseForge")])
@@ -56,9 +59,6 @@
                             (.mods, "Mods"), (.modpacks, "Packs"), (.shaders, "Shaders"), (.resourcePacks, "Resource"),
                             (.dataPacks, "Data"),
                         ])
-                    if let inst, !store.activeCantRunMods {
-                        ToggleRow("Fits \(inst.loaderLabel)", isOn: $store.query.onlyFitting)
-                    }
                 }
                 .padding(.horizontal, width == .compact ? 16 : 20).padding(.bottom, 4)
 
@@ -83,15 +83,10 @@
                 } else if store.results.isEmpty && store.searching {
                     Row("Searching…", leading: { Spinner() }).padding(.horizontal, width == .compact ? 16 : 20)
                     Spacer(minLength: 0)
-                } else if store.results.isEmpty && store.activeCantRunMods {
-                    ScrollView { ModsHero().padding(.horizontal, width == .compact ? 16 : 20).padding(.top, 6) }
                 } else if store.results.isEmpty {
-                    EmptyState("No results", message: "Try another name, or turn off Fits.", icon: .book)
+                    EmptyState("No results", message: "Try another name.", icon: .book)
                 } else {
                     BlockList {
-                        if store.activeCantRunMods {
-                            ModsHero().padding(.vertical, 6).blockListRow(horizontal: width == .compact ? 16 : 20)
-                        }
                         ForEach(store.results) { p in
                             let selected = width != .compact && nav.mod == .project(p.id)
                             Button {
@@ -110,11 +105,10 @@
                                             isLoading: store.installing.contains(p.id)
                                         ) {
                                             endEditing()
-                                            Task { await store.get(p) }
+                                            store.install(projectID: p.id)
                                         }
                                     }
                                 }
-                                .dimmed(!p.fits)
                             }
                             .buttonStyle(RowButtonStyle())
                             .blockListRow(horizontal: width == .compact ? 16 : 20)
@@ -173,7 +167,7 @@
                         AdaptiveGrid(minItem: 100, maxColumns: 3) {
                             Stat(Fmt.count(p.downloads), label: "Downloads")
                             Stat(
-                                p.fits ? "✓" : "✕", label: "Fits \(store.activeInstance?.gameVersion ?? "")",
+                                p.fits ? "✓" : "✕", label: "Fits \(store.modsInstance?.gameVersion ?? "")",
                                 tone: p.fits ? .success : .danger)
                             Stat(Fmt.ago(p.updated) ?? "—", label: "Updated")
                         }
@@ -212,17 +206,16 @@
                             Text(verbatim: err).cofreFont(.secondary).foregroundStyle(Color.cofre.muted)
                         }
                         if p.installed {
-                            Banner("Installed in \(store.activeInstance?.name ?? "")", icon: .check, tone: .success)
+                            Banner("Installed in \(store.modsInstance?.name ?? "")", icon: .check, tone: .success)
                         } else if store.versions[id] == nil {
                             if store.versionsError[id] == nil { Row("Loading versions…", leading: { Spinner() }) }
                         } else {
                             let name = versions.first { $0.id == chosen }?.name
-                            // Nothing fits this instance: Get offers one that runs it instead.
                             BlockButton(
                                 name.map { "Install \($0)" } ?? "Get", role: .primary,
                                 isLoading: store.installing.contains(id)
                             ) {
-                                Task { await store.get(p, versionID: chosen) }
+                                store.install(projectID: id, versionID: chosen)
                             }
                             .keyboardShortcut(.return, modifiers: .command)
                         }
@@ -237,7 +230,7 @@
                     DetailPlaceholder()
                 }
             }
-            .task(id: "\(id)-\(store.activeInstance?.id ?? "")") { await store.loadProject(id) }
+            .task(id: "\(id)-\(store.modsInstance?.id ?? "")") { await store.loadProject(id) }
         }
     }
 
@@ -285,7 +278,7 @@
             let updates = all.filter { $0.updateTo != nil }.count
             VStack(alignment: .leading, spacing: 0) {
                 ColumnHeader("Installed") {
-                    if let inst = store.activeInstance { Badge(inst.name, tone: inst.loader.tone) }
+                    if let inst = store.modsInstance { Badge(inst.name, tone: inst.loader.tone) }
                 }
                 VStack(spacing: 8) {
                     Segmented(
@@ -332,7 +325,7 @@
                     .padding(.horizontal, width == .compact ? 16 : 20).padding(.vertical, 8)
                 }
             }
-            .task(id: kind) { await store.loadInstalled(kind) }
+            .task(id: "\(kind)-\(store.modsInstance?.id ?? "")") { await store.loadInstalled(kind) }
         }
     }
 

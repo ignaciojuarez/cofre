@@ -61,7 +61,7 @@ struct CofreModVersion {
                 case .modpacks: "modpack"
                 }
             var filters = ["query": query.text, "limit": "50", "projectType": projectType]
-            if query.onlyFitting, let instanceID = query.instanceID {
+            if let instanceID = query.instanceID {
                 let context = air.modContext(forProfile: instanceID)
                 filters["mcVersion"] = context["minecraft"] as? String
                 if query.kind == .mods, let loader = context["loader"] as? String, loader != "vanilla" {

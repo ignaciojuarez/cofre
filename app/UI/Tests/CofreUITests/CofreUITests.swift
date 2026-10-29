@@ -230,56 +230,47 @@
             XCTAssertTrue(store.results.isEmpty)
         }
 
-        // Get on a mod the active instance can't run: offer an instance that runs it, else a pre-filled new one.
-        func testGetOffersAnInstanceThatRunsTheMod() async throws {
-            let mock = MockBackend(stepDelay: 0)
-            let store = CofreStore(services: CofreServices(backend: mock), defaults: freshDefaults())
+        // Mods works on one instance that runs mods: Play's when it does, else the last one picked.
+        func testModsTargetsAnInstanceThatRunsMods() async throws {
+            let defaults = freshDefaults()
+            let store = CofreStore(services: CofreServices(backend: MockBackend(stepDelay: 0)), defaults: defaults)
             await store.start()
-            let iris = try XCTUnwrap(MockBackend.projects.first { $0.id == "iris" })
-            let create = try XCTUnwrap(MockBackend.projects.first { $0.id == "create" })
+            XCTAssertEqual(store.modsInstance?.id, "survival")
+            XCTAssertEqual(store.query.instanceID, "survival")
+            await store.search()
+            XCTAssertTrue(store.results.contains { $0.id == "iris" })
+            XCTAssertFalse(store.results.contains { $0.id == "create" })  // Forge and NeoForge only
 
-            await store.get(iris)  // Survival+ runs it: installs, no sheet.
-            XCTAssertNil(store.misfit)
-
+            // Picking in Mods selects it in Play too; Vanilla in Play keeps Mods where it was.
+            await store.selectInstance("cobblemon")
             await store.selectInstance("vanilla")
-            XCTAssertTrue(store.activeCantRunMods)
-            await store.get(iris)
-            XCTAssertEqual(store.misfit?.fitting?.id, "survival")  // Fabric 1.21.1; Skyblock is 1.20.4
-            XCTAssertFalse(store.installing.contains("iris"))
+            XCTAssertEqual(store.activeInstance?.id, "vanilla")
+            XCTAssertEqual(store.modsInstance?.id, "cobblemon")
+            XCTAssertEqual(store.query.instanceID, "cobblemon")
+            await store.search()
+            XCTAssertTrue(store.results.contains { $0.id == "create" })
+            XCTAssertFalse(store.results.contains { $0.id == "iris" })
 
-            await store.selectInstance("skyblock")
-            await store.get(create)
-            XCTAssertEqual(store.misfit?.fitting?.id, "cobblemon")  // the only NeoForge 1.21.1
+            // Remembered across launches.
+            let again = CofreStore(services: CofreServices(backend: MockBackend(stepDelay: 0)), defaults: defaults)
+            await again.start()
+            await again.selectInstance("vanilla")
+            XCTAssertEqual(again.modsInstance?.id, "cobblemon")
 
-            store.instances.removeAll { $0.id == "cobblemon" }
-            await store.get(create)
-            XCTAssertNil(store.misfit?.fitting)
-            XCTAssertEqual(
-                store.misfit?.plan,
-                NewInstancePlan(name: "NeoForge 1.21.1", version: "1.21.1", loader: .neoforge, thenInstall: create))
+            // Nothing runs mods: no target, so Mods shows only the hero.
+            again.instances.removeAll { $0.loader != .vanilla }
+            XCTAssertNil(again.modsInstance)
+            XCTAssertNil(again.query.instanceID)
         }
 
-        func testNewInstancePlanFromMods() async throws {
+        func testNewInstancePlanFromMods() async {
             let store = CofreStore(services: CofreServices(backend: MockBackend(stepDelay: 0)), defaults: freshDefaults())
             await store.start()
-            let create = try XCTUnwrap(MockBackend.projects.first { $0.id == "create" })
             await store.selectInstance("vanilla")
-            // Vanilla's "Make a mods instance": Fabric, same version.
+            // Fabric on the same version; taken names get a number.
             XCTAssertEqual(store.planNewInstance(), NewInstancePlan(name: "Fabric 26.3", version: "26.3", loader: .fabric))
-            // A mod the version doesn't support: its newest release, its most popular loader.
-            let p = store.planNewInstance(for: create, supported: ["1.20.1", "1.21.1", "1.21"])
-            XCTAssertEqual([p.loader.rawValue, p.version], ["neoforge", "1.21.1"])
-            // A modded instance keeps its loader when the mod supports it; taken names get a number.
-            await store.selectInstance("create")
-            store.instances.append(InstanceSummary(id: "x", name: "Forge 1.21.1", loader: .forge, gameVersion: "1.21.1"))
-            XCTAssertEqual(store.planNewInstance(for: create, supported: ["1.21.1"]).name, "Forge 1.21.1 2")
-            XCTAssertEqual(store.moddedInstance?.id, "survival")  // most recently played
-        }
-
-        func testNewestReleaseSkipsSnapshots() {
-            XCTAssertEqual(CofreStore.newestRelease(["1.9", "1.21.1", "1.21", "26w44a", "1.21.1-pre1"]), "1.21.1")
-            XCTAssertEqual(CofreStore.newestRelease(["1.21.4", "26.3"]), "26.3")
-            XCTAssertNil(CofreStore.newestRelease([]))
+            store.instances.append(InstanceSummary(id: "x", name: "Fabric 26.3", loader: .fabric, gameVersion: "26.3"))
+            XCTAssertEqual(store.planNewInstance().name, "Fabric 26.3 2")
         }
 
         func testAgoLongCoversMonths() {

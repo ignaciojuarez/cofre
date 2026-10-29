@@ -296,7 +296,7 @@
         @State private var ownFolder = true
         @State private var fabricAPI = true
         @State private var creating = false
-        /// From Mods: pre-fills the form, then switches to the new instance (and installs `thenInstall`) there.
+        /// From Mods: pre-fills the form, then makes the new instance the one Mods (and Play) works on.
         private let plan: NewInstancePlan?
 
         public init(plan: NewInstancePlan? = nil) {
@@ -314,9 +314,6 @@
                 SheetHeader("New instance")
                 ScrollView {
                     VStack(alignment: .leading, spacing: 10) {
-                        if let mod = plan?.thenInstall {
-                            Row("Adds \(mod.title)", leading: { ProjectIcon(project: mod, size: 22) })
-                        }
                         SectionLabel("Name")
                         Field("Name", text: $name)
                         SectionLabel("Version")
@@ -413,10 +410,9 @@
                 // On failure the sheet stays open; the error shows in the banner.
                 guard let made else { return }
                 dismiss()
-                if let plan {
+                if plan != nil {
                     // From Mods: stay there, on the new instance.
                     await store.selectInstance(made.id)
-                    if let mod = plan.thenInstall { store.install(projectID: mod.id) }
                 } else {
                     nav.instance = made.id
                     nav.section = .instances

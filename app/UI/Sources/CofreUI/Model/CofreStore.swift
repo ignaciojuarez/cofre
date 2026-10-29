@@ -25,8 +25,9 @@
 
         // Library
         public private(set) var libraryLoaded = false
-        public var instances: [InstanceSummary] = []
-        public var activeInstanceID: String?
+        public var instances: [InstanceSummary] = [] { didSet { searchModsInstance() } }
+        /// Play's instance. When it runs mods, Mods works on it too.
+        public var activeInstanceID: String? { didSet { searchModsInstance() } }
         public var worlds: [WorldSummary] = []
         public var servers: [ServerSummary] = []
         public var accounts: [Account] = []
@@ -45,8 +46,9 @@
         public var installed: [ContentKind: [InstalledItem]] = [:]
         public var installing: Set<String> = []
         public var importProgress: InstallProgress?
-        /// "Get" on a mod the active instance can't run: the sheet offering where it can go instead.
-        public var misfit: ModMisfit?
+        /// Saved: the last modded instance picked (in Mods, Play or Instances), so Mods keeps it while Play is on
+        /// Vanilla.
+        public var modsInstanceID: String? { didSet { defaults.set(modsInstanceID, forKey: Keys.modsInstance) } }
         /// Pre-fills P04 New instance when it opens from Mods.
         public var newInstancePlan: NewInstancePlan?
 
@@ -78,6 +80,7 @@
         private enum Keys {
             static let completed = "cofre.setup.completed"
             static let step = "cofre.setup.step"
+            static let modsInstance = "cofre.mods.instance"
         }
 
         /// `defaults` holds the setup progress; tests and the preview host pass their own suite.
@@ -86,6 +89,7 @@
             self.defaults = defaults
             setupCompleted = defaults.bool(forKey: Keys.completed)
             setupStep = defaults.object(forKey: Keys.step) as? Int
+            modsInstanceID = defaults.string(forKey: Keys.modsInstance)
         }
 
         public var capabilities: BackendCapabilities { backend.capabilities }
@@ -93,7 +97,7 @@
 
         public var activeInstance: InstanceSummary? { instances.first { $0.id == activeInstanceID } ?? instances.first }
         public var activeAccount: Account? { accounts.first { $0.isActive } ?? accounts.first }
-        public var updateCount: Int { activeInstance?.updatesAvailable ?? 0 }
+        public var updateCount: Int { modsInstance?.updatesAvailable ?? 0 }
         public var isJITReady: Bool { setup.jit.isReady }
         /// The wizard shows only for users who never finished it, once their state has loaded. It stays up through
         /// S08 Ready even when every check passes mid-flow; `finishSetup()` (Play) or a complete state at load ends it.
@@ -146,19 +150,19 @@
 
         public func selectInstance(_ id: String) async {
             activeInstanceID = id
+            if let i = instances.first(where: { $0.id == id }), i.loader != .vanilla { modsInstanceID = id }
             await loadActiveInstance()
         }
 
         func loadActiveInstance() async {
             guard let id = activeInstance?.id else { return }
-            query.instanceID = id
+            let mods = modsInstance?.id
             await run {
                 async let w = self.backend.worlds(instanceID: id)
                 async let s = self.backend.servers(instanceID: id)
-                async let m = self.backend.installed(.mods, instanceID: id)
                 self.worlds = try await w
                 self.servers = try await s
-                self.installed[.mods] = try await m
+                if let mods { self.installed[.mods] = try await self.backend.installed(.mods, instanceID: mods) }
             }
         }
 
@@ -383,7 +387,7 @@
         }
 
         public func loadProject(_ id: String) async {
-            guard let inst = activeInstance?.id else {
+            guard let inst = modsInstance?.id else {
                 versionsError[id] = String(localized: "Pick an instance first.")
                 return
             }
@@ -400,7 +404,7 @@
         }
 
         public func install(projectID: String, versionID: String? = nil) {
-            guard let inst = activeInstance?.id else { return }
+            guard let inst = modsInstance?.id else { return }
             let version = versionID ?? versions[projectID]?.first(where: \.fits)?.id ?? "latest"
             installing.insert(projectID)
             Task {
@@ -413,91 +417,33 @@
             }
         }
 
-        /// Mods need a loader: on Vanilla, the Mods list leads with "Make a mods instance" instead of the Fits switch.
-        /// Resource and data packs work on Vanilla, so they browse as usual.
-        public var activeCantRunMods: Bool { activeInstance?.loader == .vanilla && query.kind == .mods }
+        /// Instances that can run mods: Mods targets one of these.
+        public var moddedInstances: [InstanceSummary] { instances.filter { $0.loader != .vanilla } }
 
-        /// The modded instance to offer "Switch to": the most recently played.
-        public var moddedInstance: InstanceSummary? {
-            instances.filter { $0.loader != .vanilla }.max { ($0.lastPlayed ?? .distantPast) < ($1.lastPlayed ?? .distantPast) }
+        /// Where Mods searches and installs: Play's instance when it runs mods, else the last one picked, else the
+        /// most recently played. `nil` when none runs mods; Mods then only offers to make one.
+        public var modsInstance: InstanceSummary? {
+            if let a = activeInstance, a.loader != .vanilla { return a }
+            let modded = moddedInstances
+            return modded.first { $0.id == modsInstanceID }
+                ?? modded.max { ($0.lastPlayed ?? .distantPast) < ($1.lastPlayed ?? .distantPast) }
         }
 
-        /// "Get": installs when the active instance runs some version of the mod, otherwise opens `misfit`.
-        public func get(_ project: ProjectSummary, versionID: String? = nil) async {
-            guard let inst = activeInstance else { return }
-            guard query.kind == .mods else { return install(projectID: project.id, versionID: versionID) }
-            if inst.loader != .vanilla, let versionID {
-                return install(projectID: project.id, versionID: versionID)
-            }
-            // The Get spinner shows while this checks; `install` takes it over.
-            installing.insert(project.id)
-            let list: [ProjectVersion]
-            do { list = try await backend.versions(projectID: project.id, instanceID: inst.id) } catch {
-                installing.remove(project.id)
-                lastError = error.localizedDescription
-                return
-            }
-            versions[project.id] = list
-            if inst.loader != .vanilla, list.contains(where: \.fits) { return install(projectID: project.id) }
-            let supported = Set(list.flatMap(\.gameVersionList))
-            var fitting: InstanceSummary?
-            for c in Self.candidates(for: project, supported: supported, in: instances, excluding: inst.id) {
-                if let v = try? await backend.versions(projectID: project.id, instanceID: c.id), v.contains(where: \.fits) {
-                    fitting = c
-                    break
-                }
-            }
-            installing.remove(project.id)
-            misfit = ModMisfit(
-                project: project, instance: inst, fitting: fitting,
-                plan: planNewInstance(for: project, supported: supported))
+        /// Points the search at the Mods target whenever it may have changed.
+        private func searchModsInstance() {
+            if query.instanceID != modsInstance?.id { query.instanceID = modsInstance?.id }
         }
 
-        /// Misfit sheet → "Get it in <instance>": switches to it, then installs.
-        public func install(_ project: ProjectSummary, in instance: InstanceSummary) async {
-            misfit = nil
-            await selectInstance(instance.id)
-            install(projectID: project.id)
-        }
-
-        /// What P04 opens with from Mods: the active version (or the newest the mod supports), the most popular
-        /// loader the mod supports, and a name that isn't taken yet.
-        public func planNewInstance(for project: ProjectSummary? = nil, supported: Set<String> = []) -> NewInstancePlan {
-            let active = activeInstance
-            let order = [active?.loader].compactMap { $0 }.filter { $0 != .vanilla } + [.fabric, .neoforge, .forge, .quilt]
-            let loaders = project?.loaders ?? []
-            let loader = order.first { loaders.isEmpty || loaders.contains($0) } ?? .fabric
-            let version =
-                active.map(\.gameVersion).flatMap { supported.isEmpty || supported.contains($0) ? $0 : nil }
-                ?? Self.newestRelease(supported) ?? active?.gameVersion ?? ""
-            var name = version.isEmpty ? loader.displayName : "\(loader.displayName) \(version)"
+        /// P04 from Mods: Fabric on the active version (empty: the newest release), with a name that isn't taken.
+        public func planNewInstance() -> NewInstancePlan {
+            let version = activeInstance?.gameVersion ?? ""
+            var name = version.isEmpty ? Loader.fabric.displayName : "\(Loader.fabric.displayName) \(version)"
             let taken = Set(instances.map(\.name))
             if taken.contains(name) {
                 let base = name
                 name = (2...).lazy.map { "\(base) \($0)" }.first { !taken.contains($0) }!
             }
-            return NewInstancePlan(name: name, version: version, loader: loader, thenInstall: project)
-        }
-
-        /// Other modded instances that likely run `project`, most recently played first. `get` confirms each one
-        /// with `versions(projectID:instanceID:)`.
-        static func candidates(
-            for project: ProjectSummary, supported: Set<String>, in instances: [InstanceSummary], excluding id: String
-        ) -> [InstanceSummary] {
-            instances
-                .filter {
-                    $0.id != id && $0.loader != .vanilla
-                        && (project.loaders.isEmpty || project.loaders.contains($0.loader))
-                        && (supported.isEmpty || supported.contains($0.gameVersion))
-                }
-                .sorted { ($0.lastPlayed ?? .distantPast) > ($1.lastPlayed ?? .distantPast) }
-        }
-
-        /// The highest plain release ("1.21.4", "26.3"); snapshots and pre-releases don't count.
-        static func newestRelease(_ versions: Set<String>) -> String? {
-            let parts = { (v: String) in v.split(separator: ".").compactMap { Int($0) } }
-            return versions.filter { v in !v.isEmpty && parts(v).count == v.split(separator: ".").count }
-                .max { parts($0).lexicographicallyPrecedes(parts($1)) }
+            return NewInstancePlan(name: name, version: version, loader: .fabric)
         }
 
         public func importPack(_ url: URL, intoInstance: Bool = false) {
@@ -513,12 +459,12 @@
         }
 
         public func loadInstalled(_ kind: ContentKind) async {
-            guard let inst = activeInstance?.id else { return }
+            guard let inst = modsInstance?.id else { return }
             await run { self.installed[kind] = try await self.backend.installed(kind, instanceID: inst) }
         }
 
         public func setEnabled(_ on: Bool, item: InstalledItem) {
-            guard let inst = activeInstance?.id, var list = installed[item.kind], let i = list.firstIndex(of: item)
+            guard let inst = modsInstance?.id, var list = installed[item.kind], let i = list.firstIndex(of: item)
             else { return }
             list[i].enabled = on
             installed[item.kind] = list
@@ -526,13 +472,13 @@
         }
 
         public func deleteItem(_ item: InstalledItem) {
-            guard let inst = activeInstance?.id else { return }
+            guard let inst = modsInstance?.id else { return }
             installed[item.kind]?.removeAll { $0.id == item.id }
             Task { await run { try await self.backend.delete(item, instanceID: inst) } }
         }
 
         public func updateAll() async {
-            guard let inst = activeInstance?.id else { return }
+            guard let inst = modsInstance?.id else { return }
             await run {
                 try await self.backend.updateAll(instanceID: inst)
                 self.installed[.mods] = try await self.backend.installed(.mods, instanceID: inst)
@@ -595,28 +541,9 @@
         }
     }
 
-    /// "Get" on a mod the active instance can't run (Vanilla, another loader or another version).
-    public struct ModMisfit: Identifiable, Equatable {
-        public var project: ProjectSummary
-        /// The active instance.
-        public var instance: InstanceSummary
-        /// Another instance it runs in, most recently played. `nil` offers a new instance instead.
-        public var fitting: InstanceSummary?
-        public var plan: NewInstancePlan
-        public var id: String { project.id }
-    }
-
-    /// Pre-fills P04 New instance. `thenInstall` is installed into the new instance once it's made.
+    /// Pre-fills P04 New instance.
     public struct NewInstancePlan: Equatable {
         public var name: String, version: String, loader: Loader
-        public var thenInstall: ProjectSummary?
-    }
-
-    extension ProjectVersion {
-        /// `gameVersions` is a display string ("1.21, 1.21.1").
-        var gameVersionList: [String] {
-            gameVersions.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-        }
     }
 
     /// Destructive actions confirmed by the root view's alert, whichever menu, swipe or button started them.

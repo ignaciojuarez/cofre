@@ -328,11 +328,10 @@
             return Self.projects.filter { q.isEmpty || $0.title.lowercased().contains(q) }.compactMap {
                 var p = $0
                 p.source = query.source
-                if inst?.loader == .vanilla { p.installed = false }
-                // Like Modrinth's loader facet: Vanilla filters by version only.
-                if let inst, inst.loader != .vanilla, query.kind == .mods {
+                // Like Modrinth's loader facet: only mods for the instance's loader.
+                if let inst, query.kind == .mods {
                     p.fits = p.loaders.contains(inst.loader)
-                    if query.onlyFitting && !p.fits { return nil }
+                    if !p.fits { return nil }
                 }
                 return p
             }
@@ -350,6 +349,8 @@
                 ProjectVersion(id: "\(projectID)-188", name: "1.8.8", gameVersions: "1.21.1", fits: fits("1.21.1")),
                 ProjectVersion(id: "\(projectID)-187", name: "1.8.7", gameVersions: "1.21.1", fits: fits("1.21.1")),
                 ProjectVersion(id: "\(projectID)-181", name: "1.8.1", gameVersions: "1.21", fits: fits("1.21")),
+                ProjectVersion(id: "\(projectID)-174", name: "1.7.4", gameVersions: "1.20.4", fits: fits("1.20.4")),
+                ProjectVersion(id: "\(projectID)-162", name: "1.6.2", gameVersions: "1.20.1", fits: fits("1.20.1")),
             ]
         }
         public func dependencies(versionID: String, instanceID: String) async throws -> [ProjectDependency] {
