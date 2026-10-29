@@ -226,7 +226,7 @@
                     do {
                         try Task.checkCancellation()
                         if !self.isJITEnabled {
-                            continuation.yield(LaunchProgress(stage: 1, of: 8, title: "JIT", detail: "Enabling JIT"))
+                            continuation.yield(LaunchProgress(stage: 1, of: 7, title: "JIT", detail: "Enabling JIT"))
                             let result = await CofreJIT.enable(pid: getpid(), pairingURL: { self.pairingURL })
                             NSLog("[Cofre] launch JIT status=%@", String(describing: result))
                             try Task.checkCancellation()
@@ -242,26 +242,40 @@
                         }
                         try Task.checkCancellation()
                         NSLog("[Cofre] launch JIT ready; starting Air")
-                        // Air downloads Java, libraries, assets and mods in one task (stages 2–5), then takes over the
-                        // window with its game screen. "downloading:<fraction>", "running", "failed:<message>".
+                        // Air downloads first, then publishes its real launch stages. Completion is emitted only after
+                        // AmeLaunchStageCompleted (the first rendered frame).
                         self.air.launchProfile(instanceID, accountID: accountID) { event in
-                            let parts = event.split(separator: ":", maxSplits: 1).map(String.init)
-                            let value = parts.count > 1 ? parts[1] : ""
-                            switch parts.first ?? "" {
+                            let parts = event.split(separator: ":", maxSplits: 3).map(String.init)
+                            let kind = parts.first ?? ""
+                            switch kind {
                             case "downloading":
-                                let f = min(max(Double(value) ?? 0, 0), 0.999) * 4
+                                let f = min(max(Double(parts.dropFirst().first ?? "0") ?? 0, 0), 0.999)
                                 continuation.yield(
                                     LaunchProgress(
-                                        stage: 2 + Int(f), of: 8, title: "Downloading", fraction: f - f.rounded(.down)))
-                            case "running":
-                                continuation.yield(LaunchProgress(stage: 8, of: 8, title: "In game", finished: true))
+                                        stage: 2, of: 7, title: "Game files", fraction: f))
+                            case "air":
+                                let airStage = Int(parts.count > 1 ? parts[1] : "0") ?? 0
+                                let fraction = Double(parts.count > 2 ? parts[2] : "0") ?? 0
+                                let mapped: (Int, String) = switch airStage {
+                                case 2: (3, "Renderer")
+                                case 3: (4, "Java")
+                                case 4, 5: (5, "Starting Minecraft")
+                                case 6: (6, "Loading")
+                                case 7: (7, "In game")
+                                default: (2, "Game files")
+                                }
+                                NSLog("[Cofre] launch Air stage=%d title=%@ fraction=%.3f", airStage, mapped.1, fraction)
+                                continuation.yield(LaunchProgress(stage: mapped.0, of: 7, title: mapped.1, fraction: fraction))
+                            case "completed":
+                                continuation.yield(LaunchProgress(stage: 7, of: 7, title: "In game", finished: true))
                                 continuation.finish()
                             case "failed":
+                                let value = parts.dropFirst().joined(separator: ":")
                                 continuation.finish(
                                     throwing: NSError(
                                         domain: "CofreAir", code: 1,
                                         userInfo: [
-                                            NSLocalizedDescriptionKey: value.isEmpty
+                                                NSLocalizedDescriptionKey: value.isEmpty
                                                 ? "Minecraft couldn't start. Check the launcher log." : value
                                         ]))
                             default: break
@@ -278,6 +292,7 @@
         public func cancelLaunch() async {
             launchTask?.cancel()
             launchTask = nil
+            air.hideCofreLaunchOverlay()
         }
         public func logLines(_ kind: LogKind) -> AsyncStream<LogLine> {
             AsyncStream { continuation in

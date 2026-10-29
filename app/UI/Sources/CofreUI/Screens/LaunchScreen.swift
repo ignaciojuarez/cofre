@@ -84,10 +84,11 @@
         @Environment(NavModel.self) private var nav
         @Environment(\.widthClass) private var width
         @State private var showLog = false
+        @State private var showHideConfirmation = false
 
         private var stageNames: [String] {
             let java = store.activeInstance?.javaVersion.map { "Java \($0)" } ?? "Java"
-            return ["JIT", java, "Libraries", "Assets", "Mods", "Renderer", "First frame", "In game"]
+            return ["JIT", "Game files", "Renderer", java, "Starting Minecraft", "Loading", "In game"]
         }
 
         var body: some View {
@@ -152,12 +153,7 @@
                         if p?.finished == true || store.launchError != nil {
                             BlockButton("Close", role: .primary) { close() }
                         } else {
-                            BlockButton("Cancel") {
-                                Task {
-                                    await store.cancelLaunch()
-                                    nav.showingLaunch = false
-                                }
-                            }
+                            BlockButton("Hide") { showHideConfirmation = true }
                             .keyboardShortcut(".", modifiers: .command)
                         }
                     }
@@ -170,11 +166,23 @@
                     LogView(lines: store.launchLog).padding(.horizontal, 16).padding(.bottom, 16)
                 }
             }
+            .confirmationDialog("Hide Minecraft launch?", isPresented: $showHideConfirmation) {
+                Button("Hide", role: .destructive) {
+                    Task {
+                        await store.cancelLaunch()
+                        nav.showingLaunch = false
+                    }
+                }
+                Button("Keep waiting", role: .cancel) {}
+            } message: {
+                Text("Java may already be running. Hiding Cofre will leave Minecraft running.")
+            }
         }
 
         private func close() {
             store.launch = nil
             nav.showingLaunch = false
+            Task { await store.cancelLaunch() }
         }
     }
 #endif

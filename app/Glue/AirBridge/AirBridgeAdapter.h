@@ -85,6 +85,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)launchProfile:(NSString *)profile
             accountID:(nullable NSString *)accountID
              progress:(void (^)(NSString *stage))progress;
+- (void)hideCofreLaunchOverlay;
 /// Searches projects from the selected catalog.
 - (void)searchProjects:(NSDictionary *)filters
                 source:(NSInteger)source

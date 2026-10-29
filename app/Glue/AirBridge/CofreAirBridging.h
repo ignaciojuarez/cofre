@@ -65,6 +65,8 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)launchProfile:(NSString *)profile
             accountID:(nullable NSString *)accountID
              progress:(void (^)(NSString *))progress;
+/// Hides Cofre's launch overlay. Java may continue if it already started.
+- (void)hideCofreLaunchOverlay;
 - (void)searchProjects:(NSDictionary *)filters
                 source:(NSInteger)source
             completion:(void (^)(NSArray *, NSError *_Nullable))completion;

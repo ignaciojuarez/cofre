@@ -41,12 +41,18 @@ enum CofreBackendError: LocalizedError {
 @MainActor final class Air {
     var calls = 0
     var fails = false
+    func hideCofreLaunchOverlay() {}
     func launchProfile(_ profile: String, accountID: String?, progress: (String) -> Void) {
         precondition(CofreJIT.enabled, "Air started before JIT")
         precondition(profile == "instance" && accountID == "account")
         calls += 1
         progress("preparing")
-        progress(fails ? "failed" : "running")
+        if fails { progress("failed:Minecraft couldn't start. Check the launcher log.") }
+        else {
+            progress("air:2:0.4:")
+            progress("air:6:0.8:")
+            progress("completed")
+        }
     }
 }
 @MainActor final class Harness {
@@ -84,7 +90,7 @@ ${launch}
             precondition(!rows.contains(where: { $0.finished }))
         } else {
             precondition(failure == nil && backend.air.calls == 1)
-            precondition(rows.last?.finished == true && rows.last?.stage == 8)
+            precondition(rows.last?.finished == true && rows.last?.stage == 7 && rows.last?.of == 7)
         }
         CofreJIT.onEnable = nil
     }
