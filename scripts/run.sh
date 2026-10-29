@@ -10,11 +10,31 @@ APP="$ROOT/artifacts/Payload/$APP_BUNDLE_NAME"
 if (( BUILD )); then
   bt_step "Build ($APP_NAME)"
   AIR="$ROOT/.work/air"
+  find "$AIR" -name CMakeCache.txt -delete
+  find "$AIR" -type d -name CMakeFiles -prune -exec rm -rf {} +
   mkdir -p "$AIR/Natives/Assets.xcassets"
+  mkdir -p "$AIR/Natives/CofreGlue"
+  cp "$ROOT"/app/Glue/AirBridge/AirBridgeAdapter.* "$AIR/Natives/CofreGlue/"
+  cp "$ROOT"/app/Glue/AirBridge/CofreStartup.m "$AIR/Natives/CofreGlue/"
+  cp "$ROOT"/app/Glue/AirBridge/CofreTunnelService.* "$AIR/Natives/CofreGlue/"
+  python3 - <<PY2
+from pathlib import Path
+p=Path("$AIR/Natives/CMakeLists.txt")
+s=p.read_text()
+needle="  main_hook.m\n"
+for f in ("CofreGlue/AirBridgeAdapter.m", "CofreGlue/CofreStartup.m", "CofreGlue/CofreTunnelService.m"):
+    if f not in s: s=s.replace(needle, needle+"  "+f+"\n")
+if "NetworkExtension" not in s: s=s.replace("target_link_libraries(AngelAuraAmethyst", "target_link_libraries(AngelAuraAmethyst\n  -framework NetworkExtension")
+p.write_text(s)
+PY2
+  rm -rf "$ROOT/artifacts/Payload/PlugIns" "$ROOT/artifacts/Payload/Cofre.app/PlugIns" 2>/dev/null || true
   cp -R "$ROOT"/app/Resources/AppIcon/*.appiconset "$AIR/Natives/Assets.xcassets/"
   (cd "$AIR" && eval "gmake -j4 dsym package PLATFORM=2 BOOTJDK=\"$BOOTJDK\" JOBS=4 $MAKE_ARGS")
-  mkdir -p "$ROOT/artifacts/Payload"; unzip -q -o "$(ls -t "$ROOT/.work/air"/artifacts/*-ios.ipa | head -1)" -d "$ROOT/artifacts"
+  mkdir -p "$ROOT/artifacts/Payload"; rm -rf "$APP"; unzip -q -o "$(ls -t "$ROOT/.work/air"/artifacts/*-ios.ipa | head -1)" -d "$ROOT/artifacts"
   mv "$ROOT/artifacts/Payload/AngelAuraAmethyst.app" "$APP"
+  rm -rf "$APP/PlugIns"
+  mkdir -p "$APP/PlugIns"
+  cp -R "$ROOT/.build-tools/signing/build/Build/Products/Debug-iphoneos/PacketTunnel.appex" "$APP/PlugIns/PacketTunnel.appex"
   python3 "$ROOT/scripts/sign-development.py"
 fi
 [[ -d "$APP" ]] || bt_die "no signed app at $APP; run with --build"
