@@ -75,13 +75,19 @@ public struct NavChrome: View {
             Spacer(minLength: 8)
             VStack(spacing: 4) {
                 PixelIcon(.bolt, size: 20)
-                Text(verbatim: "JIT").cofreFont(.label).foregroundStyle(store.isJITReady ? Color.cofre.success : Color.cofre.muted)
+                // Word plus mark, not color alone.
+                Text(verbatim: store.isJITReady ? "JIT ✓" : "JIT ✕").cofreFont(.label)
+                    .foregroundStyle(store.isJITReady ? Color.cofre.success : Color.cofre.muted)
             }
             .padding(.vertical, 8)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(store.isJITReady ? Text("JIT ready") : Text("JIT not ready"))
+            // PixelIcon hides itself from VoiceOver, so the account gets its own element.
             PixelIcon(.head, size: 26).padding(.vertical, 8)
-                .accessibilityLabel(Text(verbatim: store.activeAccount?.name ?? "No account")).accessibilityHidden(false)
+                .overlay {
+                    Color.clear.accessibilityElement()
+                        .accessibilityLabel(store.activeAccount.map { Text("Account \($0.name)") } ?? Text("No account"))
+                }
         }
         .padding(.horizontal, 6).padding(.top, 10).padding(.bottom, 12)
         .frame(width: theme.space.rail)
@@ -124,7 +130,7 @@ public struct NavChrome: View {
                         }
                         .foregroundStyle(Color.cofre.muted)
                         .padding(.horizontal, 12)
-                        .frame(maxWidth: .infinity, minHeight: 36, alignment: .leading)
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)

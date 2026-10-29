@@ -64,7 +64,7 @@ public struct AccentFamily: Sendable, Hashable, Identifiable {
         face: .init(0x5b3fd6), faceBevel: .init(dark: 0x8a74ff, light: 0x8069ef), faceLip: .init(0x3a2694),
         accent: .init(dark: 0x9a86ff, light: 0x5333c9), onFace: .init(0xffffff))
     public static let emerald = AccentFamily(id: "emerald", name: "Emerald",
-        face: .init(0x1f8a4c), faceBevel: .init(0x4cc27e), faceLip: .init(0x0f5a2f),
+        face: .init(0x1a7a43), faceBevel: .init(0x4cc27e), faceLip: .init(0x0f5a2f),
         accent: .init(dark: 0x57d58c, light: 0x136336), onFace: .init(0xffffff))
     public static let copper = AccentFamily(id: "copper", name: "Copper",
         face: .init(0xb4531f), faceBevel: .init(0xe0814a), faceLip: .init(0x7a3410),

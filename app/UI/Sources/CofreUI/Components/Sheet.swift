@@ -25,7 +25,11 @@ struct BlockSheetContent<C: View>: View {
             .presentationDetents(sizeClass == .compact ? [.medium, .large] : [.large])
             .presentationDragIndicator(sizeClass == .compact ? .visible : .hidden)
             .modifier(FormSizing())
-            .onKeyPress(.escape) { dismiss(); return .handled }
+            .background {
+                // Esc: a hidden cancel button works even when nothing in the sheet has focus.
+                Button("Close") { dismiss() }.keyboardShortcut(.cancelAction)
+                    .opacity(0).allowsHitTesting(false).accessibilityHidden(true)
+            }
     }
 }
 

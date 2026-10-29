@@ -19,7 +19,7 @@ public struct ColumnHeader<Trailing: View>: View {
                 if isPushed {
                     Button { dismiss() } label: {
                         Text(verbatim: "‹").cofreFont(.header).foregroundStyle(Color.cofre.accent)
-                            .frame(minWidth: 30, minHeight: 44, alignment: .leading)
+                            .frame(minWidth: 44, minHeight: 44, alignment: .leading)
                     }
                     .buttonStyle(.plain)
                     .keyboardShortcut(.escape, modifiers: [])

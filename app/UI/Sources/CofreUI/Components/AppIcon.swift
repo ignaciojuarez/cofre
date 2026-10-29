@@ -5,10 +5,14 @@ import SwiftUI
 public struct AppIcon: View {
     let size: CGFloat
     public init(size: CGFloat = 30) { self.size = size }
+    /// Decoded once; the rail and sidebar re-render on every store change.
+    private static let image: CGImage? = Bundle.module.url(forResource: "AppIcon", withExtension: "png", subdirectory: "Images")
+        .flatMap { CGImageSourceCreateWithURL($0 as CFURL, nil) }
+        .flatMap { CGImageSourceCreateImageAtIndex($0, 0, nil) }
+
     public var body: some View {
         Group {
-            if let url = Bundle.module.url(forResource: "AppIcon", withExtension: "png", subdirectory: "Images"),
-               let src = CGImageSourceCreateWithURL(url as CFURL, nil), let img = CGImageSourceCreateImageAtIndex(src, 0, nil) {
+            if let img = Self.image {
                 Image(decorative: img, scale: 1).interpolation(.none).resizable()
             } else {
                 PixelIcon(.chest, size: size)
