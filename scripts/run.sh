@@ -31,11 +31,20 @@ if (( BUILD )); then
     grep -qxF "CMAKE_CACHEFILE_DIR:INTERNAL=$dir" "$cache" || { rm -f "$cache"; rm -rf "$dir/CMakeFiles"; }
   done < <(find "$AIR" -name CMakeCache.txt)
   mkdir -p "$AIR/Natives/Assets.xcassets"
-  # Apply every Air patch once, in order (the same patches scripts/update-upstream.sh applies).
-  for patch in "$ROOT"/patches/air/*.patch; do
-    git -C "$AIR" apply --reverse --check "$patch" 2>/dev/null && continue
-    git -C "$AIR" apply "$patch" || bt_die "Air patch does not apply: $(basename "$patch")"
-  done
+  # Apply every Air patch in order (the same patches scripts/update-upstream.sh applies). When the
+  # patch set changes, first restore every file the old and new sets touch, so edited patches apply.
+  stamp="$AIR/.cofre-patches"
+  sum=$(cat "$ROOT"/patches/air/*.patch | shasum | cut -d' ' -f1)
+  if [[ "$(head -n1 "$stamp" 2>/dev/null)" != "$sum" ]]; then
+    while IFS= read -r file; do
+      [[ -n "$file" ]] || continue
+      git -C "$AIR" checkout -q -- "$file" 2>/dev/null || rm -f "${AIR:?}/$file"
+    done < <({ tail -n +2 "$stamp" 2>/dev/null || true; sed -n 's|^+++ b/||p' "$ROOT"/patches/air/*.patch; } | sort -u)
+    for patch in "$ROOT"/patches/air/*.patch; do
+      git -C "$AIR" apply "$patch" || bt_die "Air patch does not apply: $(basename "$patch")"
+    done
+    { echo "$sum"; sed -n 's|^+++ b/||p' "$ROOT"/patches/air/*.patch; } > "$stamp"
+  fi
   rm -rf "$AIR/Natives/CofreGlue" && mkdir -p "$AIR/Natives/CofreGlue"
   cp "$ROOT"/app/Glue/CofreConstants.h "$ROOT"/app/Glue/AirBridge/*.[hm] "$AIR/Natives/CofreGlue/"
   rm -rf "$ROOT/artifacts/Payload/PlugIns" "$ROOT/artifacts/Payload/Cofre.app/PlugIns" 2>/dev/null || true
