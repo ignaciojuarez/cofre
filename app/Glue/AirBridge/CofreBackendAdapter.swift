@@ -21,6 +21,9 @@ public final class CofreBackendAdapter: NSObject, CofreBackend {
         let d = UserDefaults.standard
         if d.object(forKey: "cofre.setup.pairing") != nil { setup.pairing = d.bool(forKey: "cofre.setup.pairing") ? .ready : .blocked }
         if d.object(forKey: "cofre.setup.vpn") != nil { setup.vpn = d.bool(forKey: "cofre.setup.vpn") ? .ready : .blocked }
+        if d.object(forKey: "cofre.setup.trust") != nil { setup.trust = d.bool(forKey: "cofre.setup.trust") ? .ready : .blocked }
+        if d.object(forKey: "cofre.setup.account") != nil { setup.account = d.bool(forKey: "cofre.setup.account") ? .ready : .blocked }
+        if d.object(forKey: "cofre.setup.devMode") != nil { setup.devMode = d.bool(forKey: "cofre.setup.devMode") ? .ready : .blocked }
         if d.object(forKey: "cofre.setup.jit") != nil { setup.jit = d.bool(forKey: "cofre.setup.jit") ? .ready : .blocked }
     }
     public override init() { super.init(); loadPersistedSetup() }
@@ -34,9 +37,15 @@ public final class CofreBackendAdapter: NSObject, CofreBackend {
         }
     }
     public func recheckSetup() async {
-        setup.pairing = hasPairing() ? .ready : .blocked
-        setup.vpn = isVPNRunning ? .ready : .unknown
-        setup.jit = isJITEnabled ? .ready : .blocked
+        let key = hasPairing()
+        let accountReady = (try? await accounts().isEmpty == false) ?? false
+        let vpnReady = await vpnManagerEnabled()
+        setup.pairing = key ? .ready : .failed("Import a valid pairing file")
+        setup.trust = key ? .ready : .failed("Trust this iPhone, then import its key")
+        setup.account = accountReady ? .ready : .failed("Sign in with Microsoft")
+        setup.vpn = vpnReady ? .ready : .failed("Allow Cofre's VPN")
+        setup.jit = isJITEnabled ? .ready : .failed("Run Test JIT after pairing")
+        setup.devMode = isJITEnabled ? .ready : .failed("Enable Developer Mode")
         persistSetup()
         setupContinuations.forEach { $0.yield(setup) }
     }
@@ -118,9 +127,19 @@ public final class CofreBackendAdapter: NSObject, CofreBackend {
 
     private var pairingURL: URL { FileManager.default.urls(for:.documentDirectory,inDomains:.userDomainMask)[0].appendingPathComponent("StikJIT/pairingFile.plist") }
     private func logURL(_ kind: LogKind) -> URL { FileManager.default.urls(for:.documentDirectory,inDomains:.userDomainMask)[0].appendingPathComponent(kind == .latest ? "latestlog.txt" : "latestlog.txt") }
+    private func vpnManagerEnabled() async -> Bool {
+        await withCheckedContinuation { continuation in
+            NETunnelProviderManager.loadAllFromPreferences { managers, _ in
+                continuation.resume(returning: managers?.contains { $0.isEnabled && $0.protocolConfiguration is NETunnelProviderProtocol && (($0.protocolConfiguration as? NETunnelProviderProtocol)?.providerBundleIdentifier == "com.ignaciojuarez.cofre.tunnel") } ?? false)
+            }
+        }
+    }
     private func persistSetup() {
         let d = UserDefaults.standard
         d.set(setup.pairing.isReady, forKey: "cofre.setup.pairing")
+        d.set(setup.trust.isReady, forKey: "cofre.setup.trust")
+        d.set(setup.account.isReady, forKey: "cofre.setup.account")
+        d.set(setup.devMode.isReady, forKey: "cofre.setup.devMode")
         d.set(setup.vpn.isReady, forKey: "cofre.setup.vpn")
         d.set(setup.jit.isReady, forKey: "cofre.setup.jit")
     }
