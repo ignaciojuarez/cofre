@@ -133,7 +133,8 @@
             let loader = Loader(rawValue: (d["loader"] as? String ?? "vanilla").lowercased()) ?? .vanilla
             return InstanceSummary(
                 id: id, name: d["name"] as? String ?? id, loader: loader,
-                gameVersion: d["version"] as? String ?? "", loaderVersion: d["loaderVersion"] as? String,
+                gameVersion: d["version"] as? String ?? "",
+                loaderVersion: (d["loaderVersion"] as? String).flatMap { $0.isEmpty ? nil : $0 },
                 ownFolder: d["ownFolder"] as? Bool ?? true)
         }
 

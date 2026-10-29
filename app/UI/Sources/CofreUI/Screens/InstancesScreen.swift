@@ -197,7 +197,7 @@
                         Segmented(
                             "Instance", selection: $tab,
                             options: [
-                                (0, "Overview"), (1, "Mods · \(inst.modCount ?? 0)"),
+                                (0, "Overview"), (1, "Mods · \(modCount(inst))"),
                                 (2, "Worlds · \(store.worlds.count)"), (3, "Options"),
                             ])
                         switch tab {
@@ -217,10 +217,15 @@
             }
         }
 
+        /// The live list when it's this instance's, so the count matches the rows below.
+        private func modCount(_ inst: InstanceSummary) -> Int {
+            store.modsInstance?.id == inst.id ? store.installed[.mods]?.count ?? inst.modCount ?? 0 : inst.modCount ?? 0
+        }
+
         @ViewBuilder private func overview(_ inst: InstanceSummary) -> some View {
             let prefs = store.preferences(for: inst.id)
             AdaptiveGrid(minItem: 110) {
-                Stat("\(inst.modCount ?? 0)", label: "Mods")
+                Stat("\(modCount(inst))", label: "Mods")
                 Stat(Fmt.bytes(inst.sizeBytes) ?? "—", label: "Size")
                 Stat("\(inst.updatesAvailable)", label: "Updates", tone: inst.updatesAvailable > 0 ? .warn : .neutral)
                 Stat(Fmt.ago(inst.lastPlayed) ?? "—", label: "Played")

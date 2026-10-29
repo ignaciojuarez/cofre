@@ -101,7 +101,7 @@
         }
 
         public func instances() async throws -> [InstanceSummary] {
-            air.instances().compactMap { d in
+            var list: [InstanceSummary] = air.instances().compactMap { d in
                 guard let id = d["id"] as? String else { return nil }
                 let loader = Loader(rawValue: (d["loader"] as? String ?? "vanilla").lowercased()) ?? .vanilla
                 return InstanceSummary(
@@ -111,6 +111,10 @@
                     ownFolder: d["ownFolder"] as? Bool ?? true
                 )
             }
+            for i in list.indices where list[i].loader != .vanilla {
+                list[i].modCount = try? await installed(.mods, instanceID: list[i].id).count
+            }
+            return list
         }
         public func worlds(instanceID: String) async throws -> [WorldSummary] {
             try await callback { done in self.air.worlds(forProfile: instanceID) { done($0 as? [Any] ?? []) } }.map { d in
