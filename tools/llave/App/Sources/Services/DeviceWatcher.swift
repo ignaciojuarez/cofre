@@ -33,7 +33,8 @@ public final class DeviceWatcher: DeviceWatcherProtocol, @unchecked Sendable {
 
     public static func resolveBinary() -> URL? {
         if let res = Bundle.main.url(forResource: "llave-pair", withExtension: nil),
-           FileManager.default.isExecutableFile(atPath: res.path) {
+            FileManager.default.isExecutableFile(atPath: res.path)
+        {
             return res
         }
         let devPaths = [
@@ -41,7 +42,7 @@ public final class DeviceWatcher: DeviceWatcherProtocol, @unchecked Sendable {
             "/usr/local/bin/llave-pair",
             FileManager.default.currentDirectoryPath + "/core/target/release/llave-pair",
             FileManager.default.currentDirectoryPath + "/llave/core/target/release/llave-pair",
-            FileManager.default.currentDirectoryPath + "/../core/target/release/llave-pair"
+            FileManager.default.currentDirectoryPath + "/../core/target/release/llave-pair",
         ]
         for p in devPaths {
             if FileManager.default.isExecutableFile(atPath: p) {

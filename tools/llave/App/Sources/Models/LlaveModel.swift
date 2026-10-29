@@ -1,5 +1,5 @@
-import Foundation
 import Combine
+import Foundation
 
 @MainActor
 public final class LlaveModel: ObservableObject {
@@ -22,7 +22,8 @@ public final class LlaveModel: ObservableObject {
     private var pairingDeviceUDID: String?
 
     public init(
-        deviceWatcherFactory: @escaping (Bool) -> DeviceWatcherProtocol = { isSim in DeviceWatcher(isSimulating: isSim) },
+        deviceWatcherFactory: @escaping (Bool) -> DeviceWatcherProtocol = { isSim in DeviceWatcher(isSimulating: isSim)
+        },
         pairingService: PairingServiceProtocol = PairingService(),
         airDropService: AirDropServiceProtocol = AirDropService(),
         isSimulating: Bool = false
@@ -33,7 +34,6 @@ public final class LlaveModel: ObservableObject {
         self.isSimulating = isSimulating
         restartWatcher()
     }
-
 
     public func restartWatcher() {
         deviceWatcher?.stop()
@@ -55,8 +55,11 @@ public final class LlaveModel: ObservableObject {
         detectedDevices = devices
         guard let selectedUDID = pairingDeviceUDID else {
             // Only the initial waiting state may auto-start pairing.
-            if case .noDevice = state { transitionToDefaultDeviceState(devices) }
-            else if case .multipleDevices = state { transitionToDefaultDeviceState(devices) }
+            if case .noDevice = state {
+                transitionToDefaultDeviceState(devices)
+            } else if case .multipleDevices = state {
+                transitionToDefaultDeviceState(devices)
+            }
             return
         }
         guard devices.contains(where: { $0.udid == selectedUDID }) else {
@@ -122,7 +125,13 @@ public final class LlaveModel: ObservableObject {
         case .validated:
             state = .placing(device)
         case .error(let code, let message):
-            if message.localizedCaseInsensitiveContains("not installed") { state = .cofreMissing(device) } else if code == "PAIRING_FAILED" && message.localizedCaseInsensitiveContains("placement") { state = .placementFailed(device, message) } else { state = .error(LlaveError(code: code, message: message)) }
+            if message.localizedCaseInsensitiveContains("not installed") {
+                state = .cofreMissing(device)
+            } else if code == "PAIRING_FAILED" && message.localizedCaseInsensitiveContains("placement") {
+                state = .placementFailed(device, message)
+            } else {
+                state = .error(LlaveError(code: code, message: message))
+            }
         }
     }
 
@@ -166,7 +175,8 @@ public final class LlaveModel: ObservableObject {
     }
 
     private func makeTemporaryPairingURL(deviceName: String) -> URL {
-        let sanitized = deviceName
+        let sanitized =
+            deviceName
             .components(separatedBy: CharacterSet.alphanumerics.inverted)
             .filter { !$0.isEmpty }
             .joined(separator: " ")

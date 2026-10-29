@@ -1,9 +1,18 @@
 import Foundation
 
-public enum PairingFileValidationError: Error, Equatable { case notDictionary, missing(String), wrongType(String), empty(String), tooLarge(String), invalid(String) }
+public enum PairingFileValidationError: Error, Equatable {
+    case notDictionary
+    case missing(String)
+    case wrongType(String)
+    case empty(String)
+    case tooLarge(String)
+    case invalid(String)
+}
 
 public enum PairingFileValidator {
-    public static let requiredKeys = ["HostID", "HostCertificate", "HostPrivateKey", "RootCertificate", "RootPrivateKey", "SystemBUID", "UDID"]
+    public static let requiredKeys = [
+        "HostID", "HostCertificate", "HostPrivateKey", "RootCertificate", "RootPrivateKey", "SystemBUID", "UDID",
+    ]
     private static let maxString = 256
     private static let maxBlob = 64 * 1024
     @discardableResult public static func validate(_ data: Data, requireRemotePairing: Bool = false) throws -> String {
@@ -19,7 +28,13 @@ public enum PairingFileValidator {
             guard !value.isEmpty else { throw PairingFileValidationError.empty(key) }
             guard value.count <= maxBlob else { throw PairingFileValidationError.tooLarge(key) }
         }
-        if requireRemotePairing { for key in ["EscrowBag", "PairingCertificate", "PairingPrivateKey"] { guard let value = dict[key] as? Data, !value.isEmpty else { throw PairingFileValidationError.missing(key) } } }
+        if requireRemotePairing {
+            for key in ["EscrowBag", "PairingCertificate", "PairingPrivateKey"] {
+                guard let value = dict[key] as? Data, !value.isEmpty else {
+                    throw PairingFileValidationError.missing(key)
+                }
+            }
+        }
         return dict["UDID"] as! String
     }
 }

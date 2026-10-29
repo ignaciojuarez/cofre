@@ -15,7 +15,8 @@ public final class PairingService: PairingServiceProtocol, @unchecked Sendable {
         AsyncThrowingStream { continuation in
             Task.detached { [binaryURL] in
                 guard let bin = binaryURL, FileManager.default.isExecutableFile(atPath: bin.path) else {
-                    continuation.finish(throwing: LlaveError(code: "CLI_NOT_FOUND", message: "llave-pair binary not found"))
+                    continuation.finish(
+                        throwing: LlaveError(code: "CLI_NOT_FOUND", message: "llave-pair binary not found"))
                     return
                 }
 
@@ -43,7 +44,8 @@ public final class PairingService: PairingServiceProtocol, @unchecked Sendable {
                         let lineData = buffer.subdata(in: buffer.startIndex..<newlineRange.lowerBound)
                         buffer.removeSubrange(buffer.startIndex...newlineRange.lowerBound)
                         if let line = String(data: lineData, encoding: .utf8),
-                           let event = LlaveEvent.parse(line: line) {
+                            let event = LlaveEvent.parse(line: line)
+                        {
                             continuation.yield(event)
                         }
                     }
