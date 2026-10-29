@@ -43,7 +43,7 @@ struct BlockSheetContent<C: View>: View {
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
             .frame(width: hugsContent && !compact ? 420 : nil)
             .presentationBackground(Color.cofre.panel)
-            .presentationDetents(hugsContent ? [.height(height)] : compact ? [.medium, .large] : [.large])
+            .presentationDetents(hugsContent ? [.height(height)] : compact ? [.fraction(0.75), .large] : [.large])
             .presentationDragIndicator(compact ? .visible : .hidden)
             .modifier(FormSizing(fitted: hugsContent))
             .background {
