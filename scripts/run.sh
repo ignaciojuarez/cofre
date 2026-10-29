@@ -36,7 +36,8 @@ PY2
   rm -rf "$ROOT/artifacts/Payload/PlugIns" "$ROOT/artifacts/Payload/Cofre.app/PlugIns" 2>/dev/null || true
   cp -R "$ROOT"/app/Resources/AppIcon/*.appiconset "$AIR/Natives/Assets.xcassets/"
   (cd "$AIR" && eval "gmake -j4 dsym package PLATFORM=2 BOOTJDK=\"$BOOTJDK\" JOBS=4 $MAKE_ARGS")
-  mkdir -p "$ROOT/artifacts/Payload"; rm -rf "$APP"; IPA=$(find "$ROOT/.work/air/artifacts" -maxdepth 1 -type f -name "*-ios.ipa" -print -quit); [[ -n "$IPA" && -f "$IPA" ]] || bt_die "no IPA artifact"; unzip -q -o "$IPA" -d "$ROOT/artifacts"
+  mkdir -p "$ROOT/artifacts/Payload"; rm -rf "$APP"; IPA=$(find "$ROOT/.work/air/artifacts" -maxdepth 1 -type f -name "*-ios.ipa" -print -quit)
+  if [[ -n "$IPA" && -f "$IPA" ]]; then unzip -q -o "$IPA" -d "$ROOT/artifacts"; else BUILT_APP=$(find "$AIR/Natives/build" -maxdepth 1 -type d -name "*.app" -print -quit); [[ -n "$BUILT_APP" && -d "$BUILT_APP" ]] || bt_die "no IPA or app artifact"; cp -R "$BUILT_APP" "$ROOT/artifacts/Payload/AngelAuraAmethyst.app"; fi
   mv "$ROOT/artifacts/Payload/AngelAuraAmethyst.app" "$APP"
   INFO="$APP/Info.plist"
   /usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes array" "$INFO" 2>/dev/null || /usr/libexec/PlistBuddy -c "Print :CFBundleDocumentTypes" "$INFO" >/dev/null || bt_die "plist document types failed"
