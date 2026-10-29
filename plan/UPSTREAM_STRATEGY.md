@@ -13,11 +13,14 @@ Measured with `git ls-files` and `wc -l` (tracked source files; generated/binary
 | `tools/` | 28 | **2,253** | Llave pairing helper and server-card CLI |
 | `scripts/` | 7 | **315** | Cofre build/update/sign tooling |
 | **Our tracked code total** | **112** | **14,426** | |
-| Air `Natives/` | 5,435 | **4,474,770** | Air engine/UI/native bridge (raw tree; includes some bundled/generated source) |
+| Air's own code (Natives + JavaApp, excluding vendored trees) | ~600 | **156,901** | UI 78k (replaced by CofreUI), services 41k (mods, downloads, installers, auth, worlds, servers), launch core 37k (JVM boot, GL/Metal bridges, input, JIT/TXM, audio) |
+| Third-party vendored in Air (`Natives/external`, `ThirdParty`) | — | **~4,977,000** | JREs, LWJGL, renderers, shader compilers, ZeroTier: not Air's work |
 | Air `JavaApp/` | 68 | **9,084** | Air Java-side launcher/services |
 | Air `installers/` | 0 | 0 | No directory in this checkout; installers live under Air `Natives` |
 
-Air is therefore roughly **311×** our tracked source by lines before counting its third-party trees. `upstream/air/ThirdParty` and `lwjgl-lib` contain vendored renderer/runtime source and binaries; JREs, LWJGL, MobileGlues/GL4ES/ANGLE/Metal layers, ZeroTier/idevice and StikJIT remain third-party regardless of architecture. They are not Cofre-owned code.
+About 97% of the Air tree is vendored third-party code. Air's own code is ~157k lines, about 11× ours, and we have already replaced its 78k-line UI. The part we truly depend on is the ~37k-line launch core.
+
+**Strategy refinement (shrink, don't rewrite):** keep Air for the launch core. Move services (mods, downloads, worlds, servers) into Cofre's Swift code when we touch them, as server join already is. If Air ever goes away, forking just the launch core is a manageable job. `upstream/air/ThirdParty` and `lwjgl-lib` contain vendored renderer/runtime source and binaries; JREs, LWJGL, MobileGlues/GL4ES/ANGLE/Metal layers, ZeroTier/idevice and StikJIT remain third-party regardless of architecture. They are not Cofre-owned code.
 
 ### Air runtime still used
 
