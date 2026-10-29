@@ -4,8 +4,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"; APP_ROOT="$ROOT"
 BUILD_TOOLS="${BUILD_TOOLS:-<local-volume>/Developer/kiwios/tools/build-runners}"
 source "$BUILD_TOOLS/lib/common.sh"; source "$BUILD_TOOLS/lib/device.sh"; source "$BUILD_TOOLS/lib/relay.sh"
 source "$ROOT/scripts/run.config"; [[ ! -f "$ROOT/scripts/run.local.config" ]] || source "$ROOT/scripts/run.local.config"
-BUILD=0
-for a in "$@"; do case "$a" in --build) BUILD=1;; --relay-host=*) RELAY_HOST=${a#*=};; --device=*) RELAY_DEVICE_ID=${a#*=};; *) bt_die "unknown option: $a";; esac; done
+BUILD=0; SQIM=0
+for a in "$@"; do case "$a" in --build) BUILD=1;; --sqim) SQIM=1;; --relay-host=*) RELAY_HOST=${a#*=};; --device=*) RELAY_DEVICE_ID=${a#*=};; *) bt_die "unknown option: $a";; esac; done
 APP="$ROOT/artifacts/Payload/$APP_BUNDLE_NAME"
 if (( BUILD )); then
   bt_step "Build ($APP_NAME)"
@@ -16,4 +16,5 @@ if (( BUILD )); then
 fi
 [[ -d "$APP" ]] || bt_die "no signed app at $APP; run with --build"
 codesign -d --entitlements - "$APP" 2>/dev/null | grep -q get-task-allow || bt_die "not development-signed"
+if (( SQIM )); then bt_sqim_upload "$APP"; exit 0; fi
 bt_relay_preflight; bt_relay_install "$APP" "$BUNDLE_ID"
