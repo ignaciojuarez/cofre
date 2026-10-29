@@ -3,6 +3,9 @@ options:
   deploymentTarget:
     macOS: '14.0'
   bundleIdPrefix: com.ignaciojuarez
+packages:
+  CofreUI:
+    path: ../../../app/UI
 settings:
   base:
     SWIFT_VERSION: 5.9
@@ -13,10 +16,16 @@ targets:
   Llave:
     type: application
     platform: macOS
-    sources: [Sources]
-    resources: [Resources]
+    sources:
+      - Sources
+      - path: Resources
+        buildPhase: resources
+        excludes: [Info.plist]
+    dependencies:
+      - package: CofreUI
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.ignaciojuarez.llave
+      INFOPLIST_FILE: Resources/Info.plist
       INFOPLIST_KEY_CFBundleDisplayName: Llave
       INFOPLIST_KEY_LSMinimumSystemVersion: '14.0'
       GENERATE_INFOPLIST_FILE: YES

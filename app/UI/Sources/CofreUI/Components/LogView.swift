@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import SwiftUI
 
 // §2 #24 LogView: live or static, colored by tag. One VoiceOver element labelled "Log".
@@ -40,3 +41,4 @@ public struct LogView: View {
         }
     }
 }
+#endif

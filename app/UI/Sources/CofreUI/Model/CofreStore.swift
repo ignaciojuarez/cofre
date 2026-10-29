@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import SwiftUI
 
 /// UI state for every screen. Screens read this; it calls the `CofreBackend` protocols.
@@ -315,3 +316,4 @@ public final class CofreStore {
         do { try await body() } catch { lastError = error.localizedDescription }
     }
 }
+#endif

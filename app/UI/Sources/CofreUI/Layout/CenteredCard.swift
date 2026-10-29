@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import SwiftUI
 
 // §3.2 CenteredCard: full screen on compact; a 560 pt card over a PixelScene on regular (Setup, Ready).
@@ -50,3 +51,4 @@ public struct CenteredCard<C: View>: View {
         }
     }
 }
+#endif

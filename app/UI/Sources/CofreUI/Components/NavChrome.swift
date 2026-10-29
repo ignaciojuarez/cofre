@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import SwiftUI
 
 // §2 #27 NavChrome: one NAV list rendered as tab bar (compact), 76 pt rail (medium) or 248 pt sidebar (expanded).
@@ -190,3 +191,4 @@ public struct InstanceGlyph: View {
         }
     }
 }
+#endif

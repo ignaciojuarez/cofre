@@ -1,6 +1,12 @@
 import CoreText
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+typealias PlatformFont = UIFont
+#else
+import AppKit
+typealias PlatformFont = NSFont
+#endif
 
 // DESIGN_SYSTEM §1.2 and §5.4. Fonts ship in Resources/Fonts (SIL OFL 1.1, see OFL.txt).
 
@@ -10,7 +16,7 @@ public enum TextRole: CaseIterable, Sendable {
     case chip, navSmall, stat, headerCompact, displayCompact
 
     struct Spec {
-        let face: String, size: CGFloat, style: Font.TextStyle, uiStyle: UIFont.TextStyle
+        let face: String, size: CGFloat, style: Font.TextStyle, uiStyle: PlatformFont.TextStyle
         var tracking: CGFloat = 0, uppercase = false, lineSpacing: CGFloat = 0, boldFace: String? = nil
     }
 
@@ -81,12 +87,17 @@ public extension Font {
     /// Ligatures and contextual alternates are off, as in the mockups (Pixelify's "fi" ligature breaks the pixel grid).
     static func cofre(_ role: TextRole, bold: Bool = false, typeSize: DynamicTypeSize = .large) -> Font {
         let s = role.spec
+        #if canImport(UIKit)
         let traits = UITraitCollection(preferredContentSizeCategory: UIContentSizeCategory(typeSize))
         let size = UIFontMetrics(forTextStyle: s.uiStyle).scaledValue(for: s.size, compatibleWith: traits)
+        #else
+        let size = s.size // macOS has no Dynamic Type.
+        #endif
         return Font(CofreFonts.ctFont(bold ? (s.boldFace ?? s.face) : s.face, size: size))
     }
 }
 
+#if canImport(UIKit)
 public extension UIFont {
     /// Same role for UIKit, scaled with `UIFontMetrics`.
     static func cofre(_ role: TextRole) -> UIFont {
@@ -96,6 +107,7 @@ public extension UIFont {
         return UIFontMetrics(forTextStyle: s.uiStyle).scaledFont(for: base)
     }
 }
+#endif
 
 extension CofreFonts {
     private static let cache = NSCache<NSString, CTFont>()

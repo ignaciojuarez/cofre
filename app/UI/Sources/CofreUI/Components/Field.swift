@@ -56,7 +56,10 @@ public struct Field: View {
         switch kind {
         case .secure: SecureField(text: $text, prompt: placeholder) { Text(title) }
         case .mono: TextField(text: $text, prompt: placeholder, axis: .vertical) { Text(title) }
-            .autocorrectionDisabled().textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            #if os(iOS)
+            .textInputAutocapitalization(.never)
+            #endif
         case .search: TextField(text: $text, prompt: placeholder) { Text(title) }
             .autocorrectionDisabled().submitLabel(.search)
         case .plain: TextField(text: $text, prompt: placeholder) { Text(title) }

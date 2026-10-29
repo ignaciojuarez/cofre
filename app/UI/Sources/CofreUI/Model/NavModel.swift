@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import SwiftUI
 
 // §3.3: one nav model per window. All navigation state lives here, not in view identity,
@@ -90,3 +91,4 @@ public enum AirScreenRoute: Identifiable, Hashable, Sendable {
     case controlsEditor, forgeInstaller(String)
     public var id: String { switch self { case .controlsEditor: "controls"; case .forgeInstaller(let i): "forge-\(i)" } }
 }
+#endif

@@ -1,3 +1,4 @@
+import ImageIO
 import SwiftUI
 
 /// §2 #17 AppIcon: placeholder chest (`cofre-design/icons/01-vanilla.png`). Decorative.
@@ -7,8 +8,8 @@ public struct AppIcon: View {
     public var body: some View {
         Group {
             if let url = Bundle.module.url(forResource: "AppIcon", withExtension: "png", subdirectory: "Images"),
-               let img = UIImage(contentsOfFile: url.path) {
-                Image(uiImage: img).interpolation(.none).resizable()
+               let src = CGImageSourceCreateWithURL(url as CFURL, nil), let img = CGImageSourceCreateImageAtIndex(src, 0, nil) {
+                Image(decorative: img, scale: 1).interpolation(.none).resizable()
             } else {
                 PixelIcon(.chest, size: size)
             }

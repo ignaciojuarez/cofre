@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -181,3 +182,4 @@ struct PairingGuide: View {
         ShareLink(item: url) { Text("Send to Mac") }.buttonStyle(.block(size: .small))
     }
 }
+#endif

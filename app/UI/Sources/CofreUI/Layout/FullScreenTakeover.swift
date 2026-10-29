@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import SwiftUI
 
 // §3.2 FullScreenTakeover: hides the shell (Launch, controls editor, game). Same on every width.
@@ -22,3 +23,4 @@ struct TakeoverContent<C: View>: View {
             .statusBarHidden(false)
     }
 }
+#endif

@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
@@ -138,3 +139,4 @@ final class CofreUITests: XCTestCase {
         return (max(l1, l2) + 0.05) / (min(l1, l2) + 0.05)
     }
 }
+#endif

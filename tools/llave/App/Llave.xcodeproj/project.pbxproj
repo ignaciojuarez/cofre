@@ -14,12 +14,18 @@
 		29A3003DC219E654B9A655DD /* LlaveEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1A2247BFC4263EDE510C512 /* LlaveEvent.swift */; };
 		36912DAD1E1CD992A322236C /* LlaveApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF5E9969C08CA12F637249C8 /* LlaveApp.swift */; };
 		3A83505B474BA7F498CE44BC /* LlaveError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24D8A8B02D17C6FE7F4D1844 /* LlaveError.swift */; };
+		5D061E4004AE1CE17AF31147 /* Llave.icns in Resources */ = {isa = PBXBuildFile; fileRef = F923B555F9F77635917528A7 /* Llave.icns */; };
+		60A581E9C21F799CF5C84102 /* CofreUI in Frameworks */ = {isa = PBXBuildFile; productRef = C4A8CEE2D6650C0DBAF19736 /* CofreUI */; };
+		62635E9826073555475CB786 /* StateScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F0688BEA18CD714413B15E6 /* StateScreen.swift */; };
+		82503F1886B3DD1AEB1C7E13 /* llave-pair in Resources */ = {isa = PBXBuildFile; fileRef = 739DFF0388BFAC98A92CF059 /* llave-pair */; };
 		85B18C809D7A871F8C15FEAE /* PairingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FFD41CA2D32D0D2F6DDCD30 /* PairingService.swift */; };
 		89EBFE322A7D79F71CB4C808 /* Device.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0577A0019B49A30BB92FAA8 /* Device.swift */; };
 		8EF5862A4A18F8E62C8E563D /* StateMachineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D16B503EA0715E3A5EE5AA5 /* StateMachineTests.swift */; };
+		9180E7C355C6BAC82586D4EA /* PreviewState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30FE541594336ECE05FF9B59 /* PreviewState.swift */; };
 		A7919A88A1CB9DE0F38A857F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AF03BF59257B3221D57FF15 /* ContentView.swift */; };
 		E74C1A8141F2C5D9830FE8D8 /* LlaveModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9315B0A24D5107EFC84DBFF3 /* LlaveModel.swift */; };
 		F49EE00FEA557440D830ED30 /* EventParsingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 030D06139229B856BAF3426E /* EventParsingTests.swift */; };
+		F90A6ABAD30EC4E58B553515 /* PairingStage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75A5611EBFB5C7F26CE65F13 /* PairingStage.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -33,11 +39,16 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		01BD9831757B0F401B72CC88 /* UI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = UI; path = ../../../app/UI; sourceTree = SOURCE_ROOT; };
 		030D06139229B856BAF3426E /* EventParsingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventParsingTests.swift; sourceTree = "<group>"; };
+		0F0688BEA18CD714413B15E6 /* StateScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StateScreen.swift; sourceTree = "<group>"; };
 		24D8A8B02D17C6FE7F4D1844 /* LlaveError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LlaveError.swift; sourceTree = "<group>"; };
 		2695B746516762BD20C9A1CD /* LlaveTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LlaveTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		2D16B503EA0715E3A5EE5AA5 /* StateMachineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StateMachineTests.swift; sourceTree = "<group>"; };
+		30FE541594336ECE05FF9B59 /* PreviewState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewState.swift; sourceTree = "<group>"; };
 		3A6CE21C4906E44A8A947670 /* DeviceWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceWatcher.swift; sourceTree = "<group>"; };
+		739DFF0388BFAC98A92CF059 /* llave-pair */ = {isa = PBXFileReference; path = "llave-pair"; sourceTree = "<group>"; };
+		75A5611EBFB5C7F26CE65F13 /* PairingStage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingStage.swift; sourceTree = "<group>"; };
 		895A51961B08D31882CDF4F0 /* LlaveState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LlaveState.swift; sourceTree = "<group>"; };
 		8FFD41CA2D32D0D2F6DDCD30 /* PairingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingService.swift; sourceTree = "<group>"; };
 		9315B0A24D5107EFC84DBFF3 /* LlaveModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LlaveModel.swift; sourceTree = "<group>"; };
@@ -47,14 +58,28 @@
 		A0577A0019B49A30BB92FAA8 /* Device.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Device.swift; sourceTree = "<group>"; };
 		CF5E9969C08CA12F637249C8 /* LlaveApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LlaveApp.swift; sourceTree = "<group>"; };
 		E1A2247BFC4263EDE510C512 /* LlaveEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LlaveEvent.swift; sourceTree = "<group>"; };
+		F923B555F9F77635917528A7 /* Llave.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = Llave.icns; sourceTree = "<group>"; };
 		FFF58445A19DDAF850DA6F91 /* AirDropService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirDropService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		29D8BBBA447083570DD342C7 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				60A581E9C21F799CF5C84102 /* CofreUI in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		0ABCC28264DEFEF60257EDA5 = {
 			isa = PBXGroup;
 			children = (
 				0F969CA3FDD4B0A55ED1A0C5 /* LlaveTests */,
+				C6C19C37C80687A4011704E3 /* Packages */,
+				E20018C85F330A3FA6E3A528 /* Resources */,
 				5CD894B1E349B6269DEE6F7B /* Sources */,
 				B9E18C59DA2C230F16755B9F /* Products */,
 			);
@@ -96,6 +121,9 @@
 			isa = PBXGroup;
 			children = (
 				9AF03BF59257B3221D57FF15 /* ContentView.swift */,
+				75A5611EBFB5C7F26CE65F13 /* PairingStage.swift */,
+				30FE541594336ECE05FF9B59 /* PreviewState.swift */,
+				0F0688BEA18CD714413B15E6 /* StateScreen.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -119,6 +147,23 @@
 				2695B746516762BD20C9A1CD /* LlaveTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		C6C19C37C80687A4011704E3 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				01BD9831757B0F401B72CC88 /* UI */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		E20018C85F330A3FA6E3A528 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				739DFF0388BFAC98A92CF059 /* llave-pair */,
+				F923B555F9F77635917528A7 /* Llave.icns */,
+			);
+			path = Resources;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -147,6 +192,8 @@
 			buildConfigurationList = D2D39F893A9A40E2A89FF28B /* Build configuration list for PBXNativeTarget "Llave" */;
 			buildPhases = (
 				70028A15B0EB1DC134E88C81 /* Sources */,
+				ADF3F418CD28806E5B062166 /* Resources */,
+				29D8BBBA447083570DD342C7 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -154,6 +201,7 @@
 			);
 			name = Llave;
 			packageProductDependencies = (
+				C4A8CEE2D6650C0DBAF19736 /* CofreUI */,
 			);
 			productName = Llave;
 			productReference = 9F7151E70E11B0F933D1AEA9 /* Llave.app */;
@@ -187,6 +235,9 @@
 			);
 			mainGroup = 0ABCC28264DEFEF60257EDA5;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				901E1F01BF3F1F7D561AE46F /* XCLocalSwiftPackageReference "../../../app/UI" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B9E18C59DA2C230F16755B9F /* Products */;
 			projectDirPath = "";
@@ -197,6 +248,18 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		ADF3F418CD28806E5B062166 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5D061E4004AE1CE17AF31147 /* Llave.icns in Resources */,
+				82503F1886B3DD1AEB1C7E13 /* llave-pair in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		70028A15B0EB1DC134E88C81 /* Sources */ = {
@@ -213,6 +276,9 @@
 				E74C1A8141F2C5D9830FE8D8 /* LlaveModel.swift in Sources */,
 				146746DF990E668CD9C3A457 /* LlaveState.swift in Sources */,
 				85B18C809D7A871F8C15FEAE /* PairingService.swift in Sources */,
+				F90A6ABAD30EC4E58B553515 /* PairingStage.swift in Sources */,
+				9180E7C355C6BAC82586D4EA /* PreviewState.swift in Sources */,
+				62635E9826073555475CB786 /* StateScreen.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -277,6 +343,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				COMBINE_HIDPI_IMAGES = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Resources/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Llave;
 				INFOPLIST_KEY_LSMinimumSystemVersion = 14.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -354,6 +421,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				COMBINE_HIDPI_IMAGES = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Resources/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Llave;
 				INFOPLIST_KEY_LSMinimumSystemVersion = 14.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -463,6 +531,20 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		901E1F01BF3F1F7D561AE46F /* XCLocalSwiftPackageReference "../../../app/UI" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../../app/UI;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		C4A8CEE2D6650C0DBAF19736 /* CofreUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CofreUI;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = C82761B629467AA407A0AE98 /* Project object */;
 }

@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import SwiftUI
 import UIKit
 
@@ -81,3 +82,4 @@ struct AirScreenHost: UIViewControllerRepresentable {
     }
     func updateUIViewController(_ vc: CofreAirHostController, context: Context) {}
 }
+#endif

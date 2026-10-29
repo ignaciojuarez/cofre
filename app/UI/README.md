@@ -3,6 +3,10 @@
 Cofre's whole UI as one SwiftUI package (iOS 17+). iPhone and iPad render the **same panes**; only the container
 changes. Spec: `cofre-design/system/DESIGN_SYSTEM.md`. No Air, CofreKit or ObjC imports.
 
+**macOS 14 too, for the Mac pairing helper** (`tools/llave`). There, tokens resolve to `NSColor` (`PlatformColor`), fonts
+skip Dynamic Type, and only tokens, fonts and components build. Screens, layout, store, facades, mocks, `NavChrome`,
+`LogView` and the UIKit theme are wrapped in `#if canImport(UIKit)`. `PixelArt` draws larger art in the PixelIcon recipe.
+
 | Part | Where | Count |
 |---|---|---|
 | Tokens (only hex values) · theme · fonts · UIKit theme | `Sources/CofreUI/Tokens/` | — |
@@ -84,6 +88,7 @@ One adapter conforming to `CofreBackend` (typealias in `Facade/Services.swift`),
 cd app/UI
 xcodebuild -scheme CofreUI -destination 'generic/platform=iOS Simulator' build
 xcodebuild test -scheme CofreUI -destination 'platform=iOS Simulator,id=<shared UDID>'   # 11 tests
+swift test                     # macOS: the 2 AppKit token and font tests
 
 cd PreviewHost                 # regenerate with `xcodegen` after editing project.yml
 xcodebuild -project CofrePreviewHost.xcodeproj -scheme CofrePreviewHost -destination 'generic/platform=iOS Simulator' build

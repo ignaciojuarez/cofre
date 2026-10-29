@@ -54,8 +54,7 @@ private struct BlockButtonBody: View {
                 }
             }
             .contentShape(Rectangle().inset(by: -max(0, (44 - height) / 2)))
-            .contentShape(.hoverEffect, Rectangle())
-            .hoverEffect(.highlight)
+            .blockPointer()
             .onHover { hovering = $0 }
             .opacity(enabled ? 1 : m.disabledOpacity)
             .blockFocusRing()

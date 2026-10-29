@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import SwiftUI
 
 // §3.2 AdaptiveListDetail: compact pushes the detail; regular shows list + detail columns.
@@ -73,3 +74,4 @@ public struct DetailPlaceholder: View {
         EmptyState("Nothing selected", message: "Pick an item from the list.", icon: .chest)
     }
 }
+#endif

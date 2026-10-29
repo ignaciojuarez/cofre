@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import SwiftUI
 
 // P02 Launch. FullScreenTakeover + AdaptiveSplit(.stack): scene and XP bar beside the stages and live log;
@@ -111,3 +112,4 @@ private struct LaunchStages: View {
         }
     }
 }
+#endif

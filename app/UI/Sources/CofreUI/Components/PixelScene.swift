@@ -7,20 +7,21 @@ public struct PixelScene: View {
     public init(seed: UInt32, pixels: CGSize = .init(width: 120, height: 80)) { self.seed = seed; self.pixels = pixels }
 
     public var body: some View {
-        Image(uiImage: SceneRenderer.image(seed: seed, w: Int(pixels.width), h: Int(pixels.height)))
-            .interpolation(.none)
-            .resizable()
-            .aspectRatio(contentMode: .fill)
-            .accessibilityIgnoresInvertColors()
-            .accessibilityHidden(true)
+        Group {
+            if let img = SceneRenderer.image(seed: seed, w: Int(pixels.width), h: Int(pixels.height)) {
+                Image(decorative: img, scale: 1).interpolation(.none).resizable().aspectRatio(contentMode: .fill)
+            }
+        }
+        .accessibilityIgnoresInvertColors()
+        .accessibilityHidden(true)
     }
 }
 
 enum SceneRenderer {
-    private static let cache = NSCache<NSString, UIImage>()
+    private static let cache = NSCache<NSString, CGImage>()
     private static let bayer: [[Double]] = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]
 
-    static func image(seed: UInt32, w: Int, h: Int) -> UIImage {
+    static func image(seed: UInt32, w: Int, h: Int) -> CGImage? {
         let key = "\(seed)-\(w)x\(h)" as NSString
         if let hit = cache.object(forKey: key) { return hit }
         var px = [UInt32](repeating: 0, count: w * h)
@@ -75,11 +76,11 @@ enum SceneRenderer {
         }
 
         var rgba = px.flatMap { c -> [UInt8] in [UInt8((c >> 16) & 0xff), UInt8((c >> 8) & 0xff), UInt8(c & 0xff), 255] }
-        let image: UIImage = rgba.withUnsafeMutableBytes { buf in
+        guard let image: CGImage = rgba.withUnsafeMutableBytes({ buf in
             let ctx = CGContext(data: buf.baseAddress, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
                                 space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
-            return ctx?.makeImage().map { UIImage(cgImage: $0) } ?? UIImage()
-        }
+            return ctx?.makeImage()
+        }) else { return nil }
         cache.setObject(image, forKey: key)
         return image
     }

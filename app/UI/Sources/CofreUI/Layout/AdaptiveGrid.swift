@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import SwiftUI
 
 // §3.2 AdaptiveGrid: as many columns as fit (capped by `maxColumns`), filling the width; one column at accessibility sizes.
@@ -19,3 +20,4 @@ public struct AdaptiveGrid<C: View>: View {
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
     }
 }
+#endif

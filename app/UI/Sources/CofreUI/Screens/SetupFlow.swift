@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -112,7 +113,7 @@ private struct DevModeStep: View {
             Row("Developer Mode → On", leading: { RowIndex(3) })
             Row("Restart → Turn On", leading: { RowIndex(4) })
         }
-        Text("No toggle? Open Cofre once, then check again.").cofreFont(.secondary).foregroundStyle(Color.cofre.muted)
+        Text("No toggle yet? Do the Mac step first, then come back.").cofreFont(.secondary).foregroundStyle(Color.cofre.muted)
         if on {
             BlockButton("Next", role: .primary) { step += 1 }.keyboardShortcut(.defaultAction)
         } else {
@@ -305,3 +306,4 @@ private struct ReadyStep: View {
             .keyboardShortcut(.defaultAction)
     }
 }
+#endif

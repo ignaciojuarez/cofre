@@ -8,6 +8,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if ProcessInfo.processInfo.environment["LLAVE_SIMULATE"] == "1" { DispatchQueue.main.asyncAfter(deadline: .now() + 3) { NSApp.terminate(nil) } }
     }
 
+    /// One window; closing it ends the helper so `pair.sh` can finish.
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+
     func applicationWillTerminate(_ notification: Notification) {
         model?.cleanupTemporaryFile()
     }
@@ -16,14 +19,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 @main
 struct LlaveApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @StateObject private var model = LlaveModel(isSimulating: ProcessInfo.processInfo.environment["LLAVE_SIMULATE"] == "1")
+    // A preview run never talks to a real iPhone.
+    @StateObject private var model = LlaveModel(isSimulating: ProcessInfo.processInfo.environment["LLAVE_SIMULATE"] == "1" || PreviewState.current != nil)
 
     var body: some Scene {
-        WindowGroup {
+        Window("Cofre", id: "llave") {
             ContentView(model: model)
                 .onAppear {
                     appDelegate.model = model
                 }
         }
+        .windowStyle(.hiddenTitleBar)
+        .windowResizability(.contentSize)
     }
 }

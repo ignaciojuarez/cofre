@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import SwiftUI
 
 // §3.2 AdaptiveShell: tab bar (compact) · rail (< 1100) · sidebar (≥ 1100). Reads the window, never the device.
@@ -59,3 +60,4 @@ struct ShellLayout: Layout {
         }
     }
 }
+#endif

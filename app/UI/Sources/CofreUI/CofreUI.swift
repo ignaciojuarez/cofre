@@ -1,4 +1,5 @@
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
 
 /// Entry points for the shell. See README.md.
@@ -24,6 +25,7 @@ public enum CofreUI {
         return host
     }
 }
+#endif
 
 /// Web pages the UI links to. The domain is a placeholder until the site is published.
 public enum CofreLinks {
@@ -34,6 +36,7 @@ public enum CofreLinks {
     public static func short(_ url: URL) -> String { (url.host() ?? "") + url.path() }
 }
 
+#if canImport(UIKit)
 /// Root view: setup wizard until every check passes, then the adaptive shell. Launch, sheets and Air's
 /// UIKit screens are presented from here so every section shares them.
 public struct CofreRootView: View {
@@ -112,3 +115,4 @@ public struct CofreRootView: View {
         .opacity(0).allowsHitTesting(false).accessibilityHidden(true)
     }
 }
+#endif

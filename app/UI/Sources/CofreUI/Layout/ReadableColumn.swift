@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import SwiftUI
 
 // §3.2 ReadableColumn: full width on compact, max 720 pt centered on regular.
@@ -36,3 +37,4 @@ public struct PaneScroll<C: View>: View {
         .scrollDismissesKeyboard(.interactively)
     }
 }
+#endif

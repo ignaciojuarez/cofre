@@ -1,4 +1,12 @@
+import SwiftUI
+#if canImport(UIKit)
 import UIKit
+/// What tokens resolve to: `UIColor` in the app, `NSColor` in the Mac helper.
+public typealias PlatformColor = UIColor
+#else
+import AppKit
+public typealias PlatformColor = NSColor
+#endif
 
 // DESIGN_SYSTEM §1.1. This is the only file that writes hex values.
 
@@ -104,9 +112,14 @@ enum PixelArtColors {
     static let oreTints: [String: UInt32] = ["gold": 0xf0b84f, "redstone": 0xf07a68, "diamond": 0x5ad1e8, "amethyst": 0xb07bff, "emerald": 0x45c27a, "copper": 0xf08a3a, "lapis": 0x9a86ff]
 }
 
-extension UIColor {
+extension PlatformColor {
     convenience init(hex: UInt32, alpha: CGFloat = 1) {
         self.init(red: CGFloat((hex >> 16) & 0xff) / 255, green: CGFloat((hex >> 8) & 0xff) / 255,
                   blue: CGFloat(hex & 0xff) / 255, alpha: alpha)
     }
+}
+
+extension Color {
+    /// A fixed pixel-art color. UI uses `Color.cofre` tokens instead.
+    init(hex: UInt32) { self.init(platform: PlatformColor(hex: hex)) }
 }

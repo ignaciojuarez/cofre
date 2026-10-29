@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import UIKit
 
 /// Sample data from the approved mockups. For previews, tests and the preview host only: no Air logic.
@@ -309,3 +310,4 @@ public final class MockAirScreens: AirScreens {
         return vc
     }
 }
+#endif

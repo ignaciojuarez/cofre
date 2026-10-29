@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import SwiftUI
 
 // §3.2 AdaptiveSplit: primary (min width) + secondary (fixed width) side by side when both fit,
@@ -52,3 +53,4 @@ public struct AdaptiveSplit<P: View, S: View>: View {
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { ownWidth = $0 }
     }
 }
+#endif

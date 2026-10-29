@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import Foundation
 
 // The boundary between CofreUI and the logic layer. Screens never see these directly: they read the
@@ -74,3 +75,4 @@ public struct CofreServices {
         CofreServices(backend: MockBackend(setupComplete: setupComplete), airScreens: MockAirScreens())
     }
 }
+#endif

@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import SwiftUI
 
 // P01 Play home + Worlds. AdaptiveSplit: side by side on regular, a Play · Worlds segmented control on compact.
@@ -135,3 +136,4 @@ public struct WorldsPane: View {
         }
     }
 }
+#endif

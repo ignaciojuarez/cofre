@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import UIKit
 
 // ┌────────────────────────────────────────────────────────────────────────────────────────────┐
@@ -98,3 +99,4 @@ public protocol AirAppearance: AnyObject {
 // `GamePreferences` has more fields than `CofrePreferences` (autoRAM, fsrMode, fpsOverlay, vsync, fpsCap,
 // mute, mic, gyro, virtual mouse, hotbar swipe, TouchController, button scale, layouts, download source,
 // verify files, AirPlay, capes, updates). Map each to its Air pref key in `LibraryService.preferences`.
+#endif

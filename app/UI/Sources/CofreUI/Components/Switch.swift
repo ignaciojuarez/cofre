@@ -36,7 +36,7 @@ private struct BlockSwitch: View {
     private func track(on: Bool) -> some View {
         ZStack(alignment: on ? .trailing : .leading) {
             Rectangle().fill(on ? Color.cofre.face : Color.cofre.well)
-            if UIAccessibility.isOnOffSwitchLabelsEnabled {
+            if onOffLabels {
                 Text(verbatim: on ? "I" : "O").cofreFont(.chip)
                     .foregroundStyle(on ? Color.cofre.onFace : Color.cofre.muted)
                     .frame(maxWidth: .infinity, alignment: on ? .leading : .trailing).padding(.horizontal, 5)
@@ -50,7 +50,14 @@ private struct BlockSwitch: View {
         .frame(width: 40, height: 22)
         .overlay { Rectangle().strokeBorder(Color.cofre.outline, lineWidth: 2) }
         .padding(.vertical, 11)
-        .contentShape(.hoverEffect, Rectangle())
-        .hoverEffect(.highlight)
+        .blockPointer()
+    }
+
+    private var onOffLabels: Bool {
+        #if canImport(UIKit)
+        UIAccessibility.isOnOffSwitchLabelsEnabled
+        #else
+        false
+        #endif
     }
 }

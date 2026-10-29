@@ -31,7 +31,7 @@ struct BlockSheetContent<C: View>: View {
 
 private struct FormSizing: ViewModifier {
     func body(content: Content) -> some View {
-        if #available(iOS 18.0, *) { content.presentationSizing(.form) } else { content }
+        if #available(iOS 18.0, macOS 15.0, *) { content.presentationSizing(.form) } else { content }
     }
 }
 

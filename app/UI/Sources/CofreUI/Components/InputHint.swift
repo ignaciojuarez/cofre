@@ -46,7 +46,7 @@ public struct ControllerGlyph: View {
         .foregroundStyle(.white)
         .padding(.horizontal, 4)
         .frame(minWidth: 20, minHeight: 20)
-        .background(Capsule().fill(Color(uiColor: UIColor(hex: PixelArtColors.controllerGlyph))))
+        .background(Capsule().fill(Color(hex: PixelArtColors.controllerGlyph)))
         .overlay { Capsule().strokeBorder(Color.cofre.outline, lineWidth: 2) }
     }
 }

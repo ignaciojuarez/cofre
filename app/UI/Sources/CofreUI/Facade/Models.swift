@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import Foundation
 
 // Value types the screens render. Plain Swift, no Air or ObjC. The logic agent maps CofreKit/AirBridge types onto these.
@@ -282,3 +283,4 @@ enum Fmt {
     }
     static func mb(_ n: Int) -> String { n.formatted(.number.grouping(.automatic)) + " MB" }
 }
+#endif

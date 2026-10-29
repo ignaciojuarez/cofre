@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "CofreUI",
     defaultLocalization: "en",
-    platforms: [.iOS(.v17)],
+    platforms: [.iOS(.v17), .macOS(.v14)],
     products: [.library(name: "CofreUI", targets: ["CofreUI"])],
     targets: [
         .target(

@@ -28,9 +28,11 @@ public struct Badge: View {
     }
 }
 
+#if canImport(UIKit)
 public extension Badge {
     /// Loader badge ("Fabric 1.21.1") with the loader's tone.
     init(loader: Loader, version: String? = nil) {
         self.init([loader.displayName, version].compactMap { $0 }.joined(separator: " "), tone: loader.tone)
     }
 }
+#endif

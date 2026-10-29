@@ -58,9 +58,13 @@ public extension View {
     /// Accent ring 2 pt outside the outline, square. Turns the system focus effect off.
     func blockFocusRing() -> some View { modifier(FocusRing()) }
 
-    /// Small controls: hover overlay plus the pointer morphing to the rectangle.
-    func blockPointer() -> some View {
+    /// Small controls: hover overlay plus the pointer morphing to the rectangle. The Mac keeps its arrow pointer.
+    @ViewBuilder func blockPointer() -> some View {
+        #if os(iOS)
         contentShape(.hoverEffect, Rectangle()).hoverEffect(.highlight)
+        #else
+        self
+        #endif
     }
 
     /// Visual can be smaller than 44 pt; the hit area never is (§1.3).
@@ -112,7 +116,7 @@ public struct PageBackground: View {
     public init() {}
     public var body: some View {
         Color.cofre.page.overlay {
-            Image(uiImage: StoneTexture.image(light: scheme == .light))
+            Image(decorative: StoneTexture.image(light: scheme == .light), scale: 0.5)
                 .resizable(resizingMode: .tile)
                 .opacity(0.9)
                 .accessibilityIgnoresInvertColors()
@@ -123,26 +127,26 @@ public struct PageBackground: View {
 }
 
 enum StoneTexture {
-    @MainActor private static var cache: [Bool: UIImage] = [:]
+    @MainActor private static var cache: [Bool: CGImage] = [:]
 
-    @MainActor static func image(light: Bool) -> UIImage {
+    /// 64 px bitmap, shown at scale 0.5 so a tile is 128 pt.
+    @MainActor static func image(light: Bool) -> CGImage {
         if let hit = cache[light] { return hit }
         let pal = light ? CofreTheme.current.palette.stone.light : CofreTheme.current.palette.stone.dark
         var rng = Mulberry32(seed: 5)
-        let format = UIGraphicsImageRendererFormat(); format.scale = 1
-        // 32×32 art pixels, each drawn 4× so a tile is 128 pt at scale 1.
-        let img = UIGraphicsImageRenderer(size: CGSize(width: 64, height: 64), format: format).image { ctx in
-            for y in stride(from: 0, to: 32, by: 2) {
-                for x in stride(from: 0, to: 32, by: 2) {
-                    let i = Int(rng.next() * rng.next() * Double(pal.count) * 1.6) % pal.count
-                    UIColor(hex: pal[i]).setFill()
-                    ctx.fill(CGRect(x: x * 2, y: y * 2, width: 4, height: 4))
-                }
+        let ctx = CGContext(data: nil, width: 64, height: 64, bitsPerComponent: 8, bytesPerRow: 0,
+                            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        // 32×32 art pixels, each drawn 4× (rows from the top, like the mockups).
+        for y in stride(from: 0, to: 32, by: 2) {
+            for x in stride(from: 0, to: 32, by: 2) {
+                let i = Int(rng.next() * rng.next() * Double(pal.count) * 1.6) % pal.count
+                ctx.setFillColor(PlatformColor(hex: pal[i]).cgColor)
+                ctx.fill(CGRect(x: x * 2, y: 60 - y * 2, width: 4, height: 4))
             }
         }
-        let scaled = UIImage(cgImage: img.cgImage!, scale: 0.5, orientation: .up)
-        cache[light] = scaled
-        return scaled
+        let img = ctx.makeImage()!
+        cache[light] = img
+        return img
     }
 }
 

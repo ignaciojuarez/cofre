@@ -34,26 +34,51 @@ public struct PixelIcon: View {
 
     public var body: some View {
         let rows = glyph.rows, palette = PixelArtColors.icons[glyph.rawValue] ?? [:]
-        let h = rows.count, w = rows.map(\.count).max() ?? 1
-        let tintColor = tint ?? Color(uiColor: UIColor(hex: PixelArtColors.oreTints["diamond"]!))
+        let tintColor = tint ?? Color(hex: PixelArtColors.oreTints["diamond"]!)
         Canvas { ctx, sz in
-            let k = min(sz.width / CGFloat(w), sz.height / CGFloat(h))
-            let ox = (sz.width - k * CGFloat(w)) / 2, oy = (sz.height - k * CGFloat(h)) / 2
-            for (y, row) in rows.enumerated() {
-                for (x, ch) in row.enumerated() where ch != "." {
-                    let rect = CGRect(x: ox + CGFloat(x) * k, y: oy + CGFloat(y) * k, width: k + 0.01, height: k + 0.01)
-                    switch ch {
-                    case "@": ctx.fill(Path(rect), with: .color(tintColor))
-                    case "&": ctx.fill(Path(rect), with: .color(tintColor)); ctx.fill(Path(rect), with: .color(.black.opacity(0.38)))
-                    case "c": ctx.fill(Path(rect), with: .foreground)
-                    default: if let hex = palette[ch] { ctx.fill(Path(rect), with: .color(Color(uiColor: UIColor(hex: hex)))) }
-                    }
+            drawPixels(rows, in: sz) { ch, rect in
+                switch ch {
+                case "@": ctx.fill(Path(rect), with: .color(tintColor))
+                case "&": ctx.fill(Path(rect), with: .color(tintColor)); ctx.fill(Path(rect), with: .color(.black.opacity(0.38)))
+                case "c": ctx.fill(Path(rect), with: .foreground)
+                default: if let hex = palette[ch] { ctx.fill(Path(rect), with: .color(Color(hex: hex))) }
                 }
             }
         }
         .frame(width: size, height: size)
         .accessibilityIgnoresInvertColors()
         .accessibilityHidden(true)
+    }
+}
+
+/// Larger art in the PixelIcon recipe: one char per pixel, "." transparent, colors from tokens.
+/// Each art pixel is `pixel` pt, so art lines up with a PixelScene drawn at the same scale.
+public struct PixelArt: View {
+    let rows: [String], palette: [Character: Color], pixel: CGFloat
+
+    public init(_ rows: [String], palette: [Character: Color], pixel: CGFloat = 4) {
+        self.rows = rows; self.palette = palette; self.pixel = pixel
+    }
+
+    public var body: some View {
+        Canvas { ctx, sz in
+            drawPixels(rows, in: sz) { ch, rect in if let c = palette[ch] { ctx.fill(Path(rect), with: .color(c)) } }
+        }
+        .frame(width: CGFloat(rows.map(\.count).max() ?? 0) * pixel, height: CGFloat(rows.count) * pixel)
+        .accessibilityIgnoresInvertColors()
+        .accessibilityHidden(true)
+    }
+}
+
+/// Fits the grid into `size`, centered, and hands each non-"." pixel's rect to `fill`.
+private func drawPixels(_ rows: [String], in size: CGSize, _ fill: (Character, CGRect) -> Void) {
+    let h = rows.count, w = rows.map(\.count).max() ?? 1
+    let k = min(size.width / CGFloat(w), size.height / CGFloat(h))
+    let ox = (size.width - k * CGFloat(w)) / 2, oy = (size.height - k * CGFloat(h)) / 2
+    for (y, row) in rows.enumerated() {
+        for (x, ch) in row.enumerated() where ch != "." {
+            fill(ch, CGRect(x: ox + CGFloat(x) * k, y: oy + CGFloat(y) * k, width: k + 0.01, height: k + 0.01))
+        }
     }
 }
 

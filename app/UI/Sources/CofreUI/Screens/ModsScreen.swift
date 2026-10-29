@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -264,3 +265,4 @@ public struct ImportPackSheet: View {
         dismiss()
     }
 }
+#endif

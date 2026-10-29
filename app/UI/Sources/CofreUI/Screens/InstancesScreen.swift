@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -293,3 +294,4 @@ public struct NewInstanceSheet: View {
         }
     }
 }
+#endif
