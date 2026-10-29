@@ -118,6 +118,41 @@ public struct PlayHomePane: View {
     }
 }
 
+/// A server. With a server card (GAP-14): a "Modded" badge and Join, which opens the Join server sheet.
+/// While its install runs with the sheet closed, the row shows the percent.
+struct ServerRow: View {
+    let server: ServerSummary
+    @Environment(CofreStore.self) private var store
+    @Environment(NavModel.self) private var nav
+
+    var body: some View {
+        let modded = server.hasServerCard && store.can(.serverJoin)
+        let progress = modded ? store.serverJoinProgress(address: server.address) : nil
+        Row(server.name) {
+            HStack(spacing: 6) {
+                if modded { Badge("Modded", tone: .accent) }
+                SubtitleText(text: Text(verbatim: server.detail ?? server.address))
+            }
+        } leading: {
+            PixelIcon(.cmd, size: 26)
+        } trailing: {
+            HStack(spacing: 8) {
+                if let progress {
+                    Meta("\(Int((progress * 100).rounded()))%")
+                } else if let ms = server.pingMS {
+                    Meta("\(ms) ms", tone: ms < 100 ? .success : .warn)
+                }
+                if modded {
+                    BlockButton("Join", size: .small) {
+                        nav.serverJoin = ServerJoinRequest(server: server.address)
+                    }
+                    .accessibilityLabel(Text("Join \(server.name)"))
+                }
+            }
+        }
+    }
+}
+
 /// Worlds and servers. New worlds are made in game, so there's no "+ New" here.
 public struct WorldsPane: View {
     @Environment(CofreStore.self) private var store
@@ -136,13 +171,7 @@ public struct WorldsPane: View {
                 }
                 if !store.servers.isEmpty {
                     ListSection("Servers") {
-                        ForEach(store.servers) { s in
-                            Row(s.name, subtitle: s.detail ?? s.address) {
-                                PixelIcon(.cmd, size: 26)
-                            } trailing: {
-                                if let ms = s.pingMS { Meta("\(ms) ms", tone: ms < 100 ? .success : .warn) }
-                            }
-                        }
+                        ForEach(store.servers) { s in ServerRow(server: s) }
                     }
                     .padding(.top, 6)
                 }

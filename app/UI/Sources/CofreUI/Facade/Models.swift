@@ -81,8 +81,10 @@ public struct ServerSummary: Identifiable, Hashable, Sendable {
     public let id: String
     public var name: String, address: String
     public var detail: String?, pingMS: Int?
-    public init(id: String, name: String, address: String, detail: String? = nil, pingMS: Int? = nil) {
-        self.id = id; self.name = name; self.address = address; self.detail = detail; self.pingMS = pingMS
+    /// The server publishes a server card (GAP-14): its row gets a "Modded" badge and a Join button.
+    public var hasServerCard: Bool
+    public init(id: String, name: String, address: String, detail: String? = nil, pingMS: Int? = nil, hasServerCard: Bool = false) {
+        self.id = id; self.name = name; self.address = address; self.detail = detail; self.pingMS = pingMS; self.hasServerCard = hasServerCard
     }
 }
 

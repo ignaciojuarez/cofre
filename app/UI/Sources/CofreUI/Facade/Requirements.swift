@@ -119,6 +119,8 @@ public struct BackendCapabilities: OptionSet, Sendable {
     public static let appIcon = BackendCapabilities(rawValue: 1 << 7)
     public static let language = BackendCapabilities(rawValue: 1 << 8)
     public static let lanRoom = BackendCapabilities(rawValue: 1 << 9)
+    /// GAP-14 Join server sheet: "Modded" badges and Join buttons on server rows, and `cofre://join` links.
+    public static let serverJoin = BackendCapabilities(rawValue: 1 << 10)
 }
 
 public protocol OptionalActions: AnyObject {
@@ -150,6 +152,19 @@ public extension OptionalActions where Self: LibraryService {
     func createInstance(name: String, version: String, loader: Loader, ownFolder: Bool, fabricAPI: Bool) async throws -> InstanceSummary {
         try await createInstance(name: name, version: version, loader: loader)
     }
+}
+
+// MARK: GAP-14 · Join server sheet (addition, not in §4.2)
+/// Hands out one `ServerJoinViewModel` per server (types in ServerJoin.swift). The default returns `nil`, and the
+/// sheet stays hidden until `capabilities` contains `.serverJoin`, so adapters written before this compile unchanged.
+public protocol ServerJoinSource: AnyObject {
+    /// Start resolving the server's card and return its live model. Called again only after the previous model
+    /// was dropped (sheet closed while nothing was installing).
+    @MainActor func serverJoin(_ request: ServerJoinRequest) -> (any ServerJoinViewModel)?
+}
+
+public extension ServerJoinSource {
+    @MainActor func serverJoin(_ request: ServerJoinRequest) -> (any ServerJoinViewModel)? { nil }
 }
 
 // MARK: GAP-12 · Extended preferences (addition, not in §4.2)

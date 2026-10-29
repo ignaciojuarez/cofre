@@ -58,7 +58,7 @@ public protocol AccountService: AnyObject {
 /// Everything the UI needs from one object. The logic agent writes one adapter around CofreKit that conforms.
 public typealias CofreBackend = SetupService & LibraryService & ContentService & AccountService
     & LaunchControl & LogSource & InstanceActions & VersionCatalog & ProjectCatalog & InstallProgressSource
-    & JITTester & SigningInfoSource & SystemCatalog & AirAppearance & OptionalActions
+    & JITTester & SigningInfoSource & SystemCatalog & AirAppearance & OptionalActions & ServerJoinSource
 
 /// What the shell hands to `CofreUI.makeRootViewController(services:)`.
 public struct CofreServices {

@@ -13,6 +13,7 @@ skip Dynamic Type, and only tokens, fonts and components build. Screens, layout,
 | Components (§2, one file each) | `Sources/CofreUI/Components/` | 27 |
 | Layout containers (§3.2) | `Sources/CofreUI/Layout/` | 7 |
 | Screens: Setup S01–S08 · Play P01 · Launch P02 · Instances P03/I02/P04 · Mods M01–M04 · Settings X00–X07 + About | `Sources/CofreUI/Screens/` | 26 screen IDs |
+| Join server sheet (GAP-14): join, needs you, key changed, installing, update, error, ready | `Sources/CofreUI/Screens/ServerJoin/` | 1 sheet, 7 states |
 | Nav model + observable store | `Sources/CofreUI/Model/` | — |
 | Service protocols · facade gaps · UI value types | `Sources/CofreUI/Facade/` | — |
 | Mock backend (previews, tests, preview host) | `Sources/CofreUI/Mocks/` | — |
@@ -79,6 +80,7 @@ One adapter conforming to `CofreBackend` (typealias in `Facade/Services.swift`),
 | `AirScreens` | GAP-10 | X03, P04 Forge/NeoForge | Glue, UIKit |
 | `AirAppearance` | GAP-11 | all Air VCs | Air prefs + `AMEGlassStyleChanged` |
 | `GamePreferences` extra keys | GAP-12 (addition) | X01–X07 | Air pref keys |
+| `ServerJoinSource` + `ServerJoinViewModel` | GAP-14 (addition) | Join server sheet | `CofreServerJoin` view-models (see below) |
 
 `MockBackend` implements all of it with the mockups' sample data and is the reference for expected values.
 
@@ -101,6 +103,61 @@ All additive (2026-10-29). Every new member has a default, so `CofreBackendAdapt
 | `GamePreferences.envVariables`, `shaderCacheMB`, `multidraw`, `computeShaders` | Models.swift | `[:]`, 512, "Auto", `true` | GAP-12 pref keys |
 | `ProjectSummary.pageURL: URL?` | Models.swift | `nil` → `fallbackPageURL` (Modrinth project, CurseForge search) | The project's web page, used by M02 Share |
 | `CofreStore(services:defaults:)` | CofreStore.swift | `.standard` | UI-only. Saves setup progress under `cofre.setup.completed` and `cofre.setup.step` |
+| `ServerJoinSource` added to `CofreBackend` (GAP-14) | Requirements.swift | `serverJoin(_:)` returns `nil` | Return one live `ServerJoinViewModel` per server (types in `Facade/ServerJoin.swift`) |
+| `.serverJoin` capability | Requirements.swift | off (on in `MockBackend`) | Turn on once `serverJoin(_:)` works. Shows "Modded" badges, Join buttons and `cofre://join` links |
+| `ServerSummary.hasServerCard` | Models.swift | `false` | The server publishes a card: its row gets "Modded" and Join |
+| `NavModel.serverJoin`, `NavModel.open(_ url:) -> Bool` | NavModel.swift | — | Shell: forward `scene(_:openURLContexts:)` to `nav.open(url)`; register the `cofre` URL scheme in Info.plist |
+
+### Join server sheet (GAP-14)
+
+`Facade/ServerJoin.swift` mirrors `launcher-plan/server-join/POPUP_CONTRACT.md` §2 field for field (same type and
+field names, `Loader` and `CheckState` from Models.swift), so the adapter around `CofreServerJoin` is a mapping. In the
+adapter file, qualify the clashing names (`CofreUI.ServerJoinRequirementsState`).
+
+```swift
+@MainActor protocol ServerJoinViewModel: AnyObject, Observable {
+    var server: ServerSummary { get }   // header: name, address, detail "12/40 online", pingMS
+    var state: ServerJoinState { get }  // .resolving · .requirements · .warnings(_, requirements:) · .installing · .updateAvailable · .error · .ready
+    func send(_ action: ServerJoinAction)
+}
+```
+
+| Action | Sent when | Backend does |
+|---|---|---|
+| `.setSelected(id:isSelected:)` | An optional mod, resource pack or shader switch | Update `isSelected`, recompute `totalDownloadSizeBytes` and `formattedDownloadSize` |
+| `.install` / `.update` | "Install & Join" / "Update & Join" | Go to `.installing`. The UI never sends `.install` while blocked |
+| `.resolveWarning(id:)` | "Get" on a CurseForge item (UI also opens `actionURL`), or "Trust new key" after the native alert | Set `isResolved` when the file arrives or the key is pinned |
+| `.cancelInstall` | Cancel in `.installing` | Stop and keep the old profile |
+| `.setAutoUpdate(_)` / `.setAutoConnect(_)` | The two switches | Update the state |
+| `.retry` | `RecoveryAction.retry` | Resolve again |
+| `.launch` | "Launch & Join" | Pass `--server`/`--port` on the next launch of `instanceID` if `autoConnectOnLaunch`. The UI starts the launch |
+| `.dismiss` | The sheet closed | Nothing. Keep installing |
+
+Additions to the contract (all defaulted): `requiredMods` and `trust: ServerJoinTrust?` (origin, key fingerprint,
+pinned fingerprint, first use) on requirements; `isResolved` on `WarningItem`; `autoUpdate` on the update state;
+`ServerJoinState`, `ServerJoinAction` and `ServerJoinRequest` (deep-link fields `server`, `card`, `pin`). `RecoveryAction`
+is `Hashable`, because the contract's `Equatable` error state needs it.
+
+Semantics the UI relies on:
+
+- **Warnings.** Group by ID prefix: `warn.ios.incompatible_mod_dropped` → "Won't work on iPhone",
+  `warn.curseforge.manual_download_needed` → "Download N mods yourself", the rest → "Before you join". Several items
+  of one kind use `prefix:item` IDs. `blocking` and `security` items keep the one primary disabled ("1 left") until
+  `isResolved`. `canProceedAnyway` waives `blocking` only, never `security`. An open item with no action shows "Blocked".
+- **Key changed.** Send `warn.security.key_rotation_unverified` (no action: blocked, the UI tells the user to ask the
+  owner) with `trust.pinnedKeyFingerprint` set. A signed rotation is another `security` item with
+  `actionLabel: "Trust new key"`; the UI confirms in a native alert, then sends `.resolveWarning`.
+- **First visit.** `trust.isFirstUse` shows the trust line: origin and the first 8 characters of the key.
+- **Errors.** The sheet shows its own words for each `ErrorCode`. `title`, `message` and `.failed(String)` are never
+  shown, so raw errors can't leak. Use them for logs.
+- **Installing.** Stage titles are shown as is: use the player's words ("Fabric 1.21.1", "Mods", "Java 21"), with
+  `detail` as the trailing meta ("17 / 24", "Already have").
+- **Lifetime.** `serverJoin(_:)` is called when the sheet opens. The store keeps an installing model after the sheet
+  closes (the server row shows its percent) and drops any other, so the next open reads the card again.
+
+Layout: a system bottom sheet on compact, with a detent that hugs the content. On regular width it's a centered
+560 pt card overlay instead of a system sheet, because iPad sheets size themselves once and can't follow content
+that changes between states. The card is modal for VoiceOver, and Esc, the scrub gesture and a tap outside close it.
 
 Semantics the UI now relies on:
 
@@ -115,7 +172,8 @@ Semantics the UI now relies on:
 ```sh
 cd app/UI
 xcodebuild -scheme CofreUI -destination 'generic/platform=iOS Simulator' build
-xcodebuild test -scheme CofreUI -destination 'platform=iOS Simulator,id=<shared UDID>'   # 18 tests
+xcodebuild test -scheme CofreUI -destination 'platform=iOS Simulator,id=<shared UDID>'   # 28 tests
+# TEST_RUNNER_COFRE_SNAPSHOT_DIR=/tmp/join … keeps the Join sheet render-test PNGs (every state × compact, card, AX)
 swift test                     # macOS: the 2 AppKit token and font tests
 
 cd PreviewHost                 # regenerate with `xcodegen` after editing project.yml
@@ -124,10 +182,12 @@ xcrun simctl install <UDID> <DerivedData>/Build/Products/Debug-iphonesimulator/C
 xcrun simctl launch <UDID> app.cofre.ui.previewhost -screen mods          # play|instances|mods|modpage|settings|jit|setup|launch
 xcrun simctl launch <UDID> app.cofre.ui.previewhost -screen setup -setupStep 3 -type xl
 xcrun simctl launch <UDID> app.cofre.ui.previewhost -screen play -canvas 1376x1032 -snapshot ipad13   # PNG in app Documents
+xcrun simctl launch <UDID> app.cofre.ui.previewhost -screen join -joinState needsAttention   # firstVisit|keyChanged|installing|update|error|ready|resolving|live
+xcrun simctl launch <UDID> app.cofre.ui.previewhost -screen join -joinURL 'cofre://join?server=mc.example.com'   # deep-link route
 ```
 
 Use the shared simulators from `<local-volume>/Developer/kiwios/docs/simulators.md`. Never install on devices.
-Screenshots: `cofre-design/system/screens/`.
+Screenshots: `cofre-design/system/screens/`; Join server sheet: `cofre-design/server-join/screens/`.
 
 ## Known gaps
 

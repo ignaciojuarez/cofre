@@ -64,8 +64,18 @@ public final class NavModel {
     public var preferRail = false
     public var showingLaunch = false
     public var showingAirScreen: AirScreenRoute?
+    /// The Join server sheet (GAP-14). Shown only when the backend reports `.serverJoin`, and after setup.
+    public var serverJoin: ServerJoinRequest?
 
     public init() {}
+
+    /// Routes a deep link. `cofre://join?server=…&card=…&pin=…` opens the Join server sheet. The shell forwards
+    /// `scene(_:openURLContexts:)` here; returns `false` for links Cofre doesn't handle.
+    @discardableResult public func open(_ url: URL) -> Bool {
+        guard let request = ServerJoinRequest(url: url) else { return false }
+        serverJoin = request
+        return true
+    }
 
     // §3.3: section and selection are saved per scene in `stateRestorationActivity`.
     public struct Snapshot: Codable, Sendable {

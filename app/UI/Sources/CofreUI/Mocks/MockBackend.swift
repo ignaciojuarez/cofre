@@ -10,8 +10,11 @@ public final class MockBackend: CofreBackend, @unchecked Sendable {
     public var accountList = [Account(id: "steve", name: "Steve_42", kind: "Microsoft", isActive: true)]
     /// Seconds between simulated launch/test steps. 0 makes streams finish immediately.
     public var stepDelay: Double
-    /// GAP-13. Empty like today's production backend, so screenshots show what ships. Tests turn flags on.
-    public var capabilities: BackendCapabilities = []
+    /// GAP-13. Only `.serverJoin` (GAP-14), so screenshots show what ships plus the Join server sheet. Tests turn flags on.
+    public var capabilities: BackendCapabilities = [.serverJoin]
+    /// GAP-14. Where the Join server sheet starts; `nil` reads the card (resolving, then first visit, or ready once installed).
+    public var serverJoinScenario: MockServerJoin.Scenario?
+    private var joinedServers: Set<String> = []
     /// Makes `search` throw, for the offline state.
     public var offline = false
     private var worldList: [String: [WorldSummary]] = [:]
@@ -88,7 +91,8 @@ public final class MockBackend: CofreBackend, @unchecked Sendable {
         ]
     }
     public func servers(instanceID: String) async throws -> [ServerSummary] {
-        [ServerSummary(id: "s1", name: "friends.cofre.lan", address: "10.0.0.4", detail: "LAN · 3/8 online", pingMS: 24),
+        [MockServerJoin.ironwood,
+         ServerSummary(id: "s1", name: "friends.cofre.lan", address: "10.0.0.4", detail: "LAN · 3/8 online", pingMS: 24),
          ServerSummary(id: "s2", name: "play.example.net", address: "play.example.net", detail: "1.21.1 · 112/500", pingMS: 140)] + extraServers
     }
     public func preferences(instanceID: String?) async throws -> GamePreferences { prefs }
@@ -316,6 +320,16 @@ public final class MockBackend: CofreBackend, @unchecked Sendable {
         i.ownFolder = ownFolder
         if let n = instanceList.firstIndex(where: { $0.id == i.id }) { instanceList[n] = i }
         return i
+    }
+
+    // MARK: GAP-14 ServerJoinSource
+    @MainActor public func serverJoin(_ request: ServerJoinRequest) -> (any ServerJoinViewModel)? {
+        let server = request.id == MockServerJoin.ironwood.address ? MockServerJoin.ironwood
+            : ServerSummary(id: request.id, name: request.server, address: request.server, hasServerCard: true)
+        let model = MockServerJoin(server: server, scenario: serverJoinScenario ?? (joinedServers.contains(request.id) ? .ready : .resolving),
+                                   stepDelay: stepDelay)
+        model.onInstalled = { [weak self] in self?.joinedServers.insert(request.id) }
+        return model
     }
 
     // MARK: GAP-11 AirAppearance

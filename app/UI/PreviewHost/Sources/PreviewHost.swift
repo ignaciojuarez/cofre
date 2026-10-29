@@ -3,7 +3,9 @@ import SwiftUI
 import UIKit
 
 // Launch arguments (all optional):
-//   -screen play|instances|mods|modpage|settings|jit|setup|launch   (default play)
+//   -screen play|worlds|instances|mods|modpage|settings|jit|setup|launch|join   (default play)
+//   -joinState firstVisit|needsAttention|keyChanged|installing|update|error|ready|resolving|live   Join server sheet state
+//   -joinURL cofre://join?server=…   Opens the sheet through the deep-link route instead
 //   -setupStep 0…7      Setup step for -screen setup
 //   -type xl|ax3        Dynamic Type override
 //   -appearance light   Light theme
@@ -34,6 +36,17 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         case "settings": nav.section = .settings
         case "jit": nav.section = .settings; nav.settingsPane = .jitJava
         case "launch": nav.showingLaunch = true
+        case "worlds": nav.playPane = 1
+        case "join":
+            nav.playPane = 1
+            if let mock = services.backend as? MockBackend {
+                // "live" reads the card like the app: resolving, then first visit.
+                let state = args.string(forKey: "joinState")
+                mock.serverJoinScenario = state == "live" ? nil : state.flatMap(MockServerJoin.Scenario.init(rawValue:)) ?? .firstVisit
+                if mock.serverJoinScenario == .resolving { mock.stepDelay = 60 }
+            }
+            if let link = args.string(forKey: "joinURL").flatMap(URL.init(string:)) { nav.open(link) }
+            else { nav.serverJoin = ServerJoinRequest(server: MockServerJoin.ironwood.address) }
         default: break
         }
 
@@ -45,13 +58,13 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         let setupStep = args.object(forKey: "setupStep") != nil ? args.integer(forKey: "setupStep") : nil
         let root = UIHostingController(rootView: CofreRootView(store: store, nav: nav, setupStart: setupStep))
         root.view.backgroundColor = .cofre.page
+        let window = UIWindow(windowScene: scene)
+        // On the window, so presented sheets get it too.
         switch args.string(forKey: "type") {
-        case "xl": root.traitOverrides.preferredContentSizeCategory = .extraLarge
-        case "ax3": root.traitOverrides.preferredContentSizeCategory = .accessibilityExtraExtraLarge
+        case "xl": window.traitOverrides.preferredContentSizeCategory = .extraLarge
+        case "ax3": window.traitOverrides.preferredContentSizeCategory = .accessibilityExtraExtraLarge
         default: break
         }
-
-        let window = UIWindow(windowScene: scene)
         window.overrideUserInterfaceStyle = theme.interfaceStyle
         if let canvas = args.string(forKey: "canvas").flatMap(Self.size(from:)) {
             window.rootViewController = CanvasController(child: root, canvas: canvas, snapshot: args.string(forKey: "snapshot") ?? screen)

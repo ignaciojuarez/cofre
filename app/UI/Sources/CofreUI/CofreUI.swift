@@ -52,6 +52,7 @@ public enum CofreLinks {
 public struct CofreRootView: View {
     @State private var store: CofreStore
     @State private var nav: NavModel
+    @Environment(\.horizontalSizeClass) private var sizeClass
     private let setupStart: Int?
 
     /// `setupStart` forces the wizard at that step (preview host); `nil` resumes where the user left off.
@@ -111,12 +112,38 @@ public struct CofreRootView: View {
                 .ignoresSafeArea()
             }
         }
+        // Join server (GAP-14): a bottom sheet on compact, a centered card overlay on regular.
+        .sheet(item: serverJoinRequest(card: false), onDismiss: startPendingJoinLaunch) { request in
+            JoinServerSheet(request: request, style: .bottomSheet).environment(store).environment(nav)
+        }
+        .overlay {
+            if let request = serverJoinRequest(card: true).wrappedValue {
+                JoinServerCard(request: request) { nav.serverJoin = nil; startPendingJoinLaunch() }
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.15), value: serverJoinRequest(card: true).wrappedValue)
+        .onOpenURL { nav.open($0) }
         .environment(store)
         .environment(nav)
         .environment(\.cofreTheme, store.theme)
         .preferredColorScheme(store.theme.colorScheme)
         .tint(Color.cofre.accent)
         .task { await store.start() }
+    }
+
+    /// GAP-14. Deep links can arrive any time; the sheet waits for the `.serverJoin` capability and finished setup.
+    private func serverJoinRequest(card: Bool) -> Binding<ServerJoinRequest?> {
+        Binding(get: { store.can(.serverJoin) && store.setupCompleted && (sizeClass == .regular) == card ? nav.serverJoin : nil },
+                set: { nav.serverJoin = $0 })
+    }
+
+    /// "Launch & Join" waits for the sheet to finish closing, so the launch takeover can present.
+    private func startPendingJoinLaunch() {
+        guard let id = store.pendingJoinLaunch else { return }
+        store.pendingJoinLaunch = nil
+        // The install made or changed a profile, so reload instances first.
+        Task { await store.refreshLibrary(); startLaunch(store, nav, instanceID: id) }
     }
 
     private var confirming: Binding<Bool> {

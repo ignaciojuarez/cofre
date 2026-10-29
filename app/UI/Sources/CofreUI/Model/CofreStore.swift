@@ -57,6 +57,12 @@ public final class CofreStore {
     public var curseForgeKey: String?
     public var theme = CofreTheme.current
     public var lastError: String?
+
+    // Server join (GAP-14)
+    /// Live Join server models by `ServerJoinRequest.id`. An installing one stays after its sheet closes.
+    public var serverJoins: [String: any ServerJoinViewModel] = [:]
+    /// Set by the sheet's "Launch & Join"; the root starts the launch once the sheet is gone.
+    public var pendingJoinLaunch: String?
     /// A destructive action waiting for the one shared confirmation alert (root view).
     public var pendingConfirmation: Confirmation?
     /// Set by the hosting controller so window-level UIKit state follows X07.
@@ -211,6 +217,31 @@ public final class CofreStore {
             let s = try await self.backend.addServer(instanceID: inst, name: name.isEmpty ? address : name, address: address)
             self.servers.append(s)
         }
+    }
+
+    // MARK: Server join (GAP-14)
+
+    /// The live model for `request`, made on first use. `nil` without `.serverJoin` or when the backend has none.
+    @discardableResult public func openServerJoin(_ request: ServerJoinRequest) -> (any ServerJoinViewModel)? {
+        if let m = serverJoins[request.id] { return m }
+        guard can(.serverJoin), let m = backend.serverJoin(request) else { return nil }
+        serverJoins[request.id] = m
+        return m
+    }
+
+    /// The sheet closed. An install keeps its model and keeps going; anything else is dropped, so the next open
+    /// reads the card again.
+    public func closeServerJoin(_ request: ServerJoinRequest) {
+        guard let m = serverJoins[request.id] else { return }
+        m.send(.dismiss)
+        if case .installing = m.state { return }
+        serverJoins[request.id] = nil
+    }
+
+    /// Install progress for a server row while its sheet is closed.
+    public func serverJoinProgress(address: String) -> Double? {
+        guard case .installing(let s) = serverJoins[ServerJoinRequest(server: address).id]?.state else { return nil }
+        return s.progressFraction
     }
 
     public func removeAccount(_ a: Account) async {
