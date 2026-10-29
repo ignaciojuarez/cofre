@@ -63,6 +63,7 @@ public final class CofreBackendAdapter: NSObject, CofreBackend {
     public func preferences(instanceID: String?) async throws -> GamePreferences {
         var p = GamePreferences(); p.autoRAM = air.preferenceObject("java.auto_ram") as? Bool ?? true
         p.ramMB = Int(air.preferencesForProfile(instanceID ?? air.profiles.selectedProfileName)["ramMB"] as? Int ?? 4096)
+        p.deviceRAMMB = p.ramMB
         p.envVariables = parseEnv(air.preferenceObject("java.env_variables") as? String ?? "")
         p.shaderCacheMB = air.preferenceObject("mobileglues.max_glsl_cache_size") as? Int ?? 512
         p.multidraw = "\(air.preferenceObject("mobileglues.multidraw_mode") as? Int ?? 0)"
