@@ -5,8 +5,10 @@ use std::path::Path;
 use tokio::time::{Duration, sleep};
 
 use idevice::{
-    IdeviceError, IdeviceService,
+    Idevice, IdeviceError, IdeviceService,
     lockdown::LockdownClient,
+    pairing_file::PairingFile,
+    provider::IdeviceProvider,
     remote_pairing::{RemotePairingLockdownService, RpPairingFile},
     usbmuxd::{Connection, UsbmuxdAddr, UsbmuxdConnection},
 };
@@ -14,6 +16,34 @@ use idevice::{
 use crate::models::PairEvent;
 
 const PROHIBITED_IPAD_UDID: &str = "COFRE_DEVICE_UDID";
+
+/// The usbmuxd connection, with the pairing record Llave just made. Llave never saves that record to usbmuxd, so
+/// the stock provider has none and every service after pairing (remote pairing, house_arrest) would fail.
+#[derive(Debug)]
+struct PairedProvider<P: IdeviceProvider> {
+    inner: P,
+    pairing: PairingFile,
+}
+
+impl<P: IdeviceProvider> IdeviceProvider for PairedProvider<P> {
+    fn connect(
+        &self,
+        port: u16,
+    ) -> std::pin::Pin<Box<dyn Future<Output = Result<Idevice, IdeviceError>> + Send>> {
+        self.inner.connect(port)
+    }
+
+    fn label(&self) -> &str {
+        self.inner.label()
+    }
+
+    fn get_pairing_file(
+        &self,
+    ) -> std::pin::Pin<Box<dyn Future<Output = Result<PairingFile, IdeviceError>> + Send>> {
+        let pairing = self.pairing.clone();
+        Box::pin(async move { Ok(pairing) })
+    }
+}
 
 pub async fn run_pair(
     udid_opt: Option<String>,
@@ -167,6 +197,10 @@ pub async fn run_pair(
         msg
     })?;
     PairEvent::WifiEnabled.emit();
+    let provider = PairedProvider {
+        inner: provider,
+        pairing: pairing_file.clone(),
+    };
 
     // Prepare combined plist
     let mut pairing_file_with_udid = pairing_file;
