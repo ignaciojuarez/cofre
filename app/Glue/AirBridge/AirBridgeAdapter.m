@@ -342,8 +342,19 @@ static NSError *CofreAirError(NSString *message) {
     completion(ok ? nil : error);
   }
 }
+// Configured like Air's own launcher. Present it directly: inside a navigation
+// controller its exit menu and Done button act on the wrong controller.
 - (UIViewController *)controlsEditor {
-  return [CustomControlsViewController new];
+  CustomControlsViewController *vc = [CustomControlsViewController new];
+  vc.modalPresentationStyle = UIModalPresentationOverFullScreen;
+  vc.modalInPresentation = YES;
+  vc.setDefaultCtrl = ^(NSString *name) {
+    setPrefObject(@"control.default_ctrl", name);
+  };
+  vc.getDefaultCtrl = ^{
+    return getPrefObject(@"control.default_ctrl");
+  };
+  return vc;
 }
 - (UIViewController *)forgeInstaller:(NSString *)instanceID {
   return [ForgeInstallViewController new];

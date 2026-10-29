@@ -121,17 +121,19 @@ public enum CofreLinks {
                 }
                 .environment(store).environment(nav)
             }
-            .fullScreenTakeover(item: $nav.showingAirScreen) { route in
-                if let air = store.services.airScreens {
-                    AirScreenHost(
-                        make: {
-                            switch route {
-                            case .controlsEditor: air.controlsEditor()
-                            case .forgeInstaller(let id): air.forgeInstaller(instanceID: id)
-                            }
-                        }, onClose: { nav.showingAirScreen = nil }
-                    )
-                    .ignoresSafeArea()
+            .fullScreenTakeover(item: airTakeover) { route in
+                if let air = store.services.airScreens, case .forgeInstaller(let id) = route {
+                    AirScreenHost(make: { air.forgeInstaller(instanceID: id) }, onClose: { nav.showingAirScreen = nil })
+                        .ignoresSafeArea()
+                }
+            }
+            // Air's controls editor is a self-contained full-screen editor with its own exit menu; it only works
+            // presented directly, so it skips the takeover.
+            .onChange(of: nav.showingAirScreen) { _, route in
+                guard route == .controlsEditor else { return }
+                nav.showingAirScreen = nil
+                if let editor = store.services.airScreens?.controlsEditor() {
+                    UIViewController.cofreTopmost?.present(editor, animated: true)
                 }
             }
             // Join server (GAP-14): a bottom sheet on compact, a centered card overlay on regular.
@@ -181,6 +183,12 @@ public enum CofreLinks {
             }
         }
 
+        private var airTakeover: Binding<AirScreenRoute?> {
+            Binding(
+                get: { nav.showingAirScreen == .controlsEditor ? nil : nav.showingAirScreen },
+                set: { nav.showingAirScreen = $0 })
+        }
+
         private var confirming: Binding<Bool> {
             Binding(get: { store.pendingConfirmation != nil }, set: { if !$0 { store.pendingConfirmation = nil } })
         }
@@ -206,6 +214,16 @@ public enum CofreLinks {
                 }.keyboardShortcut("l", modifiers: .command)
             }
             .opacity(0).allowsHitTesting(false).accessibilityHidden(true)
+        }
+    }
+
+    extension UIViewController {
+        /// The controller on top of the key window, for presenting Air's UIKit screens.
+        static var cofreTopmost: UIViewController? {
+            let window = UIApplication.shared.connectedScenes.lazy.compactMap { ($0 as? UIWindowScene)?.keyWindow }.first
+            var top = window?.rootViewController
+            while let next = top?.presentedViewController { top = next }
+            return top
         }
     }
 
