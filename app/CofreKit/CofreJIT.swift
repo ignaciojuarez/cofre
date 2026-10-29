@@ -14,7 +14,8 @@ public final class CofreJIT: @unchecked Sendable {
         guard let session = tunnel() else { status = .needsVPN; return status }
         status = .enabling
         do {
-            let body = try JSONSerialization.data(withJSONObject: ["cmd":"enableJIT", "pid":pid])
+            let pairing = try Data(contentsOf: pairingURL())
+            let body = try JSONSerialization.data(withJSONObject: ["cmd":"enableJIT", "pid":pid, "pairing": pairing.base64EncodedString()])
             let reply = try await withCheckedThrowingContinuation { (c: CheckedContinuation<Data?, Error>) in
                 do { try session.sendProviderMessage(body) { c.resume(returning: $0) } }
                 catch { c.resume(throwing: error) }

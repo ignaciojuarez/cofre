@@ -23,10 +23,29 @@ targets:
     platform: iOS
     sources:
       - path: ../../extensions/PacketTunnel
+      - path: ../../upstream/stikjit/Sources
+      - path: ../../upstream/stikjit/Resources
+        buildPhase: resources
+      - path: ../../extensions/PacketTunnel/CofreTXM.js
+        buildPhase: resources
+      - path: ../../upstream/stikjit/idevice/module.modulemap
+        buildPhase: sources
+      - path: ../../upstream/stikjit/iokit/module.modulemap
+        buildPhase: sources
+    dependencies:
+      - sdk: JavaScriptCore.framework
+      - sdk: Network.framework
+      - sdk: Security.framework
+      - sdk: CFNetwork.framework
+      - sdk: IOKit.framework
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.ignaciojuarez.cofre.tunnel
       INFOPLIST_FILE: PacketTunnel-Info.plist
       CODE_SIGN_ENTITLEMENTS: Tunnel.entitlements
+      SWIFT_INCLUDE_PATHS: "$(SRCROOT)/../../upstream/stikjit/idevice $(SRCROOT)/../../upstream/stikjit/iokit"
+      HEADER_SEARCH_PATHS: "$(SRCROOT)/../../upstream/stikjit/idevice $(SRCROOT)/../../upstream/stikjit/iokit"
+      LIBRARY_SEARCH_PATHS: "$(SRCROOT)/../../upstream/stikjit/idevice"
+      OTHER_LDFLAGS: "$(inherited) -Wl,-hidden-lidevice_ffi"
 schemes:
   CofreSigning:
     build:
