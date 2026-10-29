@@ -68,9 +68,22 @@ extension CofreBackendAdapter {
 
     fileprivate func installJoin(request: CofreUI.ServerJoinRequest, model: AirServerJoinModel) async {
         guard case .requirements = model.state else { return }
-        model.state = .installing(CofreUI.ServerJoinInstallingState(title: "Preparing server", progressFraction: 0, formattedProgress: "Preparing…", stages: [], currentStageIndex: 0, canCancel: true))
-        // Air's bridge currently exposes pack import and launch, so use those lifecycle hooks.
-        model.state = .ready(CofreUI.ServerJoinReadyState(serverID: request.id, serverName: request.server, serverAddress: request.server, instanceID: request.id, isJITReady: isJITEnabled))
+        model.state = .installing(CofreUI.ServerJoinInstallingState(title: "Downloading server pack", progressFraction: 0, formattedProgress: "Preparing…", stages: [], currentStageIndex: 0, canCancel: true))
+        do {
+            let resolution = try await resolveJoin(request)
+            try await withCheckedThrowingContinuation { continuation in
+                air.importPack(resolution.card.pack.url, profile: request.id, progress: { fraction, stage in
+                    Task { @MainActor in
+                        model.state = .installing(CofreUI.ServerJoinInstallingState(title: stage, progressFraction: fraction, formattedProgress: "\(Int(fraction * 100))%", stages: [], currentStageIndex: 0, canCancel: true))
+                    }
+                }, completion: { error in
+                    if let error { continuation.resume(throwing: error) } else { continuation.resume() }
+                })
+            }
+            model.state = .ready(CofreUI.ServerJoinReadyState(serverID: resolution.card.id, serverName: resolution.card.server.name, serverAddress: request.server, instanceID: request.id, isJITReady: isJITEnabled))
+        } catch {
+            model.state = .error(CofreUI.ServerJoinErrorState(code: .networkTimeout, title: "Install failed", message: String(describing: error), recoveryAction: .retry))
+        }
     }
 
     fileprivate func launchJoin(request: CofreUI.ServerJoinRequest) {
