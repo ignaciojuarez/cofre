@@ -10,6 +10,9 @@ struct CofreModVersion {
     var gameVersions: [String] { data["gameVersions"] as? [String] ?? [] }
     var loaders: [String] { (data["loaders"] as? [String] ?? []).map { $0.lowercased() } }
     var file: [String: Any] { data["file"] as? [String: Any] ?? [:] }
+    /// Modrinth puts the size on the file, CurseForge on the version (`fileLength`, passed as `size`).
+    var sizeBytes: Int64? { ((file["size"] ?? data["size"]) as? NSNumber).map(\.int64Value).flatMap { $0 > 0 ? $0 : nil } }
+    var sha1: String? { (file["hashes"] as? [String: Any])?["sha1"] as? String }
 
     func fits(gameVersion: String, loader: String) -> Bool {
         !gameVersion.isEmpty && gameVersions.contains(gameVersion)
@@ -17,49 +20,84 @@ struct CofreModVersion {
     }
 
     struct Dependency {
+        enum Relation { case required, optional, incompatible }
         let projectID: String
         let versionID: String?
-        let required: Bool
+        let relation: Relation
+        var required: Bool { relation == .required }
     }
 
+    /// Embedded (bundled in the jar) and tool dependencies need nothing installed.
     var dependencies: [Dependency] {
         (data["dependencies"] as? [[String: Any]] ?? []).compactMap { row in
             if source == 2 {
-                guard let id = row["modId"] as? NSNumber,
-                    let relation = row["relationType"] as? Int, [2, 3].contains(relation)
-                else { return nil }
-                return Dependency(projectID: id.stringValue, versionID: nil, required: relation == 3)
+                // CurseForge relationType: 2 optional, 3 required, 5 incompatible.
+                guard let id = row["modId"] as? NSNumber, let type = row["relationType"] as? Int else { return nil }
+                let relation: Dependency.Relation? = [2: .optional, 3: .required, 5: .incompatible][type]
+                return relation.map { Dependency(projectID: id.stringValue, versionID: nil, relation: $0) }
             }
-            guard let type = row["dependency_type"] as? String, ["required", "optional"].contains(type)
-            else { return nil }
+            let relation: Dependency.Relation? =
+                switch row["dependency_type"] as? String {
+                case "required": .required
+                case "optional": .optional
+                case "incompatible": .incompatible
+                default: nil
+                }
+            guard let relation else { return nil }
             return Dependency(
                 projectID: row["project_id"] as? String ?? "", versionID: row["version_id"] as? String,
-                required: type == "required")
+                relation: relation)
         }
     }
 }
 
 #if canImport(UIKit)
     import CofreUI
+    import CryptoKit
 
     @MainActor
     final class CofreModCatalog {
         // The facade passes IDs, so retain the catalog and download metadata across calls.
         var projects: [String: [String: Any]] = [:]
         var versions: [String: CofreModVersion] = [:]
+        /// Project titles for dependencies that never showed up in a search.
+        var titles: [String: String] = [:]
+        /// File SHA-1s by path, size and date, so listing doesn't re-read every jar.
+        var hashes: [String: String] = [:]
+        /// Modrinth's answer per SHA-1: "projectID|versionID", or "" when Modrinth doesn't know the file.
+        var identities: [String: String] =
+            UserDefaults.standard.dictionary(forKey: "cofre.mods.identities") as? [String: String] ?? [:]
+        /// Newest fitting version per instance and SHA-1, with when it was asked.
+        var updates: [String: (asked: Date, latest: [String: [String: Any]])] = [:]
+    }
+
+    extension CofreModVersion {
+        func candidate(title: String) -> ModCandidate {
+            ModCandidate(
+                projectID: projectID, versionID: id, title: title,
+                version: data["version"] as? String ?? name, gameVersions: gameVersions, loaders: loaders,
+                channel: data["channel"] as? String ?? "release", sizeBytes: sizeBytes,
+                dependencies: dependencies.map {
+                    ModCandidate.Dependency(projectID: $0.projectID, versionID: $0.versionID, relation: $0.candidateRelation)
+                },
+                downloadable: (file["url"] as? String)?.hasPrefix("https://") == true)
+        }
+    }
+
+    extension CofreModVersion.Dependency {
+        var candidateRelation: ModCandidate.Relation {
+            switch relation {
+            case .required: .required
+            case .optional: .optional
+            case .incompatible: .incompatible
+            }
+        }
     }
 
     extension CofreBackendAdapter {
         public func search(_ query: ProjectQuery) async throws -> [ProjectSummary] {
             let source = query.source == .curseforge ? 2 : 1
-            let projectType: String =
-                switch query.kind {
-                case .mods: "mod"
-                case .shaders: "shader"
-                case .resourcePacks: "resourcepack"
-                case .dataPacks: "datapack"
-                case .modpacks: "modpack"
-                }
+            let projectType = Self.projectType(query.kind)
             var filters = ["query": query.text, "limit": "50", "projectType": projectType]
             if let instanceID = query.instanceID {
                 let context = air.modContext(forProfile: instanceID)
@@ -87,14 +125,13 @@ struct CofreModVersion {
         }
 
         public func versions(projectID: String, instanceID: String) async throws -> [ProjectVersion] {
-            let source = modCatalog.projects[projectID]?["apiSource"] as? Int ?? 1
-            let versions = try await loadModVersions(projectID: projectID, source: source)
-            let context = air.modContext(forProfile: instanceID)
-            return versions.map { version in
+            let target = modTarget(instanceID)
+            let kind = Self.kind(modCatalog.projects[projectID]?["projectType"] as? String)
+            return try await loadModVersions(projectID: projectID, source: source(of: projectID)).map { version in
                 ProjectVersion(
                     id: version.id, name: version.name, gameVersions: version.gameVersions.joined(separator: ", "),
                     channel: (version.data["channel"] as? String ?? "release").capitalized,
-                    fits: modFits(version, context: context))
+                    fits: version.candidate(title: "").fits(game: target.game, loader: target.loader, kind: kind))
             }
         }
 
@@ -102,102 +139,465 @@ struct CofreModVersion {
             guard let version = modCatalog.versions[versionID] else {
                 throw modError("Reload this project's versions before checking dependencies.")
             }
-            let local = try await installed(.mods, instanceID: instanceID)
-            return version.dependencies.map { dependency in
-                let installed = local.contains { $0.enabled && $0.id == dependency.projectID }
+            let local = try await scan(.mods, instanceID: instanceID, online: false)
+            var out: [ProjectDependency] = []
+            for dependency in version.dependencies where dependency.relation != .incompatible {
                 let id = dependency.projectID.isEmpty ? dependency.versionID ?? "unknown" : dependency.projectID
-                return ProjectDependency(
-                    id: id, name: modCatalog.projects[id]?["title"] as? String ?? id,
-                    required: dependency.required, installed: installed)
+                let name = await projectTitle(id, source: version.source)
+                out.append(
+                    ProjectDependency(
+                        id: id, name: name, required: dependency.required,
+                        installed: local.contains { $0.enabled && $0.matches(id, title: name) }))
             }
+            return out
+        }
+
+        // MARK: Plan and install
+
+        public func installPlan(projectID: String, versionID: String?, kind: ContentKind, instanceID: String)
+            async throws -> ModInstallPlan
+        {
+            let source = source(of: projectID)
+            let target = modTarget(instanceID)
+            let have = kind == .modpacks ? [] : try await scan(kind, instanceID: instanceID, online: false)
+            let resolver = ModResolver(
+                game: target.game, loader: target.loader, kind: kind, installed: have,
+                versions: { [weak self] id in try await self?.candidates(id, source: source) ?? [] })
+            return try await resolver.plan(projectID: projectID, versionID: versionID)
         }
 
         public func install(projectID: String, versionID: String, instanceID: String)
             -> AsyncThrowingStream<InstallProgress, Error>
         {
-            AsyncThrowingStream { continuation in
+            let kind = Self.kind(modCatalog.projects[projectID]?["projectType"] as? String)
+            return AsyncThrowingStream { continuation in
                 Task { @MainActor in
                     do {
-                        let project = modCatalog.projects[projectID] ?? [:]
-                        guard (project["projectType"] as? String ?? "mod") == "mod" else {
-                            throw modError("This installer supports mods. Use pack import for modpacks.")
-                        }
-                        let source = project["apiSource"] as? Int ?? 1
-                        let context = air.modContext(forProfile: instanceID)
-                        continuation.yield(InstallProgress(title: "Resolving mod dependencies", fraction: 0))
-                        let available = try await loadModVersions(projectID: projectID, source: source)
-                        guard
-                            let selected = available.first(where: {
-                                versionID == "latest" ? modFits($0, context: context) : $0.id == versionID
-                            })
-                        else { throw modError("This mod version is no longer available for the instance.") }
-                        var plan: [CofreModVersion] = []
-                        var visited: [String: String] = [:]
-                        try await planModInstall(selected, context: context, visited: &visited, plan: &plan)
-                        for (index, version) in plan.enumerated() {
-                            var payload =
-                                modCatalog.projects[version.projectID] ?? [
-                                    "id": version.projectID, "title": version.name,
-                                ]
-                            payload["apiSource"] = version.source
-                            payload["downloadURL"] = version.file["url"]
-                            payload["filename"] = version.file["filename"]
-                            payload["sha1"] = (version.file["hashes"] as? [String: Any])?["sha1"]
-                            payload["version"] = version.data["version"]
-                            try await withCheckedThrowingContinuation { (done: CheckedContinuation<Void, Error>) in
-                                air.installProject(
-                                    payload, profile: instanceID,
-                                    progress: { fraction, stage in
-                                        continuation.yield(
-                                            InstallProgress(
-                                                title: "\(stage) \(version.name)",
-                                                fraction: (Double(index) + min(max(fraction, 0), 1))
-                                                    / Double(plan.count)))
-                                    },
-                                    completion: { error in
-                                        if let error { done.resume(throwing: error) } else { done.resume() }
-                                    })
-                            }
-                        }
-                        continuation.yield(InstallProgress(title: "Installed", fraction: 1))
+                        let plan = try await installPlan(
+                            projectID: projectID, versionID: versionID == "latest" ? nil : versionID, kind: kind,
+                            instanceID: instanceID)
+                        if let reason = plan.blocked { throw modError(reason) }
+                        for try await p in install(plan, picking: [], instanceID: instanceID) { continuation.yield(p) }
                         continuation.finish()
                     } catch { continuation.finish(throwing: error) }
                 }
             }
         }
 
-        /// Resolve required dependencies before writing files; pinned versions must match exactly.
-        private func planModInstall(
-            _ version: CofreModVersion, context: [AnyHashable: Any],
-            visited: inout [String: String], plan: inout [CofreModVersion]
+        /// Downloads every file into a staging folder first, then moves them all in. A failure before the move
+        /// leaves the instance untouched; one during it puts back what moved.
+        public func install(_ plan: ModInstallPlan, picking optionalIDs: Set<String>, instanceID: String)
+            -> AsyncThrowingStream<InstallProgress, Error>
+        {
+            AsyncThrowingStream { continuation in
+                Task { @MainActor in
+                    let fm = FileManager.default
+                    let staging = fm.temporaryDirectory.appendingPathComponent("cofre-install-\(UUID().uuidString)")
+                    defer { try? fm.removeItem(at: staging) }
+                    let files = plan.files(picking: optionalIDs)
+                    var stages = files.map { InstallProgress.Stage(title: $0.name, state: .unknown) }
+                    let total = max(files.compactMap { $0.turnsOn ? nil : $0.sizeBytes }.reduce(0, +), 1)
+                    var done: Int64 = 0
+                    func send() {
+                        continuation.yield(
+                            InstallProgress(
+                                title: plan.target.name, fraction: min(Double(done) / Double(total), 0.99),
+                                stages: stages))
+                    }
+                    do {
+                        try fm.createDirectory(at: staging, withIntermediateDirectories: true)
+                        var staged: [(mod: PlannedMod, version: CofreModVersion, file: URL)] = []
+                        for (i, mod) in files.enumerated() {
+                            stages[i].state = .checking
+                            stages[i].detail = mod.turnsOn ? "Turning on" : nil
+                            send()
+                            if !mod.turnsOn {
+                                guard let version = modCatalog.versions[mod.versionID] else {
+                                    throw modError("\(mod.name) is no longer available. Try again.")
+                                }
+                                let file = try await download(version, kind: plan.kind, name: mod.name, into: staging)
+                                staged.append((mod, version, file))
+                                done += mod.sizeBytes ?? 0
+                            }
+                            stages[i].state = .ready
+                        }
+                        if plan.makesInstance {
+                            guard let pack = staged.first?.file else { throw modError("The pack didn't download.") }
+                            try await importDownloadedPack(pack) { fraction in
+                                continuation.yield(
+                                    InstallProgress(title: plan.target.name, fraction: fraction, stages: stages))
+                            }
+                        } else {
+                            try await commit(staged, turningOn: files.filter(\.turnsOn), kind: plan.kind,
+                                instanceID: instanceID, backup: staging.appendingPathComponent(".replaced"))
+                        }
+                        NSLog("[Cofre] mods installed instance=%@ files=%ld", instanceID, files.count)
+                        continuation.yield(InstallProgress(title: plan.target.name, fraction: 1, stages: stages))
+                        continuation.finish()
+                    } catch {
+                        NSLog("[Cofre] mods install failed instance=%@ %@", instanceID, error.localizedDescription)
+                        continuation.finish(throwing: error)
+                    }
+                }
+            }
+        }
+
+        private func download(_ version: CofreModVersion, kind: ContentKind, name: String, into folder: URL)
+            async throws -> URL
+        {
+            let filename = version.file["filename"] as? String ?? ""
+            let allowed = kind == .mods ? ["jar"] : kind == .modpacks ? ["mrpack", "zip"] : ["zip"]
+            guard let url = modURL(version.file["url"]), url.scheme == "https",
+                !filename.isEmpty, (filename as NSString).lastPathComponent == filename,
+                !filename.hasPrefix("."), allowed.contains((filename as NSString).pathExtension.lowercased())
+            else {
+                throw modError(
+                    version.source == 2 && version.file["url"] == nil
+                        ? "\(name) only downloads in CurseForge's app."
+                        : "\(name) has no file Cofre can install.")
+            }
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 60
+            request.setValue(Self.userAgent, forHTTPHeaderField: "User-Agent")
+            let (temp, response) = try await URLSession.shared.download(for: request)
+            guard (response as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) ?? false else {
+                throw modError("\(name) didn't download (HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0)).")
+            }
+            if let expected = version.sha1?.lowercased(), try await Self.sha1(of: temp) != expected {
+                throw modError("\(name) downloaded damaged. Try again.")
+            }
+            let destination = folder.appendingPathComponent(filename)
+            try? FileManager.default.removeItem(at: destination)
+            try FileManager.default.moveItem(at: temp, to: destination)
+            return destination
+        }
+
+        /// Moves staged files in, turns disabled dependencies back on, and drops older files of the same projects.
+        private func commit(
+            _ staged: [(mod: PlannedMod, version: CofreModVersion, file: URL)], turningOn: [PlannedMod],
+            kind: ContentKind, instanceID: String, backup: URL
         ) async throws {
-            let key = "\(version.source):\(version.projectID)"
-            if let existing = visited[key] {
-                guard existing == version.id else {
-                    throw modError("These mods require conflicting dependency versions.")
-                }
-                return
+            let fm = FileManager.default
+            let folder = try contentFolder(kind, instanceID: instanceID, create: true)
+            try fm.createDirectory(at: backup, withIntermediateDirectories: true)
+            let have = try await scan(kind, instanceID: instanceID, online: false)
+            var undo: [() -> Void] = []
+            func move(_ from: URL, _ to: URL) throws {
+                try fm.moveItem(at: from, to: to)
+                undo.append { try? fm.moveItem(at: to, to: from) }
             }
-            guard visited.count < 100 else { throw modError("This mod has too many dependencies to install safely.") }
-            guard modFits(version, context: context) else {
-                throw modError("\(version.name) does not support this instance's Minecraft version and loader.")
-            }
-            visited[key] = version.id
-            for dependency in version.dependencies where dependency.required {
-                guard !dependency.projectID.isEmpty else {
-                    throw modError("A required dependency has no project ID. Install it manually before retrying.")
+            do {
+                for mod in turningOn {
+                    guard let item = have.first(where: { !$0.enabled && $0.matches(mod.id, title: mod.name) }) else {
+                        continue
+                    }
+                    try move(
+                        folder.appendingPathComponent(item.id + ".disabled"), folder.appendingPathComponent(item.id))
                 }
-                let versions = try await loadModVersions(projectID: dependency.projectID, source: version.source)
-                guard
-                    let selected = versions.first(where: {
-                        (dependency.versionID == nil || $0.id == dependency.versionID) && modFits($0, context: context)
+                var index = modIndex(instanceID)
+                for (mod, version, file) in staged {
+                    // Older files of this project (an update), and a same-named file, step aside first.
+                    let name = file.lastPathComponent
+                    let old = have.filter { $0.projectID == mod.id || $0.id == name }
+                    for item in old {
+                        let path = folder.appendingPathComponent(item.enabled ? item.id : item.id + ".disabled")
+                        try move(path, backup.appendingPathComponent(path.lastPathComponent))
+                        index[item.id] = nil
+                    }
+                    try move(file, folder.appendingPathComponent(name))
+                    index[name] = "\(version.source)|\(mod.id)|\(version.id)"
+                }
+                UserDefaults.standard.set(index, forKey: Self.indexKey(instanceID))
+            } catch {
+                undo.reversed().forEach { $0() }
+                throw error
+            }
+        }
+
+        private func importDownloadedPack(_ url: URL, progress: @escaping (Double) -> Void) async throws {
+            try await withCheckedThrowingContinuation { (done: CheckedContinuation<Void, Error>) in
+                air.importPack(
+                    url, profile: nil,
+                    progress: { fraction, _ in Task { @MainActor in progress(min(max(fraction, 0), 0.99)) } },
+                    completion: { error in
+                        if let error { done.resume(throwing: error) } else { done.resume() }
                     })
-                else {
-                    throw modError("No compatible version of required dependency \(dependency.projectID) was found.")
-                }
-                try await planModInstall(selected, context: context, visited: &visited, plan: &plan)
             }
-            plan.append(version)
+        }
+
+        // MARK: Installed content
+
+        public func installed(_ kind: ContentKind, instanceID: String) async throws -> [InstalledItem] {
+            try await scan(kind, instanceID: instanceID, online: true)
+        }
+
+        /// The files in the instance's folder for `kind`. Air reads mod names and versions out of each jar. `online`
+        /// asks Modrinth which project each unknown file is, and for updates; offline only what's cached is used.
+        func scan(_ kind: ContentKind, instanceID: String, online: Bool, identify: Bool = true) async throws
+            -> [InstalledItem]
+        {
+            guard [.mods, .shaders, .resourcePacks].contains(kind) else { return [] }
+            var items: [InstalledItem]
+            if kind == .mods {
+                let rows: [Any] = await withCheckedContinuation { c in
+                    air.mods(forProfile: instanceID) { c.resume(returning: $0) }
+                }
+                items = rows.compactMap { row in
+                    let x = row as? [String: Any] ?? [:]
+                    let file = Self.enabledName(x["file"] as? String ?? "")
+                    guard let id = file.isEmpty ? x["id"] as? String : file else { return nil }
+                    return InstalledItem(
+                        id: id, name: x["name"] as? String ?? id, version: x["version"] as? String ?? "",
+                        enabled: x["enabled"] as? Bool ?? true, kind: kind)
+                }
+            } else {
+                let folder = try contentFolder(kind, instanceID: instanceID, create: false)
+                let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+                items = names.filter { !$0.hasPrefix(".") }.sorted().map { name in
+                    let id = Self.enabledName(name)
+                    return InstalledItem(
+                        id: id, name: (id as NSString).deletingPathExtension, version: "", enabled: id == name,
+                        kind: kind)
+                }
+            }
+            if identify { try? await self.identify(&items, kind: kind, instanceID: instanceID, online: online) }
+            return items
+        }
+
+        /// Fills `projectID` (and `updateTo` for mods): Cofre's own install index first, then each file's SHA-1
+        /// through Modrinth's version_files, which also knows files installed by Air or copied in by hand.
+        private func identify(_ items: inout [InstalledItem], kind: ContentKind, instanceID: String, online: Bool)
+            async throws
+        {
+            guard !items.isEmpty else { return }
+            let index = modIndex(instanceID)
+            let folder = try contentFolder(kind, instanceID: instanceID, create: false)
+            var hashOf: [String: String] = [:]
+            for item in items {
+                let path = folder.appendingPathComponent(item.enabled ? item.id : item.id + ".disabled")
+                if let sha = try? await cachedSHA1(path) { hashOf[item.id] = sha }
+            }
+            let unknown = Set(hashOf.values).filter { modCatalog.identities[$0] == nil }
+            if online, !unknown.isEmpty,
+                let found = try? await modrinthJSON(
+                    "version_files", body: ["hashes": Array(unknown), "algorithm": "sha1"]) as? [String: Any]
+            {
+                for sha in unknown {
+                    let v = found[sha] as? [String: Any]
+                    modCatalog.identities[sha] = v.map {
+                        "\($0["project_id"] as? String ?? "")|\($0["id"] as? String ?? "")"
+                    } ?? ""
+                }
+                UserDefaults.standard.set(
+                    modCatalog.identities.filter { !$0.value.isEmpty }, forKey: "cofre.mods.identities")
+            }
+            for i in items.indices {
+                if let entry = index[items[i].id]?.split(separator: "|").map(String.init), entry.count == 3 {
+                    items[i].projectID = entry[1]
+                    modCatalog.titles[entry[1]] = modCatalog.titles[entry[1]] ?? items[i].name
+                } else if let sha = hashOf[items[i].id], let id = modCatalog.identities[sha], !id.isEmpty {
+                    items[i].projectID = String(id.split(separator: "|").first ?? "")
+                }
+            }
+            if kind == .mods { await markUpdates(&items, hashOf: hashOf, instanceID: instanceID, online: online) }
+        }
+
+        /// One request for every identified mod: the newest version for this game and loader, per file.
+        private func markUpdates(
+            _ items: inout [InstalledItem], hashOf: [String: String], instanceID: String, online: Bool
+        ) async {
+            let known = hashOf.filter { !(modCatalog.identities[$0.value] ?? "").isEmpty }
+            let cached = modCatalog.updates[instanceID]
+            var latest = cached?.latest ?? [:]
+            let stale = cached.map { Date().timeIntervalSince($0.asked) > 1800 } ?? true
+            if online, !known.isEmpty, stale || Set(known.values).contains(where: { latest[$0] == nil }) {
+                let target = modTarget(instanceID)
+                let loaders = target.loader == .quilt ? ["quilt", "fabric"] : [target.loader.rawValue]
+                if let found = try? await modrinthJSON(
+                    "version_files/update",
+                    body: [
+                        "hashes": Array(Set(known.values)), "algorithm": "sha1", "loaders": loaders,
+                        "game_versions": [target.game],
+                    ]) as? [String: [String: Any]]
+                {
+                    latest = found
+                    modCatalog.updates[instanceID] = (Date(), found)
+                }
+            }
+            for i in items.indices {
+                guard let sha = known[items[i].id], let newest = latest[sha],
+                    let current = modCatalog.identities[sha]?.split(separator: "|").last,
+                    let newID = newest["id"] as? String, newID != current
+                else { continue }
+                items[i].updateTo = newest["version_number"] as? String ?? newID
+                var data: [String: Any] = [
+                    "id": newID, "projectID": items[i].projectID ?? "", "apiSource": 1,
+                    "name": newest["name"] as? String ?? newID, "version": newest["version_number"] ?? newID,
+                    "gameVersions": newest["game_versions"] ?? [], "loaders": newest["loaders"] ?? [],
+                    "channel": newest["version_type"] ?? "release", "dependencies": newest["dependencies"] ?? [],
+                ]
+                let files = newest["files"] as? [[String: Any]] ?? []
+                data["file"] = files.first { $0["primary"] as? Bool == true } ?? files.first ?? [:]
+                modCatalog.versions[newID] = CofreModVersion(data: data)
+            }
+        }
+
+        public func setEnabled(_ enabled: Bool, item: InstalledItem, instanceID: String) async throws {
+            let folder = try contentFolder(item.kind, instanceID: instanceID, create: false)
+            let on = folder.appendingPathComponent(item.id)
+            let off = folder.appendingPathComponent(item.id + ".disabled")
+            if enabled, FileManager.default.fileExists(atPath: off.path) {
+                try FileManager.default.moveItem(at: off, to: on)
+            } else if !enabled, FileManager.default.fileExists(atPath: on.path) {
+                try FileManager.default.moveItem(at: on, to: off)
+            }
+        }
+
+        public func delete(_ item: InstalledItem, instanceID: String) async throws {
+            let folder = try contentFolder(item.kind, instanceID: instanceID, create: false)
+            for name in [item.id, item.id + ".disabled"] {
+                let url = folder.appendingPathComponent(name)
+                if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
+            }
+            var index = modIndex(instanceID)
+            index[item.id] = nil
+            UserDefaults.standard.set(index, forKey: Self.indexKey(instanceID))
+        }
+
+        /// Each update is its own plan and install, so new dependencies come along and a failure stops only it.
+        public func updateAll(instanceID: String) async throws {
+            var failed: [String] = []
+            for item in try await scan(.mods, instanceID: instanceID, online: true) where item.updateTo != nil {
+                guard let id = item.projectID else { continue }
+                let next = modCatalog.versions.values.first { $0.projectID == id && $0.source == 1 }?.id
+                do {
+                    let plan = try await installPlan(projectID: id, versionID: next, kind: .mods, instanceID: instanceID)
+                    if let reason = plan.blocked { throw modError(reason) }
+                    for try await _ in install(plan, picking: [], instanceID: instanceID) {}
+                } catch { failed.append(item.name) }
+            }
+            modCatalog.updates[instanceID] = nil
+            if !failed.isEmpty {
+                throw modError("Couldn't update \(ListFormatter.localizedString(byJoining: failed)).")
+            }
+        }
+
+        // MARK: Helpers
+
+        private func candidates(_ projectID: String, source: Int) async throws -> [ModCandidate] {
+            var versions = try await loadModVersions(projectID: projectID, source: source)
+            // CurseForge file IDs only grow, so higher is newer.
+            if source == 2 { versions.sort { (Int($0.id) ?? 0) > (Int($1.id) ?? 0) } }
+            let title = await projectTitle(projectID, source: source)
+            return versions.map { $0.candidate(title: title) }
+        }
+
+        private func projectTitle(_ id: String, source: Int) async -> String {
+            if let t = modCatalog.projects[id]?["title"] as? String ?? modCatalog.titles[id] { return t }
+            var title: String?
+            if source == 2 {
+                if let key = curseForgeKey(), let url = URL(string: "https://api.curseforge.com/v1/mods/\(id)") {
+                    var request = URLRequest(url: url)
+                    request.setValue(key, forHTTPHeaderField: "x-api-key")
+                    request.timeoutInterval = 15
+                    if let (data, _) = try? await URLSession.shared.data(for: request),
+                        let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+                    {
+                        title = (json["data"] as? [String: Any])?["name"] as? String
+                    }
+                }
+            } else {
+                title = (try? await modrinthJSON("project/\(id)", body: nil) as? [String: Any])?["title"] as? String
+            }
+            if let title { modCatalog.titles[id] = title }
+            return title ?? id
+        }
+
+        private func modrinthJSON(_ path: String, body: [String: Any]?) async throws -> Any {
+            guard let url = URL(string: "https://api.modrinth.com/v2/\(path)") else { throw modError("Bad request.") }
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 15
+            request.setValue(Self.userAgent, forHTTPHeaderField: "User-Agent")
+            if let body {
+                request.httpMethod = "POST"
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            }
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard (response as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) ?? false else {
+                throw modError("Modrinth answered \((response as? HTTPURLResponse)?.statusCode ?? 0).")
+            }
+            return try JSONSerialization.jsonObject(with: data)
+        }
+
+        private func cachedSHA1(_ url: URL) async throws -> String {
+            let a = try FileManager.default.attributesOfItem(atPath: url.path)
+            guard a[.type] as? FileAttributeType == .typeRegular else { throw modError("Not a file.") }
+            let key = "\(url.path)|\(a[.size] ?? 0)|\((a[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0)"
+            if let sha = modCatalog.hashes[key] { return sha }
+            let sha = try await Self.sha1(of: url)
+            modCatalog.hashes[key] = sha
+            return sha
+        }
+
+        /// Off the main actor: a big modpack folder is hundreds of megabytes.
+        nonisolated private static func sha1(of url: URL) async throws -> String {
+            try await Task.detached(priority: .userInitiated) {
+                let data = try Data(contentsOf: url, options: .mappedIfSafe)
+                return Insecure.SHA1.hash(data: data).map { String(format: "%02x", $0) }.joined()
+            }.value
+        }
+
+        /// The instance's folder for `kind`: Air's mods folder, and its siblings for shaders and resource packs.
+        private func contentFolder(_ kind: ContentKind, instanceID: String, create: Bool) throws -> URL {
+            guard let mods = air.modsFolder(forProfile: instanceID) else {
+                throw modError("This instance's folder is missing.")
+            }
+            let modsURL = URL(fileURLWithPath: mods)
+            let folder =
+                switch kind {
+                case .shaders: modsURL.deletingLastPathComponent().appendingPathComponent("shaderpacks")
+                case .resourcePacks: modsURL.deletingLastPathComponent().appendingPathComponent("resourcepacks")
+                default: modsURL
+                }
+            if create { try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) }
+            return folder
+        }
+
+        /// Files Cofre installed: file name → "source|projectID|versionID".
+        private func modIndex(_ instanceID: String) -> [String: String] {
+            UserDefaults.standard.dictionary(forKey: Self.indexKey(instanceID)) as? [String: String] ?? [:]
+        }
+        private static func indexKey(_ instanceID: String) -> String { "cofre.mods.index.\(instanceID)" }
+        private static func enabledName(_ file: String) -> String {
+            file.hasSuffix(".disabled") ? String(file.dropLast(".disabled".count)) : file
+        }
+        private static let userAgent = "ignaciojuarez/cofre (github.com/ignaciojuarez/cofre)"
+
+        private func modTarget(_ instanceID: String) -> (game: String, loader: Loader) {
+            let context = air.modContext(forProfile: instanceID)
+            return (
+                context["minecraft"] as? String ?? "",
+                Loader(rawValue: (context["loader"] as? String ?? "").lowercased()) ?? .vanilla
+            )
+        }
+
+        private func source(of projectID: String) -> Int {
+            modCatalog.projects[projectID]?["apiSource"] as? Int
+                ?? modCatalog.versions.values.first { $0.projectID == projectID }?.source ?? 1
+        }
+
+        private static func projectType(_ kind: ContentKind) -> String {
+            switch kind {
+            case .mods: "mod"
+            case .shaders: "shader"
+            case .resourcePacks: "resourcepack"
+            case .dataPacks: "datapack"
+            case .modpacks: "modpack"
+            }
+        }
+        private static func kind(_ projectType: String?) -> ContentKind {
+            ContentKind.allCases.first { self.projectType($0) == projectType } ?? .mods
         }
 
         private func loadModVersions(projectID: String, source: Int) async throws -> [CofreModVersion] {
@@ -209,11 +609,6 @@ struct CofreModVersion {
                 modCatalog.versions[version.id] = version
                 return version
             }
-        }
-
-        private func modFits(_ version: CofreModVersion, context: [AnyHashable: Any]) -> Bool {
-            version.fits(
-                gameVersion: context["minecraft"] as? String ?? "", loader: context["loader"] as? String ?? "vanilla")
         }
 
         private func modRows(_ body: (@escaping ([Any], Error?) -> Void) -> Void) async throws -> [[String: Any]] {

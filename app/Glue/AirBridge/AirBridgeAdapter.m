@@ -422,6 +422,13 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
                                completion:completion];
 }
 
+- (NSString *)modsFolderForProfile:(NSString *)profile {
+  if (!_profiles.profiles[profile])
+    return nil;
+  return [[ModService sharedService] ensureModsFolderForProfile:profile
+                                                           error:nil];
+}
+
 - (void)duplicateProfile:(NSString *)name
               completion:(void (^)(NSDictionary *, NSError *))completion {
   NSDictionary *original = [_profiles.profiles[name] copy];
@@ -733,7 +740,8 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
                 NSMutableArray *rows = [NSMutableArray array];
                 for (ModItem *mod in mods) {
                   [rows addObject:@{@"id": mod.onlineID ?: mod.fileName ?: @"", @"name": mod.displayName ?: mod.fileName ?: @"",
-                                    @"version": mod.version ?: @"", @"enabled": @(!mod.disabled)}];
+                                    @"version": mod.version ?: @"", @"enabled": @(!mod.disabled),
+                                    @"file": mod.fileName ?: @""}];
                 }
                 if (completion)
                   completion(rows);
@@ -1123,6 +1131,7 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
                           @"loaders" : version.loaders ?: @[],
                           @"channel" : version.versionType ?: @"release",
                           @"file" : file,
+                          @"size" : version.fileSize ?: @0,
                           @"dependencies" : [raw[@"dependencies"]
                               isKindOfClass:NSArray.class]
                               ? raw[@"dependencies"]
@@ -1154,61 +1163,6 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
                   if (completion)
                     completion(error ? nil : out, error);
                 }];
-}
-- (void)installProject:(NSDictionary *)data
-               profile:(NSString *)profile
-              progress:(void (^)(double, NSString *))progress
-            completion:(void (^)(NSError *))completion {
-  if ([data[@"apiSource"] integerValue] == 2 &&
-      ![CurseForgeAPI isAPIKeyConfigured]) {
-    completion(CofreAirError(@"CurseForge requires an API key"));
-    return;
-  }
-  NSString *filename = [data[@"filename"] isKindOfClass:NSString.class]
-                           ? data[@"filename"]
-                           : nil;
-  NSString *downloadURL = [data[@"downloadURL"] isKindOfClass:NSString.class]
-                              ? data[@"downloadURL"]
-                              : nil;
-  NSURL *url = downloadURL.length ? [NSURL URLWithString:downloadURL] : nil;
-  if (!filename.length ||
-      ![filename isEqualToString:filename.lastPathComponent] ||
-      ![filename.pathExtension.lowercaseString isEqualToString:@"jar"] ||
-      ![url.scheme.lowercaseString isEqualToString:@"https"] ||
-      !url.host.length) {
-    completion(CofreAirError(@"This mod version has no valid download file"));
-    return;
-  }
-  if (!_profiles.profiles[profile]) {
-    completion(CofreAirError(@"The selected instance no longer exists"));
-    return;
-  }
-  NSError *error = nil;
-  if (![[ModService sharedService] ensureModsFolderForProfile:profile
-                                                        error:&error]) {
-    completion(
-        error
-            ?: CofreAirError(@"Could not create this instance's mods folder"));
-    return;
-  }
-  ModItem *item = [[ModItem alloc] initWithOnlineData:data];
-  item.selectedVersionDownloadURL = downloadURL;
-  item.fileName = filename;
-  item.version = data[@"version"];
-  NSString *sha1 =
-      [data[@"sha1"] isKindOfClass:NSString.class] ? data[@"sha1"] : nil;
-  [[ModService sharedService] downloadMod:item
-      toProfile:profile
-      expectedSHA1:sha1.length ? sha1 : nil
-      progress:^(NSProgress *p) {
-        if (progress)
-          progress(p.fractionCompleted, @"Downloading");
-      }
-      completion:^(NSError *error) {
-        NSLog(@"[Cofre] mod install profile=%@ file=%@ success=%d", profile,
-              filename, error == nil);
-        completion(error);
-      }];
 }
 - (void)importPack:(NSURL *)url
            profile:(NSString *)profile

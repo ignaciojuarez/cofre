@@ -119,7 +119,7 @@
                 )
             }
             for i in list.indices where list[i].loader != .vanilla {
-                list[i].modCount = try? await installed(.mods, instanceID: list[i].id).count
+                list[i].modCount = try? await scan(.mods, instanceID: list[i].id, online: false, identify: false).count
             }
             return list
         }
@@ -184,22 +184,7 @@
             NSLog("[Cofre] preferences saved instance=%@ keys=%@", instanceID ?? "global", "renderer,javaArgs,graphicsApi,video,controls,java,mobileglues")
         }
 
-        public func installed(_ kind: ContentKind, instanceID: String) async throws -> [InstalledItem] {
-            try await callback { done in self.air.mods(forProfile: instanceID) { done($0) } }.compactMap { d in
-                let x = d as? [String: Any] ?? [:]
-                guard let id = x["id"] as? String ?? x["name"] as? String else { return nil }
-                return InstalledItem(
-                    id: id, name: x["name"] as? String ?? id, version: x["version"] as? String ?? "",
-                    enabled: x["enabled"] as? Bool ?? true, kind: kind)
-            }
-        }
-        public func setEnabled(_ enabled: Bool, item: InstalledItem, instanceID: String) async throws {
-            throw unavailable("mod changes")
-        }
-        public func delete(_ item: InstalledItem, instanceID: String) async throws {
-            throw unavailable("content deletion")
-        }
-        public func updateAll(instanceID: String) async throws { throw unavailable("content updates") }
+        // Installed content (list, on/off, delete, updates) lives in CofreBackendAdapter+Mods.swift.
 
         public func accounts() async throws -> [Account] {
             air.accounts().compactMap { d in

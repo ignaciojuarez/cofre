@@ -32,6 +32,9 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)installInstanceMod:(NSDictionary *)file
                 forProfile:(NSString *)profile
                 completion:(void (^)(NSError *_Nullable))completion;
+/// The instance's mods folder (made if missing). Cofre lists, toggles and
+/// installs content there and in its sibling shaderpacks/resourcepacks.
+- (nullable NSString *)modsFolderForProfile:(NSString *)profile;
 - (void)duplicateProfile:(NSString *)profile
               completion:(void (^)(NSDictionary *_Nullable,
                                    NSError *_Nullable))completion;
@@ -82,10 +85,6 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)searchServers:(NSDictionary *)filters
                source:(NSInteger)source
            completion:(void (^)(NSArray *, NSError *_Nullable))completion;
-- (void)installProject:(NSDictionary *)data
-               profile:(NSString *)profile
-              progress:(void (^)(double, NSString *))progress
-            completion:(void (^)(NSError *_Nullable))completion;
 - (void)importPack:(NSURL *)url
            profile:(nullable NSString *)profile
           progress:(void (^)(double, NSString *))progress

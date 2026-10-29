@@ -103,11 +103,6 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)searchServers:(NSDictionary *)filters
                source:(NSInteger)source
            completion:(void (^)(NSArray *, NSError *_Nullable))completion;
-/// Installs a project into a profile.
-- (void)installProject:(NSDictionary *)data
-               profile:(NSString *)profile
-              progress:(void (^)(double, NSString *))progress
-            completion:(void (^)(NSError *_Nullable))completion;
 /// Imports a modpack into a profile.
 - (void)importPack:(NSURL *)url
            profile:(NSString *_Nullable)profile
