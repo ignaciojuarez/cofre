@@ -25,22 +25,23 @@ for name in air stikjit stikdebug; do
   new=$(git -C "$sub" rev-parse "$ref^{commit}")
   if [[ "$new" == "$old" ]]; then echo "= $name $old"; continue; fi
   changed=1; echo "→ $name ${old:0:9} → ${new:0:9} ($ref)"
-  work="$ROOT/.work/$name"
+  # Never use .work/<name>: that is the build tree scripts/run.sh compiles in.
+  work="$ROOT/.work/update-$name"
   git -C "$sub" worktree prune
   git -C "$sub" worktree remove --force "$work" >/dev/null 2>&1 || true
-  rm -rf "$work" "$ROOT/.work/$name.status" "$ROOT/.work/$name.conflict"
+  rm -rf "$work" "$work.status" "$work.conflict"
   GIT_LFS_SKIP_SMUDGE=1 git -C "$sub" worktree add --detach "$work" "$new"
   shopt -s nullglob
   for patch in "$ROOT/patches/$name"/*.patch; do
     if ! git -C "$work" am --3way "$patch"; then
       git -C "$work" am --abort || true
-      git -C "$work" status --short > "$ROOT/.work/$name.conflict"
+      git -C "$work" status --short > "$work.conflict"
       git -C "$sub" worktree remove --force "$work" >/dev/null 2>&1 || true
       echo "patch conflict: $patch" >&2; exit 2
     fi
   done
   git -C "$work" diff --check
-  git -C "$work" status --short > "$ROOT/.work/$name.status"
+  git -C "$work" status --short > "$work.status"
   git -C "$sub" worktree remove --force "$work" >/dev/null 2>&1 || true
   if (( ! dry )); then
     tmp=$(mktemp)
