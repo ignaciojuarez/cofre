@@ -7,6 +7,39 @@ NS_ASSUME_NONNULL_BEGIN
 @property(nonatomic, readonly) PLProfiles *profiles;
 /// Returns the profiles currently known to Air.
 - (NSArray<NSDictionary *> *)instances;
+// Instance catalogs and profile operations. Air owns paths, mirrors and
+// persistence.
+- (NSArray<NSURL *> *)instanceMetadataURLs:(NSURL *)url
+                                  resource:(NSInteger)resource;
+- (NSArray<NSURL *> *)loaderProfileURLs:(NSString *)loader
+                                   game:(NSString *)game
+                                version:(NSString *)version;
+- (void)neoForgeVersions:(NSString *)game
+              completion:(void (^)(NSArray<NSString *> *,
+                                   NSError *_Nullable))completion;
+- (nullable NSDictionary *)createProfile:(NSString *)name
+                                 version:(NSString *)version
+                                  loader:(NSString *)loader
+                               ownFolder:(BOOL)ownFolder
+                               fabricAPI:(BOOL)fabricAPI
+                                   error:(NSError **)error;
+- (BOOL)saveLoaderProfile:(NSDictionary *)json
+               forProfile:(NSString *)profile
+                   loader:(NSString *)loader
+                  version:(NSString *)version
+                    error:(NSError **)error;
+- (void)installInstanceMod:(NSDictionary *)file
+                forProfile:(NSString *)profile
+                completion:(void (^)(NSError *_Nullable))completion;
+- (void)duplicateProfile:(NSString *)profile
+              completion:(void (^)(NSDictionary *_Nullable,
+                                   NSError *_Nullable))completion;
+- (BOOL)deleteProfile:(NSString *)profile error:(NSError **)error;
+- (void)exportProfile:(NSString *)profile
+               format:(NSString *)format
+           completion:
+               (void (^)(NSURL *_Nullable, NSError *_Nullable))completion;
+
 /// Returns the selected Air profile name.
 - (NSString *)selectedProfileName;
 /// Scans worlds for a profile.
@@ -55,6 +88,8 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)projectVersions:(NSString *)projectID
                  source:(NSInteger)source
              completion:(void (^)(NSArray *, NSError *_Nullable))completion;
+/// Minecraft version and loader for mod compatibility.
+- (NSDictionary *)modContextForProfile:(NSString *)profile;
 /// Searches multiplayer servers.
 - (void)searchServers:(NSDictionary *)filters
                source:(NSInteger)source

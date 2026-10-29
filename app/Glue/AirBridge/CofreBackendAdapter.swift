@@ -27,6 +27,7 @@
             [.deleteWorld, .addServer, .envVariables, .rendererTuning, .serverJoin]
         }
         let air: any CofreAirBridging
+        let modCatalog = CofreModCatalog()
         public init(bridge: any CofreAirBridging) {
             self.air = bridge
             super.init()
@@ -104,15 +105,12 @@
                 guard let id = d["id"] as? String else { return nil }
                 let loader = Loader(rawValue: (d["loader"] as? String ?? "vanilla").lowercased()) ?? .vanilla
                 return InstanceSummary(
-                    id: id, name: d["name"] as? String ?? id, loader: loader, gameVersion: d["version"] as? String ?? ""
+                    id: id, name: d["name"] as? String ?? id, loader: loader,
+                    gameVersion: d["version"] as? String ?? "",
+                    loaderVersion: (d["loaderVersion"] as? String).flatMap { $0.isEmpty ? nil : $0 },
+                    ownFolder: d["ownFolder"] as? Bool ?? true
                 )
             }
-        }
-        public func createInstance(name: String, version: String, loader: Loader) async throws -> InstanceSummary {
-            throw unavailable("instance creation")
-        }
-        public func installLoader(instanceID: String, loader: Loader, version: String) async throws {
-            throw unavailable("loader installation")
         }
         public func worlds(instanceID: String) async throws -> [WorldSummary] {
             try await callback { done in self.air.worlds(forProfile: instanceID) { done($0 as? [Any] ?? []) } }.map { d in
@@ -154,9 +152,6 @@
             }
             return ServerSummary(id: address, name: name, address: address)
         }
-        public func createInstance(name: String, version: String, loader: Loader, ownFolder: Bool, fabricAPI: Bool)
-            async throws -> InstanceSummary
-        { try await createInstance(name: name, version: version, loader: loader) }
         public func preferences(instanceID: String?) async throws -> GamePreferences {
             var p = GamePreferences()
             p.autoRAM = air.preferenceObject("java.auto_ram") as? Bool ?? true
@@ -289,43 +284,6 @@
             guard FileManager.default.fileExists(atPath: u.path) else { throw unavailable("log export") }
             return u
         }
-        public func duplicate(instanceID: String) async throws -> InstanceSummary {
-            throw unavailable("instance duplication")
-        }
-        public func delete(instanceID: String) async throws { throw unavailable("instance deletion") }
-        public func export(instanceID: String, format: ExportFormat) async throws -> URL {
-            throw unavailable("instance export")
-        }
-        public func gameVersions(_ kind: VersionKind) async throws -> [GameVersion] {
-            throw unavailable("version catalog")
-        }
-        public func loaderVersions(loader: Loader, game: String) async throws -> [String] {
-            throw unavailable("loader catalog")
-        }
-        public func search(_ query: ProjectQuery) async throws -> [ProjectSummary] {
-            let source = query.source == .curseforge ? 2 : 1
-            let rows = try await callback { done in
-                self.air.searchProjects(["query": query.text, "limit": "50"], source: source) { rows, error in done(error == nil ? (rows as [Any]) : []) }
-            }
-            return rows.compactMap { d in
-                let x = d as? [String: Any] ?? [:]
-                guard let id = x["id"] as? String, !id.isEmpty else { return nil }
-                return ProjectSummary(
-                    id: id, title: x["title"] as? String ?? id, author: x["author"] as? String ?? "",
-                    summary: x["description"] as? String ?? "", iconURL: URL(string: x["iconURL"] as? String ?? ""),
-                    downloads: (x["downloads"] as? NSNumber)?.intValue ?? 0, loaders: [], fits: true,
-                    source: query.source, pageURL: URL(string: x["url"] as? String ?? ""))
-            }
-        }
-        public func versions(projectID: String, instanceID: String) async throws -> [ProjectVersion] {
-            throw unavailable("project versions")
-        }
-        public func dependencies(versionID: String, instanceID: String) async throws -> [ProjectDependency] {
-            throw unavailable("project dependencies")
-        }
-        public func install(projectID: String, versionID: String, instanceID: String) -> AsyncThrowingStream<
-            InstallProgress, Error
-        > { unavailableStream("content installation") }
         public func importPack(_ url: URL, instanceID: String?) -> AsyncThrowingStream<InstallProgress, Error> {
             unavailableStream("pack import")
         }
