@@ -1055,6 +1055,33 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
       stringByAppendingPathComponent:@"options.txt"];
   NSString *text = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil] ?: @"";
   NSMutableArray<NSString *> *lines = [[text componentsSeparatedByString:@"\n"] mutableCopy];
+
+  // Keep Minecraft's limiter aligned with Cofre's display pacing. Auto uses the
+  // panel maximum; an explicit cap is clamped so a 60 Hz device never asks the
+  // game to produce an unpresentable rate. These are standard Minecraft option
+  // keys and work for the versions Air supports without changing upstream.
+  NSInteger displayMax = MAX(30, (NSInteger)UIScreen.mainScreen.maximumFramesPerSecond);
+  NSInteger requested = [getPrefObject(@"video.max_fps") integerValue];
+  NSInteger cap = requested > 0 ? MIN(requested, displayMax) : displayMax;
+  BOOL vsync = getPrefObject(@"video.disable_game_vsync") == nil
+                   ? YES
+                   : ![getPrefObject(@"video.disable_game_vsync") boolValue];
+  void (^setOption)(NSString *, NSString *) = ^(NSString *key, NSString *value) {
+    NSUInteger index = [lines indexOfObjectPassingTest:^BOOL(NSString *line, NSUInteger idx, BOOL *stop) {
+      return [line hasPrefix:[key stringByAppendingString:@":"]];
+    }];
+    NSString *entry = [NSString stringWithFormat:@"%@:%@", key, value];
+    if (index == NSNotFound) [lines addObject:entry];
+    else lines[index] = entry;
+  };
+  setOption(@"maxFps", [NSString stringWithFormat:@"%ld", (long)cap]);
+  setOption(@"enableVsync", vsync ? @"true" : @"false");
+  NSLog(@"[Cofre] frame rate cap=%@ display=%ld Hz vsync=%@",
+        requested > 0 ? [NSString stringWithFormat:@"%ld", (long)requested] : @"auto",
+        (long)displayMax, vsync ? @"on" : @"off");
+
+  [NSFileManager.defaultManager createDirectoryAtPath:path.stringByDeletingLastPathComponent
+                          withIntermediateDirectories:YES attributes:nil error:nil];
   NSUInteger i = [lines indexOfObjectPassingTest:^BOOL(NSString *line, NSUInteger idx, BOOL *stop) {
     return [line hasPrefix:@"lang:"];
   }];
@@ -1063,6 +1090,7 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
   } else if ([lines[i].lowercaseString isEqualToString:@"lang:zh_cn"] && ![language isEqualToString:@"zh"]) {
     lines[i] = lang;
   } else {
+    [[lines componentsJoinedByString:@"\n"] writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:nil];
     return;
   }
   [NSFileManager.defaultManager createDirectoryAtPath:path.stringByDeletingLastPathComponent

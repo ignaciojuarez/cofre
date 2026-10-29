@@ -132,15 +132,19 @@
                 .padding(12).block(.panel)
                 ToggleRow("FPS overlay", isOn: prefBinding(store, instanceID, \.fpsOverlay))
                 ToggleRow("VSync", isOn: prefBinding(store, instanceID, \.vsync))
-                HStack {
-                    Text("FPS cap").cofreFont(.rowTitle).foregroundStyle(Color.cofre.ink)
-                    Spacer()
-                    SelectButton(
-                        "FPS cap", selection: prefBinding(store, instanceID, \.fpsCap),
-                        options: [30, 60, 120].map { ($0, "\($0)") }
-                    ).compactStyle()
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack {
+                        Text("FPS cap").cofreFont(.rowTitle).foregroundStyle(Color.cofre.ink)
+                        Spacer()
+                        SelectButton(
+                            "FPS cap", selection: prefBinding(store, instanceID, \.fpsCap),
+                            options: GamePreferences.fpsCapOptions
+                        ).compactStyle()
+                    }
+                    Text("Auto follows the display (up to 120 Hz); 90 Hz is used when the panel accepts it.")
+                        .cofreFont(.caption).foregroundStyle(Color.cofre.muted)
                 }
-                .padding(.horizontal, 11).frame(minHeight: 44).block(.panel)
+                .padding(.horizontal, 11).padding(.vertical, 7).block(.panel)
             }
             ListSection("Audio", spacing: 4) {
                 ToggleRow("Mute with switch", isOn: prefBinding(store, instanceID, \.muteWithSwitch))
