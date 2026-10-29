@@ -70,7 +70,9 @@
                     javaVersion: "21"),
             ]
             mods = [
-                InstalledItem(id: "sodium", name: "Sodium", version: "0.6.13", enabled: true),
+                InstalledItem(
+                    id: "sodium", name: "Sodium", version: "0.6.13+mc1.21.1", enabled: true, projectID: "sodium",
+                    versionID: "sodium-0613"),
                 InstalledItem(id: "iris", name: "Iris Shaders", version: "1.8.8", enabled: true),
                 InstalledItem(id: "create", name: "Create", version: "6.0.4", enabled: true, updateTo: "6.0.6"),
                 InstalledItem(id: "xaero", name: "Xaero's Minimap", version: "25.2.0", enabled: false),
@@ -347,18 +349,13 @@
             if failVersions { throw URLError(.timedOut) }
             // Fits like the adapter: the instance's loader and exact game version.
             let inst = instanceList.first { $0.id == instanceID }
-            let loaders = Self.projects.first { $0.id == projectID }?.loaders ?? []
-            func fits(_ game: String) -> Bool {
-                guard let inst, inst.loader != .vanilla else { return false }
-                return inst.gameVersion == game && (loaders.isEmpty || loaders.contains(inst.loader))
+            return Self.candidates(projectID).map { c in
+                ProjectVersion(
+                    id: c.versionID, name: VersionLabel.clean(c.version),
+                    gameVersions: c.gameVersions.joined(separator: ", "), channel: c.channel.capitalized,
+                    fits: inst.map { c.fits(game: $0.gameVersion, loader: $0.loader) } ?? false, number: c.version,
+                    games: c.gameVersions, loaders: c.loaders.compactMap(Loader.init(rawValue:)))
             }
-            return [
-                ProjectVersion(id: "\(projectID)-188", name: "1.8.8", gameVersions: "1.21.1", fits: fits("1.21.1")),
-                ProjectVersion(id: "\(projectID)-187", name: "1.8.7", gameVersions: "1.21.1", fits: fits("1.21.1")),
-                ProjectVersion(id: "\(projectID)-181", name: "1.8.1", gameVersions: "1.21", fits: fits("1.21")),
-                ProjectVersion(id: "\(projectID)-174", name: "1.7.4", gameVersions: "1.20.4", fits: fits("1.20.4")),
-                ProjectVersion(id: "\(projectID)-162", name: "1.6.2", gameVersions: "1.20.1", fits: fits("1.20.1")),
-            ]
         }
         public func dependencies(versionID: String, instanceID: String) async throws -> [ProjectDependency] {
             let projectID = String(versionID[..<(versionID.lastIndex(of: "-") ?? versionID.endIndex)])
@@ -425,6 +422,7 @@
             let loaders =
                 kind != .mods ? [] : projects.first { $0.id == id }?.loaders.map(\.rawValue)
                 ?? (id == "flywheel" ? ["forge", "neoforge"] : ["fabric", "quilt"])
+            if id == "sodium", kind == .mods { return sodiumBuilds }
             let builds: [(String, String, String)] = [
                 ("188", "1.8.8", "1.21.1"), ("187", "1.8.7", "1.21.1"), ("181", "1.8.1", "1.21"),
                 ("174", "1.7.4", "1.20.4"), ("162", "1.6.2", "1.20.1"),
@@ -434,6 +432,24 @@
                     projectID: id, versionID: "\(id)-\(b.0)", title: title(id), version: b.1, gameVersions: [b.2],
                     loaders: loaders, sizeBytes: sizes[id] ?? 1_180_000, dependencies: graph[id] ?? [])
             }
+        }
+
+        /// Sodium as Modrinth lists it: raw numbers, both loaders, betas and an alpha, many game versions.
+        static let sodiumBuilds: [ModCandidate] = [
+            ("093b1", "mc26.3-0.9.3-beta.1-fabric", ["26.3"], ["fabric", "quilt"], "beta"),
+            ("093b1n", "mc26.3-0.9.3-beta.1-neoforge", ["26.3"], ["neoforge"], "beta"),
+            ("092", "mc26.3-0.9.2-fabric", ["26.3"], ["fabric", "quilt"], "release"),
+            ("092n", "mc26.3-0.9.2-neoforge", ["26.3"], ["neoforge"], "release"),
+            ("090a3", "mc26.3-0.9.0-alpha.3-fabric", ["26.3"], ["fabric", "quilt"], "alpha"),
+            ("0613", "mc1.21.1-0.6.13-fabric", ["1.21.1"], ["fabric", "quilt"], "release"),
+            ("0613n", "mc1.21.1-0.6.13-neoforge", ["1.21.1"], ["neoforge"], "release"),
+            ("060b4", "mc1.21-0.6.0-beta.4-fabric", ["1.21", "1.21.1"], ["fabric", "quilt"], "beta"),
+            ("058", "mc1.20.4-0.5.8-fabric", ["1.20.4"], ["fabric", "quilt"], "release"),
+            ("0511", "mc1.20.1-0.5.11-fabric", ["1.20.1"], ["fabric", "quilt"], "release"),
+        ].map { v, number, games, loaders, channel in
+            ModCandidate(
+                projectID: "sodium", versionID: "sodium-\(v)", title: "Sodium", version: number, gameVersions: games,
+                loaders: loaders, channel: channel, sizeBytes: 1_240_000)
         }
 
         // MARK: GAP-06 InstallProgressSource
@@ -493,7 +509,7 @@
                                 list.append(
                                     InstalledItem(
                                         id: f.id, name: f.name, version: f.version, enabled: true, kind: plan.kind,
-                                        projectID: f.id))
+                                        projectID: f.id, versionID: f.versionID))
                             }
                             if plan.kind == .mods { mods = list } else { content[plan.kind] = list }
                         }

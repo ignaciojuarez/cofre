@@ -184,9 +184,14 @@
         public var issue: String?
         /// The Modrinth or CurseForge project this file came from, when known. Search rows match on it.
         public var projectID: String?
+        /// The exact version installed, when known, so M02 can mark it and offer to switch.
+        public var versionID: String?
+        /// The build `updateTo` names. Never less stable than the installed one (`VersionChannel.allowsUpdate`).
+        public var updateVersionID: String?
         public init(
             id: String, name: String, version: String, enabled: Bool, kind: ContentKind = .mods,
-            updateTo: String? = nil, issue: String? = nil, projectID: String? = nil
+            updateTo: String? = nil, issue: String? = nil, projectID: String? = nil, versionID: String? = nil,
+            updateVersionID: String? = nil
         ) {
             self.id = id
             self.name = name
@@ -196,6 +201,8 @@
             self.updateTo = updateTo
             self.issue = issue
             self.projectID = projectID
+            self.versionID = versionID
+            self.updateVersionID = updateVersionID
         }
 
         /// The same project as a search row: its project ID, else the same name (files Cofre couldn't identify, or
@@ -353,14 +360,24 @@
 
     public struct ProjectVersion: Identifiable, Hashable, Sendable {
         public let id: String
+        /// `name` is the readable label ("0.9.3 beta 1"); `number` the raw one, for Details.
         public var name: String, gameVersions: String, channel: String, fits: Bool
-        public init(id: String, name: String, gameVersions: String, channel: String = "Release", fits: Bool) {
+        public var number: String
+        public var games: [String], loaders: [Loader]
+        public init(
+            id: String, name: String, gameVersions: String, channel: String = "Release", fits: Bool,
+            number: String? = nil, games: [String]? = nil, loaders: [Loader] = []
+        ) {
             self.id = id
             self.name = name
             self.gameVersions = gameVersions
             self.channel = channel
             self.fits = fits
+            self.number = number ?? name
+            self.games = games ?? gameVersions.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+            self.loaders = loaders
         }
+        public var versionChannel: VersionChannel { VersionChannel(channel) }
     }
 
     public struct ProjectDependency: Identifiable, Hashable, Sendable {
@@ -382,9 +399,11 @@
         public var sizeBytes: Int64?
         /// Already in the instance but off: the install turns it back on instead of downloading it.
         public var turnsOn: Bool
+        /// Not a release: the sheet says so.
+        public var channel: VersionChannel
         public init(
             id: String, name: String, versionID: String, version: String = "", sizeBytes: Int64? = nil,
-            turnsOn: Bool = false
+            turnsOn: Bool = false, channel: VersionChannel = .release
         ) {
             self.id = id
             self.name = name
@@ -392,6 +411,7 @@
             self.version = version
             self.sizeBytes = sizeBytes
             self.turnsOn = turnsOn
+            self.channel = channel
         }
     }
 
@@ -419,7 +439,11 @@
         /// A modpack becomes its own instance instead of going into the target.
         public var makesInstance: Bool { kind == .modpacks }
         /// Asks first only when Get would do more than install the one thing the user tapped.
-        public var needsConfirmation: Bool { !required.isEmpty || !optional.isEmpty || makesInstance }
+        /// A beta or alpha pick asks too, so it's never a surprise.
+        public var needsConfirmation: Bool {
+            !required.isEmpty || !optional.isEmpty || makesInstance || target.channel != .release
+                || required.contains { $0.channel != .release && !$0.turnsOn }
+        }
         /// Everything that installs, with the optional ones picked.
         public func files(picking optionalIDs: Set<String> = []) -> [PlannedMod] {
             [target] + required + optional.filter { optionalIDs.contains($0.id) }

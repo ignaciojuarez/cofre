@@ -136,6 +136,97 @@
             XCTAssertFalse(plan.needsConfirmation)
         }
 
+        // MARK: Channels, labels, filters
+
+        func testUpdatesNeverMoveToALessStableChannel() {
+            XCTAssertTrue(VersionChannel.release.allowsUpdate(to: .release))
+            XCTAssertFalse(VersionChannel.release.allowsUpdate(to: .beta))
+            XCTAssertFalse(VersionChannel.release.allowsUpdate(to: .alpha))
+            XCTAssertTrue(VersionChannel.beta.allowsUpdate(to: .release))
+            XCTAssertTrue(VersionChannel.beta.allowsUpdate(to: .beta))
+            XCTAssertFalse(VersionChannel.beta.allowsUpdate(to: .alpha))
+            XCTAssertTrue(VersionChannel.alpha.allowsUpdate(to: .beta))
+            XCTAssertEqual(VersionChannel.release.updateChannels, [.release])
+            XCTAssertEqual(VersionChannel("BETA"), .beta)
+            XCTAssertEqual(VersionChannel(nil), .release)
+        }
+
+        func testVersionLabelsDropLoaderAndGameTags() {
+            let cases = [
+                "mc1.21.1-0.6.0-fabric": "0.6.0",
+                "0.9.2+mc26.3": "0.9.2",
+                "1.11.6+mc26.3": "1.11.6",
+                "0.160.5+26.3": "0.160.5",
+                "mc26.3-0.9.3-beta.1-fabric": "0.9.3 beta 1",
+                "mc26.3-0.9.0-alpha.3-neoforge": "0.9.0 alpha 3",
+                "0.5.8+1.21.1-fabric": "0.5.8",
+                "fabric-0.5.3": "0.5.3",
+                "v2.1.0": "2.1.0",
+                "sodium-fabric-0.6.0+mc1.21.1.jar (1.21.1)": "0.6.0",
+                "6.0.4": "6.0.4",
+            ]
+            for (raw, label) in cases { XCTAssertEqual(VersionLabel.clean(raw), label, raw) }
+        }
+
+        func testGetPicksNewestReleaseElseBetaElseAlpha() async throws {
+            func picked(_ versions: [ModCandidate]) async throws -> (String, VersionChannel) {
+                let plan = try await resolver(["a": versions]).plan(projectID: "a")
+                return (plan.target.versionID, plan.target.channel)
+            }
+            // Release available: it wins over a newer beta and alpha.
+            var r = try await picked([
+                candidate("a", channel: "alpha", version: "4"), candidate("a", channel: "beta", version: "3"),
+                candidate("a", version: "2"),
+            ])
+            XCTAssertEqual(r.0, "a-2")
+            XCTAssertEqual(r.1, .release)
+            // Only beta.
+            r = try await picked([candidate("a", channel: "beta", version: "3")])
+            XCTAssertEqual(r.1, .beta)
+            // Only alpha.
+            r = try await picked([candidate("a", channel: "alpha", version: "4")])
+            XCTAssertEqual(r.1, .alpha)
+            // A release for another game version doesn't fit, so this version's beta wins.
+            r = try await picked([
+                candidate("a", game: "1.20.1", version: "2"), candidate("a", channel: "beta", version: "3"),
+            ])
+            XCTAssertEqual(r.0, "a-3")
+        }
+
+        func testDependenciesFollowTheSameRuleAndNonReleaseAsks() async throws {
+            let plan = try await resolver([
+                "a": [candidate("a", deps: [.init(projectID: "lib", relation: .required)])],
+                "lib": [candidate("lib", channel: "beta", version: "9"), candidate("lib", version: "8")],
+            ]).plan(projectID: "a")
+            XCTAssertEqual(plan.required.first?.versionID, "lib-8")
+            let beta = try await resolver(["a": [candidate("a", channel: "beta")]]).plan(projectID: "a")
+            XCTAssertTrue(beta.needsConfirmation)
+        }
+
+        func testVersionFiltersDefaultToTheTarget() {
+            let inst = InstanceSummary(id: "f", name: "Fabric Mods", loader: .fabric, gameVersion: "26.3")
+            let versions = MockBackend.sodiumBuilds.map { c in
+                ProjectVersion(
+                    id: c.versionID, name: VersionLabel.clean(c.version), gameVersions: "", channel: c.channel,
+                    fits: c.fits(game: "26.3", loader: .fabric), number: c.version, games: c.gameVersions,
+                    loaders: c.loaders.compactMap(Loader.init(rawValue:)))
+            }
+            let f = VersionFilter.defaults(for: inst)
+            XCTAssertEqual(f.channels, [.release, .beta])
+            XCTAssertEqual(f.visible(versions, installed: nil, all: false).map(\.name), ["0.9.3 beta 1", "0.9.2"])
+            // The installed build stays listed even when the filters hide it; All versions lists everything.
+            XCTAssertEqual(f.visible(versions, installed: "sodium-0613", all: false).count, 3)
+            XCTAssertEqual(f.visible(versions, installed: nil, all: true).count, versions.count)
+            XCTAssertEqual(versions.preferred?.name, "0.9.2")
+            XCTAssertEqual(
+                VersionFilter.defaults(for: InstanceSummary(id: "q", name: "Q", loader: .quilt, gameVersion: "1"))
+                    .loaders, [.quilt, .fabric])
+            XCTAssertEqual(ModPagePane.title("Switch to", versions[0]), "Switch to 0.9.3 beta 1")
+            XCTAssertEqual(
+                ModPagePane.title("Install", ProjectVersion(id: "x", name: "1.0", gameVersions: "", channel: "Beta", fits: true)),
+                "Install 1.0 · beta")
+        }
+
         // MARK: Store
 
         private func store(_ configure: (MockBackend) -> Void = { _ in }) async -> (CofreStore, MockBackend) {
@@ -265,6 +356,16 @@
             await s.selectInstance("cobblemon")
             await s.search()
             XCTAssertEqual(s.installState(row(s, "sodium")), .notInstalled)
+        }
+
+        func testUpdateInstallsTheOfferedBuild() async {
+            let (s, mock) = await store()
+            let i = mock.mods.firstIndex { $0.id == "lithium" }!
+            mock.mods[i].updateVersionID = "lithium-187"
+            await s.search()
+            s.update(row(s, "lithium"))
+            await until { mock.mods.contains { $0.versionID == "lithium-187" } }
+            XCTAssertEqual(mock.mods.filter { $0.matches("lithium") }.count, 1)
         }
 
         func testModpackMakesItsOwnInstance() async {

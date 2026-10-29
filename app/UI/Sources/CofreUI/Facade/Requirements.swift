@@ -175,7 +175,7 @@ import Foundation
             async throws -> ModInstallPlan
         {
             let all = try await versions(projectID: projectID, instanceID: instanceID)
-            guard let v = all.first(where: { $0.id == versionID }) ?? all.first(where: \.fits) else {
+            guard let v = all.first(where: { $0.id == versionID }) ?? all.preferred else {
                 return ModInstallPlan(
                     target: PlannedMod(id: projectID, name: projectID, versionID: ""), kind: kind,
                     blocked: String(localized: "No version fits this instance."))

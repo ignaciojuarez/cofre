@@ -69,6 +69,8 @@ struct CofreModVersion {
             UserDefaults.standard.dictionary(forKey: "cofre.mods.identities") as? [String: String] ?? [:]
         /// Newest fitting version per instance and SHA-1, with when it was asked.
         var updates: [String: (asked: Date, latest: [String: [String: Any]])] = [:]
+        /// "instance|sha" → the allowed update found by hand when the newest was less stable ("" for none).
+        var allowedUpdates: [String: String] = [:]
     }
 
     extension CofreModVersion {
@@ -128,10 +130,15 @@ struct CofreModVersion {
             let target = modTarget(instanceID)
             let kind = Self.kind(modCatalog.projects[projectID]?["projectType"] as? String)
             return try await loadModVersions(projectID: projectID, source: source(of: projectID)).map { version in
-                ProjectVersion(
-                    id: version.id, name: version.name, gameVersions: version.gameVersions.joined(separator: ", "),
+                let number = version.data["version"] as? String ?? version.name
+                // CurseForge's "number" is a file ID; its name is the file name, which cleans up better.
+                let raw = version.source == 2 ? version.name : number
+                return ProjectVersion(
+                    id: version.id, name: VersionLabel.clean(raw),
+                    gameVersions: version.gameVersions.joined(separator: ", "),
                     channel: (version.data["channel"] as? String ?? "release").capitalized,
-                    fits: version.candidate(title: "").fits(game: target.game, loader: target.loader, kind: kind))
+                    fits: version.candidate(title: "").fits(game: target.game, loader: target.loader, kind: kind),
+                    number: raw, games: version.gameVersions, loaders: version.loaders.compactMap(Loader.init(rawValue:)))
             }
         }
 
@@ -385,7 +392,7 @@ struct CofreModVersion {
                 for sha in unknown {
                     let v = found[sha] as? [String: Any]
                     modCatalog.identities[sha] = v.map {
-                        "\($0["project_id"] as? String ?? "")|\($0["id"] as? String ?? "")"
+                        "\($0["project_id"] as? String ?? "")|\($0["id"] as? String ?? "")|\($0["version_type"] as? String ?? "release")"
                     } ?? ""
                 }
                 UserDefaults.standard.set(
@@ -394,52 +401,91 @@ struct CofreModVersion {
             for i in items.indices {
                 if let entry = index[items[i].id]?.split(separator: "|").map(String.init), entry.count == 3 {
                     items[i].projectID = entry[1]
+                    items[i].versionID = entry[2]
                     modCatalog.titles[entry[1]] = modCatalog.titles[entry[1]] ?? items[i].name
-                } else if let sha = hashOf[items[i].id], let id = modCatalog.identities[sha], !id.isEmpty {
-                    items[i].projectID = String(id.split(separator: "|").first ?? "")
+                } else if let sha = hashOf[items[i].id], let id = identity(sha) {
+                    items[i].projectID = id.project
+                    items[i].versionID = id.version
                 }
             }
             if kind == .mods { await markUpdates(&items, hashOf: hashOf, instanceID: instanceID, online: online) }
         }
 
-        /// One request for every identified mod: the newest version for this game and loader, per file.
+        /// What Modrinth said a file is: project, version, channel. Entries saved before channels read as release,
+        /// the strictest for updates.
+        private func identity(_ sha: String) -> (project: String, version: String, channel: VersionChannel)? {
+            guard let parts = modCatalog.identities[sha]?.split(separator: "|").map(String.init), parts.count >= 2,
+                !parts[0].isEmpty
+            else { return nil }
+            return (parts[0], parts[1], VersionChannel(parts.count > 2 ? parts[2] : nil))
+        }
+
+        /// Newer builds for this game and loader, never on a less stable channel than the installed one
+        /// (`VersionChannel.allowsUpdate`): one request per channel group, then a check of what came back.
         private func markUpdates(
             _ items: inout [InstalledItem], hashOf: [String: String], instanceID: String, online: Bool
         ) async {
-            let known = hashOf.filter { !(modCatalog.identities[$0.value] ?? "").isEmpty }
+            let known = hashOf.compactMapValues { sha in identity(sha).map { (sha, $0) } }
             let cached = modCatalog.updates[instanceID]
             var latest = cached?.latest ?? [:]
             let stale = cached.map { Date().timeIntervalSince($0.asked) > 1800 } ?? true
-            if online, !known.isEmpty, stale || Set(known.values).contains(where: { latest[$0] == nil }) {
-                let target = modTarget(instanceID)
+            let target = modTarget(instanceID)
+            if online, !known.isEmpty, stale || known.values.contains(where: { latest[$0.0] == nil }) {
                 let loaders = target.loader == .quilt ? ["quilt", "fabric"] : [target.loader.rawValue]
-                if let found = try? await modrinthJSON(
-                    "version_files/update",
-                    body: [
-                        "hashes": Array(Set(known.values)), "algorithm": "sha1", "loaders": loaders,
-                        "game_versions": [target.game],
-                    ]) as? [String: [String: Any]]
-                {
-                    latest = found
-                    modCatalog.updates[instanceID] = (Date(), found)
+                var found: [String: [String: Any]] = [:]
+                for (channel, group) in Dictionary(grouping: known.values, by: { $0.1.channel }) {
+                    if let answer = try? await modrinthJSON(
+                        "version_files/update",
+                        body: [
+                            "hashes": Array(Set(group.map { $0.0 })), "algorithm": "sha1", "loaders": loaders,
+                            "game_versions": [target.game], "version_types": channel.updateChannels.map(\.raw),
+                        ]) as? [String: [String: Any]]
+                    {
+                        found.merge(answer) { a, _ in a }
+                    }
                 }
+                latest = found
+                modCatalog.updates[instanceID] = (Date(), found)
+                modCatalog.allowedUpdates = modCatalog.allowedUpdates.filter { !$0.key.hasPrefix("\(instanceID)|") }
             }
             for i in items.indices {
-                guard let sha = known[items[i].id], let newest = latest[sha],
-                    let current = modCatalog.identities[sha]?.split(separator: "|").last,
-                    let newID = newest["id"] as? String, newID != current
+                guard let entry = known[items[i].id], let newest = latest[entry.0],
+                    let newID = newest["id"] as? String, newID != entry.1.version
                 else { continue }
-                items[i].updateTo = newest["version_number"] as? String ?? newID
-                var data: [String: Any] = [
-                    "id": newID, "projectID": items[i].projectID ?? "", "apiSource": 1,
-                    "name": newest["name"] as? String ?? newID, "version": newest["version_number"] ?? newID,
-                    "gameVersions": newest["game_versions"] ?? [], "loaders": newest["loaders"] ?? [],
-                    "channel": newest["version_type"] ?? "release", "dependencies": newest["dependencies"] ?? [],
-                ]
-                let files = newest["files"] as? [[String: Any]] ?? []
-                data["file"] = files.first { $0["primary"] as? Bool == true } ?? files.first ?? [:]
-                modCatalog.versions[newID] = CofreModVersion(data: data)
+                let (sha, current) = entry
+                var pick: CofreModVersion?
+                if current.channel.allowsUpdate(to: VersionChannel(newest["version_type"] as? String)) {
+                    pick = Self.modrinthVersion(newest, projectID: current.project)
+                    modCatalog.versions[newID] = pick
+                } else {
+                    // The newest is less stable: look for a newer build on an allowed channel, once per refresh.
+                    let key = "\(instanceID)|\(sha)"
+                    if modCatalog.allowedUpdates[key] == nil, online {
+                        let all = (try? await loadModVersions(projectID: current.project, source: 1)) ?? []
+                        modCatalog.allowedUpdates[key] =
+                            all.prefix { $0.id != current.version }.first {
+                                $0.fits(gameVersion: target.game, loader: target.loader.rawValue)
+                                    && current.channel.allowsUpdate(to: VersionChannel($0.data["channel"] as? String))
+                            }?.id ?? ""
+                    }
+                    pick = modCatalog.allowedUpdates[key].flatMap { modCatalog.versions[$0] }
+                }
+                guard let pick else { continue }
+                items[i].updateTo = VersionLabel.clean(pick.data["version"] as? String ?? pick.name)
+                items[i].updateVersionID = pick.id
             }
+        }
+
+        /// A Modrinth API version object in Air's row shape, so install can download it.
+        private static func modrinthVersion(_ v: [String: Any], projectID: String) -> CofreModVersion {
+            let files = v["files"] as? [[String: Any]] ?? []
+            return CofreModVersion(data: [
+                "id": v["id"] as? String ?? "", "projectID": projectID, "apiSource": 1,
+                "name": v["name"] as? String ?? "", "version": v["version_number"] ?? "",
+                "gameVersions": v["game_versions"] ?? [], "loaders": v["loaders"] ?? [],
+                "channel": v["version_type"] ?? "release", "dependencies": v["dependencies"] ?? [],
+                "file": files.first { $0["primary"] as? Bool == true } ?? files.first ?? [:],
+            ])
         }
 
         public func setEnabled(_ enabled: Bool, item: InstalledItem, instanceID: String) async throws {
@@ -468,8 +514,7 @@ struct CofreModVersion {
         public func updateAll(instanceID: String) async throws {
             var failed: [String] = []
             for item in try await scan(.mods, instanceID: instanceID, online: true) where item.updateTo != nil {
-                guard let id = item.projectID else { continue }
-                let next = modCatalog.versions.values.first { $0.projectID == id && $0.source == 1 }?.id
+                guard let id = item.projectID, let next = item.updateVersionID else { continue }
                 do {
                     let plan = try await installPlan(projectID: id, versionID: next, kind: .mods, instanceID: instanceID)
                     if let reason = plan.blocked { throw modError(reason) }

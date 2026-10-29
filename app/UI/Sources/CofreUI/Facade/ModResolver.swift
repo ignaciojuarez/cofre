@@ -5,6 +5,61 @@
     // project's versions, newest first; it returns an `ModInstallPlan`. Modrinth and CurseForge differ only in how the
     // backend reads their version rows into `ModCandidate`.
 
+    /// Release, beta or alpha. Get takes the most stable build that fits; an update never moves to a less stable one.
+    public enum VersionChannel: Int, Comparable, CaseIterable, Sendable {
+        case release, beta, alpha
+        /// Modrinth's `version_type`, CurseForge's mapped one, or a capitalized label. Unknown reads as release.
+        public init(_ raw: String?) {
+            switch raw?.lowercased() {
+            case "beta": self = .beta
+            case "alpha": self = .alpha
+            default: self = .release
+            }
+        }
+        public var raw: String { ["release", "beta", "alpha"][rawValue] }
+        public var label: String {
+            switch self {
+            case .release: String(localized: "Release")
+            case .beta: String(localized: "Beta")
+            case .alpha: String(localized: "Alpha")
+            }
+        }
+        public static func < (a: Self, b: Self) -> Bool { a.rawValue < b.rawValue }
+        /// Release only to a newer release; beta to a beta or release; alpha to anything.
+        public func allowsUpdate(to newer: VersionChannel) -> Bool { newer <= self }
+        /// Channels an update from this one may land on.
+        public var updateChannels: [VersionChannel] { Self.allCases.filter { allowsUpdate(to: $0) } }
+    }
+
+    /// Version numbers as people read them: "mc26.3-0.9.3-beta.1-fabric" → "0.9.3 beta 1". The raw number stays
+    /// for Details.
+    public enum VersionLabel {
+        public static func clean(_ number: String) -> String {
+            var s = number.trimmingCharacters(in: .whitespaces)
+            func strip(_ pattern: String) {
+                s = s.replacingOccurrences(of: pattern, with: "", options: [.regularExpression, .caseInsensitive])
+            }
+            strip(#"\s*\([^)]*\)$"#)
+            strip(#"\.(jar|zip)$"#)
+            // Loader tags anywhere: "-fabric", "neoforge-", "+quilt".
+            strip(#"[-+_]?\b(fabric|neoforge|forge|quilt)\b(?=$|[-+_])"#)
+            strip(#"^[-+_]+"#)
+            // Game version tags: "mc26.3-" in front, "+mc26.3" / "+26.3" / "-mc1.21.1" behind.
+            strip(#"^mc[0-9.]+[-+_]"#)
+            strip(#"\+(mc)?[0-9][0-9.]*([-+_][0-9a-z.]*)?$"#)
+            strip(#"[-_]mc[0-9][0-9.]*$"#)
+            // A project name in front of the number ("sodium-0.6.0"), and a leading "v".
+            strip(#"^[a-z][a-z0-9 ]*?[-_ ](?=v?[0-9])"#)
+            strip(#"^v(?=[0-9])"#)
+            // Pre-release suffixes read as words.
+            s = s.replacingOccurrences(
+                of: #"[-.+_ ]?(beta|alpha|pre|rc)[-._ ]?([0-9]+)?$"#, with: " $1 $2",
+                options: [.regularExpression, .caseInsensitive]
+            ).trimmingCharacters(in: .whitespaces)
+            return s.isEmpty ? number : s
+        }
+    }
+
     /// One downloadable version of a project, as the resolver needs it.
     public struct ModCandidate: Hashable, Sendable {
         public enum Relation: Hashable, Sendable { case required, optional, incompatible }
@@ -53,7 +108,9 @@
         }
 
         var planned: PlannedMod {
-            PlannedMod(id: projectID, name: title, versionID: versionID, version: version, sizeBytes: sizeBytes)
+            PlannedMod(
+                id: projectID, name: title, versionID: versionID, version: VersionLabel.clean(version),
+                sizeBytes: sizeBytes, channel: VersionChannel(channel))
         }
     }
 
@@ -161,11 +218,20 @@
             return plan
         }
 
-        /// A pinned version when it fits (authors sometimes pin an old one), else the newest stable fit.
+        /// A pinned version when it fits (authors sometimes pin an old one), else the newest fitting release, then
+        /// beta, then alpha.
         func pick(_ all: [ModCandidate], pinned: String?) -> ModCandidate? {
             let fits = all.filter { $0.fits(game: game, loader: loader, kind: kind) }
             if let pinned, let exact = fits.first(where: { $0.versionID == pinned }) { return exact }
-            return fits.first { $0.channel == "release" } ?? fits.first { $0.channel == "beta" } ?? fits.first
+            return Self.mostStable(fits, channel: { VersionChannel($0.channel) })
+        }
+
+        /// The newest of the most stable channel present (lists are newest first).
+        public static func mostStable<T>(_ newestFirst: [T], channel: (T) -> VersionChannel) -> T? {
+            for c in VersionChannel.allCases {
+                if let found = newestFirst.first(where: { channel($0) == c }) { return found }
+            }
+            return nil
         }
 
         /// Why nothing fits: no build for this game version at all, or only for another loader.
@@ -176,6 +242,45 @@
                 return String(localized: "\(name) has no \(label) version, only \(other.displayName).")
             }
             return String(localized: "\(name) has no \(kind == .mods ? label : game) version yet.")
+        }
+    }
+#endif
+
+#if canImport(UIKit)
+    /// M02's version filters. The defaults come from the Mods target: its loader, its game version, Release + Beta.
+    public struct VersionFilter: Equatable, Sendable {
+        /// Empty means any.
+        public var loaders: Set<Loader>, games: Set<String>
+        public var channels: Set<VersionChannel>
+        public init(loaders: Set<Loader> = [], games: Set<String> = [], channels: Set<VersionChannel>) {
+            self.loaders = loaders
+            self.games = games
+            self.channels = channels
+        }
+
+        public static func defaults(for instance: InstanceSummary?) -> VersionFilter {
+            guard let instance, instance.loader != .vanilla else { return VersionFilter(channels: [.release, .beta]) }
+            return VersionFilter(
+                loaders: instance.loader == .quilt ? [.quilt, .fabric] : [instance.loader],
+                games: instance.gameVersion.isEmpty ? [] : [instance.gameVersion], channels: [.release, .beta])
+        }
+
+        /// Versions with no loader we know (shaders, packs) pass the loader filter.
+        public func matches(_ v: ProjectVersion) -> Bool {
+            (loaders.isEmpty || v.loaders.isEmpty || !loaders.isDisjoint(with: v.loaders))
+                && (games.isEmpty || !games.isDisjoint(with: v.games)) && channels.contains(v.versionChannel)
+        }
+
+        /// What M02 lists: matching versions that fit, plus the installed one. `all` lists everything.
+        public func visible(_ versions: [ProjectVersion], installed: String?, all: Bool) -> [ProjectVersion] {
+            all ? versions : versions.filter { ($0.fits && matches($0)) || $0.id == installed }
+        }
+    }
+
+    extension Array where Element == ProjectVersion {
+        /// What Get installs: the newest fitting release, else beta, else alpha.
+        public var preferred: ProjectVersion? {
+            ModResolver.mostStable(filter(\.fits), channel: \.versionChannel)
         }
     }
 #endif

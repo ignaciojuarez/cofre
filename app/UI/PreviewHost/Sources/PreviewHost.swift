@@ -13,6 +13,8 @@ import UIKit
 //   -instance vanilla   Active instance (mock IDs: survival create cobblemon skyblock vanilla)
 //   -instances a,b      Keep only these mock instances
 //   -plan YES           Open New instance pre-filled from Mods ("Make a mods instance", "New mods instance")
+//   -mod sodium         Project for -screen modpage (default iris). -allVersions YES opens All versions
+//   -fabric26 YES       Add "Fabric Mods" (Fabric 26.3, Sodium 0.9.2 installed) and make it the target
 //   -get culling        Tap Get on that mock mod (-screen mods). With -getConfirm YES, also tap Install;
 //                       -getFail fabric-api fails that download; -getSlow YES holds each download for a while
 //   -type xl|ax3        Dynamic Type override
@@ -43,7 +45,10 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         case "mods": nav.section = .mods
         case "modpage":
             nav.section = .mods
-            nav.mod = .project("iris")
+            nav.mod = .project(args.string(forKey: "mod") ?? "iris")
+        case "installed":
+            nav.section = .mods
+            nav.mod = .installed
             (services.backend as? MockBackend)?.failVersions = args.bool(forKey: "failVersions")
         case "settings": nav.section = .settings
         case "jit":
@@ -86,6 +91,16 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
                 nav.sheet = .newInstance
             }
         }
+        if args.bool(forKey: "fabric26"), let mock = services.backend as? MockBackend {
+            mock.instanceList.insert(
+                InstanceSummary(
+                    id: "fabric26", name: "Fabric Mods", loader: .fabric, gameVersion: "26.3", loaderVersion: "0.17.2",
+                    icon: .init(glyph: .grass)), at: 0)
+            if let i = mock.mods.firstIndex(where: { $0.id == "sodium" }) {
+                mock.mods[i].version = "0.9.2+mc26.3"
+                mock.mods[i].versionID = "sodium-092"
+            }
+        }
         if let id = args.string(forKey: "get"), let mock = services.backend as? MockBackend {
             mock.failDownload = args.string(forKey: "getFail")
             mock.stepDelay = args.bool(forKey: "getSlow") ? 30 : 0
@@ -107,7 +122,9 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
                     report: MockGameExit.report(
                         args.string(forKey: "exitReason").flatMap(GameExitReport.Reason.init) ?? .memory),
                     showDetails: args.bool(forKey: "exitDetails"), close: {}))
-            : UIHostingController(rootView: CofreRootView(store: store, nav: nav, setupStart: setupStep))
+            : UIHostingController(
+                rootView: CofreRootView(store: store, nav: nav, setupStart: setupStep)
+                    .environment(\.showsAllVersions, args.bool(forKey: "allVersions")))
         root.view.backgroundColor = .cofre.page
         let window = UIWindow(windowScene: scene)
         // On the window, so presented sheets get it too.

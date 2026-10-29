@@ -418,7 +418,7 @@
             do {
                 let v = try await backend.versions(projectID: id, instanceID: inst)
                 versions[id] = v
-                if let first = v.first(where: \.fits) {
+                if let first = v.preferred {
                     dependencies[first.id] = try await backend.dependencies(versionID: first.id, instanceID: inst)
                 }
             } catch is CancellationError {} catch {
@@ -539,11 +539,22 @@
 
         /// A search row in the Mods target: installed, off, or with an update. Modpacks become instances, so never.
         public func installState(_ p: ProjectSummary) -> ProjectInstallState {
-            guard query.kind != .modpacks,
-                let item = installed[query.kind]?.first(where: { $0.matches(p.id, title: p.title) })
-            else { return .notInstalled }
+            guard let item = installedItem(for: p) else { return .notInstalled }
             if let to = item.updateTo { return .update(to) }
             return item.enabled ? .installed : .off
+        }
+
+        /// The target's file for a search row, if it has one.
+        public func installedItem(for p: ProjectSummary) -> InstalledItem? {
+            guard query.kind != .modpacks else { return nil }
+            let items = installed[query.kind] ?? []
+            // An exact project match beats a same-name one.
+            return items.first { $0.projectID == p.id } ?? items.first { $0.matches(p.id, title: p.title) }
+        }
+
+        /// Update: exactly the build the backend offered, so a beta never replaces a release unasked.
+        public func update(_ p: ProjectSummary) {
+            get(p.id, versionID: installedItem(for: p)?.updateVersionID)
         }
 
         /// Instances that can run mods: Mods targets one of these.

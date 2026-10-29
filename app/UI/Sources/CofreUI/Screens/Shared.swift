@@ -115,9 +115,10 @@
                                 if let issue = item.issue {
                                     Text("Needs dep · \(issue)").foregroundStyle(Color.cofre.danger)
                                 } else if let to = item.updateTo {
-                                    Text(verbatim: "\(item.version) → \(to)").foregroundStyle(Color.cofre.warn)
+                                    Text(verbatim: "\(VersionLabel.clean(item.version)) → \(to)")
+                                        .foregroundStyle(Color.cofre.warn)
                                 } else {
-                                    Text(verbatim: item.enabled ? item.version : String(localized: "Off"))
+                                    Text(verbatim: item.enabled ? VersionLabel.clean(item.version) : String(localized: "Off"))
                                         .foregroundStyle(Color.cofre.muted)
                                 }
                             }

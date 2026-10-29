@@ -142,12 +142,18 @@
         @Environment(CofreStore.self) private var store
         @Environment(\.widthClass) private var width
         @State private var versionID: String?
+        /// Session-only. `nil` uses the target's defaults.
+        @State private var filter: VersionFilter?
+        @State private var showAll = false
+        @Environment(\.showsAllVersions) private var startAll
         public init(id: String) { self.id = id }
 
         public var body: some View {
             let p = store.results.first { $0.id == id }
             let versions = store.versions[id] ?? []
-            let chosen = versionID ?? versions.first(where: \.fits)?.id
+            let have = p.flatMap { store.installedItem(for: $0) }
+            let installed = have?.versionID.flatMap { v in versions.contains { $0.id == v } ? v : nil }
+            let chosen = versionID ?? installed ?? versions.preferred?.id
             VStack(spacing: 0) {
                 ColumnHeader(p?.title ?? "") {
                     if let url = p.flatMap({ $0.pageURL ?? $0.fallbackPageURL }) {
@@ -177,24 +183,7 @@
                             Stat(Fmt.ago(p.updated) ?? "—", label: "Updated")
                         }
                         Text(verbatim: p.summary).cofreFont(.body).foregroundStyle(Color.cofre.inkSoft)
-                        ListSection("Versions", spacing: 4) {
-                            ForEach(versions) { v in
-                                Button {
-                                    versionID = v.id
-                                } label: {
-                                    Row("\(v.name) · \(v.gameVersions)", isSelected: chosen == v.id) {
-                                        Radio(isOn: chosen == v.id)
-                                    } trailing: {
-                                        Badge(
-                                            v.fits ? LocalizedStringKey(v.channel) : "No fit",
-                                            tone: v.fits ? (chosen == v.id ? .success : .neutral) : .danger)
-                                    }
-                                    .dimmed(!v.fits)
-                                }
-                                .buttonStyle(RowButtonStyle())
-                                .disabled(!v.fits)
-                            }
-                        }
+                        versionList(versions, chosen: chosen, installed: installed)
                         let state = store.installState(p)
                         ForEach(chosen.flatMap { store.dependencies[$0] } ?? []) { d in
                             Row(
@@ -217,27 +206,48 @@
                         }
                         let inst = store.modsInstance?.name ?? ""
                         let busy = store.modInstalls[id]?.isBusy == true
+                        let picked = versions.first { $0.id == chosen }
                         switch state {
-                        case .installed:
-                            Banner("Installed in \(inst)", icon: .check, tone: .success)
-                        case .off:
-                            Banner("Off in \(inst)", icon: .check, tone: .warn) {
-                                BlockButton("Turn on", size: .small, fullWidth: false) { turnOn(p) }
+                        case .installed, .off, .update:
+                            if state == .off {
+                                Banner("Off in \(inst)", icon: .check, tone: .warn) {
+                                    BlockButton("Turn on", size: .small, fullWidth: false) { turnOn(p) }
+                                }
+                            } else {
+                                Banner("Installed in \(inst)", icon: .check, tone: .success)
                             }
-                        case .update(let to):
-                            Banner("Installed in \(inst)", icon: .check, tone: .success)
-                            BlockButton("Update to \(to)", role: .primary, isLoading: busy) { store.get(id) }
+                            // Another build picked by hand: switch to it, whatever its channel.
+                            if let picked, versionID != nil, picked.id != installed {
+                                BlockButton(Self.title("Switch to", picked), role: .primary, isLoading: busy) {
+                                    store.get(id, versionID: picked.id)
+                                }
+                                .keyboardShortcut(.return, modifiers: .command)
+                            } else if case .update(let to) = state {
+                                BlockButton("Update to \(to)", role: .primary, isLoading: busy) { store.update(p) }
+                                    .keyboardShortcut(.return, modifiers: .command)
+                            }
                         case .notInstalled:
                             if store.versions[id] == nil {
                                 if store.versionsError[id] == nil { Row("Loading versions…", leading: { Spinner() }) }
-                            } else {
-                                let name = versions.first { $0.id == chosen }?.name
+                            } else if let picked {
+                                // Get takes the newest fitting release (else beta, else alpha) and says which.
+                                let isDefault = picked.id == versions.preferred?.id
                                 BlockButton(
-                                    name.map { "Install \($0)" } ?? "Get", role: .primary, isLoading: busy
+                                    isDefault
+                                        ? (picked.versionChannel == .release
+                                            ? "Get" : "Get · \(picked.versionChannel.label.lowercased())")
+                                        : Self.title("Install", picked),
+                                    role: .primary, isLoading: busy
                                 ) {
-                                    store.get(id, versionID: chosen)
+                                    store.get(id, versionID: picked.id)
                                 }
                                 .keyboardShortcut(.return, modifiers: .command)
+                            }
+                        }
+                        if let picked {
+                            ListSection("Details", spacing: 4) {
+                                Row("Version", trailing: { Self.detail(picked.number) })
+                                Row("ID", trailing: { Self.detail(picked.id) })
                             }
                         }
                         if width > .compact {
@@ -252,7 +262,13 @@
                 }
             }
             .task(id: "\(id)-\(store.modsInstance?.id ?? "")") { await store.loadProject(id) }
+            .onAppear { if startAll { showAll = true } }
         }
+    }
+
+    extension EnvironmentValues {
+        /// Previews and screenshots: M02 opens on All versions.
+        @Entry public var showsAllVersions = false
     }
 
     /// M01 row trailing: ✓ when the target has it, Off, Update, or Get (spinning while a Get runs).
@@ -269,7 +285,10 @@
             case .off:
                 Badge("Off").accessibilityLabel(Text("Installed, off"))
             case .update:
-                BlockButton("Update", size: .small) { act() }
+                BlockButton("Update", size: .small) {
+                    willAct()
+                    store.update(project)
+                }
             case .notInstalled:
                 BlockButton("Get", role: .primary, size: .small, isLoading: busy) { act() }
                     .accessibilityValue(progress.map { Text("\(Int($0 * 100)) percent") } ?? Text(""))
@@ -285,10 +304,157 @@
     }
 
     extension ModPagePane {
+        /// "Install 0.9.3 beta 1", "Switch to 0.9.2"; the channel is added when the label doesn't say it.
+        static func title(_ verb: String, _ v: ProjectVersion) -> String {
+            let c = v.versionChannel
+            let says = c == .release || v.name.lowercased().contains(c.raw)
+            return "\(verb) \(v.name)" + (says ? "" : " · \(c.label.lowercased())")
+        }
+
+        /// M02 versions: filtered to the target by default, with a one-tap way to see the rest.
+        @ViewBuilder fileprivate func versionList(_ versions: [ProjectVersion], chosen: String?, installed: String?)
+            -> some View
+        {
+            let f = filter ?? .defaults(for: store.modsInstance)
+            let shown = f.visible(versions, installed: installed, all: showAll)
+            let hidden = versions.count - shown.count
+            ListSection("Versions", spacing: 4) {
+                if !versions.isEmpty {
+                    VersionFilterBar(versions: versions, filter: Binding(get: { f }, set: { filter = $0 }))
+                        .disabled(showAll)
+                }
+                ForEach(shown) { v in
+                    Button {
+                        versionID = v.id
+                    } label: {
+                        Row(v.name, subtitle: Self.subtitle(v), isSelected: chosen == v.id) {
+                            Radio(isOn: chosen == v.id)
+                        } trailing: {
+                            HStack(spacing: 4) {
+                                if v.id == installed { Badge("Installed", tone: .success) }
+                                if !v.fits {
+                                    Badge("No fit", tone: .danger)
+                                } else if v.versionChannel != .release || v.id != installed {
+                                    Badge(v.versionChannel.label, tone: Self.tone(v.versionChannel))
+                                }
+                            }
+                        }
+                        .dimmed(!v.fits)
+                    }
+                    .buttonStyle(RowButtonStyle())
+                    .disabled(!v.fits)
+                }
+                if shown.isEmpty, !versions.isEmpty {
+                    Row("No versions match these filters", leading: { PixelIcon(.book, size: 18) })
+                }
+                if hidden > 0 || showAll {
+                    Button {
+                        showAll.toggle()
+                    } label: {
+                        ValueRow(
+                            showAll ? "Only versions for this instance" : "Show \(hidden) hidden",
+                            value: showAll ? "" : String(localized: "All versions"), accent: true)
+                    }
+                    .buttonStyle(RowButtonStyle())
+                }
+            }
+        }
+
+        static func detail(_ value: String) -> some View {
+            Text(verbatim: value).cofreFont(.secondary).foregroundStyle(Color.cofre.muted)
+                .lineLimit(1).truncationMode(.middle).textSelection(.enabled)
+        }
+
+        static func subtitle(_ v: ProjectVersion) -> String {
+            let games = v.games.prefix(3).joined(separator: ", ") + (v.games.count > 3 ? " +\(v.games.count - 3)" : "")
+            return ([games] + [v.loaders.map(\.displayName).joined(separator: ", ")]).filter { !$0.isEmpty }
+                .joined(separator: " · ")
+        }
+
+        static func tone(_ c: VersionChannel) -> Tone {
+            switch c {
+            case .release: .neutral
+            case .beta: .warn
+            case .alpha: .danger
+            }
+        }
+
         fileprivate func turnOn(_ p: ProjectSummary) {
             guard let item = store.installed[store.query.kind]?.first(where: { $0.matches(p.id, title: p.title) })
             else { return }
             store.setEnabled(true, item: item)
+        }
+    }
+
+    /// M02 filter menus: Loader, Game version, Channel. Native menus; the labels say what's on.
+    struct VersionFilterBar: View {
+        let versions: [ProjectVersion]
+        @Binding var filter: VersionFilter
+
+        var body: some View {
+            let loaders = Loader.allCases.filter { l in versions.contains { $0.loaders.contains(l) } }
+            let games = Self.gameOrder(Set(versions.flatMap(\.games)))
+            HStack(spacing: 6) {
+                if !loaders.isEmpty {
+                    menu(filter.loaders.isEmpty ? String(localized: "Any loader") : loaderLabel) {
+                        Toggle("Any loader", isOn: set(\.loaders, to: []))
+                        ForEach(loaders) { l in Toggle(l.displayName, isOn: set(\.loaders, to: [l])) }
+                    }
+                }
+                menu(filter.games.count == 1 ? filter.games.first! : String(localized: "Any version")) {
+                    Toggle("Any version", isOn: set(\.games, to: []))
+                    ForEach(games, id: \.self) { g in Toggle(g, isOn: set(\.games, to: [g])) }
+                }
+                menu(channelLabel) {
+                    ForEach(VersionChannel.allCases, id: \.self) { c in
+                        Toggle(
+                            c.label,
+                            isOn: Binding(
+                                get: { filter.channels.contains(c) },
+                                set: { on in
+                                    if on { filter.channels.insert(c) } else if filter.channels.count > 1 {
+                                        filter.channels.remove(c)
+                                    }
+                                }))
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+        }
+
+        private var loaderLabel: String {
+            Loader.allCases.filter { filter.loaders.contains($0) }.map(\.displayName).joined(separator: " + ")
+        }
+        private var channelLabel: String {
+            filter.channels.count == VersionChannel.allCases.count
+                ? String(localized: "Any channel")
+                : filter.channels.sorted().map(\.label).joined(separator: " + ")
+        }
+
+        /// A single-choice item: on when the filter is exactly `value`.
+        private func set<T: Equatable>(_ key: WritableKeyPath<VersionFilter, T>, to value: T) -> Binding<Bool> {
+            Binding(get: { filter[keyPath: key] == value }, set: { if $0 { filter[keyPath: key] = value } })
+        }
+
+        private func menu<C: View>(_ title: String, @ViewBuilder content: () -> C) -> some View {
+            Menu {
+                content()
+            } label: {
+                Text(verbatim: "\(title) ▾").cofreFont(.label).foregroundStyle(Color.cofre.ink).lineLimit(1)
+                    .padding(.horizontal, 10).frame(minHeight: 32)
+                    .block(.button, lip: 3)
+            }
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .blockPointer()
+        }
+
+        /// Newest game version first: "26.3", "1.21.1", "1.21", "1.20.4".
+        static func gameOrder(_ games: Set<String>) -> [String] {
+            games.sorted { a, b in
+                let x = a.split(separator: ".").map { Int($0) ?? 0 }, y = b.split(separator: ".").map { Int($0) ?? 0 }
+                return x.lexicographicallyPrecedes(y) == false && x != y
+            }
         }
     }
 

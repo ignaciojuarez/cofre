@@ -70,7 +70,15 @@
             ) {
                 icon(plan.target.id)
             } trailing: {
-                Meta(Fmt.fileSize(plan.target.sizeBytes) ?? "")
+                HStack(spacing: 6) {
+                    channelBadge(plan.target)
+                    Meta(Fmt.fileSize(plan.target.sizeBytes) ?? "")
+                }
+            }
+            if plan.target.channel != .release {
+                Text("No release fits \(target?.name ?? "this instance") yet, so this is the newest \(plan.target.channel.label.lowercased()).")
+                    .cofreFont(.secondary).foregroundStyle(Color.cofre.muted)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             if plan.makesInstance {
                 Text("Packs make their own instance, so \(target?.name ?? "your instance") stays as it is.")
@@ -85,7 +93,10 @@
                             if m.turnsOn {
                                 Meta("Turns on", tone: .warn)
                             } else {
-                                Meta(Fmt.fileSize(m.sizeBytes) ?? "")
+                                HStack(spacing: 6) {
+                                    channelBadge(m)
+                                    Meta(Fmt.fileSize(m.sizeBytes) ?? "")
+                                }
                             }
                         }
                     }
@@ -170,6 +181,12 @@
             if job.plan?.makesInstance == true { return String(localized: "Made a new instance") }
             let name = store.instances.first { $0.id == job.instanceID }?.name ?? ""
             return String(localized: "Installed in \(name)")
+        }
+
+        @ViewBuilder private func channelBadge(_ m: PlannedMod) -> some View {
+            if m.channel != .release {
+                Badge(m.channel.label, tone: m.channel == .beta ? .warn : .danger)
+            }
         }
 
         /// The project's icon when it's in the results, else a book.
