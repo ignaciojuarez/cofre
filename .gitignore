@@ -2,3 +2,7 @@
 artifacts/*.ipa
 artifacts/Payload/
 *.xcarchive
+
+build-air.log
+build-air.pid
+app/Resources/AppIcon/.DS_Store
