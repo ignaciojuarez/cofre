@@ -1,5 +1,6 @@
 #import <UIKit/UIKit.h>
 #import <Foundation/Foundation.h>
+#include <sys/stat.h>
 
 static BOOL CofreValidPairing(NSData *data, NSString **udidOut) {
     NSError *error = nil; id obj = [NSPropertyListSerialization propertyListWithData:data options:NSPropertyListImmutable format:nil error:&error];
@@ -20,4 +21,12 @@ static void CofreImportPairingURL(NSURL *url) {
     else if (![fm moveItemAtURL:tmp toURL:dst error:&error]) { NSLog(@"[Cofre] pairing install failed: %@", error); [fm removeItemAtURL:tmp error:NULL]; return; }
     NSLog(@"[Cofre] pairing imported udid=%@", udid.length > 4 ? [udid substringFromIndex:udid.length - 4] : udid);
 }
-__attribute__((constructor)) static void CofrePairingImportInstall(void) { [[NSNotificationCenter defaultCenter] addObserverForName:UISceneOpenURLContextsNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *n){ for (UIOpenURLContext *c in n.userInfo[UISceneOpenURLContextsKey]) CofreImportPairingURL(c.URL); }]; [[NSNotificationCenter defaultCenter] addObserverForName:UISceneWillConnectNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *n){ for (UIOpenURLContext *c in n.userInfo[UISceneConnectionOptionsKey].URLContexts) CofreImportPairingURL(c.URL); }]; }
+__attribute__((constructor)) static void CofrePairingImportInstall(void) {
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"UISceneOpenURLContextsNotification" object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *n){
+        for (UIOpenURLContext *c in n.userInfo[@"UISceneOpenURLContextsKey"]) CofreImportPairingURL(c.URL);
+    }];
+    [[NSNotificationCenter defaultCenter] addObserverForName:UISceneWillConnectNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *n){
+        UISceneConnectionOptions *options = n.userInfo[@"UISceneConnectionOptionsKey"];
+        for (UIOpenURLContext *c in options.URLContexts) CofreImportPairingURL(c.URL);
+    }];
+}
