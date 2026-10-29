@@ -6,7 +6,7 @@ import CofreUI
 
 public enum CofreBackendError: LocalizedError {
     case unavailable(String)
-    public var errorDescription: String? { switch self { case .unavailable(let name): "(name) is unavailable in this Air build" } }
+    public var errorDescription: String? { switch self { case .unavailable(let name): "\(name) is unavailable in this Air build" } }
 }
 
 /// Production bridge. Air owns the data and launch lifecycle; unsupported Air APIs are surfaced as unavailable.

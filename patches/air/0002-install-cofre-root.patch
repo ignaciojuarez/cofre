@@ -1,0 +1,18 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Cofre <cofre@example.invalid>
+Date: Thu, 29 Oct 2026 01:00:00 -0700
+Subject: [PATCH] [COFRE] Install Cofre root UI
+
+Reason: make the production app show CofreUI while retaining Air screens behind the facade.
+Drop when: Air exposes an official root-controller integration point.
+--- a/Natives/SceneDelegate.m
++++ b/Natives/SceneDelegate.m
+@@ -1,5 +1,6 @@
+ #import "SceneDelegate.h"
++#import <UIKit/UIKit.h>
++extern UIViewController *CofreMakeRootViewController(void);
+@@ -114,6 +115,10 @@
+     [self.window makeKeyAndVisible];
++    UIViewController *cofreRoot = CofreMakeRootViewController();
++    if (cofreRoot) { self.window.rootViewController = cofreRoot; NSLog(@"[Cofre] UI root installed"); }
+*** End Patch

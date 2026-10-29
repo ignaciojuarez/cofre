@@ -18,13 +18,16 @@ if (( BUILD )); then
   cp "$ROOT"/app/Glue/AirBridge/AirBridgeAdapter.* "$AIR/Natives/CofreGlue/"
   cp "$ROOT"/app/Glue/AirBridge/CofreStartup.m "$AIR/Natives/CofreGlue/"
   cp "$ROOT"/app/Glue/AirBridge/CofreTunnelService.* "$AIR/Natives/CofreGlue/"
+  cp "$ROOT"/app/Glue/AirBridge/CofreRootFactory.m "$AIR/Natives/CofreGlue/"
+  cp "$ROOT"/app/Shell/CofreRootViewController.swift "$AIR/Natives/CofreGlue/"
+  cp "$ROOT"/app/Glue/AirBridge/CofreBackendAdapter.swift "$AIR/Natives/CofreGlue/"
   cp "$ROOT"/app/Glue/AirBridge/CofrePairingImport.m "$AIR/Natives/CofreGlue/"
   python3 - <<PY2
 from pathlib import Path
 p=Path("$AIR/Natives/CMakeLists.txt")
 s=p.read_text()
 needle="  main_hook.m\n"
-for f in ("CofreGlue/AirBridgeAdapter.m", "CofreGlue/CofreStartup.m", "CofreGlue/CofreTunnelService.m", "CofreGlue/CofrePairingImport.m"):
+for f in ("CofreGlue/AirBridgeAdapter.m", "CofreGlue/CofreStartup.m", "CofreGlue/CofreTunnelService.m", "CofreGlue/CofrePairingImport.m", "CofreGlue/CofreRootFactory.m"):
     if f not in s: s=s.replace(needle, needle+"  "+f+"\n")
 if "NetworkExtension" not in s: s=s.replace("target_link_libraries(AngelAuraAmethyst", "target_link_libraries(AngelAuraAmethyst\n  -framework NetworkExtension")
 p.write_text(s)
