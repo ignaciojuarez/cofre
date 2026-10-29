@@ -1,11 +1,12 @@
 #if canImport(UIKit)
 import Foundation
 import UIKit
+import Observation
 import CofreUI
 import CofreServerJoin
 
 @MainActor
-final class AirServerJoinModel: NSObject, ServerJoinViewModel {
+@Observable final class AirServerJoinModel: NSObject, ServerJoinViewModel {
     let server: CofreUI.ServerSummary
     private(set) var state: CofreUI.ServerJoinState = .resolving
     private let request: CofreUI.ServerJoinRequest
