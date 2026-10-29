@@ -1,7 +1,9 @@
 import Foundation
 import NetworkExtension
 
-/// Minimal split tunnel: only 10.7.0.1/32 is routed; packets are reversed for the peer.
+/// Loopback flow: app sends to 10.7.0.1, the tunnel reflects it to 10.7.0.2,
+/// where the device lockdownd listener receives it. Open spike S1: verify
+/// traffic originating in this appex traverses its own tunnel.
 final class LoopbackTunnel {
     private let settings: NEPacketTunnelNetworkSettings
     init() {

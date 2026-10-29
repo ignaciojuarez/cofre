@@ -1,6 +1,11 @@
-Cofre
+Cofre is GPL-3.0-or-later. Our code is Copyright Ignacio Juarez and contributors.
 
-Upstream components (pinned in UPSTREAM.lock):
-- Air (GPL-3.0)
-- StikJIT (MPL-2.0)
-- StikDebug is a fallback app only (AGPL-3.0); no code is embedded.
+Third-party components:
+- Air / Amethyst-iOS-MyRemastered: GPL-3.0, see upstream/air and its license.
+- StikJIT: MPL-2.0, see upstream/stikjit and its license.
+- idevice crate: MIT, see tools/llave/core and Cargo.lock.
+- Fonts: OFL-1.1, see app/UI resources and font license files.
+- StikDebug is a separate fallback app under AGPL-3.0; its code is not embedded in Cofre.
+
+Brand disclaimer: Cofre is an independent project and is not affiliated with Apple, Mojang, Microsoft, Air, Amethyst, StikDebug, or StikJIT.
+Source, pinned upstream revisions, patches, and build instructions are provided with each release.

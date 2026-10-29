@@ -1,8 +1,8 @@
-use std::fs::File;
+use std::fs::OpenOptions;
 use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
 
 use idevice::{
     IdeviceError, IdeviceService,
@@ -15,7 +15,11 @@ use crate::models::PairEvent;
 
 const PROHIBITED_IPAD_UDID: &str = "COFRE_DEVICE_UDID";
 
-pub async fn run_pair(udid_opt: Option<String>, out_path: &Path, place: bool) -> Result<(), String> {
+pub async fn run_pair(
+    udid_opt: Option<String>,
+    out_path: &Path,
+    place: bool,
+) -> Result<(), String> {
     let mut usbmuxd = UsbmuxdConnection::default()
         .await
         .map_err(|e| format!("Failed to connect to usbmuxd: {e}"))?;
@@ -26,11 +30,10 @@ pub async fn run_pair(udid_opt: Option<String>, out_path: &Path, place: bool) ->
         .map_err(|e| format!("Failed to list devices: {e}"))?;
 
     let dev = match udid_opt {
-        Some(target_udid) => {
-            devs.into_iter()
-                .find(|d| d.udid.eq_ignore_ascii_case(&target_udid))
-                .ok_or_else(|| format!("Device with UDID {target_udid} not found"))?
-        }
+        Some(target_udid) => devs
+            .into_iter()
+            .find(|d| d.udid.eq_ignore_ascii_case(&target_udid))
+            .ok_or_else(|| format!("Device with UDID {target_udid} not found"))?,
         None => {
             let usb_devs: Vec<_> = devs
                 .into_iter()
@@ -108,11 +111,11 @@ pub async fn run_pair(udid_opt: Option<String>, out_path: &Path, place: bool) ->
             }
             Err(e) => {
                 // Check if device is already paired
-                if let Ok(existing_record) = usbmuxd.get_pair_record(&dev.udid).await {
-                    if lc.start_session(&existing_record).await.is_ok() {
-                        PairEvent::Paired.emit();
-                        break existing_record;
-                    }
+                if let Ok(existing_record) = usbmuxd.get_pair_record(&dev.udid).await
+                    && lc.start_session(&existing_record).await.is_ok()
+                {
+                    PairEvent::Paired.emit();
+                    break existing_record;
                 }
                 let err = PairEvent::Error {
                     code: "PAIRING_FAILED".to_string(),
@@ -133,22 +136,36 @@ pub async fn run_pair(udid_opt: Option<String>, out_path: &Path, place: bool) ->
         .map_err(|e| format!("Failed to validate lockdown session: {e}"))?;
 
     // Enable wireless lockdown connections
-    let _ = lc
-        .set_value(
-            "EnableWifiConnections",
-            true.into(),
-            Some("com.apple.mobile.wireless_lockdown"),
-        )
-        .await;
-
-    let _ = lc
-        .set_value(
-            "EnableWifiDebugging",
-            true.into(),
-            Some("com.apple.mobile.wireless_lockdown"),
-        )
-        .await;
-
+    lc.set_value(
+        "EnableWifiConnections",
+        true.into(),
+        Some("com.apple.mobile.wireless_lockdown"),
+    )
+    .await
+    .map_err(|e| {
+        let msg = format!("EnableWifiConnections failed: {e}");
+        PairEvent::Error {
+            code: "WIFI_CONNECTIONS_FAILED".into(),
+            message: msg.clone(),
+        }
+        .emit();
+        msg
+    })?;
+    lc.set_value(
+        "EnableWifiDebugging",
+        true.into(),
+        Some("com.apple.mobile.wireless_lockdown"),
+    )
+    .await
+    .map_err(|e| {
+        let msg = format!("EnableWifiDebugging failed: {e}");
+        PairEvent::Error {
+            code: "WIFI_DEBUGGING_FAILED".into(),
+            message: msg.clone(),
+        }
+        .emit();
+        msg
+    })?;
     PairEvent::WifiEnabled.emit();
 
     // Prepare combined plist
@@ -158,31 +175,47 @@ pub async fn run_pair(udid_opt: Option<String>, out_path: &Path, place: bool) ->
         .serialize()
         .map_err(|e| format!("Failed to serialize lockdown record: {e}"))?;
 
-    let lockdown_val: plist::Value = plist::Value::from_reader_xml(std::io::Cursor::new(&serialized_lockdown))
-        .map_err(|e| format!("Failed to parse lockdown plist: {e}"))?;
+    let lockdown_val: plist::Value =
+        plist::Value::from_reader_xml(std::io::Cursor::new(&serialized_lockdown))
+            .map_err(|e| format!("Failed to parse lockdown plist: {e}"))?;
 
     let mut combined_dict = match lockdown_val {
         plist::Value::Dictionary(d) => d,
         _ => return Err("Lockdown record is not a dictionary".to_string()),
     };
 
-    // RemotePairing for iOS 17.4+
+    // RemotePairing is optional when legacy lockdown pairing already works.
     if !is_ios_version_below(&prod_version, 17, 4) {
-        let hostname = format!("llave-{}", &uuid::Uuid::new_v4().simple().to_string()[..6]);
-        if let Ok(service) = RemotePairingLockdownService::connect(&provider).await {
-            if let Ok(mut rp_client) = service.into_client(&hostname) {
-                let mut rp_file = RpPairingFile::generate(&hostname);
-                if rp_client.connect(&mut rp_file, async || "000000".to_string()).await.is_ok() {
-                    let rp_bytes = rp_file.to_bytes();
-                    if let Ok(plist::Value::Dictionary(rp_dict)) =
-                        plist::Value::from_reader_xml(std::io::Cursor::new(&rp_bytes))
-                    {
-                        for (k, v) in rp_dict {
-                            combined_dict.insert(k, v);
-                        }
-                    }
+        let result: Result<plist::Dictionary, String> = async {
+            let hostname = format!("llave-{}", &uuid::Uuid::new_v4().simple().to_string()[..6]);
+            let service = RemotePairingLockdownService::connect(&provider)
+                .await
+                .map_err(|e| format!("connect: {e}"))?;
+            let mut client = service
+                .into_client(&hostname)
+                .map_err(|e| format!("client: {e}"))?;
+            let mut file = RpPairingFile::generate(&hostname);
+            client
+                .connect(&mut file, async || "000000".to_string())
+                .await
+                .map_err(|e| format!("handshake: {e}"))?;
+            match plist::Value::from_reader_xml(std::io::Cursor::new(&file.to_bytes())) {
+                Ok(plist::Value::Dictionary(d)) => Ok(d),
+                _ => Err("invalid plist".into()),
+            }
+        }
+        .await;
+        match result {
+            Ok(rp_dict) => {
+                for (k, v) in rp_dict {
+                    combined_dict.insert(k, v);
                 }
             }
+            Err(message) => PairEvent::Warning {
+                code: "REMOTE_PAIRING_FAILED".into(),
+                message,
+            }
+            .emit(),
         }
     }
 
@@ -218,26 +251,69 @@ pub async fn run_pair(udid_opt: Option<String>, out_path: &Path, place: bool) ->
         .map_err(|e| format!("Failed to serialize combined plist: {e}"))?;
 
     if place {
-        let house = idevice::house_arrest::HouseArrestClient::connect(&provider).await.map_err(|e| format!("Cofre is not installed or house_arrest is unavailable: {e}"))?;
-        let mut afc = match house.vend_container("com.ignaciojuarez.cofre").await { Ok(a) => a, Err(_) => idevice::house_arrest::HouseArrestClient::connect(&provider).await.map_err(|e| format!("Cofre placement failed: {e}"))?.vend_documents("com.ignaciojuarez.cofre").await.map_err(|e| format!("Cofre placement failed: {e}"))? };
+        let house = idevice::house_arrest::HouseArrestClient::connect(&provider)
+            .await
+            .map_err(|e| format!("Cofre is not installed or house_arrest is unavailable: {e}"))?;
+        let mut afc = match house.vend_container("com.ignaciojuarez.cofre").await {
+            Ok(a) => a,
+            Err(_) => idevice::house_arrest::HouseArrestClient::connect(&provider)
+                .await
+                .map_err(|e| format!("Cofre placement failed: {e}"))?
+                .vend_documents("com.ignaciojuarez.cofre")
+                .await
+                .map_err(|e| format!("Cofre placement failed: {e}"))?,
+        };
         let _ = afc.mk_dir("/Documents/StikJIT").await;
-        let mut f = afc.open("/Documents/StikJIT/pairingFile.plist", idevice::afc::opcode::AfcFopenMode::Wr).await.map_err(|e| format!("Cofre placement failed: {e}"))?;
-        f.write_entire(&xml_bytes).await.map_err(|e| format!("Cofre placement failed: {e}"))?;
-        f.close().await.map_err(|e| format!("Cofre placement failed: {e}"))?;
+        let mut f = afc
+            .open(
+                "/Documents/StikJIT/pairingFile.plist",
+                idevice::afc::opcode::AfcFopenMode::Wr,
+            )
+            .await
+            .map_err(|e| format!("Cofre placement failed: {e}"))?;
+        f.write_entire(&xml_bytes)
+            .await
+            .map_err(|e| format!("Cofre placement failed: {e}"))?;
+        f.close()
+            .await
+            .map_err(|e| format!("Cofre placement failed: {e}"))?;
         println!("{{\"event\":\"placed\"}}");
     }
 
-    if let Some(parent) = out_path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| format!("Failed to create parent dir: {e}"))?;
+    let root = std::env::var_os("COFRE_PAIRING_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| std::path::PathBuf::from("pairings"));
+    std::fs::create_dir_all(&root).map_err(|e| format!("Failed to create app pairing dir: {e}"))?;
+    let out_path = if out_path.is_absolute() {
+        out_path.to_path_buf()
+    } else {
+        root.join(out_path)
+    };
+    if out_path.parent() != Some(root.as_path()) {
+        return Err("--out must be a file directly inside the app pairing directory".into());
     }
-
-    let mut file = File::create(out_path).map_err(|e| format!("Failed to create output file: {e}"))?;
-    let mut perms = file.metadata().map_err(|e| e.to_string())?.permissions();
-    perms.set_mode(0o600);
-    file.set_permissions(perms).map_err(|e| e.to_string())?;
-
-    file.write_all(&xml_bytes).map_err(|e| format!("Failed to write pairing file: {e}"))?;
-    file.flush().map_err(|e| format!("Failed to flush pairing file: {e}"))?;
+    if out_path.is_symlink() || out_path.exists() {
+        return Err("refusing to overwrite existing pairing output".into());
+    }
+    let tmp = root.join(format!(".{}.tmp", uuid::Uuid::new_v4()));
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&tmp)
+        .map_err(|e| format!("Failed to create output file: {e}"))?;
+    file.set_permissions(std::fs::Permissions::from_mode(0o600))
+        .map_err(|e| e.to_string())?;
+    file.write_all(&xml_bytes)
+        .map_err(|e| format!("Failed to write pairing file: {e}"))?;
+    file.flush()
+        .map_err(|e| format!("Failed to flush pairing file: {e}"))?;
+    file.sync_all()
+        .map_err(|e| format!("Failed to sync pairing file: {e}"))?;
+    drop(file);
+    std::fs::rename(&tmp, &out_path).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        format!("Failed to install pairing file: {e}")
+    })?;
 
     Ok(())
 }
@@ -246,11 +322,23 @@ fn is_ios_version_below(version: &str, target_major: u32, target_minor: u32) -> 
     let mut parts = version.split('.');
     let major = parts
         .next()
-        .and_then(|s| s.chars().take_while(|c| c.is_ascii_digit()).collect::<String>().parse::<u32>().ok())
+        .and_then(|s| {
+            s.chars()
+                .take_while(|c| c.is_ascii_digit())
+                .collect::<String>()
+                .parse::<u32>()
+                .ok()
+        })
         .unwrap_or(0);
     let minor = parts
         .next()
-        .and_then(|s| s.chars().take_while(|c| c.is_ascii_digit()).collect::<String>().parse::<u32>().ok())
+        .and_then(|s| {
+            s.chars()
+                .take_while(|c| c.is_ascii_digit())
+                .collect::<String>()
+                .parse::<u32>()
+                .ok()
+        })
         .unwrap_or(0);
     (major, minor) < (target_major, target_minor)
 }

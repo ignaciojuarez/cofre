@@ -1,22 +1,5 @@
 #import "CofreTunnelService.h"
-#import <NetworkExtension/NetworkExtension.h>
 @implementation CofreTunnelService
-+ (void)installAndStart {
-    [NETunnelProviderManager loadAllFromPreferencesWithCompletionHandler:^(NSArray<NETunnelProviderManager *> *managers, NSError *error) {
-        NETunnelProviderManager *m = managers.firstObject ?: [NETunnelProviderManager new];
-        NETunnelProviderProtocol *p = [NETunnelProviderProtocol new];
-        p.providerBundleIdentifier = @"com.ignaciojuarez.cofre.tunnel";
-        p.serverAddress = @"10.7.0.1";
-        m.protocolConfiguration = p; m.localizedDescription = @"Cofre loopback"; m.enabled = YES;
-        [m saveToPreferencesWithCompletionHandler:^(NSError *saveError) {
-            if (saveError) { NSLog(@"[Cofre] tunnel save failed %@", saveError); return; }
-            [m loadFromPreferencesWithCompletionHandler:^(NSError *loadError) {
-                if (loadError) { NSLog(@"[Cofre] tunnel reload failed %@", loadError); return; }
-                NSError *startError = nil; [m.connection startVPNTunnelAndReturnError:&startError];
-                if (startError) NSLog(@"[Cofre] tunnel start failed %@", startError);
-                else NSLog(@"[Cofre] tunnel requested 10.7.0.1");
-            }];
-        }];
-    }];
-}
++ (NETunnelProviderManager *)cofreManagerFromManagers:(NSArray<NETunnelProviderManager *> *)managers { for (NETunnelProviderManager *m in managers) if ([m.protocolConfiguration isKindOfClass:NETunnelProviderProtocol.class] && [((NETunnelProviderProtocol *)m.protocolConfiguration).providerBundleIdentifier isEqualToString:@"com.ignaciojuarez.cofre.tunnel"]) return m; return nil; }
++ (void)installAndStart { [NETunnelProviderManager loadAllFromPreferencesWithCompletionHandler:^(NSArray *managers, NSError *error) { if (error) { NSLog(@"[Cofre] tunnel load failed %@", error); return; } NETunnelProviderManager *m = [self cofreManagerFromManagers:managers] ?: [NETunnelProviderManager new]; NETunnelProviderProtocol *p = [m.protocolConfiguration isKindOfClass:NETunnelProviderProtocol.class] ? (id)m.protocolConfiguration : [NETunnelProviderProtocol new]; p.providerBundleIdentifier = @"com.ignaciojuarez.cofre.tunnel"; p.serverAddress = @"10.7.0.1"; m.protocolConfiguration=p; m.localizedDescription=@"Cofre loopback"; m.enabled=YES; [m saveToPreferencesWithCompletionHandler:^(NSError *e){ if(e){NSLog(@"[Cofre] tunnel save failed %@",e);return;} [m loadFromPreferencesWithCompletionHandler:^(NSError *e2){ if(e2){NSLog(@"[Cofre] tunnel reload failed %@",e2);return;} if (![self cofreManagerFromManagers:@[m]]) { NSLog(@"[Cofre] tunnel identity changed after reload"); return; } NSError *startError=nil; [m.connection startVPNTunnelAndReturnError:&startError]; if(startError) NSLog(@"[Cofre] tunnel start failed %@",startError); }]; }]; }]; }
 @end
