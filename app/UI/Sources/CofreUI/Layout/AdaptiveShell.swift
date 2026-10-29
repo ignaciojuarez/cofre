@@ -1,5 +1,6 @@
 #if canImport(UIKit)
     import SwiftUI
+    import UIKit
 
     // §3.2 AdaptiveShell: tab bar (compact) · rail (< 1100) · sidebar (≥ 1100). Reads the window, never the device.
     // One `onGeometryChange` at the root publishes `\.widthClass`. A custom layout moves the chrome
@@ -12,6 +13,7 @@
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
         @Environment(\.cofreTheme) private var theme
         @State private var width: CGFloat = 0
+        @State private var keyboardUp = false
 
         public init(nav: NavModel, @ViewBuilder content: @escaping (NavModel.Section) -> Content) {
             self.nav = nav
@@ -22,7 +24,7 @@
             let widthClass = WidthClass.resolve(sizeClass: sizeClass, width: width)
             let style: NavChrome.Style =
                 widthClass == .compact ? .tabBar : (widthClass == .expanded && !nav.preferRail ? .sidebar : .rail)
-            ShellLayout(compact: widthClass == .compact) {
+            ShellLayout(compact: widthClass == .compact, chromeHidden: keyboardUp) {
                 content(nav.section)
                     .id(nav.section)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -41,6 +43,13 @@
                     ? .easeInOut(duration: theme.motion.reducedCrossfade) : .easeInOut(duration: theme.motion.column),
                 value: style
             )
+            // Like a native tab bar, the bottom bar stays under the keyboard instead of riding up on it.
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+                keyboardUp = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+                keyboardUp = false
+            }
             .background {
                 // ⌃⌘S toggles sidebar ↔ rail.
                 Button("") { nav.preferRail.toggle() }.keyboardShortcut("s", modifiers: [.control, .command]).hidden()
@@ -51,6 +60,8 @@
     /// Two subviews: content, chrome. Compact puts chrome at the bottom, regular at the leading edge.
     struct ShellLayout: Layout {
         let compact: Bool
+        /// Compact only: the keyboard is up, so the content takes the whole height and the bar sits below it.
+        var chromeHidden = false
 
         func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
             proposal.replacingUnspecifiedDimensions()
@@ -61,7 +72,7 @@
             let content = subviews[0]
             let chrome = subviews[1]
             if compact {
-                let h = chrome.sizeThatFits(.init(width: b.width, height: nil)).height
+                let h = chromeHidden ? 0 : chrome.sizeThatFits(.init(width: b.width, height: nil)).height
                 chrome.place(at: CGPoint(x: b.minX, y: b.maxY - h), proposal: .init(width: b.width, height: h))
                 content.place(at: b.origin, proposal: .init(width: b.width, height: b.height - h))
             } else {
