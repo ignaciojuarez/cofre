@@ -96,5 +96,8 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)gameInputMouseButton:(NSInteger)button down:(BOOL)down;
 - (void)gameInputLookX:(float)deltaX y:(float)deltaY;
 - (void)setGameKeyboardShown:(BOOL)shown;
+- (void)gameInputScroll:(NSInteger)steps;
+/// inWorld, guiScale and pixelsPerPoint (0 when unknown).
+- (NSDictionary<NSString *, NSNumber *> *)gameScreenState;
 @end
 NS_ASSUME_NONNULL_END

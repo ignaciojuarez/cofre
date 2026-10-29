@@ -12,7 +12,7 @@
             switch self {
             case .game: "Game"
             case .renderer: "Renderer"
-            case .touch: "Touch & gyro"
+            case .touch: "Controls"
             case .controller: "Controller"
             case .controlsEditor: "Controls editor"
             case .jitJava: "JIT & Java"

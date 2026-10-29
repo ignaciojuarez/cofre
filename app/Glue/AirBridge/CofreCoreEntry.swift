@@ -18,6 +18,11 @@ public final class CofreCoreEntry: NSObject {
     @MainActor public static func handleGameExit(_ code: Int32) {
         CofreGameExit.handle(code: Int(code), root: root, bridge: bridge)
     }
+    /// The in-game touch overlay. Air's `CofreGameOverlayHost` asks once per game view.
+    @objc(touchOverlay)
+    @MainActor public static func touchOverlay() -> UIViewController {
+        TouchOverlayController(input: CofreGameInput.shared)
+    }
     @objc(rootViewController)
     @MainActor public static func rootViewController() -> UIViewController? {
         guard let root else { NSLog("[Cofre] UI fallback reason=root missing"); return nil }

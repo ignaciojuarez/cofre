@@ -4,6 +4,7 @@
 #import "utils.h"
 
 #include "glfw_keycodes.h"
+#include <objc/message.h>
 #include <string.h>
 #include <stdatomic.h>
 
@@ -31,6 +32,9 @@ static int CofreKeyCode(const char *name) {
     if (strcmp(name, "Q") == 0) return GLFW_KEY_Q;
     if (strcmp(name, "ESC") == 0) return GLFW_KEY_ESCAPE;
     if (strcmp(name, "F5") == 0) return GLFW_KEY_F5;
+    if (strcmp(name, "F1") == 0) return GLFW_KEY_F1;
+    if (strcmp(name, "TAB") == 0) return GLFW_KEY_TAB;
+    if (strcmp(name, "F") == 0) return GLFW_KEY_F;
     if (name[0] >= '1' && name[0] <= '9' && name[1] == '\0') return GLFW_KEY_1 + name[0] - '1';
     return GLFW_KEY_UNKNOWN;
 }
@@ -42,7 +46,7 @@ static void CofreAirInputKey(const char *name, BOOL down) {
 }
 
 static void CofreAirInputMouseButton(int button, BOOL down) {
-    int key = button == 1 ? GLFW_MOUSE_BUTTON_RIGHT : GLFW_MOUSE_BUTTON_LEFT;
+    int key = button == 1 ? GLFW_MOUSE_BUTTON_RIGHT : button == 2 ? GLFW_MOUSE_BUTTON_MIDDLE : GLFW_MOUSE_BUTTON_LEFT;
     CallbackBridge_nativeSendMouseButton(key, down ? 1 : 0, 0);
 }
 
@@ -87,6 +91,19 @@ void CofreInputMouseButton(int button, BOOL down) { CofreAirInputMouseButton(but
 void CofreInputLook(float deltaX, float deltaY) { CofreAirInputLook(deltaX, deltaY); }
 void CofreInputShowKeyboard(void) { CofreAirInputShowKeyboard(); }
 void CofreInputHideKeyboard(void) { CofreAirInputHideKeyboard(); }
+void CofreInputScroll(int steps) { CallbackBridge_nativeSendScroll(0, steps); }
+
+NSDictionary<NSString *, NSNumber *> *CofreGameScreenState(void) {
+    // isGrabbing: Minecraft grabbed the cursor, so the player is in the world (no screen open).
+    // guiScale is kept current by Air from options.txt; windowWidth is the game's framebuffer width in pixels.
+    CGFloat points = SurfaceViewController.currentInstance.view.bounds.size.width;
+    double pixelsPerPoint = points > 0 && windowWidth > 0 ? windowWidth / points : 0;
+    return @{
+        @"inWorld": @(isGrabbing == JNI_TRUE),
+        @"guiScale": @(guiScale),
+        @"pixelsPerPoint": @(pixelsPerPoint),
+    };
+}
 
 void CofreSDLTextInputStateChanged(BOOL active, const char *reason) {
     NSString *why = reason ? [NSString stringWithUTF8String:reason] : @"sdl";
@@ -137,28 +154,24 @@ void CofreSDLTextInputStateChanged(BOOL active, const char *reason) {
         overlay.backgroundColor = UIColor.clearColor;
         [container addSubview:overlay];
 
-        UIButton *(^button)(NSString *, SEL) = ^UIButton *(NSString *title, SEL action) {
-            UIButton *b = [UIButton buttonWithType:UIButtonTypeSystem];
-            b.backgroundColor = [UIColor colorWithWhite:0 alpha:0.55];
-            b.layer.cornerRadius = 8;
-            [b setTitle:title forState:UIControlStateNormal];
-            [b setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
-            [b addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];
-            return b;
-        };
-        UIButton *keyboard = button(@"⌨", @selector(cofreShowKeyboard:));
-        UIButton *jump = button(@"JUMP", @selector(cofreJump:));
-        UIButton *mode = button(@"AUTO", @selector(cofreMode:));
-        for (UIButton *b in @[keyboard, jump, mode]) [overlay addSubview:b];
-        keyboard.frame = CGRectMake(16, 16, 56, 42);
-        jump.frame = CGRectMake(CGRectGetWidth(container.bounds) - 104, CGRectGetHeight(container.bounds) - 70, 88, 48);
-        mode.frame = CGRectMake(84, 16, 72, 42);
-        jump.autoresizingMask = UIViewAutoresizingFlexibleTopMargin | UIViewAutoresizingFlexibleLeftMargin;
-        NSLog(@"[Cofre] touch overlay installed; Air touch look/tap/hold remains active");
+        // Cofre's SwiftUI overlay (CofreCore.framework) owns world touches; menus and the hotbar fall through
+        // to Air, so Air's hotbar taps must stay on.
+        setPrefBool(@"control.gesture_hotbar", YES);
+        Class entry = NSClassFromString(@"CofreCoreEntry");
+        SEL make = NSSelectorFromString(@"touchOverlay");
+        UIViewController *touch = [entry respondsToSelector:make]
+            ? ((UIViewController *(*)(id, SEL))objc_msgSend)(entry, make) : nil;
+        if (!touch) {
+            NSLog(@"[Cofre] touch overlay missing; Air touch remains active");
+            return;
+        }
+        [game addChildViewController:touch];
+        touch.view.frame = overlay.bounds;
+        touch.view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        [overlay addSubview:touch.view];
+        [touch didMoveToParentViewController:game];
+        NSLog(@"[Cofre] touch overlay installed");
     });
 }
 
-+ (void)cofreShowKeyboard:(id)sender { CofreAirInputShowKeyboard(); }
-+ (void)cofreJump:(id)sender { CofreAirInputKey("SPACE", YES); CofreAirInputKey("SPACE", NO); }
-+ (void)cofreMode:(id)sender { NSLog(@"[Cofre] input mode=auto"); }
 @end

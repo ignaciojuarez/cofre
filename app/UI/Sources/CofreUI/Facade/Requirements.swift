@@ -13,11 +13,47 @@ import Foundation
     public enum CofreInputKey: String, CaseIterable, Sendable {
         case w = "W", a = "A", s = "S", d = "D", jump = "SPACE", sneak = "SHIFT", sprint = "CTRL"
         case inventory = "E", chat = "T", drop = "Q", escape = "ESC", f5 = "F5"
+        /// Hide HUD, player list (held), swap hands.
+        case f1 = "F1", tab = "TAB", swapHands = "F"
         case hotbar1 = "1", hotbar2 = "2", hotbar3 = "3", hotbar4 = "4", hotbar5 = "5"
         case hotbar6 = "6", hotbar7 = "7", hotbar8 = "8", hotbar9 = "9"
     }
 
-    public enum CofreMouseButton: Int, Sendable { case left = 0, right = 1 }
+    public enum CofreMouseButton: Int, Sendable { case left = 0, right = 1, middle = 2 }
+
+    /// Where the game is: in the world (cursor grabbed) or on a screen (inventory, chat, pause).
+    /// `guiScale` and `pixelsPerPoint` place Minecraft's hotbar; nil means unknown (the overlay estimates).
+    public struct GameScreenState: Equatable, Sendable {
+        public var inWorld: Bool
+        public var guiScale: Int?
+        public var pixelsPerPoint: Double?
+        public init(inWorld: Bool, guiScale: Int? = nil, pixelsPerPoint: Double? = nil) {
+            self.inWorld = inWorld
+            self.guiScale = guiScale
+            self.pixelsPerPoint = pixelsPerPoint
+        }
+        public static let world = GameScreenState(inWorld: true)
+    }
+
+    /// Auto mode: the last input used wins, as long as its device is still there. Before any input,
+    /// fall back to what's connected (`automatic`). A pad left in a bag stops hiding touch at the first touch.
+    public struct CofreInputModeTracker: Equatable, Sendable {
+        public var hasController = false, hasKeyboardOrMouse = false
+        public private(set) var lastUsed: CofreInputMode?
+        public init(hasController: Bool = false, hasKeyboardOrMouse: Bool = false) {
+            self.hasController = hasController
+            self.hasKeyboardOrMouse = hasKeyboardOrMouse
+        }
+        public mutating func used(_ mode: CofreInputMode) { if mode != .auto { lastUsed = mode } }
+        public var mode: CofreInputMode {
+            switch lastUsed {
+            case .touch?: .touch
+            case .controller? where hasController: .controller
+            case .keyboardMouse? where hasKeyboardOrMouse: .keyboardMouse
+            default: .automatic(hasController: hasController, hasKeyboardOrMouse: hasKeyboardOrMouse)
+            }
+        }
+    }
 
     /// Pure policy state used by the production bridge and unit tests.
     public struct CofreKeyboardPolicy: Equatable, Sendable {
@@ -46,6 +82,15 @@ import Foundation
         func textInputRequests() -> AsyncStream<Bool>
         func showKeyboard()
         func hideKeyboard()
+        // Touch overlay (plan/touch-controls.md §5)
+        /// Effective mode now and on every change.
+        func inputModeUpdates() -> AsyncStream<CofreInputMode>
+        /// World vs. screen, and the GUI scale, now and on every change.
+        func screenUpdates() -> AsyncStream<GameScreenState>
+        /// The overlay saw a touch: Auto switches back to touch.
+        func noteTouchInput()
+        /// Mouse wheel, in notches (positive = up).
+        func scroll(steps: Int)
     }
 
     extension GameInputService {
@@ -61,6 +106,13 @@ import Foundation
         public func textInputRequests() -> AsyncStream<Bool> { AsyncStream { $0.finish() } }
         public func showKeyboard() {}
         public func hideKeyboard() {}
+        public func inputModeUpdates() -> AsyncStream<CofreInputMode> {
+            let mode = inputMode
+            return AsyncStream { $0.yield(mode) }
+        }
+        public func screenUpdates() -> AsyncStream<GameScreenState> { AsyncStream { $0.yield(.world) } }
+        public func noteTouchInput() {}
+        public func scroll(steps: Int) {}
     }
 
 

@@ -60,8 +60,8 @@
                     switch pane {
                     case .game: GameSettingsContent(instanceID: nil)
                     case .renderer: RendererContent()
-                    case .touch: ControlsContent(controller: false)
-                    case .controller: ControlsContent(controller: true)
+                    case .touch: ControlsPane()
+                    case .controller: ControllerContent()
                     case .controlsEditor: ControlsEditorContent()
                     case .jitJava: JITJavaContent()
                     case .accounts: AccountsDataContent()
@@ -195,35 +195,22 @@
 
     // MARK: X03 Controls (touch, controller, editor)
 
-    struct ControlsContent: View {
-        let controller: Bool
+    /// Touch, input mode and look live in `ControlsPane` (Screens/Game).
+    struct ControllerContent: View {
         @Environment(CofreStore.self) private var store
         @Environment(NavModel.self) private var nav
         var body: some View {
-            Segmented(
-                "Input", selection: Binding(get: { controller }, set: { nav.settingsPane = $0 ? .controller : .touch }),
-                options: [(false, "Touch"), (true, "Controller")])
             ListSection(spacing: 4) {
                 HStack {
                     Text("Layout").cofreFont(.rowTitle).foregroundStyle(Color.cofre.ink)
                     Spacer()
                     SelectButton(
-                        "Layout", selection: prefBinding(store, nil, controller ? \.controllerLayout : \.touchLayout),
+                        "Layout", selection: prefBinding(store, nil, \.controllerLayout),
                         options: ["Default", "Compact", "Builder"].map { ($0, $0) }
                     ).compactStyle()
                 }.padding(.horizontal, 11).frame(minHeight: 44).block(.panel)
-                if controller {
-                    ToggleRow("Gyro aim", isOn: prefBinding(store, nil, \.gyroAim))
-                    if store.can(.controllerNavigation) { HintStrip() }
-                } else {
-                    ToggleRow("Gyro aim", isOn: prefBinding(store, nil, \.gyroAim))
-                    ToggleRow("Virtual mouse", isOn: prefBinding(store, nil, \.virtualMouse))
-                    ToggleRow("Hotbar swipe", isOn: prefBinding(store, nil, \.hotbarSwipe))
-                    ToggleRow("TouchController mod", isOn: prefBinding(store, nil, \.touchControllerMod))
-                    BlockSlider("Button size", value: prefBinding(store, nil, \.buttonScale), in: 0.5...2, step: 0.05) {
-                        "\(Int($0 * 100)) %"
-                    }
-                }
+                ToggleRow("Gyro aim", isOn: prefBinding(store, nil, \.gyroAim))
+                if store.can(.controllerNavigation) { HintStrip() }
             }
             BlockButton("Open controls editor", icon: .cmd) { nav.showingAirScreen = .controlsEditor }
                 .keyboardShortcut("k", modifiers: [.command, .shift])

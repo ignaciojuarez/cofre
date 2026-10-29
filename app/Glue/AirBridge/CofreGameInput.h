@@ -4,7 +4,7 @@
 NS_ASSUME_NONNULL_BEGIN
 
 /// Input event seam used by CofreGameInput.swift and the touch overlay.
-// These five functions are implemented by the framework shim and delivered to
+// These functions are implemented by the framework shim and delivered to
 // Air through notifications. The Air-side implementation keeps the callback
 // bridge private to the game executable.
 void CofreInputKey(const char *name, BOOL down);
@@ -12,6 +12,9 @@ void CofreInputMouseButton(int button, BOOL down);
 void CofreInputLook(float deltaX, float deltaY);
 void CofreInputShowKeyboard(void);
 void CofreInputHideKeyboard(void);
+void CofreInputScroll(int steps);
+/// inWorld (cursor grabbed), guiScale and pixelsPerPoint of the running game.
+NSDictionary<NSString *, NSNumber *> *CofreGameScreenState(void);
 
 /// Called by Air's SDL hook when Minecraft starts/stops text input.
 void CofreSDLTextInputStateChanged(BOOL active, const char *reason);

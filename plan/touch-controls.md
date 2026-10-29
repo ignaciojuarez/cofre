@@ -136,3 +136,26 @@ Controller and keyboard-and-mouse options (bindings, deadzone) stay in their own
 3. **Auto rule:** prefer **last-used** input over "a GCController exists" (U10). A paired pad in a bag shouldn't hide touch.
 4. **Hotbar rect:** the GUI scale (from `options.txt` or auto) so the dock and slot taps line up with the game's hotbar.
 5. **Optional (later):** a player-state stream (flying, swimming, riding, creative) for context glyphs.
+
+## 6. Built (phase 2): C · Dock by default
+
+| Piece | Where |
+|---|---|
+| Rules (visibility, frames, mirroring, scale, hotbar, fade, stick, tap/hold/drag, sneak lock) | `Screens/Game/TouchLayout.swift`, tested in `TouchControlsTests` |
+| Overlay model, view and UIKit host (`TouchOverlayController`, pass-through hit test) | `Screens/Game/TouchOverlay.swift`, `TouchOverlayParts.swift` |
+| Settings → Controls (`SettingsPane.touch`, titled "Controls") | `Screens/Game/ControlsPane.swift`. Touch options are saved as `cofre.touch.settings` and read live by the overlay. |
+| Review renders | `TouchOverlayPreview.swift`, PreviewHost `-screen touch -touch c\|a\|b\|ipad\|settings\|sheet` |
+| Air hosting | `CofreGameOverlayHost` asks `CofreCoreEntry.touchOverlay` for the controller; R's debug buttons are gone |
+
+**Touch ownership:** in the world, the overlay takes every touch except the game's hotbar. Drag = `look` (points × screen scale × sensitivity, Invert Y), tap = right click, hold 250 ms = left button held, which keeps breaking while dragging. On game screens it takes only ⌨ and ✕, and Air handles the pointer. The hotbar always falls through to Air's own slot taps, and the host forces `control.gesture_hotbar` on. Air's touch look ignores `mouse_speed` and has no Invert Y, which is why the overlay owns look.
+
+**Facade gaps (§5):**
+| Gap | Status |
+|---|---|
+| World vs. menu | Done: `screenUpdates()` polls Air's `isGrabbing` at 10 Hz |
+| F1 / Tab / F / middle click / scroll | Done: GLFW keys and the middle button in `CofreGameInput.m`, plus `scroll(steps:)` → `nativeSendScroll`. The overlay doesn't use scroll or pick block yet. |
+| Auto = last input used | Done: `CofreInputModeTracker`, fed by touches (including touches that fall through), `GCControllerDidBecomeCurrent`, `GCMouseDidBecomeCurrent`, and the pad and keyboard handlers chained after Air's. If Air replaces a handler later, only the "became current" notifications switch modes. |
+| GUI scale | Done: Air's `guiScale` plus the framebuffer's pixels per point. Falls back to Minecraft's auto rule. |
+| Player state (flying, swimming, riding) | **Stub:** glyphs stay jump/sneak, since those keys already fly, swim and dismount |
+
+**Deferred:** an in-place "Edit layout" editor (the old Air controls editor still edits Air's hidden layout), Minimal's swipe up on the hotbar (its ≡ tray has Inventory instead), two-finger pick block, and stepping aside for the TouchController mod.

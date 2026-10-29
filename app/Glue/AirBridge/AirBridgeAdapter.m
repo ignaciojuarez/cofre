@@ -1209,6 +1209,12 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
 - (void)setGameKeyboardShown:(BOOL)shown {
   shown ? CofreInputShowKeyboard() : CofreInputHideKeyboard();
 }
+- (void)gameInputScroll:(NSInteger)steps {
+  CofreInputScroll((int)steps);
+}
+- (NSDictionary<NSString *, NSNumber *> *)gameScreenState {
+  return CofreGameScreenState();
+}
 @end
 
 UIViewController *CofreMakeControlsEditor(void) {

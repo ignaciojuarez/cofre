@@ -10,7 +10,11 @@ public final class CofreGameInput: NSObject, GameInputService {
     private let defaults = UserDefaults.standard
     private var observers: [NSObjectProtocol] = []
     private var continuations: [UUID: AsyncStream<Bool>.Continuation] = [:]
+    private var modeContinuations: [UUID: AsyncStream<CofreInputMode>.Continuation] = [:]
     private var detectedMode: CofreInputMode = .touch
+    /// Auto: the last input used wins (plan/touch-controls.md U10).
+    private var tracker = CofreInputModeTracker()
+    private var lastAnnounced: CofreInputMode?
     private var policy = CofreKeyboardPolicy()
     /// Air's bridge is injected when the backend is created; it owns callback routing.
     public weak var bridge: (any CofreAirBridging)?
@@ -39,6 +43,15 @@ public final class CofreGameInput: NSObject, GameInputService {
         observers = names.map { name in
             center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in self?.recomputeMode() }
         }
+        // "Became current" fires when a pad or mouse is actually used; the handlers below catch every press.
+        observers.append(center.addObserver(forName: .GCControllerDidBecomeCurrent, object: nil, queue: .main) {
+            [weak self] note in
+            if let pad = note.object as? GCController { self?.watch(pad) }
+            self?.used(.controller)
+        })
+        observers.append(center.addObserver(forName: .GCMouseDidBecomeCurrent, object: nil, queue: .main) {
+            [weak self] _ in self?.used(.keyboardMouse)
+        })
         observers.append(center.addObserver(
             forName: Notification.Name("CofreSDLTextInputStateChanged"), object: nil, queue: .main
         ) { [weak self] note in
@@ -55,11 +68,91 @@ public final class CofreGameInput: NSObject, GameInputService {
     }
 
     private func recomputeMode() {
-        detectedMode = .automatic(
-            hasController: !GCController.controllers().isEmpty,
-            hasKeyboardOrMouse: GCKeyboard.coalesced != nil || !GCMouse.mice().isEmpty)
-        NSLog("[Cofre] input mode=%@", effectiveMode.rawValue)
+        tracker.hasController = !GCController.controllers().isEmpty
+        tracker.hasKeyboardOrMouse = GCKeyboard.coalesced != nil || !GCMouse.mice().isEmpty
+        GCController.controllers().forEach(watch)
+        watchKeyboard()
+        announce()
     }
+
+    private func used(_ mode: CofreInputMode) {
+        guard tracker.lastUsed != mode else { return }
+        tracker.used(mode)
+        announce()
+    }
+
+    private func announce() {
+        detectedMode = tracker.mode
+        let mode = effectiveMode
+        guard mode != lastAnnounced else { return }
+        lastAnnounced = mode
+        NSLog("[Cofre] input mode=%@", mode.rawValue)
+        modeContinuations.values.forEach { $0.yield(mode) }
+    }
+
+    /// Chains onto the pad's handler (Air's stays first) so any press counts as controller use.
+    private var watchedPads = NSHashTable<GCController>.weakObjects()
+    private func watch(_ pad: GCController) {
+        guard !watchedPads.contains(pad), let gamepad = pad.extendedGamepad else { return }
+        watchedPads.add(pad)
+        let previous = gamepad.valueChangedHandler
+        gamepad.valueChangedHandler = { [weak self] g, e in
+            previous?(g, e)
+            DispatchQueue.main.async { self?.used(.controller) }
+        }
+    }
+
+    private var keyboardWatched = false
+    private func watchKeyboard() {
+        guard !keyboardWatched, let input = GCKeyboard.coalesced?.keyboardInput else { return }
+        keyboardWatched = true
+        let previous = input.keyChangedHandler
+        input.keyChangedHandler = { [weak self] k, b, code, pressed in
+            previous?(k, b, code, pressed)
+            DispatchQueue.main.async { self?.used(.keyboardMouse) }
+        }
+    }
+
+    public func inputModeUpdates() -> AsyncStream<CofreInputMode> {
+        AsyncStream { continuation in
+            let id = UUID()
+            modeContinuations[id] = continuation
+            continuation.yield(effectiveMode)
+            continuation.onTermination = { [weak self] _ in
+                DispatchQueue.main.async { self?.modeContinuations.removeValue(forKey: id) }
+            }
+        }
+    }
+
+    public func noteTouchInput() { used(.touch) }
+
+    /// Polls Air ten times a second while someone listens; yields on change.
+    public func screenUpdates() -> AsyncStream<GameScreenState> {
+        AsyncStream { continuation in
+            let task = Task { @MainActor [weak self] in
+                var last: GameScreenState?
+                while !Task.isCancelled {
+                    let now = self?.screenState() ?? .world
+                    if now != last {
+                        last = now
+                        continuation.yield(now)
+                    }
+                    try? await Task.sleep(nanoseconds: 100_000_000)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    private func screenState() -> GameScreenState {
+        guard let d = bridge?.gameScreenState() else { return .world }
+        let gui = d["guiScale"]?.intValue ?? 0, ppp = d["pixelsPerPoint"]?.doubleValue ?? 0
+        return GameScreenState(
+            inWorld: d["inWorld"]?.boolValue ?? true, guiScale: gui > 0 ? gui : nil,
+            pixelsPerPoint: ppp > 0 ? ppp : nil)
+    }
+
+    public func scroll(steps: Int) { bridge?.gameInputScroll(steps) }
 
     public func press(_ key: CofreInputKey) { keyCall(key, down: true) }
     public func release(_ key: CofreInputKey) { keyCall(key, down: false) }
@@ -107,4 +200,8 @@ extension CofreBackendAdapter {
     public func textInputRequests() -> AsyncStream<Bool> { CofreGameInput.shared.textInputRequests() }
     public func showKeyboard() { CofreGameInput.shared.showKeyboard() }
     public func hideKeyboard() { CofreGameInput.shared.hideKeyboard() }
+    public func inputModeUpdates() -> AsyncStream<CofreInputMode> { CofreGameInput.shared.inputModeUpdates() }
+    public func screenUpdates() -> AsyncStream<GameScreenState> { CofreGameInput.shared.screenUpdates() }
+    public func noteTouchInput() { CofreGameInput.shared.noteTouchInput() }
+    public func scroll(steps: Int) { CofreGameInput.shared.scroll(steps: steps) }
 }
