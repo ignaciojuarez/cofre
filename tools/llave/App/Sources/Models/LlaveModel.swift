@@ -111,8 +111,10 @@ public final class LlaveModel: ObservableObject {
             state = .locked(device)
         case .waitingForTrust:
             state = .waitingForTrust(device)
-        case .paired, .wifiEnabled:
+        case .paired, .wifiEnabled, .remotePairingWarning:
             state = .pairing(device)
+        case .wifiFailed(let code, let message):
+            state = .error(LlaveError(code: code, message: message))
         case .placed:
             state = .done(device)
         case .validated:

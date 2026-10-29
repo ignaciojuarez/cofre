@@ -5,6 +5,8 @@ public enum LlaveEvent: Equatable, Sendable {
     case waitingForTrust
     case paired
     case wifiEnabled
+    case wifiFailed(code: String, message: String)
+    case remotePairingWarning(message: String)
     case validated
     case placed
     case error(code: String, message: String)
@@ -33,6 +35,10 @@ public enum LlaveEvent: Equatable, Sendable {
             return .paired
         case "wifi_enabled":
             return .wifiEnabled
+        case "warning" where wire.code == "REMOTE_PAIRING_FAILED":
+            return .remotePairingWarning(message: wire.message ?? "RemotePairing unavailable")
+        case "error" where (wire.code == "WIFI_CONNECTIONS_FAILED" || wire.code == "WIFI_DEBUGGING_FAILED"):
+            return .wifiFailed(code: wire.code ?? "WIFI_FAILED", message: wire.message ?? "Wi-Fi setup failed")
         case "validated":
             return .validated
         case "placed":
