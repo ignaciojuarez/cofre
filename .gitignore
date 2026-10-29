@@ -6,3 +6,4 @@ artifacts/Payload/
 build-air.log
 build-air.pid
 app/Resources/AppIcon/.DS_Store
+scripts/__pycache__/

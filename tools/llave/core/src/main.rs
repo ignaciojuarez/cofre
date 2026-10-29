@@ -31,7 +31,12 @@ async fn main() {
                 }
             }
         }
-        Commands::Pair { udid, out, place, simulate } => {
+        Commands::Pair {
+            udid,
+            out,
+            place,
+            simulate,
+        } => {
             let is_sim = global_simulate || simulate;
             if is_sim {
                 if let Err(e) = simulate::run_simulated_pair(&out).await {
