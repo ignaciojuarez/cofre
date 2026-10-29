@@ -1,0 +1,4 @@
+LICENSE
+StikDebug/Scripts/universal.js
+StikDebug/Device/JITEnableContext.swift
+StikDebug/Info.plist

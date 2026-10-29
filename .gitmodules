@@ -1,0 +1,9 @@
+[submodule "upstream/air"]
+	url = https://github.com/herbrine8403/Amethyst-iOS-MyRemastered
+	path = upstream/air
+[submodule "upstream/stikdebug"]
+	path = upstream/stikdebug
+	url = https://github.com/StikDebug/StikDebug
+[submodule "upstream/stikjit"]
+	path = upstream/stikjit
+	url = https://github.com/StikDebug/StikJIT

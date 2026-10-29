@@ -1,0 +1,6 @@
+Cofre
+
+Upstream components (pinned in UPSTREAM.lock):
+- Air (GPL-3.0)
+- StikJIT (MPL-2.0)
+- StikDebug is a fallback app only (AGPL-3.0); no code is embedded.

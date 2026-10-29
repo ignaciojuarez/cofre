@@ -1,0 +1,9 @@
+LICENSE
+Makefile
+entitlements.*.xml
+Natives/JavaLauncher.m
+Natives/resources/UniversalJIT26*.js
+Natives/authenticator/MicrosoftAuthenticator.m
+Natives/installer/modpack/CurseForgeAPI.m
+Natives/SceneDelegate.m
+Natives/Info.plist

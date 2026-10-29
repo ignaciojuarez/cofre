@@ -1,0 +1,5 @@
+LICENSE
+INTEGRATION.md
+project.yml
+Sources/*.swift
+Resources/*.js
