@@ -201,6 +201,11 @@ extension MrpackIndex {
         }
 
         func launchJoin(request: ServerJoinRequest) {
+            let version = air.instances().first(where: { ($0["id"] as? String) == request.id })?["version"] as? String ?? ""
+            if let address = MinecraftServerAddress.parse(request.server) {
+                NSLog("[Cofre] server join instance=%@ version=%@ args=%@", request.id, version,
+                      MinecraftLaunchArguments.server(address, gameVersion: version).joined(separator: " "))
+            }
             Task { try? await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in air.addServer(request.server, name: request.server, forProfile: request.id) { e in if let e { c.resume(throwing: e) } else { c.resume() } } } }
             _ = launch(instanceID: request.id, accountID: nil)
         }

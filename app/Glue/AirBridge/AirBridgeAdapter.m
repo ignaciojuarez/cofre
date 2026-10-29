@@ -261,6 +261,12 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
   return out;
 }
 
+- (NSURL *)gameDirectoryForProfile:(NSString *)profile {
+  NSDictionary *p = self.profiles.profiles[profile];
+  NSString *path = p ? amePCLVersionGameDirAbsolute(p, nil) : nil;
+  return path.length ? [NSURL fileURLWithPath:path isDirectory:YES] : nil;
+}
+
 - (NSArray<NSURL *> *)instanceMetadataURLs:(NSURL *)url
                                   resource:(NSInteger)resource {
   return [PLMirrorCenter

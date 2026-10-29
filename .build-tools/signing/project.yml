@@ -30,6 +30,7 @@ targets:
       - path: ../../app/Glue/CofreConstants.swift
       - path: ../../app/Glue/PairingFileValidator.swift
       - path: ../../app/Glue/AirBridge/CofreBackendAdapter.swift
+      - path: ../../app/Glue/AirBridge/CofreServerEngine.swift
       - path: ../../app/Glue/AirBridge/CofrePreferences.swift
       - path: ../../app/Glue/AirBridge/CofreBackendAdapter+Instances.swift
       - path: ../../app/Glue/AirBridge/CofreBackendAdapter+Mods.swift
@@ -61,6 +62,7 @@ targets:
     sources:
       - path: ../../tests/preferences/CofrePreferencesTests.swift
       - path: ../../tests/logs/CofreLogStoreTests.swift
+      - path: ../../tests/servers/CofreServerEngineTests.swift
     dependencies:
       - target: CofreCore
       - package: CofreUI

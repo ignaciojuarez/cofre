@@ -147,17 +147,20 @@
             }
         }
         public func servers(instanceID: String) async throws -> [ServerSummary] {
-            try await callback { done in self.air.searchServers(["query": "", "limit": "50"], source: 1) { rows, error in done(error == nil ? (rows as [Any]) : []) } }
-                .compactMap { d in
-                    let x = d as? [String: Any] ?? [:]
-                    guard let id = x["id"] as? String, !id.isEmpty else { return nil }
-                    let address = x["address"] as? String ?? ""
-                    let hasCard = UserDefaults.standard.bool(
-                        forKey: "cofre.server-card.\(address.split(separator: ":").first.map(String.init) ?? address)")
-                    return ServerSummary(
-                        id: id, name: x["title"] as? String ?? id, address: address,
-                        detail: x["description"] as? String, hasServerCard: hasCard)
-                }
+            guard let dir = air.gameDirectory(forProfile: instanceID) else { return [] }
+            let url = dir.appendingPathComponent("servers.dat")
+            guard let data = try? Data(contentsOf: url) else { return [] }
+            return try ServersDatCodec.decode(data).map { s in
+                ServerSummary(id: s.ip, name: s.name, address: s.ip, detail: nil,
+                              hasServerCard: UserDefaults.standard.bool(forKey: "cofre.server-card.\(s.ip)"))
+            }
+        }
+
+        public func discoverServers(query: String = "", limit: Int = 50) async throws -> [ServerSummary] {
+            try await callback { done in self.air.searchServers(["query": query, "limit": String(limit)], source: 1) { rows, error in done(error == nil ? (rows as [Any]) : []) } }.compactMap { d in
+                let x = d as? [String: Any] ?? [:]; guard let id = x["id"] as? String, !id.isEmpty else { return nil }
+                return ServerSummary(id: id, name: x["title"] as? String ?? id, address: x["address"] as? String ?? "", detail: x["description"] as? String)
+            }
         }
         public func deleteWorld(instanceID: String, worldID: String) async throws {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in

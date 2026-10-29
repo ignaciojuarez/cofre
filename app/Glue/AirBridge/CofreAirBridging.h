@@ -3,6 +3,7 @@
 NS_ASSUME_NONNULL_BEGIN
 @protocol CofreAirBridging <NSObject>
 - (NSArray<NSDictionary *> *)instances;
+- (nullable NSURL *)gameDirectoryForProfile:(NSString *)profile;
 // Instance catalogs and profile operations. Air owns paths, mirrors and
 // persistence.
 - (NSArray<NSURL *> *)instanceMetadataURLs:(NSURL *)url
