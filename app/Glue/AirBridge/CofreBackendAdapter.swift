@@ -12,7 +12,7 @@ public enum CofreBackendError: LocalizedError {
 /// Production bridge. Air owns the data and launch lifecycle; unsupported Air APIs are surfaced as unavailable.
 @MainActor
 public final class CofreBackendAdapter: NSObject, CofreBackend {
-    public var capabilities: BackendCapabilities { [.deleteWorld, .addServer, .envVariables, .rendererTuning] }
+    public var capabilities: BackendCapabilities { [.deleteWorld, .addServer, .envVariables, .rendererTuning, .serverJoin] }
     private let air = CofreAirBridgeAdapter()
     private var launchTask: Task<Void, Never>?
     private var setup = SetupState()
