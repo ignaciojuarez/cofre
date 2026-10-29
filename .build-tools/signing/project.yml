@@ -74,6 +74,7 @@ targets:
       PRODUCT_BUNDLE_IDENTIFIER: com.ignaciojuarez.cofre.tunnel
       INFOPLIST_FILE: PacketTunnel-Info.plist
       CODE_SIGN_ENTITLEMENTS: Tunnel.entitlements
+      SWIFT_OBJC_BRIDGING_HEADER: $(SRCROOT)/../../extensions/PacketTunnel/TunnelRoute.h
       SWIFT_INCLUDE_PATHS: "$(SRCROOT)/../../upstream/stikjit/idevice $(SRCROOT)/../../upstream/stikjit/iokit"
       HEADER_SEARCH_PATHS: "$(SRCROOT)/../../upstream/stikjit/idevice $(SRCROOT)/../../upstream/stikjit/iokit"
       LIBRARY_SEARCH_PATHS: "$(SRCROOT)/../../upstream/stikjit/idevice"

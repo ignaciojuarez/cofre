@@ -370,7 +370,7 @@
                     localized: "Your key may be old. Run the Mac step again: \(CofreLinks.short(CofreLinks.pairing))")
             case .vpn: String(localized: "Turn off other VPNs (work, ad blocker), then try again.")
             case .diskImage: String(localized: "Connect to Wi-Fi. After a restart, JIT needs internet once.")
-            case .debugger: String(localized: "Check Developer Mode is on: Settings → Privacy & Security.")
+            case .debugger: String(localized: "Restart this iPhone, open Cofre, then try again.")
             case .region, .detach: String(localized: "Close Cofre fully, open it again, then try again.")
             case nil:
                 String(localized: "Use Wi-Fi, or Airplane Mode for a moment, and turn off other VPNs. Then try again.")

@@ -304,10 +304,14 @@
                         case .enabled: (.debugger, "")
                         case .needsPairing: (.pairing, "No pairing key yet")
                         case .needsVPN: (.vpn, "The VPN isn't on")
-                        case .failed(let m): (.debugger, m)
+                        case .failed(let m, let step): (step.flatMap(JITStep.Kind.init) ?? .debugger, m)
                         case .unavailable, .enabling: (.debugger, "JIT didn't turn on")
                         }
                     guard result.isEnabled else {
+                        // Steps before the one that failed passed.
+                        for passed in JITStep.Kind.allCases.prefix(while: { $0 != kind }) {
+                            continuation.yield(JITStep(kind: passed, state: .ready))
+                        }
                         continuation.yield(JITStep(kind: kind, state: .failed(message)))
                         continuation.finish(throwing: CofreBackendError.jit(message))
                         return
@@ -330,7 +334,7 @@
         public func appInfo() -> AppInfo {
             AppInfo(
                 version: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
-                airVersion: "Air", sourceURL: URL(string: "https://github.com/ignaciojb/cofre")!)
+                airVersion: "Air", sourceURL: URL(string: "https://github.com/ignaciojuarez/cofre")!)
         }
         public func renderers() async -> [RendererOption] { [] }
         public func javaRuntimes() async -> [JavaRuntime] { [] }

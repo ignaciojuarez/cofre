@@ -1,11 +1,11 @@
 import Foundation
 import NetworkExtension
-import UIKit
 
 public enum CofreJITStatus: Equatable {
     case unavailable, needsPairing, needsVPN, enabling
     case enabled(String)
-    case failed(String)
+    /// `step`: the `JITStep.Kind` raw value that failed (vpn, diskImage, debugger), when the tunnel knows it.
+    case failed(String, step: String? = nil)
 }
 extension CofreJITStatus {
     public var isEnabled: Bool {
@@ -51,15 +51,11 @@ public final class CofreJIT: @unchecked Sendable {
                 status = .enabled(mode)
                 return status
             }
-            throw NSError(
-                domain: "CofreJIT", code: 1,
-                userInfo: [NSLocalizedDescriptionKey: dict["reason"] as? String ?? "PacketTunnel did not enable JIT"])
+            status = .failed(
+                dict["reason"] as? String ?? "The VPN extension didn't enable JIT.", step: dict["step"] as? String)
+            return status
         } catch {
             status = .failed(error.localizedDescription)
-            if UIApplication.shared.canOpenURL(URL(string: "stikjit://")!) {
-                let url = URL(string: "stikjit://enable-jit?bundle-id=com.ignaciojuarez.cofre&pid=\(pid)")!
-                await UIApplication.shared.open(url)
-            }
             return status
         }
     }
