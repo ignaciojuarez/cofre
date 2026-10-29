@@ -76,7 +76,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             do {
                 try StikJIT.enableJIT(
                     targetPID: Int32(pid), pairingFile: url,
-                    configuration: .init(deviceAddress: "10.7.0.1", rsdPort: 49152), script: .custom(scriptURL),
+                    configuration: .init(deviceAddress: CofreConstants.tunnelAddress, rsdPort: 49152), script: .custom(scriptURL),
                     forceScript: true, progress: { NSLog("[Cofre] JIT %@", $0) })
                 NSLog("[Cofre] JIT enabled pid=%d mode=txm peakMB=%.1f", pid, peak)
                 completionHandler?(reply("enabled", mode: "txm"))

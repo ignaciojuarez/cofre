@@ -7,10 +7,10 @@ import NetworkExtension
 final class LoopbackTunnel {
     private let settings: NEPacketTunnelNetworkSettings
     init() {
-        settings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "10.7.0.1")
+        settings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: CofreConstants.tunnelAddress)
         settings.ipv4Settings = NEIPv4Settings(addresses: ["10.7.0.2"], subnetMasks: ["255.255.255.0"])
         settings.ipv4Settings?.includedRoutes = [
-            NEIPv4Route(destinationAddress: "10.7.0.1", subnetMask: "255.255.255.255")
+            NEIPv4Route(destinationAddress: CofreConstants.tunnelAddress, subnetMask: "255.255.255.255")
         ]
         settings.ipv4Settings?.excludedRoutes = [NEIPv4Route.default()]
     }

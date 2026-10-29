@@ -7,7 +7,7 @@ packages:
   CofreUI:
     path: ../../app/UI
   CofreServerJoin:
-    path: ../../app/CofreKit/ServerJoin
+    path: ../../app/ServerJoin
 settings:
   base:
     DEVELOPMENT_TEAM: APPLE_TEAM_ID
@@ -27,12 +27,13 @@ targets:
     type: framework
     platform: iOS
     sources:
+      - path: ../../app/Glue/CofreConstants.swift
+      - path: ../../app/Glue/PairingFileValidator.swift
       - path: ../../app/Glue/AirBridge/CofreBackendAdapter.swift
       - path: ../../app/Glue/AirBridge/ServerJoinAdapter.swift
       - path: ../../app/Glue/AirBridge/CofreCoreEntry.swift
-      - path: ../../app/Glue/AirBridge/CofreUITypes.swift
       - path: ../../app/Shell/CofreRootViewController.swift
-      - path: ../../app/CofreKit/CofreJIT.swift
+      - path: ../../app/Glue/CofreJIT.swift
     dependencies:
       - package: CofreUI
         product: CofreUI
@@ -45,11 +46,12 @@ targets:
       GENERATE_INFOPLIST_FILE: YES
       ARCHS: arm64
       SWIFT_OBJC_BRIDGING_HEADER: $(SRCROOT)/../../app/Glue/AirBridge/CofreAirBridging.h
-      SWIFT_INCLUDE_PATHS: "$(SRCROOT)/../../app/UI/build/Debug-iphoneos $(SRCROOT)/../../app/CofreKit/ServerJoin/build/Debug-iphoneos"
+      SWIFT_INCLUDE_PATHS: "$(SRCROOT)/../../app/UI/build/Debug-iphoneos $(SRCROOT)/../../app/ServerJoin/build/Debug-iphoneos"
   PacketTunnel:
     type: app-extension
     platform: iOS
     sources:
+      - path: ../../app/Glue/CofreConstants.swift
       - path: ../../extensions/PacketTunnel
       - path: ../../upstream/stikjit/Sources
       - path: ../../upstream/stikjit/Resources

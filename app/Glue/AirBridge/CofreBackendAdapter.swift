@@ -78,21 +78,14 @@
             UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!)
         }
         public func hasPairing() -> Bool {
-            guard let data = try? Data(contentsOf: pairingURL),
-                let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil),
-                let dict = plist as? [String: Any]
-            else { return false }
-            return ["HostID", "SystemBUID", "UDID"].allSatisfy { (dict[$0] as? String)?.isEmpty == false }
-                && ["HostCertificate", "HostPrivateKey", "RootCertificate", "RootPrivateKey"].allSatisfy {
-                    (dict[$0] as? Data)?.isEmpty == false
-                }
+            guard let data = try? Data(contentsOf: pairingURL) else { return false }
+            return (try? PairingFileValidator.validate(data)) != nil
         }
         public func importPairing(_ data: Data) throws {
-            let dir = pairingURL.deletingLastPathComponent()
-            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            try data.write(to: pairingURL, options: [.atomic, .completeFileProtection])
-            setup.pairing = hasPairing() ? .ready : .failed("Invalid pairing file")
-            setup.trust = setup.pairing
+            _ = try PairingFileValidator.validate(data)
+            try PairingFileStore.write(data, to: pairingURL)
+            setup.pairing = .ready
+            setup.trust = .ready
             persistSetup()
             setupContinuations.values.forEach { $0.yield(setup) }
         }
@@ -104,16 +97,16 @@
         public func instances() async throws -> [InstanceSummary] {
             air.instances().compactMap { d in
                 guard let id = d["id"] as? String else { return nil }
-                let loader = UILoader(rawValue: (d["loader"] as? String ?? "vanilla").lowercased()) ?? .vanilla
+                let loader = Loader(rawValue: (d["loader"] as? String ?? "vanilla").lowercased()) ?? .vanilla
                 return InstanceSummary(
                     id: id, name: d["name"] as? String ?? id, loader: loader, gameVersion: d["version"] as? String ?? ""
                 )
             }
         }
-        public func createInstance(name: String, version: String, loader: UILoader) async throws -> InstanceSummary {
+        public func createInstance(name: String, version: String, loader: Loader) async throws -> InstanceSummary {
             throw unavailable("instance creation")
         }
-        public func installLoader(instanceID: String, loader: UILoader, version: String) async throws {
+        public func installLoader(instanceID: String, loader: Loader, version: String) async throws {
             throw unavailable("loader installation")
         }
         public func worlds(instanceID: String) async throws -> [WorldSummary] {
@@ -125,7 +118,7 @@
                     lastPlayed: nil)
             }
         }
-        public func servers(instanceID: String) async throws -> [UIServerSummary] {
+        public func servers(instanceID: String) async throws -> [ServerSummary] {
             try await callback { done in self.air.searchServers(["query": "", "limit": "50"], source: 1) { rows, error in done(error == nil ? (rows as [Any]) : []) } }
                 .compactMap { d in
                     let x = d as? [String: Any] ?? [:]
@@ -133,7 +126,7 @@
                     let address = x["address"] as? String ?? ""
                     let hasCard = UserDefaults.standard.bool(
                         forKey: "cofre.server-card.\(address.split(separator: ":").first.map(String.init) ?? address)")
-                    return UIServerSummary(
+                    return ServerSummary(
                         id: id, name: x["title"] as? String ?? id, address: address,
                         detail: x["description"] as? String, hasServerCard: hasCard)
                 }
@@ -148,15 +141,15 @@
         public func backUpWorld(instanceID: String, worldID: String) async throws -> URL {
             throw unavailable("world backup")
         }
-        public func addServer(instanceID: String, name: String, address: String) async throws -> UIServerSummary {
+        public func addServer(instanceID: String, name: String, address: String) async throws -> ServerSummary {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                 air.addServer(address, name: name, forProfile: instanceID) { error in
                     if let error { continuation.resume(throwing: error) } else { continuation.resume() }
                 }
             }
-            return UIServerSummary(id: address, name: name, address: address)
+            return ServerSummary(id: address, name: name, address: address)
         }
-        public func createInstance(name: String, version: String, loader: UILoader, ownFolder: Bool, fabricAPI: Bool)
+        public func createInstance(name: String, version: String, loader: Loader, ownFolder: Bool, fabricAPI: Bool)
             async throws -> InstanceSummary
         { try await createInstance(name: name, version: version, loader: loader) }
         public func preferences(instanceID: String?) async throws -> GamePreferences {
@@ -248,7 +241,7 @@
         public func gameVersions(_ kind: VersionKind) async throws -> [GameVersion] {
             throw unavailable("version catalog")
         }
-        public func loaderVersions(loader: UILoader, game: String) async throws -> [String] {
+        public func loaderVersions(loader: Loader, game: String) async throws -> [String] {
             throw unavailable("loader catalog")
         }
         public func search(_ query: ProjectQuery) async throws -> [ProjectSummary] {
@@ -308,7 +301,7 @@
 
         private var pairingURL: URL {
             FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent(
-                "StikJIT/pairingFile.plist")
+                CofreConstants.pairingRelativePath)
         }
         private func logURL(_ kind: LogKind) -> URL {
             FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent(
@@ -321,7 +314,7 @@
                         returning: managers?.contains {
                             $0.isEnabled && $0.protocolConfiguration is NETunnelProviderProtocol
                                 && (($0.protocolConfiguration as? NETunnelProviderProtocol)?.providerBundleIdentifier
-                                    == "com.ignaciojuarez.cofre.tunnel")
+                                    == CofreConstants.tunnelBundleID)
                         } ?? false)
                 }
             }
