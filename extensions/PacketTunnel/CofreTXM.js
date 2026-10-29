@@ -62,6 +62,8 @@ function runCofre() {
         if (request.legacy && !extended) {
             // Anything but this value makes Air abort with "Support for legacy script has been removed".
             writeRegister('0', PROBE_REPLY, request.tid);
+        } else if (request.op === 1n && address === 0n && size === 0n) {
+            // Nothing to prepare (the universal script treats this as a no-op too).
         } else if (request.op === 1n) {
             checkedRange(address, size, 1073741824n);
             if (address === 0n) {
@@ -70,11 +72,15 @@ function runCofre() {
                 address = BigInt('0x' + allocated);
             }
             checkedRange(address, size, 1073741824n);
-            // Bounded memory: one page write at a time, no region-sized JS buffers.
-            for (let offset = 0n; offset < size; offset += 16384n) {
-                let count = size - offset > 1n ? 1n : size - offset;
-                let range = checkedRange(address + offset, count, 1n);
-                if (checked('M' + range.address.toString(16) + ',1:69') !== 'OK') throw Error('Region write failed');
+            // One write per 16 KB page. StikJIT's native helper pipelines them; one round trip per page takes
+            // minutes for a JVM code cache, which looked like Play hanging on JIT.
+            if (typeof prepare_memory_region === 'function') {
+                if (!prepare_memory_region(Number(address), Number(size))) throw Error('Region prepare failed');
+            } else {
+                for (let offset = 0n; offset < size; offset += 16384n) {
+                    let range = checkedRange(address + offset, 1n, 1n);
+                    if (checked('M' + range.address.toString(16) + ',1:69') !== 'OK') throw Error('Region write failed');
+                }
             }
             writeRegister('0', address, request.tid);
             log('COFRE_REGION_READY');
