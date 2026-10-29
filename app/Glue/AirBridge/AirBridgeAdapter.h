@@ -74,11 +74,11 @@ NS_ASSUME_NONNULL_BEGIN
                              (void (^)(NSDictionary *_Nullable account,
                                        NSError *_Nullable error))completion;
 /// Reads an Air preference value.
-- (id)preferenceObject:(NSString *)key;
-/// Writes an Air preference value.
-- (void)setPreferenceObject:(NSString *)key value:(id)value;
-/// Returns preferences for a profile.
-- (NSDictionary *)preferencesForProfile:(NSString *)profile;
+- (id)preferenceObject:(NSString *)key profile:(nullable NSString *)profile;
+/// Writes an Air preference value, isolating fields that PLProfiles isolates.
+- (void)setPreferenceObject:(NSString *)key
+                      value:(id)value
+                    profile:(nullable NSString *)profile;
 /// Applies Cofre's automatic memory default when needed.
 - (void)ensureAutomaticMemoryDefault;
 /// Starts a profile launch and reports progress labels.

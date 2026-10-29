@@ -844,21 +844,43 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
   }
   NSLog(@"[Cofre] memory auto ceiling=%dMB", ame141_currentLaunchAllocMem());
 }
-- (id)preferenceObject:(NSString *)key {
+static NSString *CofreProfileFieldForPreference(NSString *key) {
+  if ([key isEqualToString:@"video.renderer"]) return @"renderer";
+  if ([key isEqualToString:@"video.graphics_api"]) return @"graphicsApi";
+  if ([key isEqualToString:@"java.java_version"]) return @"javaVersion";
+  if ([key isEqualToString:@"java.java_args"]) return @"javaArgs";
+  if ([key isEqualToString:@"java.allocated_memory"]) return @"allocatedMemory";
+  return nil;
+}
+
+- (id)preferenceObject:(NSString *)key profile:(NSString *)profile {
+  if ([key isEqualToString:@"java.ram_ceiling"]) return @(ame141_currentLaunchAllocMem());
+  NSString *field = CofreProfileFieldForPreference(key);
+  if (profile.length && field.length) {
+    NSMutableDictionary *candidate = self.profiles.profiles[profile];
+    if ([field isEqualToString:@"allocatedMemory"]) {
+      NSNumber *value = candidate[field];
+      if (value.integerValue > 0) return value;
+      return getPrefObject(key);
+    }
+    return [PLProfiles profile:candidate ?: [NSMutableDictionary dictionary]
+                    resolveKey:field];
+  }
   return getPrefObject(key);
 }
-- (void)setPreferenceObject:(NSString *)key value:(id)value {
+
+- (void)setPreferenceObject:(NSString *)key
+                      value:(id)value
+                    profile:(NSString *)profile {
+  NSString *field = CofreProfileFieldForPreference(key);
+  if (profile.length && field.length) {
+    NSMutableDictionary *candidate = [self.profiles.profiles[profile] mutableCopy];
+    if (!candidate) candidate = [NSMutableDictionary dictionary];
+    candidate[field] = value;
+    [self.profiles saveProfile:candidate withName:profile];
+    return;
+  }
   setPrefObject(key, value);
-}
-- (NSDictionary *)preferencesForProfile:(NSString *)profile {
-  return @{
-    @"ramMB" : @(ame141_currentLaunchAllocMem()),
-    @"renderer" : getPrefObject(@"renderer") ?: @"Auto",
-    @"resolution" : @(getPrefFloat(@"resolution")),
-    @"fsr" : @(getPrefBool(@"fsr1.enable")),
-    @"java" : getPrefObject(@"javaVersion") ?: @"auto",
-    @"jvmArgs" : getPrefObject(@"javaArgs") ?: @""
-  };
 }
 // Air's Play flow (LauncherNavigationController launchMinecraft:): download the
 // version's files, then hand the window to SurfaceViewController, which starts

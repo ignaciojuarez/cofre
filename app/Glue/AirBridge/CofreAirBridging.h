@@ -58,9 +58,10 @@ NS_ASSUME_NONNULL_BEGIN
                          completion:
                              (void (^)(NSDictionary *_Nullable account,
                                        NSError *_Nullable error))completion;
-- (id)preferenceObject:(NSString *)key;
-- (void)setPreferenceObject:(NSString *)key value:(id)value;
-- (NSDictionary *)preferencesForProfile:(NSString *)profile;
+- (id)preferenceObject:(NSString *)key profile:(nullable NSString *)profile;
+- (void)setPreferenceObject:(NSString *)key
+                      value:(id)value
+                    profile:(nullable NSString *)profile;
 - (void)ensureAutomaticMemoryDefault;
 - (void)launchProfile:(NSString *)profile
             accountID:(nullable NSString *)accountID

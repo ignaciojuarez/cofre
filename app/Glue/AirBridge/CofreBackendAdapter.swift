@@ -36,6 +36,11 @@
         private var launchTask: Task<Void, Never>?
         private var setup = SetupState()
         private var setupContinuations: [UUID: AsyncStream<SetupState>.Continuation] = [:]
+        private var preferenceStore: CofrePreferenceStore {
+            CofrePreferenceStore(
+                read: { [air] key, profile in air.preferenceObject(key, profile: profile) },
+                write: { [air] key, value, profile in air.setPreferenceObject(key, value: value, profile: profile) })
+        }
         private func loadPersistedSetup() {
             // Only the JIT test result is remembered; every other check is recomputed by `recheckSetup()`.
             if UserDefaults.standard.bool(forKey: "cofre.setup.jit") { setup.jit = .ready }
@@ -157,26 +162,11 @@
             return ServerSummary(id: address, name: name, address: address)
         }
         public func preferences(instanceID: String?) async throws -> GamePreferences {
-            var p = GamePreferences()
-            p.autoRAM = air.preferenceObject("java.auto_ram") as? Bool ?? true
-            p.ramMB = Int(
-                air.preferences(forProfile: instanceID ?? air.selectedProfileName())["ramMB"] as? Int ?? 4096)
-            p.deviceRAMMB = p.ramMB
-            p.envVariables = parseEnv(air.preferenceObject("java.env_variables") as? String ?? "")
-            p.shaderCacheMB = air.preferenceObject("mobileglues.max_glsl_cache_size") as? Int ?? 512
-            p.multidraw = "\(air.preferenceObject("mobileglues.multidraw_mode") as? Int ?? 0)"
-            p.computeShaders = air.preferenceObject("mobileglues.enable_ext_compute_shader") as? Bool ?? true
-            return p
+            return preferenceStore.load(instanceID: instanceID)
         }
         public func setPreferences(_ preferences: GamePreferences, instanceID: String?) async throws {
-            air.setPreferenceObject(
-                "java.env_variables",
-                value: preferences.envVariables.map { "\($0.key)=\($0.value)" }.joined(separator: " "))
-            air.setPreferenceObject("mobileglues.max_glsl_cache_size", value: preferences.shaderCacheMB)
-            air.setPreferenceObject(
-                "mobileglues.multidraw_mode",
-                value: preferences.multidraw == "Auto" ? 0 : (Int(preferences.multidraw) ?? 0))
-            air.setPreferenceObject("mobileglues.enable_ext_compute_shader", value: preferences.computeShaders)
+            preferenceStore.save(preferences, instanceID: instanceID)
+            NSLog("[Cofre] preferences saved instance=%@ keys=%@", instanceID ?? "global", "renderer,javaArgs,graphicsApi,video,controls,java,mobileglues")
         }
 
         public func installed(_ kind: ContentKind, instanceID: String) async throws -> [InstalledItem] {
@@ -359,7 +349,23 @@
                 version: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
                 airVersion: "Air", sourceURL: URL(string: "https://github.com/ignaciojuarez/cofre")!)
         }
-        public func renderers() async -> [RendererOption] { [] }
+        public func renderers() async -> [RendererOption] {
+            let candidates: [(String, String, String, String?)] = [
+                ("auto", "Auto", "Picks per version", nil),
+                ("libmetallum.dylib", "Metal", "Best for Minecraft 26+", "libmetallum.dylib"),
+                ("libmobileglues.dylib", "MobileGlues", "OpenGL 4 · modern packs", "libmobileglues.dylib"),
+                ("libtinygl4angle.dylib", "ANGLE", "OpenGL ES on Metal", "libtinygl4angle.dylib"),
+                ("libOSMesa.8.dylib", "Zink", "OpenGL on Vulkan", "libOSMesa.8.dylib"),
+                ("libgl4es_114.dylib", "GL4ES", "Legacy · 1.16 and older", "libgl4es_114.dylib"),
+                ("libgl4eszl2.dylib", "Krypton", "OpenGL 3 · light", "libgl4eszl2.dylib"),
+            ]
+            let current = preferenceStore.stringValue(.renderer, profile: nil)
+            return candidates.compactMap { id, name, detail, file in
+                let path = file.map { Bundle.main.bundleURL.appendingPathComponent("Frameworks").appendingPathComponent($0).path }
+                guard file == nil || (path.map { FileManager.default.fileExists(atPath: $0) } ?? false) || id == current else { return nil }
+                return RendererOption(id: id, name: name, detail: detail, recommended: id == "auto")
+            }
+        }
         public func javaRuntimes() async -> [JavaRuntime] { [] }
         public func storage() async -> StorageUsage { StorageUsage(gameBytes: 0, javaBytes: 0, cacheBytes: 0) }
         public func clearCache() async throws { throw unavailable("cache management") }
