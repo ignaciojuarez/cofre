@@ -927,7 +927,7 @@ function iconSVG(name,size,color){
 }
 document.querySelectorAll('.px[data-i]').forEach(el=>el.innerHTML=iconSVG(el.dataset.i,+el.dataset.s||16,el.dataset.c||'#5ad1e8'));
 
-// Pixel scenes: PNGs rendered by CofreUI's PixelScene (waterfall canyon), one per seed and size, in scenes/.
+// Pixel scenes: PNGs rendered by CofreUI's PixelScene (moonlit lake), one per seed and size, in scenes/.
 function rng(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
 function scene(seed,W,H){return `scenes/${seed}-${W}x${H}.png`;}
 function paintScenes(){document.querySelectorAll('[data-scene]').forEach(el=>{el.style.backgroundImage=`url(${scene(+el.dataset.scene,+el.dataset.sw||120,+el.dataset.sh||80)})`;});}

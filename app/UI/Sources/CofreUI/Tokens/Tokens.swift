@@ -94,44 +94,16 @@ public struct AccentFamily: Sendable, Hashable, Identifiable {
 
 /// Fixed colors used only inside pixel art (icons and scenes). Not themeable on purpose.
 enum PixelArtColors {
-    // PixelScene palettes, one per style. Skies stay dark at the top so white titles read on any crop.
-    enum Falls {
-        static let sky: [UInt32] = [0x0a0b24, 0x11143a, 0x1a1a4e, 0x24215f, 0x30296e, 0x3d327c, 0x4b3d8a]
-        static let mesa: (UInt32, UInt32) = (0x2a2463, 0x3a3178)
-        static let rock: [UInt32] = [0x231d40, 0x282147, 0x1f1a39, 0x2c2550]
-        static let rockLit: UInt32 = 0x46397a, rockBack: (UInt32, UInt32) = (0x18142f, 0x221c40)
-        static let grass: (UInt32, UInt32) = (0x3f9a55, 0x2a6b3d), vine: UInt32 = 0x1f5434
-        static let water: [UInt32] = [0x2f8fb3, 0x5ad1e8, 0xa8ecf7, 0xe9fbff]
-        static let pool: [UInt32] = [0x1f3a6e, 0x182c58, 0x112043, 0x0c1631]
-        static let ripple: UInt32 = 0x3d63a0, mist: (UInt32, UInt32) = (0x6577b8, 0xa9b8ea)
-        static let tree: (UInt32, UInt32, UInt32) = (0x1e5a3a, 0x2f7a4c, 0x2a1a14), firefly: UInt32 = 0xf0b84f
-    }
-    enum Geode {
-        static let glow: [UInt32] = [0x3a1f70, 0x2e1858, 0x241347, 0x1c0f39, 0x150b2b, 0x0f081f]
-        static let ledge: (UInt32, UInt32) = (0x170d2c, 0x2b1a52)
-        static let rock: (UInt32, UInt32) = (0x0b0716, 0x33205e)
-        static let crystal: [UInt32] = [0xe9d6ff, 0xb983ff, 0x8152e0, 0x5534b0]
-        static let crystalDim: [UInt32] = [0x8a68cc, 0x6a4bab, 0x4d3489, 0x372466]
-        static let tip: UInt32 = 0xfaf4ff, spark: UInt32 = 0xe8d8ff
-        static let gold: (UInt32, UInt32) = (0xf0b84f, 0xa86e14)
-    }
-    enum Islands {
-        static let sky: [UInt32] = [0x080b26, 0x0e1436, 0x161d4a, 0x20265c, 0x2b2e6a, 0x373576, 0x433d80]
-        static let aurora: [UInt32] = [0x1e5a6a, 0x2c9486, 0x5fe0b0]
-        static let cloud: [(UInt32, UInt32)] = [(0x2a2a62, 0x383880), (0x3b3a7e, 0x5a56a0)]
-        static let grass: (UInt32, UInt32) = (0x6cbf3f, 0x45a03a), dirt: (UInt32, UInt32) = (0x7a5230, 0x5a3a22)
-        static let stone: (UInt32, UInt32) = (0x3a3456, 0x2b2742), root: UInt32 = 0x4a3020
-        static let leaf: (UInt32, UInt32, UInt32) = (0x5fc46a, 0x2f8f57, 0x1f6b3e), trunk: UInt32 = 0x5a3a22
-        static let water: [UInt32] = [0x5ad1e8, 0xa8ecf7, 0xe9fbff]
-        static let chest: (UInt32, UInt32, UInt32) = (0xa8642f, 0x6e3d17, 0xf0b84f)
-    }
+    // PixelScene: the moonlit lake. The sky stays dark at the top so white titles read on any crop.
     enum Lake {
         static let sky: [UInt32] = [0x05071a, 0x0a0e28, 0x111638, 0x1a1c4a, 0x26245c, 0x342c6c]
-        static let moon: (UInt32, UInt32) = (0xf1edff, 0xc4bdea), halo: UInt32 = 0x2e2c6e
+        static let moon: (UInt32, UInt32) = (0xf6f3ff, 0xc4bdea), halo: (UInt32, UInt32) = (0x2e2c6e, 0x4a4794)
         static let forest: [(UInt32, UInt32)] = [(0x232158, 0x2e2b6c), (0x0d0b26, 0x3a3882)]
-        static let water: UInt32 = 0x0b0f2c, ripple: UInt32 = 0x323c86, glint: (UInt32, UInt32) = (0xb9b4f0, 0x6e69bd)
+        static let water: UInt32 = 0x0b0f2c, ripple: UInt32 = 0x323c86
+        static let glint: [UInt32] = [0xf6f3ff, 0xc9c5f6, 0x8a85d0, 0x5a56a8]
         static let shore: (UInt32, UInt32) = (0x08081a, 0x1d3a2e), reed: (UInt32, UInt32) = (0x1c4532, 0x6a4428)
-        static let cabin: (UInt32, UInt32) = (0x0d0b22, 0x2a2152), window: UInt32 = 0xf0b84f
+        static let cabin: (UInt32, UInt32) = (0x0d0b22, 0x2a2152)
+        static let window: (UInt32, UInt32) = (0xffe08a, 0xf0b84f), glow: (UInt32, UInt32) = (0x4a3048, 0x94603a)
     }
     static let starBright: UInt32 = 0xffffff, starDim: UInt32 = 0x8c86c4
     static let controllerGlyph: UInt32 = 0x3a3550

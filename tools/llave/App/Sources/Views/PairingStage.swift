@@ -1,7 +1,7 @@
 import CofreUI
 import SwiftUI
 
-/// The big pixel illustration: a Mac and an iPhone on Cofre's pixel scene, one pose per step.
+/// The big pixel illustration: a Mac and an iPhone on Cofre's moonlit lake scene, one pose per step.
 /// The scene and every sprite share one 4 pt grid. Motion steps like the Spinner and stops under Reduce Motion.
 struct PairingStage: View {
     let art: StateScreen.Art
