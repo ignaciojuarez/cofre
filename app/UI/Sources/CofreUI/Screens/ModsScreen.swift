@@ -1,5 +1,6 @@
 #if canImport(UIKit)
     import SwiftUI
+    import UIKit
     import UniformTypeIdentifiers
 
     // M01 Browse · M02 Mod page · M03 Import pack · M04 Installed. AdaptiveListDetail: the browser on the left,
@@ -94,6 +95,7 @@
                         ForEach(store.results) { p in
                             let selected = width != .compact && nav.mod == .project(p.id)
                             Button {
+                                endEditing()
                                 nav.mod = .project(p.id)
                             } label: {
                                 Row(p.title, subtitle: "\(p.summary) · \(Fmt.count(p.downloads))", isSelected: selected)
@@ -106,7 +108,10 @@
                                         BlockButton(
                                             "Get", role: .primary, size: .small,
                                             isLoading: store.installing.contains(p.id)
-                                        ) { Task { await store.get(p) } }
+                                        ) {
+                                            endEditing()
+                                            Task { await store.get(p) }
+                                        }
                                     }
                                 }
                                 .dimmed(!p.fits)
@@ -117,10 +122,17 @@
                     }
                 }
             }
+            // Scrolling the results or tapping outside the field closes the keyboard.
+            .scrollDismissesKeyboard(.immediately)
+            .background { Color.clear.contentShape(Rectangle()).onTapGesture { endEditing() } }
             .task(id: store.query) {
                 try? await Task.sleep(for: .milliseconds(250))
                 await store.search()
             }
+        }
+
+        private func endEditing() {
+            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
         }
     }
 
