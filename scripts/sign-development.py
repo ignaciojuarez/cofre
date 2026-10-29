@@ -1,7 +1,7 @@
 from pathlib import Path
 import plistlib, subprocess
 root=Path(__file__).resolve().parents[1]; app=root/'artifacts/Payload/Cofre.app'
-profile=next(root.glob('upstream/air/.build-tools/signing/build/Debug-iphoneos/*/embedded.mobileprovision'),None)
+profile=next(root.glob('upstream/air/.build-tools/signing/build/Debug-iphoneos/*/embedded.mobileprovision'),None) or next((root.parent/'air').glob('.build-tools/signing/build/Debug-iphoneos/*/embedded.mobileprovision'),None)
 if not profile: raise SystemExit('missing development profile; build Air first')
 identity='Apple Development: Ignacio Juarez (SIGNING_IDENTITY)'; bundle='com.ignaciojuarez.cofre'; tunnel='com.ignaciojuarez.cofre.tunnel'
 p=plistlib.loads(subprocess.check_output(['security','cms','-D','-i',str(profile)])); e=dict(p['Entitlements'])
