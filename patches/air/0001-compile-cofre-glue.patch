@@ -1,19 +1,16 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Cofre <cofre@example.invalid>
 Date: Thu, 29 Oct 2026 10:30:25 -0700
-Subject: [PATCH 1/2] [COFRE] Compile Cofre's Air glue into the app
+Subject: [PATCH 1/5] [COFRE] Compile Cofre's Air glue into the app
 
 Reason: Cofre's ObjC bridge (Air data, VPN, pairing import, startup) must be built into Air's executable; the Swift layer ships separately as CofreCore.framework.
 Drop when: Air offers a plugin or extension point for third-party glue.
 ---
- Natives/CMakeLists.txt | 7 +++++++
- 1 file changed, 7 insertions(+)
-
 diff --git a/Natives/CMakeLists.txt b/Natives/CMakeLists.txt
-index 179bb64cd..312ade6d0 100644
+index 179bb64..6a582c3 100644
 --- a/Natives/CMakeLists.txt
 +++ b/Natives/CMakeLists.txt
-@@ -384,6 +384,10 @@ add_executable(AngelAuraAmethyst
+@@ -384,6 +384,11 @@ add_executable(AngelAuraAmethyst
    dyld_patch_platform.m
    main.m
    main_hook.m
@@ -21,10 +18,11 @@ index 179bb64cd..312ade6d0 100644
 +  CofreGlue/CofreStartup.m
 +  CofreGlue/CofreTunnelService.m
 +  CofreGlue/CofrePairingImport.m
++  CofreGlue/CofreGameInput.m
    # ★ [LINK511] 换底 5.1.0 时漏掉的 fork 独有源(上游 5.1.0 的 add_executable 里有):
    #   sdl3_hook.m 定义 ame_hook_getEmbeddedSDLView / ame_sdlVulkanWindowActive /
    #   amethyst_sdl3_hook_resolve(分别被 gl_bridge.m / egl_bridge.m / main_hook.m 引用);
-@@ -871,3 +875,6 @@ if(AME_RENDERER_GAP_VGPU)
+@@ -871,3 +876,6 @@ if(AME_RENDERER_GAP_VGPU)
      "-framework libGLESv2"
    )
  endif()

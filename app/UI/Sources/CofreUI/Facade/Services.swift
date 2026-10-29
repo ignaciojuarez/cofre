@@ -59,6 +59,7 @@
     public typealias CofreBackend = SetupService & LibraryService & ContentService & AccountService
         & LaunchControl & LogSource & InstanceActions & VersionCatalog & ProjectCatalog & InstallProgressSource
         & JITTester & SigningInfoSource & SystemCatalog & AirAppearance & OptionalActions & ServerJoinSource
+        & GameInputService
 
     /// What the shell hands to `CofreUI.makeRootViewController(services:)`.
     public struct CofreServices {

@@ -31,6 +31,7 @@
         public init(bridge: any CofreAirBridging) {
             self.air = bridge
             super.init()
+            CofreGameInput.shared.bridge = bridge
             loadPersistedSetup()
         }
         private var launchTask: Task<Void, Never>?

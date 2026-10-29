@@ -1,4 +1,5 @@
 #import "AirBridgeAdapter.h"
+#import "CofreGameInput.h"
 #import "CustomControlsViewController.h"
 #import "DownloadTaskManager.h"
 #import "JavaLauncher.h"
@@ -84,6 +85,7 @@ static void CofrePresentSurface(UIWindow *window, NSDictionary *metadata) {
     AmeGameLandscapeLockEnter();
     CofreWhenLandscape(window, 40, ^{
       SurfaceViewController *surface = [[SurfaceViewController alloc] initWithMetadata:metadata];
+      [CofreGameOverlayHost installOnSurface:surface];
       window.alpha = 0;
       window.rootViewController = surface;
       [window makeKeyAndVisible];
@@ -1194,6 +1196,18 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
     return getPrefObject(@"control.default_ctrl");
   };
   return vc;
+}
+- (void)gameInputKey:(NSString *)name down:(BOOL)down {
+  CofreInputKey(name.UTF8String, down);
+}
+- (void)gameInputMouseButton:(NSInteger)button down:(BOOL)down {
+  CofreInputMouseButton((int)button, down);
+}
+- (void)gameInputLookX:(float)deltaX y:(float)deltaY {
+  CofreInputLook(deltaX, deltaY);
+}
+- (void)setGameKeyboardShown:(BOOL)shown {
+  shown ? CofreInputShowKeyboard() : CofreInputHideKeyboard();
 }
 @end
 
