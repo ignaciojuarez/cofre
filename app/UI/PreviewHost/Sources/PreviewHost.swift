@@ -3,7 +3,9 @@ import SwiftUI
 import UIKit
 
 // Launch arguments (all optional):
-//   -screen play|worlds|instances|mods|modpage|settings|jit|setup|launch|join   (default play)
+//   -screen play|worlds|instances|mods|modpage|settings|jit|setup|launch|join|gameExit   (default play)
+//   -exitReason memory|renderer|missingLibrary|mods|java|unknown|quit   Why the game stopped (-screen gameExit)
+//   -exitDetails YES    Open its Details sheet
 //   -joinState firstVisit|needsAttention|keyChanged|installing|update|error|ready|resolving|live   Join server sheet state
 //   -joinURL cofre://join?server=…   Opens the sheet through the deep-link route instead
 //   -setupStep 0…7      Setup step for -screen setup
@@ -82,7 +84,14 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             }
         }
         let setupStep = args.object(forKey: "setupStep") != nil ? args.integer(forKey: "setupStep") : nil
-        let root = UIHostingController(rootView: CofreRootView(store: store, nav: nav, setupStart: setupStep))
+        let root: UIViewController =
+            screen == "gameExit"
+            ? UIHostingController(
+                rootView: GameExitView(
+                    report: MockGameExit.report(
+                        args.string(forKey: "exitReason").flatMap(GameExitReport.Reason.init) ?? .memory),
+                    showDetails: args.bool(forKey: "exitDetails"), close: {}))
+            : UIHostingController(rootView: CofreRootView(store: store, nav: nav, setupStart: setupStep))
         root.view.backgroundColor = .cofre.page
         let window = UIWindow(windowScene: scene)
         // On the window, so presented sheets get it too.

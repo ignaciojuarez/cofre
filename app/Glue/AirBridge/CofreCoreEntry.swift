@@ -13,6 +13,11 @@ public final class CofreCoreEntry: NSObject {
         CofreUIKitTheme.apply()
         root = CofreRootViewController(bridge: bridge)
     }
+    /// Minecraft exited (patch 0004 via CofreHandleGameExit): Cofre's crash screen instead of Air's.
+    @objc(handleGameExit:)
+    @MainActor public static func handleGameExit(_ code: Int32) {
+        CofreGameExit.handle(code: Int(code), root: root, bridge: bridge)
+    }
     @objc(rootViewController)
     @MainActor public static func rootViewController() -> UIViewController? {
         guard let root else { NSLog("[Cofre] UI fallback reason=root missing"); return nil }

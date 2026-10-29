@@ -303,22 +303,8 @@
             launchTask = nil
             air.hideCofreLaunchOverlay()
         }
-        public func logLines(_ kind: LogKind) -> AsyncStream<LogLine> {
-            AsyncStream { continuation in
-                let url = logURL(kind)
-                if let text = try? String(contentsOf: url) {
-                    for (i, line) in text.split(separator: "\n").enumerated() {
-                        continuation.yield(LogLine(id: i, time: "", tag: "Air", text: String(line)))
-                    }
-                }
-                continuation.finish()
-            }
-        }
-        public func exportLog(_ kind: LogKind) async throws -> URL {
-            let u = logURL(kind)
-            guard FileManager.default.fileExists(atPath: u.path) else { throw unavailable("log export") }
-            return u
-        }
+        public func logLines(_ kind: LogKind) -> AsyncStream<LogLine> { CofreLogStore().lines(kind) }
+        public func exportLog(_ kind: LogKind) async throws -> URL { try CofreLogStore().export(kind) }
         public func importPack(_ url: URL, instanceID: String?) -> AsyncThrowingStream<InstallProgress, Error> {
             unavailableStream("pack import")
         }
@@ -399,10 +385,6 @@
         private var pairingURL: URL {
             FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent(
                 CofreConstants.pairingRelativePath)
-        }
-        private func logURL(_ kind: LogKind) -> URL {
-            FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent(
-                kind == .latest ? "latestlog.txt" : "latestlog.txt")
         }
         private func publishSetup() {
             setupContinuations.values.forEach { $0.yield(setup) }

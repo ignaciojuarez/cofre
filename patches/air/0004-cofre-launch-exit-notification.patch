@@ -1,23 +1,35 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Cofre <cofre@example.invalid>
 Date: Thu, 29 Oct 2026 14:00:00 -0700
-Subject: [PATCH 4/4] Publish Air launch exit notifications
+Subject: [PATCH 4/4] Let Cofre own Air's game exit
 
-Reason: Cofre owns the launch screen and must turn a pre-first-frame JVM exit into its own failure state instead of showing Air's crash UI.
-Drop when: Air exposes a launch failure callback before its crash UI.
+Reason: Cofre owns the launch and crash screens. It needs the JVM exit code (a notification for the launch screen) and must stop Air's crash UI (PLCrashView, log view) when CofreHandleGameExit() returns YES.
+Drop when: Air exposes a game-exit callback that can replace its crash UI.
 ---
- Natives/PLLogOutputView.m | 2 ++
- 1 file changed, 2 insertions(+)
+ Natives/PLLogOutputView.m | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
 diff --git a/Natives/PLLogOutputView.m b/Natives/PLLogOutputView.m
+index 1283697..1f15325 100644
 --- a/Natives/PLLogOutputView.m
 +++ b/Natives/PLLogOutputView.m
-@@ -186,6 +186,8 @@ + (void)appendToLog:(NSString *)string {
+@@ -3,6 +3,9 @@
+ #import "SurfaceViewController.h"
+ #import "utils.h"
+ 
++// Cofre shows game exits itself while its UI is installed (app/Glue/AirBridge/CofreStartup.m).
++BOOL CofreHandleGameExit(int code);
++
+ @interface PLLogOutputView()<UITableViewDataSource, UITableViewDelegate>
+ @property(nonatomic) UITableView* logTableView;
+ @property(nonatomic) UINavigationBar* navigationBar;
+@@ -186,6 +189,9 @@ + (void)appendToLog:(NSString *)string {
  }
  
  + (void)handleExitCode:(int)code {
 +    [[NSNotificationCenter defaultCenter] postNotificationName:@"CofreAirJVMExitNotification"
 +                                                        object:nil userInfo:@{@"code": @(code)}];
++    if (CofreHandleGameExit(code)) return;
      if (!current) return;
      
      // 如果有错误，显示新的崩溃界面

@@ -82,6 +82,23 @@ UIViewController *CofreMakeRootViewController(void) {
   return root;
 }
 
+/// Air's handleExitCode: asks first (patch 0004). With Cofre's UI up, Cofre
+/// shows the exit (its launch screen before the first frame, its crash screen
+/// after) and Air's crash screen stays hidden. Called from the exiting thread,
+/// which then blocks until the process ends, so the screen goes to the main
+/// queue.
+BOOL CofreHandleGameExit(int code) {
+  Class entry = cofreOwnsJIT ? CofreCoreEntryClass() : nil;
+  if (!entry) {
+    return NO;
+  }
+  dispatch_async(dispatch_get_main_queue(), ^{
+    ((void (*)(id, SEL, int))objc_msgSend)(entry, @selector(handleGameExit:),
+                                           code);
+  });
+  return YES;
+}
+
 __attribute__((constructor)) static void CofreStartup(void) {
   NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
   [center addObserverForName:UIApplicationDidFinishLaunchingNotification
