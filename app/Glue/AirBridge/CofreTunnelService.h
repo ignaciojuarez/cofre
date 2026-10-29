@@ -3,5 +3,7 @@
 @interface CofreTunnelService : NSObject
 + (NETunnelProviderManager *)cofreManagerFromManagers:
     (NSArray<NETunnelProviderManager *> *)managers;
-+ (void)installAndStart;
+/// Starts Cofre's VPN if the user already allowed it. Setup's VPN step
+/// (CofreVPN.swift) creates the configuration, so launch never asks.
++ (void)startIfInstalled;
 @end

@@ -34,6 +34,8 @@ targets:
       - path: ../../app/Glue/AirBridge/CofreCoreEntry.swift
       - path: ../../app/Shell/CofreRootViewController.swift
       - path: ../../app/Glue/CofreJIT.swift
+      - path: ../../app/Glue/CofreVPN.swift
+      - path: ../../app/Glue/ProvisioningProfile.swift
     dependencies:
       - package: CofreUI
         product: CofreUI

@@ -1,5 +1,5 @@
 // Starts Cofre inside Air's executable: loads CofreCore.framework (our Swift UI
-// and backend), hands it the Air bridge, and starts the VPN. Air's
+// and backend), hands it the Air bridge, and starts the VPN if allowed. Air's
 // SceneDelegate (patch 0002) asks CofreMakeRootViewController() for the root
 // screen and falls back to Air's UI on nil.
 #import "AirBridgeAdapter.h"
@@ -67,6 +67,6 @@ __attribute__((constructor)) static void CofreStartup(void) {
                        queue:[NSOperationQueue mainQueue]
                   usingBlock:^(__unused NSNotification *note) {
                     CofreEnsureStarted();
-                    [CofreTunnelService installAndStart];
+                    [CofreTunnelService startIfInstalled];
                   }];
 }

@@ -22,25 +22,8 @@ public final class CofreJIT: @unchecked Sendable {
         self.pairingURL = pairingURL
     }
     public static func enable(pid: Int32, pairingURL: @escaping () -> URL) async -> CofreJITStatus {
-        let manager: NETunnelProviderManager? = await withCheckedContinuation { continuation in
-            NETunnelProviderManager.loadAllFromPreferences { managers, _ in
-                continuation.resume(
-                    returning: managers?.first {
-                        ($0.protocolConfiguration as? NETunnelProviderProtocol)?.providerBundleIdentifier
-                            == CofreConstants.tunnelBundleID
-                    })
-            }
-        }
-        guard let manager, let session = manager.connection as? NETunnelProviderSession else { return .needsVPN }
-        if manager.connection.status != .connected {
-            do { try session.startVPNTunnel() }
-            catch { return .failed("VPN start failed: \(error.localizedDescription)") }
-            let deadline = Date().addingTimeInterval(15)
-            while manager.connection.status != .connected && Date() < deadline {
-                try? await Task.sleep(nanoseconds: 100_000_000)
-            }
-            guard manager.connection.status == .connected else { return .failed("VPN connection timed out") }
-        }
+        let session: NETunnelProviderSession
+        do { session = try await CofreVPN.connect() } catch { return .failed(error.localizedDescription) }
         return await CofreJIT(tunnel: { session }, pairingURL: pairingURL).enable(pid: pid)
     }
     public func enable(pid: Int32) async -> CofreJITStatus {

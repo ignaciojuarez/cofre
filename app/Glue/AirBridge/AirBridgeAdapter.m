@@ -10,9 +10,22 @@
 #import "ServerService.h"
 #import "WorldItem.h"
 #import "WorldService.h"
+#import "authenticator/BaseAuthenticator.h"
 #import "installer/ForgeInstallViewController.h"
 #import "installer/modpack/CurseForgeAPI.h"
 #import "installer/modpack/ModrinthAPI.h"
+#import <AuthenticationServices/AuthenticationServices.h>
+
+static NSError *CofreAirError(NSString *message) {
+  return [NSError errorWithDomain:@"CofreAir"
+                             code:1
+                         userInfo:@{NSLocalizedDescriptionKey : message}];
+}
+
+@interface CofreAirBridgeAdapter () <
+    ASWebAuthenticationPresentationContextProviding>
+@property(nonatomic, strong, nullable) ASWebAuthenticationSession *authSession;
+@end
 
 @implementation CofreAirBridgeAdapter
 - (instancetype)init {
@@ -112,15 +125,100 @@
       [NSString stringWithFormat:@"%s/accounts", getenv("POJAV_HOME") ?: ""];
   NSArray *files =
       [[NSFileManager defaultManager] contentsOfDirectoryAtPath:dir error:nil];
+  NSString *selected = getPrefObject(@"internal.selected_account");
   NSMutableArray *out = [NSMutableArray array];
-  for (NSString *f in files)
-    if ([f.pathExtension isEqualToString:@"json"])
-      [out addObject:@{
-        @"id" : f.stringByDeletingPathExtension,
-        @"name" : f.stringByDeletingPathExtension
-      }];
+  for (NSString *f in files) {
+    if (![f.pathExtension isEqualToString:@"json"])
+      continue;
+    NSString *accountID = f.stringByDeletingPathExtension;
+    NSData *data =
+        [NSData dataWithContentsOfFile:[dir stringByAppendingPathComponent:f]];
+    id json = data ? [NSJSONSerialization JSONObjectWithData:data
+                                                     options:0
+                                                       error:nil]
+                   : nil;
+    NSString *name =
+        [json isKindOfClass:NSDictionary.class] ? json[@"username"] : nil;
+    [out addObject:@{
+      @"id" : accountID,
+      @"name" : [name isKindOfClass:NSString.class] ? name : accountID,
+      @"active" : @([accountID isEqualToString:selected])
+    }];
+  }
   NSLog(@"[Cofre] accounts=%lu", (unsigned long)out.count);
   return out;
+}
+- (void)signInMicrosoftWithProgress:(void (^)(NSString *))progress
+                         completion:(void (^)(NSDictionary *_Nullable,
+                                              NSError *_Nullable))completion {
+  // Same request as Air's account screen (AccountListViewController).
+  NSURL *url = [NSURL
+      URLWithString:
+          @"https://login.live.com/"
+          @"oauth20_authorize.srf?client_id=00000000402b5328&response_type="
+          @"code&scope=service%3A%3Auser.auth.xboxlive.com%3A%3AMBI_SSL&"
+          @"redirect_url=https%3A%2F%2Flogin.live.com%2Foauth20_desktop.srf"];
+  __weak typeof(self) weakSelf = self;
+  self.authSession = [[ASWebAuthenticationSession alloc]
+            initWithURL:url
+      callbackURLScheme:@"ms-xal-00000000402b5328"
+      completionHandler:^(NSURL *callbackURL, NSError *error) {
+        weakSelf.authSession = nil;
+        NSString *code = nil;
+        for (NSURLQueryItem *item in
+             [NSURLComponents componentsWithURL:callbackURL
+                        resolvingAgainstBaseURL:NO]
+                 .queryItems)
+          if ([item.name isEqualToString:@"code"])
+            code = item.value;
+        if (code.length == 0) {
+          NSLog(@"[Cofre] sign-in cancelled or refused");
+          completion(nil, CofreAirError(@"Sign-in didn't finish"));
+          return;
+        }
+        [[[MicrosoftAuthenticator alloc] initWithInput:code]
+            loginWithCallback:^(id status, BOOL success) {
+              dispatch_async(dispatch_get_main_queue(), ^{
+                BOOL demo = [status isKindOfClass:NSString.class] &&
+                            [status isEqualToString:@"DEMO"];
+                if (success && status && !demo) {
+                  progress([status description]);
+                  return;
+                }
+                if (!success) {
+                  NSLog(@"[Cofre] sign-in failed");
+                  completion(nil, [status isKindOfClass:NSError.class]
+                                      ? status
+                                      : CofreAirError(@"Sign-in failed"));
+                  return;
+                }
+                NSDictionary *d = [[BaseAuthenticator current] authData];
+                NSLog(@"[Cofre] signed in demo=%d", demo);
+                completion(
+                    @{
+                      @"id" : d[@"accountId"] ?: @"",
+                      @"name" : d[@"username"] ?: @"",
+                      @"demo" : @(demo)
+                    },
+                    nil);
+              });
+            }];
+      }];
+  self.authSession.prefersEphemeralWebBrowserSession = YES;
+  self.authSession.presentationContextProvider = self;
+  if (![self.authSession start]) {
+    self.authSession = nil;
+    completion(nil, CofreAirError(@"Couldn't open the sign-in page"));
+  }
+}
+- (ASPresentationAnchor)presentationAnchorForWebAuthenticationSession:
+    (ASWebAuthenticationSession *)session {
+  for (UIScene *scene in UIApplication.sharedApplication.connectedScenes)
+    if ([scene isKindOfClass:UIWindowScene.class])
+      for (UIWindow *window in ((UIWindowScene *)scene).windows)
+        if (window.isKeyWindow)
+          return window;
+  return [UIWindow new];
 }
 - (void)ensureAutomaticMemoryDefault {
   // The sentinel distinguishes first launch from a user who explicitly chose a

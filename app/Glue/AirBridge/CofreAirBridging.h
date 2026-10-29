@@ -16,6 +16,10 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)modsForProfile:(NSString *)profile
             completion:(void (^)(NSArray *))completion;
 - (NSArray<NSDictionary *> *)accounts;
+- (void)signInMicrosoftWithProgress:(void (^)(NSString *))progress
+                         completion:
+                             (void (^)(NSDictionary *_Nullable account,
+                                       NSError *_Nullable error))completion;
 - (id)preferenceObject:(NSString *)key;
 - (void)setPreferenceObject:(NSString *)key value:(id)value;
 - (NSDictionary *)preferencesForProfile:(NSString *)profile;

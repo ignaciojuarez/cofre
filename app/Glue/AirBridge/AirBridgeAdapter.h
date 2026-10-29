@@ -26,8 +26,15 @@ NS_ASSUME_NONNULL_BEGIN
             completion:(void (^)(NSArray *))completion;
 /// Toggles a mod's enabled state.
 - (BOOL)toggleMod:(id)mod error:(NSError **)error;
-/// Returns configured accounts.
+/// Returns configured accounts: id, name, active.
 - (NSArray<NSDictionary *> *)accounts;
+/// Signs in with Microsoft through Air's login (web page, then Xbox and
+/// Minecraft tokens). The account comes back as id, name, demo (true when it
+/// doesn't own Java Edition). Air saves and selects it.
+- (void)signInMicrosoftWithProgress:(void (^)(NSString *))progress
+                         completion:
+                             (void (^)(NSDictionary *_Nullable account,
+                                       NSError *_Nullable error))completion;
 /// Reads an Air preference value.
 - (id)preferenceObject:(NSString *)key;
 /// Writes an Air preference value.

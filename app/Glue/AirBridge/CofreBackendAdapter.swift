@@ -6,12 +6,19 @@
 
     public enum CofreBackendError: LocalizedError {
         case unavailable(String)
+        case notOwned
+        case jit(String)
         public var errorDescription: String? {
             switch self {
             case .unavailable(let name): "\(name) is unavailable in this Air build"
+            case .notOwned: "This account doesn't own Minecraft: Java Edition."
+            case .jit(let message): message
             }
         }
     }
+
+    @_silgen_name("csops")
+    private func csops(_ pid: pid_t, _ ops: UInt32, _ useraddr: UnsafeMutableRawPointer?, _ usersize: Int) -> Int32
 
     /// Production bridge. Air owns the data and launch lifecycle; unsupported Air APIs are surfaced as unavailable.
     @MainActor
@@ -29,28 +36,14 @@
         private var setup = SetupState()
         private var setupContinuations: [UUID: AsyncStream<SetupState>.Continuation] = [:]
         private func loadPersistedSetup() {
-            let d = UserDefaults.standard
-            if d.object(forKey: "cofre.setup.pairing") != nil {
-                setup.pairing = d.bool(forKey: "cofre.setup.pairing") ? .ready : .blocked
-            }
-            if d.object(forKey: "cofre.setup.vpn") != nil {
-                setup.vpn = d.bool(forKey: "cofre.setup.vpn") ? .ready : .blocked
-            }
-            if d.object(forKey: "cofre.setup.trust") != nil {
-                setup.trust = d.bool(forKey: "cofre.setup.trust") ? .ready : .blocked
-            }
-            if d.object(forKey: "cofre.setup.account") != nil {
-                setup.account = d.bool(forKey: "cofre.setup.account") ? .ready : .blocked
-            }
-            if d.object(forKey: "cofre.setup.devMode") != nil {
-                setup.devMode = d.bool(forKey: "cofre.setup.devMode") ? .ready : .blocked
-            }
-            if d.object(forKey: "cofre.setup.jit") != nil {
-                setup.jit = d.bool(forKey: "cofre.setup.jit") ? .ready : .blocked
-            }
+            // Only the JIT test result is remembered; every other check is recomputed by `recheckSetup()`.
+            if UserDefaults.standard.bool(forKey: "cofre.setup.jit") { setup.jit = .ready }
         }
 
-        public func setupState() async -> SetupState { setup }
+        public func setupState() async -> SetupState {
+            await recheckSetup()
+            return setup
+        }
         public func setupUpdates() -> AsyncStream<SetupState> {
             AsyncStream { continuation in
                 let id = UUID()
@@ -61,21 +54,26 @@
                 }
             }
         }
+        /// Checks not done yet stay `.unknown` (no error shown); `.failed` is only for an attempt that failed.
         public func recheckSetup() async {
-            let key = hasPairing()
+            // iOS opens a development build only with Developer Mode on and its signer trusted.
+            setup.devMode = ProvisioningProfile.current?.isDevelopment == true ? .ready : .blocked
+            setup.trust = .ready
+            setup.pairing = hasPairing() ? .ready : (setup.pairing.isReady ? .unknown : setup.pairing)
+            if await CofreVPN.isAllowed() { setup.vpn = .ready } else if setup.vpn.isReady { setup.vpn = .unknown }
+            if isJITEnabled { setup.jit = .ready }
             let accountReady = (try? await accounts().isEmpty == false) ?? false
-            let vpnReady = await vpnManagerEnabled()
-            setup.pairing = key ? .ready : .failed("Import a valid pairing file")
-            setup.trust = key ? .ready : .failed("Trust this iPhone, then import its key")
-            setup.account = accountReady ? .ready : .failed("Sign in with Microsoft")
-            setup.vpn = vpnReady ? .ready : .failed("Allow Cofre's VPN")
-            setup.jit = isJITEnabled ? .ready : .failed("Run Test JIT after pairing")
-            setup.devMode = isJITEnabled ? .ready : .failed("Enable Developer Mode")
-            persistSetup()
-            setupContinuations.values.forEach { $0.yield(setup) }
+            if accountReady { setup.account = .ready } else if setup.account.isReady { setup.account = .unknown }
+            publishSetup()
         }
+        /// Settings › Privacy & Security › Developer Mode, else the Settings app.
         public func openDeveloperModeSettings() {
-            UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!)
+            let links = ["App-prefs:Privacy&path=DEVELOPER_MODE", "App-prefs:Privacy", "App-prefs:"]
+            func open(_ i: Int) {
+                guard i < links.count, let url = URL(string: links[i]) else { return }
+                UIApplication.shared.open(url) { ok in if !ok { open(i + 1) } }
+            }
+            open(0)
         }
         public func hasPairing() -> Bool {
             guard let data = try? Data(contentsOf: pairingURL) else { return false }
@@ -85,14 +83,21 @@
             _ = try PairingFileValidator.validate(data)
             try PairingFileStore.write(data, to: pairingURL)
             setup.pairing = .ready
-            setup.trust = .ready
-            persistSetup()
-            setupContinuations.values.forEach { $0.yield(setup) }
+            publishSetup()
         }
         public func deletePairing() throws { if hasPairing() { try FileManager.default.removeItem(at: pairingURL) } }
-        public var isVPNRunning: Bool { false }
-        public func startVPN() async throws { throw CofreBackendError.unavailable("VPN control") }
-        public var isJITEnabled: Bool { false }
+        public private(set) var isVPNRunning = false
+        public func startVPN() async throws {
+            try await CofreVPN.connect()
+            isVPNRunning = true
+            setup.vpn = .ready
+            publishSetup()
+        }
+        /// True once a debugger has attached to Cofre (CS_DEBUGGED), which is what turning on JIT does.
+        public var isJITEnabled: Bool {
+            var flags: UInt32 = 0
+            return csops(getpid(), 0, &flags, MemoryLayout<UInt32>.size) == 0 && flags & 0x1000_0000 != 0
+        }
 
         public func instances() async throws -> [InstanceSummary] {
             air.instances().compactMap { d in
@@ -195,10 +200,28 @@
         public func accounts() async throws -> [Account] {
             air.accounts().compactMap { d in
                 guard let id = d["id"] as? String else { return nil }
-                return Account(id: id, name: d["name"] as? String ?? id, isActive: false)
+                return Account(id: id, name: d["name"] as? String ?? id, isActive: d["active"] as? Bool ?? false)
             }
         }
-        public func signInMicrosoft() async throws -> Account { throw unavailable("Microsoft sign-in") }
+        public func signInMicrosoft() async throws -> Account {
+            let d: [AnyHashable: Any] = try await withCheckedThrowingContinuation { c in
+                air.signInMicrosoft(progress: { NSLog("[Cofre] sign-in %@", $0) }) { account, error in
+                    if let account {
+                        c.resume(returning: account)
+                    } else {
+                        c.resume(throwing: error ?? CofreBackendError.unavailable("Microsoft sign-in"))
+                    }
+                }
+            }
+            guard d["demo"] as? Bool != true else {
+                throw CofreBackendError.notOwned
+            }
+            let account = Account(
+                id: d["id"] as? String ?? "", name: d["name"] as? String ?? "", isActive: true)
+            setup.account = .ready
+            publishSetup()
+            return account
+        }
         public func removeAccount(id: String) async throws { throw unavailable("account removal") }
 
         public func launch(instanceID: String, accountID: String?) -> AsyncThrowingStream<LaunchProgress, Error> {
@@ -273,19 +296,37 @@
         }
         public func testJIT() -> AsyncThrowingStream<JITStep, Error> {
             AsyncThrowingStream { continuation in
-                Task {
+                Task { @MainActor in
                     let result = await CofreJIT.enable(pid: Int32(getpid()), pairingURL: { self.pairingURL })
                     NSLog("[Cofre] JIT status=%@", String(describing: result))
-                    continuation.yield(
-                        JITStep(
-                            kind: .debugger, state: result.isEnabled ? .ready : .failed("JIT unavailable"),
-                            detail: String(describing: result)))
+                    let (kind, message): (JITStep.Kind, String) =
+                        switch result {
+                        case .enabled: (.debugger, "")
+                        case .needsPairing: (.pairing, "No pairing key yet")
+                        case .needsVPN: (.vpn, "The VPN isn't on")
+                        case .failed(let m): (.debugger, m)
+                        case .unavailable, .enabling: (.debugger, "JIT didn't turn on")
+                        }
+                    guard result.isEnabled else {
+                        continuation.yield(JITStep(kind: kind, state: .failed(message)))
+                        continuation.finish(throwing: CofreBackendError.jit(message))
+                        return
+                    }
+                    for kind in JITStep.Kind.allCases { continuation.yield(JITStep(kind: kind, state: .ready)) }
+                    UserDefaults.standard.set(true, forKey: "cofre.setup.jit")
+                    self.setup.jit = .ready
+                    self.publishSetup()
                     continuation.finish()
                 }
             }
         }
         public func deviceInfo() async -> DeviceInfo? { nil }
-        public func signingInfo() async -> SigningInfo? { nil }
+        public func signingInfo() async -> SigningInfo? {
+            ProvisioningProfile.current.map {
+                // Running at all means this device is in the profile.
+                SigningInfo(team: $0.team, expires: $0.expires, deviceRegistered: true)
+            }
+        }
         public func appInfo() -> AppInfo {
             AppInfo(
                 version: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
@@ -307,26 +348,8 @@
             FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent(
                 kind == .latest ? "latestlog.txt" : "latestlog.txt")
         }
-        private func vpnManagerEnabled() async -> Bool {
-            await withCheckedContinuation { continuation in
-                NETunnelProviderManager.loadAllFromPreferences { managers, _ in
-                    continuation.resume(
-                        returning: managers?.contains {
-                            $0.isEnabled && $0.protocolConfiguration is NETunnelProviderProtocol
-                                && (($0.protocolConfiguration as? NETunnelProviderProtocol)?.providerBundleIdentifier
-                                    == CofreConstants.tunnelBundleID)
-                        } ?? false)
-                }
-            }
-        }
-        private func persistSetup() {
-            let d = UserDefaults.standard
-            d.set(setup.pairing.isReady, forKey: "cofre.setup.pairing")
-            d.set(setup.trust.isReady, forKey: "cofre.setup.trust")
-            d.set(setup.account.isReady, forKey: "cofre.setup.account")
-            d.set(setup.devMode.isReady, forKey: "cofre.setup.devMode")
-            d.set(setup.vpn.isReady, forKey: "cofre.setup.vpn")
-            d.set(setup.jit.isReady, forKey: "cofre.setup.jit")
+        private func publishSetup() {
+            setupContinuations.values.forEach { $0.yield(setup) }
         }
         private func parseEnv(_ value: String) -> [String: String] {
             Dictionary(
