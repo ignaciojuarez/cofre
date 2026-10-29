@@ -8,6 +8,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     override func startTunnel(options: [String: NSObject]?, completionHandler: @escaping (Error?) -> Void) {
         Task {
             do {
+                let temporaryDirectory = FileManager.default.temporaryDirectory
+                for url in (try? FileManager.default.contentsOfDirectory(at: temporaryDirectory, includingPropertiesForKeys: nil)) ?? []
+                    where url.lastPathComponent.hasPrefix("cofre-pairing-") && url.pathExtension == "plist" {
+                    try? FileManager.default.removeItem(at: url)
+                }
                 try await loopback.apply(to: self)
                 NSLog("[Cofre] tunnel up 10.7.0.1")
                 completionHandler(nil)
@@ -15,7 +20,16 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         }
     }
     override func stopTunnel(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) {
-        completionHandler()
+        let task = jitTask
+        let pairing = pairingURL
+        jitTask = nil
+        pairingURL = nil
+        Task {
+            task?.cancel()
+            _ = await task?.value
+            if let pairing { try? FileManager.default.removeItem(at: pairing) }
+            completionHandler()
+        }
     }
     override func handleAppMessage(_ messageData: Data, completionHandler: ((Data?) -> Void)? = nil) {
         let started = mach_task_basic_info_data_t()
@@ -28,12 +42,18 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             }
         }
         let peak = ok ? Double(info.resident_size_max) / 1_048_576 : 0
+        func reply(_ state: String, _ reason: String? = nil, mode: String? = nil) -> Data {
+            var object: [String: Any] = ["state": state]
+            if let reason { object["reason"] = reason }
+            if let mode { object["mode"] = mode }
+            return (try? JSONSerialization.data(withJSONObject: object)) ?? Data("{\"state\":\"failed\",\"reason\":\"response encoding failed\"}".utf8)
+        }
         guard let object = try? JSONSerialization.jsonObject(with: messageData) as? [String: Any],
             object["cmd"] as? String == "enableJIT", let pid = object["pid"] as? Int, pid > 0,
             let encoded = object["pairing"] as? String, let pairing = Data(base64Encoded: encoded),
             pairing.count < 262144
         else {
-            completionHandler?(Data("{\"state\":\"failed\",\"reason\":\"invalid message\"}".utf8))
+            completionHandler?(reply("failed", "invalid message"))
             return
         }
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(
@@ -42,22 +62,31 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             try pairing.write(to: url, options: .completeFileProtection)
             pairingURL = url
         } catch {
-            completionHandler?(Data("{\"state\":\"failed\",\"reason\":\"pairing write failed\"}".utf8))
+            completionHandler?(reply("failed", "pairing write failed: \(error.localizedDescription)"))
             return
         }
-        let scriptURL = Bundle.main.url(forResource: "CofreTXM", withExtension: "js")!
+        guard let scriptURL = Bundle.main.url(forResource: "CofreTXM", withExtension: "js") else {
+            try? FileManager.default.removeItem(at: url)
+            pairingURL = nil
+            completionHandler?(reply("failed", "TXM script missing"))
+            return
+        }
         jitTask?.cancel()
-        jitTask = Task.detached { [weak self] in
+        let task = Task.detached { [weak self] in
             do {
                 try StikJIT.enableJIT(
                     targetPID: Int32(pid), pairingFile: url,
                     configuration: .init(deviceAddress: "10.7.0.1", rsdPort: 49152), script: .custom(scriptURL),
                     forceScript: true, progress: { NSLog("[Cofre] JIT %@", $0) })
                 NSLog("[Cofre] JIT enabled pid=%d mode=txm peakMB=%.1f", pid, peak)
-            } catch { NSLog("[Cofre] JIT failed pid=%d %@", pid, error.localizedDescription) }
+                completionHandler?(reply("enabled", mode: "txm"))
+            } catch {
+                NSLog("[Cofre] JIT failed pid=%d %@", pid, error.localizedDescription)
+                completionHandler?(reply("failed", error.localizedDescription))
+            }
             try? FileManager.default.removeItem(at: url)
             self?.pairingURL = nil
         }
-        completionHandler?(Data("{\"state\":\"enabling\",\"mode\":\"txm\",\"peakMB\":\(peak)}".utf8))
+        jitTask = task
     }
 }

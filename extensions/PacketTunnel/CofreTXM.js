@@ -8,6 +8,13 @@ function le(hex) {
 function hexLE(value) {
     return BigInt(value).toString(16).padStart(16, '0').match(/../g).reverse().join('');
 }
+const MAX_ADDRESS = 0xffffffffffffffffn;
+function checkedRange(address, size, cap) {
+    if (typeof address !== 'bigint' || typeof size !== 'bigint' || address < 0n || address > MAX_ADDRESS ||
+        size <= 0n || size > cap || address + size > MAX_ADDRESS + 1n)
+        throw Error('Invalid memory range');
+    return {address, size};
+}
 function parseStop(stop, instruction) {
     if (!/^T05/.test(stop)) return null;
     let fields = {};
@@ -39,7 +46,7 @@ function runCofre() {
     stop = checked('c');
     while (!/^[WX]/.test(stop)) {
         let pc = /(?:^|;)20:([0-9a-f]{16});/i.exec(stop);
-        let request = pc ? parseStop(stop, checked('m' + le(pc[1]).toString(16) + ',4')) : null;
+        let request = pc ? parseStop(stop, checked('m' + checkedRange(le(pc[1]), 4n, 4n).address.toString(16) + ',4')) : null;
         if (!request) {
             // Deliver unrelated signals rather than swallowing crashes or looping on them.
             let signal = /^T([0-9a-f]{2})/i.exec(stop);
@@ -50,23 +57,27 @@ function runCofre() {
         let address = request.legacy ? 0n : request.x0;
         let size = request.legacy ? request.x0 : request.x1;
         if (request.op === 1n) {
-            if (size <= 0n || size > 1073741824n) throw Error('Invalid JIT region size');
+            checkedRange(address, size, 1073741824n);
             if (address === 0n) {
                 let allocated = checked('_M' + size.toString(16) + ',rx');
                 if (!/^[0-9a-f]+$/i.test(allocated)) throw Error('Allocation failed');
                 address = BigInt('0x' + allocated);
             }
-            if (address === 0n || address + size > 0xffffffffffffffffn) throw Error('Invalid region');
+            checkedRange(address, size, 1073741824n);
             // Bounded memory: one page write at a time, no region-sized JS buffers.
-            for (let offset = 0n; offset < size; offset += 16384n)
-                if (checked('M' + (address + offset).toString(16) + ',1:69') !== 'OK') throw Error('Region write failed');
+            for (let offset = 0n; offset < size; offset += 16384n) {
+                let count = size - offset > 1n ? 1n : size - offset;
+                let range = checkedRange(address + offset, count, 1n);
+                if (checked('M' + range.address.toString(16) + ',1:69') !== 'OK') throw Error('Region write failed');
+            }
             writeRegister('0', address, request.tid);
             log('COFRE_REGION_READY');
         } else if (request.op === 4n) {
-            if (size > 1048576n) throw Error('Patch request too large');
+            checkedRange(address, size, 1048576n);
             for (let offset = 0n; offset < size; offset += 4096n) {
                 let count = size - offset > 4096n ? 4096n : size - offset;
-                let range = (address + offset).toString(16) + ',' + count.toString(16);
+                let bounded = checkedRange(address + offset, count, 4096n);
+                let range = bounded.address.toString(16) + ',' + bounded.size.toString(16);
                 let bytes = checked('m' + range);
                 if (bytes.length !== Number(count) * 2 || !/^[0-9a-f]+$/i.test(bytes)) throw Error('Invalid memory reply');
                 if (checked('M' + range + ':' + bytes) !== 'OK') throw Error('Patch write failed');
@@ -82,4 +93,4 @@ function runCofre() {
     log('COFRE_EXITED');
 }
 if (typeof get_pid === 'function') runCofre();
-if (typeof module !== 'undefined') module.exports = {le, hexLE, parseStop};
+if (typeof module !== 'undefined') module.exports = {le, hexLE, parseStop, checkedRange};

@@ -32,7 +32,15 @@ public final class CofreJIT: @unchecked Sendable {
             }
         }
         guard let manager, let session = manager.connection as? NETunnelProviderSession else { return .needsVPN }
-        if manager.connection.status != .connected { try? session.startVPNTunnel() }
+        if manager.connection.status != .connected {
+            do { try session.startVPNTunnel() }
+            catch { return .failed("VPN start failed: \(error.localizedDescription)") }
+            let deadline = Date().addingTimeInterval(15)
+            while manager.connection.status != .connected && Date() < deadline {
+                try? await Task.sleep(nanoseconds: 100_000_000)
+            }
+            guard manager.connection.status == .connected else { return .failed("VPN connection timed out") }
+        }
         return await CofreJIT(tunnel: { session }, pairingURL: pairingURL).enable(pid: pid)
     }
     public func enable(pid: Int32) async -> CofreJITStatus {
@@ -56,7 +64,7 @@ public final class CofreJIT: @unchecked Sendable {
                 }
             }
             let dict = (reply.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }) ?? [:]
-            if let mode = dict["mode"] as? String {
+            if dict["state"] as? String == "enabled", let mode = dict["mode"] as? String, !mode.isEmpty {
                 status = .enabled(mode)
                 return status
             }
