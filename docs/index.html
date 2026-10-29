@@ -56,7 +56,7 @@
   <img class="hero-icon" src="assets/cofre-icon.png" width="128" height="128" alt="Cofre app icon: a purple chest with a gold lock">
   <p class="label">iPhone &amp; iPad launcher · Free &amp; open source</p>
   <h1 id="hero-title">Cofre</h1>
-  <p class="pitch">Minecraft: Java Edition, mods and all, on your iPhone. JIT and VPN built in.</p>
+  <p class="pitch">Minecraft: Java Edition, mods and all, on your iPhone. JIT (what makes Java fast on iPhone) and a local VPN, built in.</p>
   <div class="actions">
     <a class="btn btn-primary btn-l" href="#step-1"><svg aria-hidden="true" class="ico"><use href="#i-arrow"/></svg>Get Cofre</a>
     <a class="btn btn-l" href="#requirements">What you need</a>
@@ -72,7 +72,7 @@
 
 <section id="steps" class="wrap section" aria-labelledby="steps-title">
   <p class="label">Zero to playing</p>
-  <h2 id="steps-title">Four steps. One button each.</h2>
+  <h2 id="steps-title">Four steps. About 10 minutes.</h2>
 
   <ol class="steps">
 
@@ -84,11 +84,11 @@
             <p class="label">Step 1 · On your iPhone</p>
             <h3>Get Cofre</h3>
           </div>
-          <span class="badge"><svg aria-hidden="true" class="ico"><use href="#i-clock"/></svg>4 min</span>
+          <span class="badge"><svg aria-hidden="true" class="ico"><use href="#i-clock"/></svg>3 min</span>
         </div>
         <ol class="howto">
           <li>Tap <b>Request an invite</b> and tell us who you are.</li>
-          <li>We send you a link that shares your iPhone's ID, so we can add it to Cofre.</li>
+          <li>We send you a link. Open it on your iPhone so we can add it to Cofre.</li>
           <li>When your install link arrives, open it on your iPhone and tap <b>Install</b>.</li>
         </ol>
         <div class="step-actions">
@@ -150,8 +150,8 @@
           <details class="more more-btn">
             <summary class="btn btn-l"><svg aria-hidden="true" class="ico"><use href="#i-bolt"/></svg>Don't see it?</summary>
             <div class="more-body">
-              <p>iOS hides Developer Mode until the iPhone has been paired with a Mac. Do <a href="#step-3">Step 3</a> first, then come back here.</p>
-              <p>Opening Cofre and seeing <b>“Developer Mode Required”</b>? Same fix: finish this step.</p>
+              <p>Tap the Cofre icon once. iOS says <b>“Developer Mode Required”</b>; then look in Privacy &amp; Security again.</p>
+              <p>Still not there? Do <a href="#step-3">Step 3</a> first. Connecting to a Mac makes the switch appear. Then come back here.</p>
             </div>
           </details>
         </div>
@@ -185,7 +185,7 @@
           <li>Have Cofre installed on your iPhone (<a href="#step-1">Step 1</a>).</li>
           <li>Plug your iPhone into the Mac with a cable.</li>
           <li>Open <b>Terminal</b> (press <kbd>⌘</kbd> <kbd>Space</kbd>, type “Terminal”, press <kbd>Return</kbd>). Paste the command below and press <kbd>Return</kbd>.</li>
-          <li>A Cofre window opens and guides you: unlock your iPhone, tap <b>Trust</b>, then wait for <b>Done</b>.</li>
+          <li>A Cofre window opens and guides you: unlock your iPhone, tap <b>Trust</b>, enter your passcode, then wait for <b>Done</b>.</li>
           <li>Open Cofre on your iPhone. It's ready.</li>
         </ol>
         <div class="command">
@@ -197,16 +197,19 @@
           <svg aria-hidden="true" class="ico ico-l"><use href="#i-shield"/></svg>
           <div>
             <p class="label">Never share your pairing key</p>
-            <p><b>Never paste or upload your pairing file to any chat, website or person.</b> Not even ChatGPT or Claude. It's a key to your phone.</p>
+            <p><b>Never share this file. It's a key to your iPhone.</b> Don't paste or upload it to any chat, website or person, not even ChatGPT or Claude.</p>
           </div>
         </aside>
         <details class="more">
           <summary>If the window shows “Send with AirDrop”</summary>
           <div class="more-body">
             <ol>
-              <li>Click <b>Send with AirDrop</b> and pick your iPhone. On the iPhone, tap <b>Accept</b>. It's saved in <b>Files → Downloads</b>.</li>
-              <li>Open Cofre, tap <b>I have a file</b> → <b>Downloads</b> → the file named after your iPhone.</li>
+              <li>Click <b>Send with AirDrop</b> and pick your iPhone. Not listed? On the iPhone, open Control Center, touch and hold the top-left group, tap <b>AirDrop</b> → <b>Everyone for 10 Minutes</b>.</li>
+              <li>On the iPhone, tap <b>Accept</b>. On iOS 26.2 or later it may ask for an <b>AirDrop code</b>: tap <b>Get AirDrop Code</b> and type the code on the Mac. (Same Apple Account on both? It's accepted by itself.)</li>
+              <li>On the iPhone, open <b>Files → Downloads</b>, tap the file named after your iPhone, then <b>Share → Cofre</b>.</li>
+              <li>When Cofre says <b>Key found</b>, delete the file from Downloads.</li>
             </ol>
+            <p>The window also has <b>Save a copy</b>, as a last resort. If you use it, AirDrop the copy, then move it to the Trash.</p>
           </div>
         </details>
         <div class="step-actions">
@@ -218,7 +221,7 @@
           <svg aria-hidden="true" class="ico ico-l"><use href="#i-people"/></svg>
           <div>
             <p class="label">Shortcut · In person</p>
-            <p><b>No Mac? Use a friend's.</b> Plug into their Mac, paste the command, tap Trust. About 2 minutes, and nothing stays on their Mac.</p>
+            <p><b>No Mac? Use a friend's.</b> Plug into their Mac, paste the command, tap Trust. About 2 minutes. Nothing stays on their Mac unless you save a copy.</p>
           </div>
         </aside>
       </div>
@@ -259,8 +262,8 @@
           <span class="badge"><svg aria-hidden="true" class="ico"><use href="#i-clock"/></svg>3 min</span>
         </div>
         <ol class="howto">
-          <li>Open Cofre. Your key is already inside, so setup moves on by itself.</li>
-          <li>When iOS asks to add a VPN, tap <b>Allow</b>. Cofre then tests JIT for you.</li>
+          <li>Open Cofre and tap <b>Set up</b>. Your key is already inside, so it skips ahead to the VPN.</li>
+          <li>Tap <b>Allow VPN</b>. When iOS asks, tap <b>Allow</b> and enter your passcode. Cofre tests JIT by itself and moves on.</li>
           <li>Tap <b>Sign in with Microsoft</b>, then <b>Play</b>.</li>
         </ol>
         <p class="fine">From then on, just tap Play. JIT and the VPN turn on by themselves.</p>
@@ -283,7 +286,7 @@
     <li class="block row"><svg aria-hidden="true" class="ico ico-l"><use href="#i-phone"/></svg><div><h3>iPhone or iPad</h3><p><b>iOS 26.</b> Tested on iPhone 17 Pro with iOS 26. Other iPhones and iPads on iOS 26 should work but aren't tested yet. Wait for our OK before big iOS updates.</p></div></li>
     <li class="block row"><svg aria-hidden="true" class="ico ico-l"><use href="#i-key"/></svg><div><h3>Minecraft: Java Edition</h3><p>A Microsoft account that owns Java Edition. Minecraft bought on a phone or console doesn't include it.</p></div></li>
     <li class="block row"><svg aria-hidden="true" class="ico ico-l"><use href="#i-mac"/></svg><div><h3>A Mac, just once</h3><p>For Step 3: about 2 minutes, plus a cable for your iPhone. A friend's Mac works too. <span class="badge soon">Windows &amp; Linux: coming soon</span></p></div></li>
-    <li class="block row"><svg aria-hidden="true" class="ico ico-l"><use href="#i-storage"/></svg><div><h3>Free space and Wi-Fi</h3><p>Keep <b>about 8 GB</b> free. Cofre is about 760 MB. Each modpack takes 1–6 GB. Wi-Fi is needed to turn on JIT.</p></div></li>
+    <li class="block row"><svg aria-hidden="true" class="ico ico-l"><use href="#i-storage"/></svg><div><h3>Free space and Wi-Fi</h3><p>Keep <b>about 8 GB</b> free. Cofre is about 760 MB. Each modpack takes 1–6 GB. Turning on JIT needs Wi-Fi, or Airplane Mode for a moment.</p></div></li>
   </ul>
 </section>
 
@@ -302,7 +305,7 @@
     <div class="block card">
       <h3 class="tone-warn"><svg aria-hidden="true" class="ico"><use href="#i-cross"/></svg>Limits</h3>
       <ul class="ticks">
-        <li><b>Memory.</b> Phones have less RAM than PCs. Cofre picks a safe amount for you. On 6 GB iPhones keep packs to about 150 mods, and lower the resolution if it closes.</li>
+        <li><b>Memory.</b> Phones have less RAM than PCs. Cofre picks a safe amount automatically. If a pack closes while loading, lower Memory or Resolution in <b>Settings → Game</b>.</li>
         <li><b>PC-only mods.</b> Mods with desktop native code don't work, such as Simple Voice Chat, Plasmo Voice and Sound Physics Remastered.</li>
         <li><b>iOS updates</b> can break JIT. Turn off automatic updates and wait for our OK.</li>
       </ul>
@@ -319,7 +322,7 @@
       <div class="more-body">
         <ol>
           <li>Check <b>Developer Mode</b> is on (<a href="#step-2">Step 2</a>).</li>
-          <li>Use Wi-Fi, and turn off any other VPN (work, ad blocker). iOS runs one VPN at a time.</li>
+          <li>Use Wi-Fi, or turn on Airplane Mode for a moment. Turn off any other VPN (work, ad blocker): iOS runs one VPN at a time.</li>
           <li>Right after a restart, JIT needs internet once to set up.</li>
           <li>Close Cofre fully and open it again. Then try <b>Settings → JIT &amp; Java → Test JIT</b>.</li>
           <li>Still failing? Your pairing key may be stale. See the next answer.</li>
@@ -349,6 +352,7 @@
       <summary>Can I share my pairing file?</summary>
       <div class="more-body">
         <p><b>No. Never paste or upload it to any chat, website or person, not even ChatGPT or Claude.</b> It's a key to your iPhone: anyone who has it can control your phone like a trusted computer. It also only works for the iPhone it was made for. Everyone runs <a href="#step-3">Step 3</a> for their own phone.</p>
+        <p>Used AirDrop? Delete the file from <b>Files → Downloads</b> once Cofre says Key found, and any copy you saved on a Mac.</p>
       </div>
     </details>
     <details class="block">
@@ -360,7 +364,7 @@
     <details class="block">
       <summary>Does it work on cellular data?</summary>
       <div class="more-body">
-        <p>Turning on JIT needs Wi-Fi. With no Wi-Fi around, you can still play single-player: start Cofre, then turn on Airplane Mode.</p>
+        <p>Turning on JIT needs Wi-Fi or Airplane Mode. No Wi-Fi? Open Cofre, turn on Airplane Mode, tap <b>Play</b>, then turn Airplane Mode off once the game is loading.</p>
       </div>
     </details>
     <details class="block">
@@ -376,7 +380,7 @@
   <p class="label">Privacy &amp; safety</p>
   <h2 id="privacy-title">Your key stays with you</h2>
   <ul class="rows">
-    <li class="block row"><svg aria-hidden="true" class="ico ico-l"><use href="#i-key"/></svg><div><h3>Your pairing key never leaves your devices</h3><p>It goes from the Mac straight into Cofre over the cable. Cofre keeps it on the phone. It's never uploaded or logged.</p></div></li>
+    <li class="block row"><svg aria-hidden="true" class="ico ico-l"><use href="#i-key"/></svg><div><h3>Your pairing key is never uploaded</h3><p>It goes from the Mac straight into Cofre over the cable. Cofre keeps it on the phone and never logs it. Nothing stays on the Mac unless you save a copy.</p></div></li>
     <li class="block row"><svg aria-hidden="true" class="ico ico-l"><use href="#i-shield"/></svg><div><h3>The helper deletes itself</h3><p>It runs from a temporary folder and is gone when it says Done. Nothing installed, no password, no account.</p></div></li>
     <li class="block row"><svg aria-hidden="true" class="ico ico-l"><use href="#i-wifi"/></svg><div><h3>Local VPN, Microsoft sign-in</h3><p>The VPN never leaves your phone. You sign in on Microsoft's own page.</p></div></li>
     <li class="block row"><svg aria-hidden="true" class="ico ico-l"><use href="#i-book"/></svg><div><h3>Open source</h3><p>Cofre is GPL-3.0. Read every line, or build it yourself.</p></div></li>

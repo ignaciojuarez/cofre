@@ -3,7 +3,7 @@
 **Once, about 2 minutes.** Cofre needs a pairing key so it can turn on JIT by itself. One command on a Mac puts the key straight into Cofre over the cable.
 
 > [!CAUTION]
-> **Never paste or upload your pairing file to any chat, website or person.** Not even ChatGPT or Claude. It's a key to your phone: anyone who has it can control your iPhone like a trusted computer.
+> **Never share this file. It's a key to your iPhone.** Don't paste or upload your pairing file to any chat, website or person, not even ChatGPT or Claude: anyone who has it can control your iPhone like a trusted computer.
 
 ## Steps
 
@@ -18,14 +18,18 @@
 4. **A Cofre window opens and guides you.** Unlock your iPhone, tap **Trust**, enter your passcode, then wait for **Done**.
 5. **Open Cofre on your iPhone.** It's ready.
 
-No Mac? Borrow a friend's for 2 minutes. Nothing stays on their Mac.
+No Mac? Borrow a friend's for 2 minutes. Nothing stays on their Mac unless you save a copy.
 
 ### If the window shows "Send with AirDrop"
 
 Sometimes the key can't go in over the cable. Then:
 
-1. Click **Send with AirDrop** and pick your iPhone. On the iPhone, tap **Accept**. It's saved in **Files → Downloads**.
-2. Open Cofre, tap **I have a file** → **Downloads** → the file named after your iPhone (it ends in `.mobiledevicepairing`).
+1. Click **Send with AirDrop** and pick your iPhone. Not listed? On the iPhone, open Control Center, touch and hold the top-left group, tap **AirDrop → Everyone for 10 Minutes**.
+2. On the iPhone, tap **Accept**. On iOS 26.2 or later it may ask for an **AirDrop code**: tap **Get AirDrop Code** and type the code on the Mac. (Same Apple Account on both? It's accepted by itself.)
+3. On the iPhone, open **Files → Downloads**, tap the file named after your iPhone (it ends in `.mobiledevicepairing`), then **Share → Cofre**. Or in Cofre: **I have a file → Downloads →** that file.
+4. When Cofre says **Key found**, delete the file from Downloads.
+
+The window also has **Save a copy (delete it after sending)**, as a last resort. If you use it, AirDrop the copy from the Desktop, then move it to the Trash. Sources: Apple's [AirDrop guide](https://support.apple.com/guide/iphone/use-airdrop-to-send-items-to-nearby-devices-iphcd8b9f0af/ios).
 
 ## What the command does, in plain words
 
@@ -40,7 +44,7 @@ Sometimes the key can't go in over the cable. Then:
 | | |
 |---|---|
 | **Nothing uploaded** | The key goes from the Mac to your iPhone over the cable. It's never sent to us or anyone else. |
-| **Nothing installed** | The helper runs from a temporary folder and deletes itself. No app stays on the Mac. |
+| **Nothing installed** | The helper runs from a temporary folder and deletes itself. No app stays on the Mac, and no key either, unless you click **Save a copy**. |
 | **No password** | It never asks for your Mac password, your Apple ID or `sudo`. If something asks, stop. |
 | **No secrets printed** | Terminal and the window show progress only, never the key. |
 | **You can read it first** | Run the command without the final `\| sh` to see the script before running it: `curl -fsSL https://github.com/ignaciojuarez/cofre/releases/latest/download/pair.sh` |
@@ -54,10 +58,11 @@ Cofre keeps the key on your iPhone. It's never uploaded or logged.
 |---|---|
 | Nothing happens, or "No iPhone found" | Use a cable that carries data, not just charging. Unlock the iPhone. Try another port. If the Mac asks **Allow accessory to connect?**, click **Allow**. |
 | No **Trust** prompt on the iPhone | Unplug, unlock the iPhone, plug in again. |
-| You tapped **Don't Trust** | On the iPhone: **Settings → General → Transfer or Reset iPhone → Reset → Reset Location & Privacy**. Then plug in and run the command again. |
+| You tapped **Don't Trust** | Unplug your iPhone, unlock it, and plug it back in. The Trust alert comes back; tap **Trust**. Still no alert? Then: **Settings → General → Transfer or Reset iPhone → Reset → Reset Location & Privacy** (this also resets app location permissions), and run the command again. Source: Apple [109054](https://support.apple.com/en-us/109054). |
 | "Install Cofre first" | Finish [Step 1](README.md), then run the command again. |
 | macOS says the helper can't be opened or checked | Stop. Don't change security settings to get around it. Ask us. |
 | **Send with AirDrop** | Follow [the fallback above](#if-the-window-shows-send-with-airdrop). |
+| JIT won't turn on after the key is in | Use Wi-Fi, or turn on Airplane Mode for a moment. Turn off other VPNs. Then **Settings → JIT & Java → Test JIT** in Cofre. |
 | It worked before, but JIT stopped after an iOS update or a reset | Run the command again. A new key replaces the old one. |
 | Cofre still says **Waiting for your key…** | Keep Cofre open and the iPhone unlocked. If the window said Done, close Cofre fully and open it again. |
 
