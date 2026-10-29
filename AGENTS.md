@@ -59,3 +59,4 @@ Machine-local settings (JDK, signing identity, relay) live in the gitignored `sc
 
 ## Update upstream
 Follow `UPDATING.md`. Stop and ask a human if a LICENSE changes, a patch would exceed the budget, or a conflict touches the JIT protocol, entitlements or sign-in.
+- Weekly upstream check: run `scripts/upstream-report.sh` and review `artifacts/upstream-report.md`.

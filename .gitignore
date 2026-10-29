@@ -13,3 +13,4 @@ artifacts/Development.entitlements
 .build/
 app/*/build/
 app/CofreKit/*/build/
+artifacts/upstream-report.md
