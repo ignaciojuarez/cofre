@@ -173,11 +173,8 @@
             throw unavailable("world backup")
         }
         public func addServer(instanceID: String, name: String, address: String) async throws -> ServerSummary {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                air.addServer(address, name: name, forProfile: instanceID) { error in
-                    if let error { continuation.resume(throwing: error) } else { continuation.resume() }
-                }
-            }
+            guard let dir = air.gameDirectory(forProfile: instanceID) else { throw CofreBackendError.unavailable("game directory") }
+            try await CofreServersStore(gameDirectory: dir).add(CofreServerRecord(name: name, ip: address))
             return ServerSummary(id: address, name: name, address: address)
         }
         public func preferences(instanceID: String?) async throws -> GamePreferences {

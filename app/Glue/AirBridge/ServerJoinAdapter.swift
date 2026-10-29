@@ -206,7 +206,7 @@ extension MrpackIndex {
                 NSLog("[Cofre] server join instance=%@ version=%@ args=%@", request.id, version,
                       MinecraftLaunchArguments.server(address, gameVersion: version).joined(separator: " "))
             }
-            Task { try? await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in air.addServer(request.server, name: request.server, forProfile: request.id) { e in if let e { c.resume(throwing: e) } else { c.resume() } } } }
+            Task { try? await addServer(instanceID: request.id, name: request.server, address: request.server) }
             _ = launch(instanceID: request.id, accountID: nil)
         }
     }
