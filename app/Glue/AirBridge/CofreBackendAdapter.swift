@@ -118,7 +118,7 @@ public final class CofreBackendAdapter: NSObject, CofreBackend {
     public func importPack(_ url: URL, instanceID: String?) -> AsyncThrowingStream<InstallProgress, Error> { unavailableStream("pack import") }
     public func testJIT() -> AsyncThrowingStream<JITStep, Error> {
         AsyncThrowingStream { continuation in
-            Task { let pid = Int32(getpid()); let service = CofreJIT(tunnel: { nil }, pairingURL: { self.pairingURL }); let result = await service.enable(pid: pid); NSLog("[Cofre] JIT status=%@", String(describing: result)); continuation.yield(JITStep(kind: .debugger, state: result.isEnabled ? .ready : .failed, detail: String(describing: result))); continuation.finish() }
+            Task { let result = await CofreJIT.enable(pid: Int32(getpid()), pairingURL: { self.pairingURL }); NSLog("[Cofre] JIT status=%@", String(describing: result)); continuation.yield(JITStep(kind: .debugger, state: result.isEnabled ? .ready : .failed, detail: String(describing: result))); continuation.finish() }
         }
     }
     public func deviceInfo() async -> DeviceInfo? { nil }

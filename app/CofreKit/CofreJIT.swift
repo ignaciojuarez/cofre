@@ -9,6 +9,16 @@ public final class CofreJIT: @unchecked Sendable {
     private let tunnel: () -> NETunnelProviderSession?
     private let pairingURL: () -> URL
     public init(tunnel: @escaping () -> NETunnelProviderSession?, pairingURL: @escaping () -> URL) { self.tunnel=tunnel; self.pairingURL=pairingURL }
+    public static func enable(pid: Int32, pairingURL: @escaping () -> URL) async -> CofreJITStatus {
+        let manager: NETunnelProviderManager? = await withCheckedContinuation { continuation in
+            NETunnelProviderManager.loadAllFromPreferences { managers, _ in
+                continuation.resume(returning: managers?.first { ($0.protocolConfiguration as? NETunnelProviderProtocol)?.providerBundleIdentifier == "com.ignaciojuarez.cofre.tunnel" })
+            }
+        }
+        guard let manager, let session = manager.connection as? NETunnelProviderSession else { return .needsVPN }
+        if manager.connection.status != .connected { try? session.startVPNTunnel() }
+        return await CofreJIT(tunnel: { session }, pairingURL: pairingURL).enable(pid: pid)
+    }
     public func enable(pid: Int32) async -> CofreJITStatus {
         guard FileManager.default.fileExists(atPath: pairingURL().path) else { status = .needsPairing; return status }
         guard let session = tunnel() else { status = .needsVPN; return status }
