@@ -182,9 +182,11 @@
         public var updateTo: String?
         /// e.g. "Fabric API missing".
         public var issue: String?
+        /// The Modrinth or CurseForge project this file came from, when known. Search rows match on it.
+        public var projectID: String?
         public init(
             id: String, name: String, version: String, enabled: Bool, kind: ContentKind = .mods,
-            updateTo: String? = nil, issue: String? = nil
+            updateTo: String? = nil, issue: String? = nil, projectID: String? = nil
         ) {
             self.id = id
             self.name = name
@@ -193,7 +195,15 @@
             self.kind = kind
             self.updateTo = updateTo
             self.issue = issue
+            self.projectID = projectID
         }
+
+        /// The same project as a search row: its project ID, else the same name (files Cofre couldn't identify, or
+        /// installed from the other site).
+        public func matches(_ projectID: String, title: String? = nil) -> Bool {
+            self.projectID == projectID || id == projectID || title.map { Self.key(name) == Self.key($0) } == true
+        }
+        static func key(_ s: String) -> String { s.lowercased().filter { $0.isLetter || $0.isNumber } }
     }
 
     public struct Account: Identifiable, Hashable, Sendable {
@@ -362,6 +372,64 @@
             self.required = required
             self.installed = installed
         }
+    }
+
+    /// One file an install adds, or turns back on (GAP-05).
+    public struct PlannedMod: Identifiable, Hashable, Sendable {
+        /// The project ID.
+        public let id: String
+        public var name: String, versionID: String, version: String
+        public var sizeBytes: Int64?
+        /// Already in the instance but off: the install turns it back on instead of downloading it.
+        public var turnsOn: Bool
+        public init(
+            id: String, name: String, versionID: String, version: String = "", sizeBytes: Int64? = nil,
+            turnsOn: Bool = false
+        ) {
+            self.id = id
+            self.name = name
+            self.versionID = versionID
+            self.version = version
+            self.sizeBytes = sizeBytes
+            self.turnsOn = turnsOn
+        }
+    }
+
+    /// What Get will do, worked out before anything downloads. Required dependencies come along; optional ones are
+    /// offered; ones already on are left out. `blocked` explains why nothing can install.
+    public struct ModInstallPlan: Hashable, Sendable {
+        public var target: PlannedMod
+        public var kind: ContentKind
+        public var required: [PlannedMod]
+        public var optional: [PlannedMod]
+        /// Dependencies already on, by name ("Already have Sodium").
+        public var present: [String]
+        public var blocked: String?
+        public init(
+            target: PlannedMod, kind: ContentKind = .mods, required: [PlannedMod] = [], optional: [PlannedMod] = [],
+            present: [String] = [], blocked: String? = nil
+        ) {
+            self.target = target
+            self.kind = kind
+            self.required = required
+            self.optional = optional
+            self.present = present
+            self.blocked = blocked
+        }
+        /// A modpack becomes its own instance instead of going into the target.
+        public var makesInstance: Bool { kind == .modpacks }
+        /// Asks first only when Get would do more than install the one thing the user tapped.
+        public var needsConfirmation: Bool { !required.isEmpty || !optional.isEmpty || makesInstance }
+        /// Everything that installs, with the optional ones picked.
+        public func files(picking optionalIDs: Set<String> = []) -> [PlannedMod] {
+            [target] + required + optional.filter { optionalIDs.contains($0.id) }
+        }
+    }
+
+    /// A search row's state in the Mods target.
+    public enum ProjectInstallState: Equatable, Sendable {
+        case notInstalled, installed, off
+        case update(String)
     }
 
     public struct InstallProgress: Equatable, Sendable {

@@ -45,6 +45,34 @@
         func search(_ query: ProjectQuery) async throws -> [ProjectSummary]
         func versions(projectID: String, instanceID: String) async throws -> [ProjectVersion]
         func dependencies(versionID: String, instanceID: String) async throws -> [ProjectDependency]
+        /// What Get installs for `projectID` of `kind`: required dependencies, optional ones, or why it can't
+        /// (`ModResolver` does the work). `versionID == nil` picks the newest fitting version.
+        func installPlan(projectID: String, versionID: String?, kind: ContentKind, instanceID: String) async throws
+            -> ModInstallPlan
+    }
+
+    extension ProjectCatalog {
+        /// Default for backends without a resolver: the picked version alone, with the dependencies it reports.
+        public func installPlan(projectID: String, versionID: String?, kind: ContentKind, instanceID: String)
+            async throws -> ModInstallPlan
+        {
+            let all = try await versions(projectID: projectID, instanceID: instanceID)
+            guard let v = all.first(where: { $0.id == versionID }) ?? all.first(where: \.fits) else {
+                return ModInstallPlan(
+                    target: PlannedMod(id: projectID, name: projectID, versionID: ""), kind: kind,
+                    blocked: String(localized: "No version fits this instance."))
+            }
+            let deps = kind == .mods ? try await dependencies(versionID: v.id, instanceID: instanceID) : []
+            return ModInstallPlan(
+                target: PlannedMod(id: projectID, name: projectID, versionID: v.id, version: v.name), kind: kind,
+                required: deps.filter { $0.required && !$0.installed }.map {
+                    PlannedMod(id: $0.id, name: $0.name, versionID: "")
+                },
+                optional: deps.filter { !$0.required && !$0.installed }.map {
+                    PlannedMod(id: $0.id, name: $0.name, versionID: "")
+                },
+                present: deps.filter(\.installed).map(\.name))
+        }
     }
 
     // MARK: GAP-06 · Install and import progress (M02, M03)
@@ -55,6 +83,19 @@
         >
         /// `instanceID == nil` imports the pack as a new instance.
         func importPack(_ url: URL, instanceID: String?) -> AsyncThrowingStream<InstallProgress, Error>
+        /// Installs every file of `plan.files(picking:)` or none: downloads all, then moves them in together. One
+        /// `stages` entry per file. A modpack becomes a new instance.
+        func install(_ plan: ModInstallPlan, picking optionalIDs: Set<String>, instanceID: String)
+            -> AsyncThrowingStream<InstallProgress, Error>
+    }
+
+    extension InstallProgressSource {
+        /// Default: the target alone, which resolves its own dependencies.
+        public func install(_ plan: ModInstallPlan, picking optionalIDs: Set<String>, instanceID: String)
+            -> AsyncThrowingStream<InstallProgress, Error>
+        {
+            install(projectID: plan.target.id, versionID: plan.target.versionID, instanceID: instanceID)
+        }
     }
 
     // MARK: GAP-07 · JIT test steps (S06, X04)

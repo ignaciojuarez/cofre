@@ -13,6 +13,8 @@ import UIKit
 //   -instance vanilla   Active instance (mock IDs: survival create cobblemon skyblock vanilla)
 //   -instances a,b      Keep only these mock instances
 //   -plan YES           Open New instance pre-filled from Mods ("Make a mods instance", "New mods instance")
+//   -get culling        Tap Get on that mock mod (-screen mods). With -getConfirm YES, also tap Install;
+//                       -getFail fabric-api fails that download; -getSlow YES holds each download for a while
 //   -type xl|ax3        Dynamic Type override
 //   -appearance light   Light theme
 //   -canvas 1376x1032   Lay the UI out at this point size (scaled to fit) and write a full-size PNG
@@ -82,6 +84,17 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
                 while !store.libraryLoaded { try? await Task.sleep(for: .milliseconds(100)) }
                 store.newInstancePlan = store.planNewInstance()
                 nav.sheet = .newInstance
+            }
+        }
+        if let id = args.string(forKey: "get"), let mock = services.backend as? MockBackend {
+            mock.failDownload = args.string(forKey: "getFail")
+            mock.stepDelay = args.bool(forKey: "getSlow") ? 30 : 0
+            Task { @MainActor in
+                while store.results.isEmpty { try? await Task.sleep(for: .milliseconds(100)) }
+                store.get(id)
+                guard args.bool(forKey: "getConfirm") else { return }
+                while store.modInstalls[id]?.phase != .confirm { try? await Task.sleep(for: .milliseconds(100)) }
+                store.confirmInstall(id)
             }
         }
         let setupStep = args.object(forKey: "setupStep") != nil ? args.integer(forKey: "setupStep") : nil

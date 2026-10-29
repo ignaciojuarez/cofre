@@ -20,6 +20,19 @@
         public var offline = false
         /// Makes `versions` throw, for M02's Try again state.
         public var failVersions = false
+        /// The project ID whose download fails mid-install, for M05's failed state. Nothing installs.
+        public var failDownload: String?
+        /// Shaders and resource packs in the target (mods are `mods`).
+        public var content: [ContentKind: [InstalledItem]] = [
+            .shaders: [
+                InstalledItem(id: "bsl", name: "BSL Shaders", version: "8.2.09", enabled: true, kind: .shaders),
+                InstalledItem(
+                    id: "complementary", name: "Complementary", version: "r5.2", enabled: false, kind: .shaders),
+            ],
+            .resourcePacks: [
+                InstalledItem(id: "faithful", name: "Faithful 32x", version: "1.21", enabled: true, kind: .resourcePacks)
+            ],
+        ]
         private var worldList: [String: [WorldSummary]] = [:]
         private var extraServers: [ServerSummary] = []
         private var cfKey: String? = "cf_live_••••3f9a"
@@ -66,6 +79,7 @@
                     id: "glass", name: "Better Glass", version: "1.4", enabled: true, issue: "Fabric API missing"),
                 InstalledItem(id: "lithium", name: "Lithium", version: "0.14.3", enabled: true, updateTo: "0.14.4"),
                 InstalledItem(id: "modmenu", name: "Mod Menu", version: "11.0.3", enabled: true),
+                InstalledItem(id: "cloth-config", name: "Cloth Config", version: "15.0.140", enabled: false),
             ]
             prefs.ramMB = 6144
             prefs.resolution = 0.7
@@ -142,27 +156,17 @@
 
         // MARK: ContentService
         public func installed(_ kind: ContentKind, instanceID: String) async throws -> [InstalledItem] {
-            switch kind {
-            case .mods: return mods
-            case .shaders:
-                return [
-                    InstalledItem(id: "bsl", name: "BSL Shaders", version: "8.2.09", enabled: true, kind: .shaders),
-                    InstalledItem(
-                        id: "complementary", name: "Complementary", version: "r5.2", enabled: false, kind: .shaders),
-                ]
-            case .resourcePacks:
-                return [
-                    InstalledItem(
-                        id: "faithful", name: "Faithful 32x", version: "1.21", enabled: true, kind: .resourcePacks)
-                ]
-            case .dataPacks, .modpacks: return []
-            }
+            kind == .mods ? mods : content[kind] ?? []
         }
         public func setEnabled(_ enabled: Bool, item: InstalledItem, instanceID: String) async throws {
             if let i = mods.firstIndex(where: { $0.id == item.id }) { mods[i].enabled = enabled }
+            if let i = content[item.kind]?.firstIndex(where: { $0.id == item.id }) {
+                content[item.kind]?[i].enabled = enabled
+            }
         }
         public func delete(_ item: InstalledItem, instanceID: String) async throws {
             mods.removeAll { $0.id == item.id }
+            content[item.kind]?.removeAll { $0.id == item.id }
         }
         public func updateAll(instanceID: String) async throws {
             await pause(2)
@@ -320,6 +324,8 @@
                 p("fabric-api", "Fabric API", "modmuss50", "Core library", "gold", 140_000_000, installed: true),
                 p("continuity", "Continuity", "PepperCode1", "Connected textures", "diamond", 9_000_000),
                 p("appleskin", "AppleSkin", "squeek502", "Food and saturation", "redstone", 33_000_000),
+                p("sodium-extra", "Sodium Extra", "FlashyReese", "More video settings", "diamond", 25_000_000),
+                p("canvas", "Canvas", "Grondag", "Shader-based renderer", "lapis", 1_900_000),
             ]
         }()
         public func search(_ query: ProjectQuery) async throws -> [ProjectSummary] {
@@ -355,7 +361,79 @@
             ]
         }
         public func dependencies(versionID: String, instanceID: String) async throws -> [ProjectDependency] {
-            versionID.hasPrefix("iris") ? [ProjectDependency(id: "sodium", name: "Sodium", installed: true)] : []
+            let projectID = String(versionID[..<(versionID.lastIndex(of: "-") ?? versionID.endIndex)])
+            let deps = Self.candidates(projectID).first { $0.versionID == versionID }?.dependencies ?? []
+            return deps.compactMap { d in
+                guard d.relation != .incompatible else { return nil }
+                let have = mods.first { $0.matches(d.projectID) }
+                return ProjectDependency(
+                    id: d.projectID, name: Self.title(d.projectID), required: d.relation == .required,
+                    installed: have?.enabled == true)
+            }
+        }
+
+        public func installPlan(projectID: String, versionID: String?, kind: ContentKind, instanceID: String)
+            async throws -> ModInstallPlan
+        {
+            if offline { throw URLError(.notConnectedToInternet) }
+            guard let inst = instanceList.first(where: { $0.id == instanceID }) else {
+                throw URLError(.fileDoesNotExist)
+            }
+            let resolver = ModResolver(
+                game: inst.gameVersion, loader: inst.loader, kind: kind, installed: try await installed(kind, instanceID: instanceID),
+                versions: { Self.candidates($0, kind: kind) })
+            return try await resolver.plan(projectID: projectID, versionID: versionID)
+        }
+
+        /// Sample dependency graph. On Survival+ (Fabric 1.21.1): Iris needs Sodium (already on), so Get just
+        /// installs; Entity Culling adds Fabric API and turns Cloth Config back on; Sodium Extra offers Reese's
+        /// Sodium Options; Continuity needs Indium, which has no 1.21.1 build; Canvas can't run with Sodium.
+        static let graph: [String: [ModCandidate.Dependency]] = [
+            "iris": [.init(projectID: "sodium", relation: .required)],
+            "culling": [
+                .init(projectID: "fabric-api", relation: .required),
+                .init(projectID: "cloth-config", relation: .required),
+                .init(projectID: "modmenu", relation: .optional),
+            ],
+            "sodium-extra": [
+                .init(projectID: "sodium", relation: .required),
+                .init(projectID: "fabric-api", relation: .required),
+                .init(projectID: "reeses", relation: .optional),
+            ],
+            "continuity": [
+                .init(projectID: "fabric-api", relation: .required),
+                .init(projectID: "indium", relation: .required),
+            ],
+            "canvas": [.init(projectID: "sodium", relation: .incompatible)],
+            "cloth-config": [.init(projectID: "fabric-api", relation: .required)],
+            "create": [.init(projectID: "flywheel", relation: .required)],
+        ]
+        static let extraTitles = [
+            "cloth-config": "Cloth Config", "reeses": "Reese's Sodium Options", "indium": "Indium",
+            "sodium-extra": "Sodium Extra", "canvas": "Canvas", "flywheel": "Flywheel",
+        ]
+        static let sizes: [String: Int64] = [
+            "fabric-api": 2_412_000, "cloth-config": 1_051_000, "culling": 386_000, "sodium-extra": 512_000,
+            "reeses": 241_000, "iris": 2_830_000, "create": 15_900_000, "flywheel": 1_230_000,
+        ]
+        static func title(_ id: String) -> String {
+            projects.first { $0.id == id }?.title ?? extraTitles[id] ?? id
+        }
+
+        /// Versions newest first, with the same IDs as `versions(projectID:instanceID:)`.
+        static func candidates(_ id: String, kind: ContentKind = .mods) -> [ModCandidate] {
+            let loaders =
+                kind != .mods ? [] : projects.first { $0.id == id }?.loaders.map(\.rawValue)
+                ?? (id == "flywheel" ? ["forge", "neoforge"] : ["fabric", "quilt"])
+            let builds: [(String, String, String)] = [
+                ("188", "1.8.8", "1.21.1"), ("187", "1.8.7", "1.21.1"), ("181", "1.8.1", "1.21"),
+                ("174", "1.7.4", "1.20.4"), ("162", "1.6.2", "1.20.1"),
+            ]
+            return builds.filter { id != "indium" || $0.2 < "1.21" }.map { b in
+                ModCandidate(
+                    projectID: id, versionID: "\(id)-\(b.0)", title: title(id), version: b.1, gameVersions: [b.2],
+                    loaders: loaders, sizeBytes: sizes[id] ?? 1_180_000, dependencies: graph[id] ?? [])
+            }
         }
 
         // MARK: GAP-06 InstallProgressSource
@@ -375,6 +453,57 @@
                 }
             }
         }
+        public struct DownloadFailed: LocalizedError {
+            public let name: String
+            public var errorDescription: String? { "\(name) didn't download: the connection dropped." }
+        }
+
+        public func install(_ plan: ModInstallPlan, picking optionalIDs: Set<String>, instanceID: String)
+            -> AsyncThrowingStream<InstallProgress, Error>
+        {
+            AsyncThrowingStream { c in
+                Task {
+                    let files = plan.files(picking: optionalIDs)
+                    var stages = files.map { InstallProgress.Stage(title: $0.name, state: .unknown) }
+                    func send(_ f: Double) { c.yield(InstallProgress(title: plan.target.name, fraction: f, stages: stages)) }
+                    // Download everything first; nothing lands until all of it has.
+                    for (i, f) in files.enumerated() {
+                        stages[i].state = .checking
+                        stages[i].detail = f.turnsOn ? String(localized: "Turning on") : Fmt.fileSize(f.sizeBytes)
+                        send(Double(i) / Double(files.count))
+                        await pause(0.6)
+                        if f.id == failDownload {
+                            c.finish(throwing: DownloadFailed(name: f.name))
+                            return
+                        }
+                        stages[i].state = .ready
+                    }
+                    if plan.makesInstance {
+                        instanceList.append(
+                            InstanceSummary(
+                                id: plan.target.id, name: plan.target.name, loader: .fabric, gameVersion: "1.21.1",
+                                icon: .init(glyph: .chest)))
+                    } else {
+                        for f in files {
+                            var list = plan.kind == .mods ? mods : content[plan.kind] ?? []
+                            list.removeAll { $0.matches(f.id) && !f.turnsOn }
+                            if let i = list.firstIndex(where: { $0.matches(f.id) }) {
+                                list[i].enabled = true
+                            } else {
+                                list.append(
+                                    InstalledItem(
+                                        id: f.id, name: f.name, version: f.version, enabled: true, kind: plan.kind,
+                                        projectID: f.id))
+                            }
+                            if plan.kind == .mods { mods = list } else { content[plan.kind] = list }
+                        }
+                    }
+                    send(1)
+                    c.finish()
+                }
+            }
+        }
+
         public func importPack(_ url: URL, instanceID: String?) -> AsyncThrowingStream<InstallProgress, Error> {
             AsyncThrowingStream { c in
                 Task {

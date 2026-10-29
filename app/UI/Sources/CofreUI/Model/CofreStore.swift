@@ -44,7 +44,12 @@
         public var versionsError: [String: String] = [:]
         public var dependencies: [String: [ProjectDependency]] = [:]
         public var installed: [ContentKind: [InstalledItem]] = [:]
-        public var installing: Set<String> = []
+        /// Gets in flight or waiting to be read, by project ID (planning, confirming, installing, done, failed).
+        public var modInstalls: [String: ModInstall] = [:]
+        /// The Get sheet: which `modInstalls` entry it shows.
+        public var modInstallSheet: String?
+        /// Installs run one at a time, so two Gets never write the same dependency twice.
+        @ObservationIgnored private var installChain: Task<Void, Never>?
         public var importProgress: InstallProgress?
         /// Saved: the last modded instance picked (in Mods, Play or Instances), so Mods keeps it while Play is on
         /// Vanilla.
@@ -388,7 +393,15 @@
             searching = true
             defer { searching = false }
             do {
-                results = try await backend.search(query)
+                // The target's own list too, so rows show ✓ for what it already has (after a switch, too).
+                let q = query
+                async let found = backend.search(q)
+                if let inst = q.instanceID, q.kind != .modpacks,
+                    let have = try? await backend.installed(q.kind, instanceID: inst), q == query
+                {
+                    installed[q.kind] = have
+                }
+                results = try await found
                 searchError = nil
             } catch is CancellationError {} catch {
                 results = []
@@ -413,18 +426,124 @@
             }
         }
 
-        public func install(projectID: String, versionID: String? = nil) {
+        /// Get: works out what installs, asks only when that's more than the project itself, then installs. Blocked
+        /// or failed Gets open the sheet with the reason.
+        public func get(_ projectID: String, versionID: String? = nil) {
             guard let inst = modsInstance?.id else { return }
-            let version = versionID ?? versions[projectID]?.first(where: \.fits)?.id ?? "latest"
-            installing.insert(projectID)
-            Task {
-                defer { installing.remove(projectID) }
-                do {
-                    for try await _ in backend.install(projectID: projectID, versionID: version, instanceID: inst) {}
-                    if let i = results.firstIndex(where: { $0.id == projectID }) { results[i].installed = true }
-                    installed[.mods] = try await backend.installed(.mods, instanceID: inst)
-                } catch { lastError = error.localizedDescription }
+            if let busy = modInstalls[projectID], !busy.isFinished {
+                if busy.phase != .planning { modInstallSheet = projectID }
+                return
             }
+            let kind = query.kind
+            let title = results.first { $0.id == projectID }?.title ?? projectID
+            modInstalls[projectID] = ModInstall(id: projectID, title: title, instanceID: inst)
+            Task {
+                do {
+                    var plan = try await backend.installPlan(
+                        projectID: projectID, versionID: versionID, kind: kind, instanceID: inst)
+                    if plan.target.name == plan.target.id { plan.target.name = title }
+                    modInstalls[projectID]?.plan = plan
+                    if let reason = plan.blocked {
+                        fail(projectID, reason, retry: false)
+                    } else if plan.needsConfirmation {
+                        modInstalls[projectID]?.phase = .confirm
+                        modInstallSheet = projectID
+                    } else {
+                        confirmInstall(projectID)
+                    }
+                } catch is CancellationError {
+                    modInstalls[projectID] = nil
+                } catch {
+                    fail(projectID, Self.installMessage(error), retry: true)
+                }
+            }
+        }
+
+        /// Kept for callers from before plans: same as Get.
+        public func install(projectID: String, versionID: String? = nil) { get(projectID, versionID: versionID) }
+
+        /// The sheet's Install. Queues behind any install already running.
+        public func confirmInstall(_ projectID: String) {
+            guard var job = modInstalls[projectID], let plan = job.plan else { return }
+            job.phase = .queued
+            job.progress = InstallProgress(
+                title: plan.target.name, fraction: 0,
+                stages: plan.files(picking: job.picked).map { .init(title: $0.name, state: .unknown) })
+            modInstalls[projectID] = job
+            let previous = installChain
+            installChain = Task {
+                await previous?.value
+                await runInstall(projectID)
+            }
+        }
+
+        private func runInstall(_ projectID: String) async {
+            guard var job = modInstalls[projectID], let plan = job.plan else { return }
+            job.phase = .installing
+            modInstalls[projectID] = job
+            do {
+                for try await p in backend.install(plan, picking: job.picked, instanceID: job.instanceID) {
+                    modInstalls[projectID]?.progress = p
+                }
+                modInstalls[projectID]?.phase = .done
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                if plan.makesInstance {
+                    instances = (try? await backend.instances()) ?? instances
+                } else if job.instanceID == modsInstance?.id {
+                    installed[plan.kind] = try? await backend.installed(plan.kind, instanceID: job.instanceID)
+                }
+                // Nobody's looking: a quiet success needs no sheet.
+                if modInstallSheet != projectID { modInstalls[projectID] = nil }
+            } catch {
+                // Mark the file that was going; the others never landed.
+                if var stages = modInstalls[projectID]?.progress?.stages,
+                    let i = stages.firstIndex(where: { $0.state == .checking })
+                {
+                    stages[i].state = .failed(Self.installMessage(error))
+                    modInstalls[projectID]?.progress?.stages = stages
+                }
+                fail(projectID, Self.installMessage(error), retry: true)
+            }
+        }
+
+        private func fail(_ projectID: String, _ reason: String, retry: Bool) {
+            modInstalls[projectID]?.phase = .failed(reason)
+            modInstalls[projectID]?.canRetry = retry
+            modInstallSheet = projectID
+        }
+
+        /// The sheet closed. Finished Gets are forgotten; running ones keep going on the row.
+        public func closeModInstall(_ projectID: String) {
+            if modInstallSheet == projectID { modInstallSheet = nil }
+            if modInstalls[projectID]?.isFinished == true || modInstalls[projectID]?.phase == .confirm {
+                modInstalls[projectID] = nil
+            }
+        }
+
+        /// Try again after a failure: plans again, since the reason may have changed (online again, mod turned off).
+        public func retryInstall(_ projectID: String) {
+            let version = modInstalls[projectID]?.plan?.target.versionID
+            modInstalls[projectID] = nil
+            get(projectID, versionID: version?.isEmpty == false ? version : nil)
+        }
+
+        /// Offline reads as offline, not as a URL error.
+        static func installMessage(_ error: Error) -> String {
+            if let u = error as? URLError,
+                [.notConnectedToInternet, .networkConnectionLost, .timedOut, .cannotFindHost].contains(u.code)
+            {
+                return String(localized: "You're offline. Connect and try again.")
+            }
+            return error.localizedDescription
+        }
+
+        /// A search row in the Mods target: installed, off, or with an update. Modpacks become instances, so never.
+        public func installState(_ p: ProjectSummary) -> ProjectInstallState {
+            guard query.kind != .modpacks,
+                let item = installed[query.kind]?.first(where: { $0.matches(p.id, title: p.title) })
+            else { return .notInstalled }
+            if let to = item.updateTo { return .update(to) }
+            return item.enabled ? .installed : .off
         }
 
         /// Instances that can run mods: Mods targets one of these.
@@ -548,6 +667,33 @@
 
         private func run(_ body: @escaping () async throws -> Void) async {
             do { try await body() } catch { lastError = error.localizedDescription }
+        }
+    }
+
+    /// One Get, from planning to done. The row shows it while the sheet is closed.
+    public struct ModInstall: Identifiable, Equatable {
+        public enum Phase: Equatable { case planning, confirm, queued, installing, done, failed(String) }
+        public let id: String
+        public var title: String, instanceID: String
+        public var phase = Phase.planning
+        public var plan: ModInstallPlan?
+        /// Optional dependencies the user turned on. None by default: offered, never forced.
+        public var picked: Set<String> = []
+        public var progress: InstallProgress?
+        public var canRetry = false
+        public var isFinished: Bool {
+            switch phase {
+            case .done, .failed: true
+            default: false
+            }
+        }
+        public var isBusy: Bool { [.planning, .queued, .installing].contains(phase) }
+        /// Bytes still to download, for "Install · 3.1 MB".
+        public var downloadBytes: Int64? {
+            guard let plan else { return nil }
+            let files = plan.files(picking: picked).filter { !$0.turnsOn }
+            let sizes = files.compactMap(\.sizeBytes)
+            return sizes.count == files.count && !files.isEmpty ? sizes.reduce(0, +) : nil
         }
     }
 

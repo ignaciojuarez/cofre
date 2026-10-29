@@ -13,6 +13,21 @@
         public init() {}
         public var body: some View {
             @Bindable var nav = nav
+            content
+                .blockSheet(item: installSheet, hugsContent: true) { route in
+                    ModInstallSheet(id: route.id).environment(store).environment(nav)
+                }
+        }
+
+        /// M05 Get sheet. Closing it tells the store, so finished Gets are forgotten.
+        private var installSheet: Binding<ModInstallRoute?> {
+            Binding(
+                get: { store.modInstallSheet.map(ModInstallRoute.init) },
+                set: { if $0 == nil, let open = store.modInstallSheet { store.closeModInstall(open) } })
+        }
+
+        @ViewBuilder private var content: some View {
+            @Bindable var nav = nav
             if store.libraryLoaded && store.modsInstance == nil {
                 // Nothing runs mods yet: only the way to make an instance that does.
                 VStack(spacing: 0) {
@@ -97,17 +112,7 @@
                                 {
                                     ProjectIcon(project: p, size: 28)
                                 } trailing: {
-                                    if p.installed {
-                                        Badge("✓", tone: .success).accessibilityLabel(Text("Installed"))
-                                    } else {
-                                        BlockButton(
-                                            "Get", role: .primary, size: .small,
-                                            isLoading: store.installing.contains(p.id)
-                                        ) {
-                                            endEditing()
-                                            store.install(projectID: p.id)
-                                        }
-                                    }
+                                    GetButton(project: p) { endEditing() }
                                 }
                             }
                             .buttonStyle(RowButtonStyle())
@@ -190,14 +195,19 @@
                                 .disabled(!v.fits)
                             }
                         }
+                        let state = store.installState(p)
                         ForEach(chosen.flatMap { store.dependencies[$0] } ?? []) { d in
                             Row(
-                                "Needs \(d.name)", subtitle: "Dependency", leading: { PixelIcon(.book, size: 18) },
+                                "\(d.required ? "Needs" : "Works with") \(d.name)",
+                                subtitle: d.required ? "Dependency" : "Optional",
+                                leading: { PixelIcon(.book, size: 18) },
                                 trailing: {
-                                    Meta(d.installed ? "Installed" : "Adds", tone: d.installed ? .success : .warn)
+                                    Meta(
+                                        d.installed ? "Installed" : d.required ? "Adds" : "Offered",
+                                        tone: d.installed ? .success : d.required ? .warn : nil)
                                 })
                         }
-                        if !p.installed, let err = store.versionsError[id] {
+                        if state == .notInstalled, let err = store.versionsError[id] {
                             Banner(String(localized: "Couldn't load versions"), icon: .cross, tone: .danger) {
                                 BlockButton("Try again", size: .small, fullWidth: false) {
                                     Task { await store.loadProject(id) }
@@ -205,19 +215,30 @@
                             }
                             Text(verbatim: err).cofreFont(.secondary).foregroundStyle(Color.cofre.muted)
                         }
-                        if p.installed {
-                            Banner("Installed in \(store.modsInstance?.name ?? "")", icon: .check, tone: .success)
-                        } else if store.versions[id] == nil {
-                            if store.versionsError[id] == nil { Row("Loading versions…", leading: { Spinner() }) }
-                        } else {
-                            let name = versions.first { $0.id == chosen }?.name
-                            BlockButton(
-                                name.map { "Install \($0)" } ?? "Get", role: .primary,
-                                isLoading: store.installing.contains(id)
-                            ) {
-                                store.install(projectID: id, versionID: chosen)
+                        let inst = store.modsInstance?.name ?? ""
+                        let busy = store.modInstalls[id]?.isBusy == true
+                        switch state {
+                        case .installed:
+                            Banner("Installed in \(inst)", icon: .check, tone: .success)
+                        case .off:
+                            Banner("Off in \(inst)", icon: .check, tone: .warn) {
+                                BlockButton("Turn on", size: .small, fullWidth: false) { turnOn(p) }
                             }
-                            .keyboardShortcut(.return, modifiers: .command)
+                        case .update(let to):
+                            Banner("Installed in \(inst)", icon: .check, tone: .success)
+                            BlockButton("Update to \(to)", role: .primary, isLoading: busy) { store.get(id) }
+                        case .notInstalled:
+                            if store.versions[id] == nil {
+                                if store.versionsError[id] == nil { Row("Loading versions…", leading: { Spinner() }) }
+                            } else {
+                                let name = versions.first { $0.id == chosen }?.name
+                                BlockButton(
+                                    name.map { "Install \($0)" } ?? "Get", role: .primary, isLoading: busy
+                                ) {
+                                    store.get(id, versionID: chosen)
+                                }
+                                .keyboardShortcut(.return, modifiers: .command)
+                            }
                         }
                         if width > .compact {
                             HStack(spacing: 10) {
@@ -231,6 +252,43 @@
                 }
             }
             .task(id: "\(id)-\(store.modsInstance?.id ?? "")") { await store.loadProject(id) }
+        }
+    }
+
+    /// M01 row trailing: ✓ when the target has it, Off, Update, or Get (spinning while a Get runs).
+    struct GetButton: View {
+        let project: ProjectSummary
+        var willAct: () -> Void = {}
+        @Environment(CofreStore.self) private var store
+
+        var body: some View {
+            let busy = store.modInstalls[project.id]?.isBusy == true
+            switch busy ? .notInstalled : store.installState(project) {
+            case .installed:
+                Badge("✓", tone: .success).accessibilityLabel(Text("Installed"))
+            case .off:
+                Badge("Off").accessibilityLabel(Text("Installed, off"))
+            case .update:
+                BlockButton("Update", size: .small) { act() }
+            case .notInstalled:
+                BlockButton("Get", role: .primary, size: .small, isLoading: busy) { act() }
+                    .accessibilityValue(progress.map { Text("\(Int($0 * 100)) percent") } ?? Text(""))
+            }
+        }
+
+        private var progress: Double? { store.modInstalls[project.id]?.progress?.fraction }
+
+        private func act() {
+            willAct()
+            store.get(project.id)
+        }
+    }
+
+    extension ModPagePane {
+        fileprivate func turnOn(_ p: ProjectSummary) {
+            guard let item = store.installed[store.query.kind]?.first(where: { $0.matches(p.id, title: p.title) })
+            else { return }
+            store.setEnabled(true, item: item)
         }
     }
 
