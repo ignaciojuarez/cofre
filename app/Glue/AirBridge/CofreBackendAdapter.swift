@@ -376,13 +376,6 @@
         private func publishSetup() {
             setupContinuations.values.forEach { $0.yield(setup) }
         }
-        private func parseEnv(_ value: String) -> [String: String] {
-            Dictionary(
-                uniqueKeysWithValues: value.split(separator: " ").compactMap { p in
-                    let a = p.split(separator: "=", maxSplits: 1)
-                    return a.count == 2 ? (String(a[0]), String(a[1])) : nil
-                })
-        }
         private func unavailable(_ name: String) -> CofreBackendError { .unavailable(name) }
         private func unavailableStream<T>(_ name: String) -> AsyncThrowingStream<T, Error> {
             AsyncThrowingStream { continuation in continuation.finish(throwing: unavailable(name)) }
