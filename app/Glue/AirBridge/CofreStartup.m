@@ -11,6 +11,10 @@
 static NSString *const CofreCorePath =
     @"@executable_path/Frameworks/CofreCore.framework/CofreCore";
 
+static BOOL cofreOwnsJIT = NO;
+
+BOOL CofreOwnsJIT(void) { return cofreOwnsJIT; }
+
 /// Loads CofreCore once and returns its entry class, or nil (logging why) if it
 /// can't be loaded.
 static Class CofreCoreEntryClass(void) {
@@ -57,6 +61,7 @@ UIViewController *CofreMakeRootViewController(void) {
   if (!root) {
     NSLog(@"[Cofre] UI fallback reason=start failed");
   }
+  cofreOwnsJIT = root != nil;
   return root;
 }
 

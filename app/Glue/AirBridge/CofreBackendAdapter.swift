@@ -226,12 +226,47 @@
 
         public func launch(instanceID: String, accountID: String?) -> AsyncThrowingStream<LaunchProgress, Error> {
             AsyncThrowingStream { continuation in
-                self.air.launchProfile(instanceID, accountID: accountID) { stage in
-                    continuation.yield(
-                        LaunchProgress(stage: 1, of: 1, title: stage, finished: stage == "running" || stage == "failed")
-                    )
+                launchTask?.cancel()
+                let task = Task { @MainActor in
+                    do {
+                        try Task.checkCancellation()
+                        if !self.isJITEnabled {
+                            continuation.yield(LaunchProgress(stage: 1, of: 8, title: "JIT", detail: "Enabling JIT"))
+                            let result = await CofreJIT.enable(pid: getpid(), pairingURL: { self.pairingURL })
+                            NSLog("[Cofre] launch JIT status=%@", String(describing: result))
+                            try Task.checkCancellation()
+                            switch result {
+                            case .enabled: break
+                            case .needsPairing: throw CofreBackendError.jit("No pairing key yet")
+                            case .needsVPN: throw CofreBackendError.jit("The VPN isn't on")
+                            case .failed(let message, let step):
+                                throw CofreBackendError.jit(step.map { "JIT failed at \($0): \(message)" } ?? message)
+                            case .unavailable, .enabling: throw CofreBackendError.jit("JIT didn't turn on")
+                            }
+                            guard self.isJITEnabled else { throw CofreBackendError.jit("JIT didn't turn on") }
+                        }
+                        try Task.checkCancellation()
+                        NSLog("[Cofre] launch JIT ready; starting Air")
+                        self.air.launchProfile(instanceID, accountID: accountID) { stage in
+                            if stage == "failed" {
+                                continuation.finish(
+                                    throwing: NSError(
+                                        domain: "CofreAir", code: 1,
+                                        userInfo: [NSLocalizedDescriptionKey: "Minecraft couldn't start. Check the launcher log for details."]))
+                                return
+                            }
+                            continuation.yield(
+                                LaunchProgress(
+                                    stage: stage == "running" ? 8 : 2, of: 8, title: stage, finished: stage == "running")
+                            )
+                        }
+                        continuation.finish()
+                    } catch {
+                        continuation.finish(throwing: error)
+                    }
                 }
-                continuation.finish()
+                launchTask = task
+                continuation.onTermination = { _ in task.cancel() }
             }
         }
         public func cancelLaunch() async {
