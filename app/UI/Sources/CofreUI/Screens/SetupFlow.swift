@@ -157,20 +157,12 @@ private struct PairingStep: View {
 
     var body: some View {
         let ok = store.setup.pairing.isReady
-        StepHeader(index: 3, glyph: .key, kicker: "Pairing file", title: "Import pairing",
-                   lede: "Made once, on any computer. Drag it in from Files, or choose it.", step: $step)
-        ListSection(spacing: 4) {
-            Row("Get iloader", leading: { RowIndex(1) }, trailing: { Meta("Mac · Win · Linux") })
-            Row("Plug in, tap Trust", leading: { RowIndex(2) })
-            Row("Pairing file → Export", leading: { RowIndex(3) })
-            Row("AirDrop or save to Files", leading: { RowIndex(4) })
-        }
+        StepHeader(index: 3, glyph: .key, kicker: "Pairing key", title: "Connect to a Mac",
+                   lede: "Run one command on a Mac with this device plugged in. The key comes straight here.", step: $step)
         if ok {
-            Banner("Pairing file imported", icon: .check, tone: .success)
+            Banner("Key found", icon: .check, tone: .success)
         } else {
-            DropZone("Drop pairingFile.plist or tap to choose", detail: "Files, AirDrop, USB drive", types: [.propertyList, .xmlPropertyList],
-                     onDrop: { urls in if let d = urls.first.flatMap({ try? Data(contentsOf: $0) }) { store.importPairing(d) } },
-                     onChoose: { choosing = true })
+            PairingGuide()
         }
         if case .failed(let msg) = store.setup.pairing { Banner(msg, icon: .cross, tone: .danger) }
         HStack(spacing: 8) {
@@ -178,14 +170,15 @@ private struct PairingStep: View {
             if ok {
                 BlockButton("Next", role: .primary) { step += 1 }.keyboardShortcut(.defaultAction)
             } else {
-                BlockButton("Choose file", role: .primary) { choosing = true }
+                BlockButton("I have a file", icon: .paper, role: .ghost, fullWidth: false) { choosing = true }
+                Spacer(minLength: 0)
             }
         }
         HStack(spacing: 10) {
-            Text("Stays on this device. Never uploaded.").cofreFont(.label).foregroundStyle(Color.cofre.muted)
+            Text("Stays on this device. Never share it.").cofreFont(.label).foregroundStyle(Color.cofre.muted)
             if width > .compact { Spacer(); KeyHint("↩", "continue"); KeyHint("esc", "back") }
         }
-        .fileImporter(isPresented: $choosing, allowedContentTypes: [.propertyList, .xmlPropertyList, .data]) { r in
+        .fileImporter(isPresented: $choosing, allowedContentTypes: UTType.pairingFiles + [.data]) { r in
             if let (_, data) = readPicked(r.map { [$0] }) { store.importPairing(data) }
         }
     }

@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 import XCTest
 @testable import CofreUI
 
@@ -48,6 +49,14 @@ final class CofreUITests: XCTestCase {
         }
         XCTAssertEqual(UIFont.cofre(.rowTitle).fontName, "Geist-Medium")
         XCTAssertNotNil(CofreFonts.licenseURL)
+    }
+
+    // S04 fallback: the Mac command's `.mobiledevicepairing` file is accepted, and so is a plain plist.
+    func testPairingFileTypesAndLink() throws {
+        let macFile = try XCTUnwrap(UTType(filenameExtension: "mobiledevicepairing"))
+        XCTAssertTrue(UTType.pairingFiles.contains { macFile.conforms(to: $0) })
+        XCTAssertTrue(UTType.pairingFiles.contains { UTType.xmlPropertyList.conforms(to: $0) })
+        XCTAssertEqual(CofreLinks.short(CofreLinks.pairing), "cofre.site/pair")
     }
 
     func testMockLaunchStreamFinishes() async throws {

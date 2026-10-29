@@ -25,6 +25,15 @@ public enum CofreUI {
     }
 }
 
+/// Web pages the UI links to. The domain is a placeholder until the site is published.
+public enum CofreLinks {
+    /// The one Mac command that puts the pairing key into Cofre over the cable, with its steps.
+    public static let pairing = URL(string: "https://cofre.site/pair")!
+
+    /// "cofre.site/pair": a URL without its scheme, for display.
+    public static func short(_ url: URL) -> String { (url.host() ?? "") + url.path() }
+}
+
 /// Root view: setup wizard until every check passes, then the adaptive shell. Launch, sheets and Air's
 /// UIKit screens are presented from here so every section shares them.
 public struct CofreRootView: View {

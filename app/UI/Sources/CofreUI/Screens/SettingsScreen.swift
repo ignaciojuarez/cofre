@@ -225,10 +225,11 @@ struct JITJavaContent: View {
             Row("Disk image", trailing: { Badge(s.jit.isReady ? "Mounted" : "—", tone: s.jit.isReady ? .success : .neutral) })
         }
         if store.jitTesting || !store.jitSteps.isEmpty { JITStepRows() }
+        if !s.pairing.isReady { PairingGuide() }
         HStack(spacing: 8) {
             BlockButton("Test JIT", isLoading: store.jitTesting) { Task { await store.testJIT() } }
                 .keyboardShortcut("j", modifiers: [.command, .option])
-            BlockButton("New pairing") { choosingPairing = true }
+            BlockButton("I have a file") { choosingPairing = true }
         }
         ListSection("Java", spacing: 4) {
             Row("Runtime", trailing: { Meta(store.preferences.java == "auto" ? "Auto per version" : store.preferences.java) })
@@ -238,7 +239,7 @@ struct JITJavaContent: View {
             Field("JVM arguments", text: prefBinding(store, nil, \.jvmArgs), prompt: "-XX:+UseG1GC", kind: .mono)
             Row("Env variables", trailing: { Meta("2 set") })
         }
-        .fileImporter(isPresented: $choosingPairing, allowedContentTypes: [.propertyList, .xmlPropertyList, .data]) { r in
+        .fileImporter(isPresented: $choosingPairing, allowedContentTypes: UTType.pairingFiles + [.data]) { r in
             if let (_, data) = readPicked(r.map { [$0] }) { store.importPairing(data) }
         }
     }

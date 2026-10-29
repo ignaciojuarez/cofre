@@ -137,4 +137,47 @@ func readPicked(_ result: Result<[URL], Error>) -> (URL, Data)? {
 extension UTType {
     static let mrpack = UTType(filenameExtension: "mrpack") ?? .zip
     static let jar = UTType(filenameExtension: "jar") ?? .data
+    /// Fallback files from the Mac command are `<device name>.mobiledevicepairing`. A plain `.plist` still works.
+    static let pairingFile = UTType(filenameExtension: "mobiledevicepairing", conformingTo: .data) ?? .data
+    static let pairingFiles: [UTType] = [.pairingFile, .propertyList, .xmlPropertyList]
+}
+
+/// Getting the pairing key: one command on a Mac with this device plugged in. The key arrives over the cable,
+/// so this rechecks setup while it's on screen. Shared by Setup S04 and Settings X04; show it only while pairing isn't ready.
+struct PairingGuide: View {
+    var url: URL = CofreLinks.pairing
+    @Environment(CofreStore.self) private var store
+
+    var body: some View {
+        ListSection(spacing: 4) {
+            Row("Plug into a Mac with a cable", leading: { RowIndex(1) })
+            Row("Run one command on the Mac", leading: { RowIndex(2) })
+            Row("Unlock, tap Trust, wait for Done", leading: { RowIndex(3) })
+        }
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) { link; Spacer(minLength: 0); share }
+            VStack(alignment: .leading, spacing: 10) { link; share }
+        }
+        .padding(12).frame(maxWidth: .infinity, alignment: .leading).block(.well)
+        Row("Waiting for your key…", leading: { Spinner() }, trailing: { Meta("Auto") })
+            .task {
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(3))
+                    await store.backend.recheckSetup()
+                }
+            }
+    }
+
+    private var link: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("The command is at").cofreFont(.label).foregroundStyle(Color.cofre.muted)
+            Text(verbatim: CofreLinks.short(url)).cofreFont(.title2).foregroundStyle(Color.cofre.accent)
+                .textSelection(.enabled)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var share: some View {
+        ShareLink(item: url) { Text("Send to Mac") }.buttonStyle(.block(size: .small))
+    }
 }

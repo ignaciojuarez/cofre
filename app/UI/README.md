@@ -83,7 +83,7 @@ One adapter conforming to `CofreBackend` (typealias in `Facade/Services.swift`),
 ```sh
 cd app/UI
 xcodebuild -scheme CofreUI -destination 'generic/platform=iOS Simulator' build
-xcodebuild test -scheme CofreUI -destination 'platform=iOS Simulator,id=<shared UDID>'   # 10 tests
+xcodebuild test -scheme CofreUI -destination 'platform=iOS Simulator,id=<shared UDID>'   # 11 tests
 
 cd PreviewHost                 # regenerate with `xcodegen` after editing project.yml
 xcodebuild -project CofrePreviewHost.xcodeproj -scheme CofrePreviewHost -destination 'generic/platform=iOS Simulator' build
