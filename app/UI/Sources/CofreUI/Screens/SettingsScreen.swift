@@ -141,7 +141,7 @@
                             options: GamePreferences.fpsCapOptions
                         ).compactStyle()
                     }
-                    Text("Auto follows the display (up to 120 Hz); 90 Hz is used when the panel accepts it.")
+                    Text("Auto follows the display, up to 120 Hz. Picking a cap turns VSync on.")
                         .cofreFont(.caption).foregroundStyle(Color.cofre.muted)
                 }
                 .padding(.horizontal, 11).padding(.vertical, 7).block(.panel)

@@ -1066,6 +1066,11 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
   BOOL vsync = getPrefObject(@"video.disable_game_vsync") == nil
                    ? YES
                    : ![getPrefObject(@"video.disable_game_vsync") boolValue];
+  // While VSync is off, Air's PojavLauncher.java rewrites maxFps:260 on every launch, so a cap turns VSync on.
+  if (requested > 0 && !vsync) {
+    setPrefBool(@"video.disable_game_vsync", NO);
+    vsync = YES;
+  }
   void (^setOption)(NSString *, NSString *) = ^(NSString *key, NSString *value) {
     NSUInteger index = [lines indexOfObjectPassingTest:^BOOL(NSString *line, NSUInteger idx, BOOL *stop) {
       return [line hasPrefix:[key stringByAppendingString:@":"]];
