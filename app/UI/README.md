@@ -1,7 +1,7 @@
 # CofreUI
 
 Cofre's whole UI as one SwiftUI package (iOS 17+). iPhone and iPad render the **same panes**; only the container
-changes. Spec: `cofre-design/system/DESIGN_SYSTEM.md`. No Air, CofreKit or ObjC imports.
+changes. Spec: `cofre-design/system/DESIGN_SYSTEM.md`. No Air, CofreBackendAdapter or ObjC imports.
 
 **macOS 14 too, for the Mac pairing helper** (`tools/llave`). There, tokens resolve to `NSColor` (`PlatformColor`), fonts
 skip Dynamic Type, and only tokens, fonts and components build. Screens, layout, store, facades, mocks, `NavChrome`,
@@ -31,7 +31,7 @@ regular, shell width ≥ 1100 pt  → 248 pt sidebar (+ pinned, JIT, account)
 Layout reads `horizontalSizeClass` plus measured width (`WidthClass.resolve`), never the device. All selection lives
 in `NavModel`, so resizing a Stage Manager window keeps it. ⌃⌘S toggles sidebar ↔ rail, ⌘1–⌘4 switch sections.
 
-## Shell entry point (for the logic agent)
+## Shell entry point (for the adapter)
 
 `CofreRootViewController` (Air's SceneDelegate hook, patch 0002) embeds one hosting controller:
 
@@ -58,7 +58,7 @@ public final class CofreRootViewController: UIViewController {
 - `CofreUI.bootstrap()` (called by `makeRootViewController`) applies `CofreUIKitTheme` once. Present every Air view controller inside `CofreAirHostController` so the scoped UIAppearance applies (CofreUI already does this for `AirScreens`).
 - State restoration: save `nav.userActivity()` in `stateRestorationActivity`, restore with `nav.restore(from:)` and pass the `NavModel` to `makeRootViewController(services:nav:)`.
 
-## What the logic agent implements
+## What the adapter implements
 
 One adapter conforming to `CofreBackend` (typealias in `Facade/Services.swift`), plus optional `AirScreens` in Glue.
 
@@ -112,7 +112,7 @@ All additive (2026-10-29). Every new member has a default, so `CofreBackendAdapt
 
 `Facade/ServerJoin.swift` mirrors `launcher-plan/server-join/POPUP_CONTRACT.md` §2 field for field (same type and
 field names, `Loader` and `CheckState` from Models.swift), so the adapter around `CofreServerJoin` is a mapping. In the
-adapter file, qualify the clashing names (`CofreUI.ServerJoinRequirementsState`).
+adapter file, use the facade types directly.
 
 ```swift
 @MainActor protocol ServerJoinViewModel: AnyObject, Observable {

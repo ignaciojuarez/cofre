@@ -10,22 +10,22 @@ extension MrpackIndex {
 }
 
     @MainActor
-    @Observable final class AirServerJoinModel: NSObject, UIServerJoinViewModel {
-        let server: UIServerSummary
-        var state: UIServerJoinState = .resolving
-        private let request: UIServerJoinRequest
+    @Observable final class LiveServerJoinModel: NSObject, ServerJoinViewModel {
+        let server: ServerSummary
+        var state: ServerJoinState = .resolving
+        private let request: ServerJoinRequest
         private weak var backend: CofreBackendAdapter?
 
-        init(request: UIServerJoinRequest, backend: CofreBackendAdapter) {
+        init(request: ServerJoinRequest, backend: CofreBackendAdapter) {
             self.request = request
             self.backend = backend
-            self.server = UIServerSummary(
+            self.server = ServerSummary(
                 id: request.id, name: request.server, address: request.server, hasServerCard: true)
             super.init()
             Task { await resolve() }
         }
 
-        func send(_ action: UIServerJoinAction) {
+        func send(_ action: ServerJoinAction) {
             switch action {
             case .retry: Task { await resolve() }
             case .install, .update: Task { await backend?.installJoin(request: request, model: self) }
@@ -46,7 +46,7 @@ extension MrpackIndex {
                     card: result.card, plan: result.plan, request: request, trust: result.trust))
             } catch {
                 state = .error(
-                    UIServerJoinErrorState(
+                    ServerJoinErrorState(
                         code: .signatureRejected, title: "Server card rejected", message: String(describing: error),
                         recoveryAction: .retry))
             }
@@ -67,11 +67,11 @@ extension MrpackIndex {
                 "Cofre/server-cards.json")
         }
 
-        public func serverJoin(_ request: UIServerJoinRequest) -> (any UIServerJoinViewModel)? {
-            AirServerJoinModel(request: request, backend: self)
+        public func serverJoin(_ request: ServerJoinRequest) -> (any ServerJoinViewModel)? {
+            LiveServerJoinModel(request: request, backend: self)
         }
 
-        func resolveJoin(_ request: UIServerJoinRequest) async throws -> JoinResolution {
+        func resolveJoin(_ request: ServerJoinRequest) async throws -> JoinResolution {
             let host = request.server.split(separator: ":", maxSplits: 1).first.map(String.init) ?? request.server
             let url = request.card ?? Discovery.wellKnown(host: host)
             let result = try CardDecoder.decodeEnvelope(try await URLSessionCardFetcher().fetch(url))
@@ -95,31 +95,31 @@ extension MrpackIndex {
         }
 
         func requirementsState(
-            card: ServerCard, plan: InstallPlan, request: UIServerJoinRequest, trust: TrustDecision
-        ) -> UIServerJoinRequirementsState {
+            card: ServerCard, plan: InstallPlan, request: ServerJoinRequest, trust: TrustDecision
+        ) -> ServerJoinRequirementsState {
             let address = card.server.addresses.first.map { "\($0.host):\($0.port)" } ?? request.server
-            let mapped = UIServerJoinRequirementsState(
+            let mapped = ServerJoinRequirementsState(
                 serverID: card.id, serverName: card.server.name, serverAddress: address, iconURL: card.server.icon,
-                gameVersion: card.game.version, loader: UILoader(rawValue: card.loader.type.rawValue) ?? .vanilla,
+                gameVersion: card.game.version, loader: Loader(rawValue: card.loader.type.rawValue) ?? .vanilla,
                 loaderVersion: card.loader.version, javaMajorVersion: card.game.javaVersion, packName: card.id,
                 packVersion: card.pack.version, totalDownloadSizeBytes: plan.totalDownloadSize,
                 formattedDownloadSize: ByteCountFormatter.string(
                     fromByteCount: plan.totalDownloadSize, countStyle: .file), requiredModCount: plan.entries.count,
                 recommendedRAMMB: card.recommendedRAMMB ?? 4096,
                 deviceRAMMB: Int(ProcessInfo.processInfo.physicalMemory / 1_048_576), isNewProfile: true,
-                trust: UIServerJoinTrust(
+                trust: ServerJoinTrust(
                     origin: card.security.origin.absoluteString, keyFingerprint: trust.fingerprint,
                     pinnedKeyFingerprint: nil, isFirstUse: trust.firstVisit))
             return mapped
         }
 
-        func installJoin(request: UIServerJoinRequest, model: AirServerJoinModel) async {
+        func installJoin(request: ServerJoinRequest, model: LiveServerJoinModel) async {
             guard case .requirements = model.state else { return }
             do {
                 let resolution = try await resolveJoin(request)
                 if resolution.trust.firstVisit || resolution.trust.pinnedFingerprint != nil {
-                    let item = UIServerJoinWarningState.WarningItem(
-                        id: UIServerJoinWarningState.StandardID.keyRotationUnverified + ":trust",
+                    let item = ServerJoinWarningState.WarningItem(
+                        id: ServerJoinWarningState.StandardID.keyRotationUnverified + ":trust",
                         severity: resolution.trust.keyChanged ? .blocking : .security,
                         title: resolution.trust.keyChanged ? "This server's key changed" : "Trust this server",
                         message: "Confirm the signing key before installing server content.",
@@ -127,19 +127,19 @@ extension MrpackIndex {
                     let req = requirementsState(
                         card: resolution.card, plan: resolution.plan, request: request, trust: resolution.trust)
                     model.state = .warnings(
-                        UIServerJoinWarningState(warnings: [item], canProceedAnyway: false), requirements: req)
+                        ServerJoinWarningState(warnings: [item], canProceedAnyway: false), requirements: req)
                     return
                 }
                 try await performInstall(resolution: resolution, request: request, model: model)
             } catch {
                 model.state = .error(
-                    UIServerJoinErrorState(
+                    ServerJoinErrorState(
                         code: .networkTimeout, title: "Install failed", message: String(describing: error),
                         recoveryAction: .retry))
             }
         }
 
-        func confirmJoin(request: UIServerJoinRequest, warningID: String, model: AirServerJoinModel)
+        func confirmJoin(request: ServerJoinRequest, warningID: String, model: LiveServerJoinModel)
             async
         {
             guard case .warnings = model.state else { return }
@@ -154,17 +154,17 @@ extension MrpackIndex {
                 try await performInstall(resolution: resolution, request: request, model: model)
             } catch {
                 model.state = .error(
-                    UIServerJoinErrorState(
+                    ServerJoinErrorState(
                         code: .signatureRejected, title: "Trust failed", message: String(describing: error),
                         recoveryAction: .retry))
             }
         }
 
         fileprivate func performInstall(
-            resolution: JoinResolution, request: UIServerJoinRequest, model: AirServerJoinModel
+            resolution: JoinResolution, request: ServerJoinRequest, model: LiveServerJoinModel
         ) async throws {
             model.state = .installing(
-                UIServerJoinInstallingState(
+                ServerJoinInstallingState(
                     title: "Downloading server pack", progressFraction: 0, formattedProgress: "Preparing…", stages: [],
                     currentStageIndex: 0, canCancel: true))
             let maxBytes = resolution.card.pack.sizeBytes ?? resolution.card.security.maxBytes
@@ -182,7 +182,7 @@ extension MrpackIndex {
                     progress: { fraction, stage in
                         Task { @MainActor in
                             model.state = .installing(
-                                UIServerJoinInstallingState(
+                                ServerJoinInstallingState(
                                     title: stage, progressFraction: fraction,
                                     formattedProgress: "\(Int(fraction * 100))%", stages: [], currentStageIndex: 0,
                                     canCancel: true))
@@ -195,12 +195,12 @@ extension MrpackIndex {
             UserDefaults.standard.set(
                 true, forKey: "cofre.server-card.\(resolution.card.server.addresses.first?.host ?? request.server)")
             model.state = .ready(
-                UIServerJoinReadyState(
+                ServerJoinReadyState(
                     serverID: resolution.card.id, serverName: resolution.card.server.name,
                     serverAddress: request.server, instanceID: request.id, isJITReady: isJITEnabled))
         }
 
-        func launchJoin(request: UIServerJoinRequest) {
+        func launchJoin(request: ServerJoinRequest) {
             Task { try? await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in air.addServer(request.server, name: request.server, forProfile: request.id) { e in if let e { c.resume(throwing: e) } else { c.resume() } } } }
             _ = launch(instanceID: request.id, accountID: nil)
         }

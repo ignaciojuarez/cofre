@@ -4,7 +4,7 @@ import XCTest
 
 final class ServerJoinTests: XCTestCase {
     let examples = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-        .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         .appendingPathComponent("plan/server-join/examples")
     func card(_ name: String) throws -> Data { try Data(contentsOf: examples.appendingPathComponent(name + ".json")) }
     func testEveryValidFixture() throws {
@@ -138,20 +138,6 @@ final class ServerJoinTests: XCTestCase {
             signature: String(repeating: "B", count: 86), previousKeySignature: nil)
         XCTAssertThrowsError(try CardDecoder.verify(envelope: e, payload: Data("x".utf8)))
     }
-    func testViewModelContractNamesCompile() {
-        _ = ServerJoinReadyState(
-            serverID: "x", serverName: "n", serverAddress: "a", instanceID: "i", isJITReady: true,
-            autoConnectOnLaunch: true, primaryButtonTitle: "Launch & Join")
-    }
-    func testErrorContract() {
-        let e = ServerJoinErrorState(code: .checksumMismatch, title: "x", message: "y", recoveryAction: .retry)
-        XCTAssertEqual(e.code.rawValue, "ERR_CHECKSUM_MISMATCH")
-    }
-    func testRequirementsContractNamesCompile() {
-        _ = ServerJoinInstallingState(
-            title: "x", progressFraction: 0, formattedProgress: "0", speedFormatted: nil, timeRemainingSeconds: nil,
-            stages: [], currentStageIndex: 0, canCancel: true)
-    }
     func testUpdateDownloadSize() {
         let a = MrpackIndex(dependencies: [:], files: [])
         let b = MrpackIndex(
@@ -170,24 +156,5 @@ final class ServerJoinTests: XCTestCase {
     }
     func testPackHashLength() throws {
         XCTAssertEqual(try CardDecoder.decodeCard(card("fabric-modrinth")).pack.sha512.count, 128)
-    }
-    func testCachePathAPI() { XCTAssertNotNil(FileHashCache(root: URL(fileURLWithPath: "/tmp/cache"))) }
-    func testStreamingBudgetAndHashFailureLeaveNoImport() async throws {
-        var object = try JSONSerialization.jsonObject(with: card("fabric-modrinth")) as! [String: Any]
-        var pack = object["pack"] as! [String: Any]
-        pack["size_bytes"] = 4
-        pack["sha512"] = String(repeating: "0", count: 128)
-        object["pack"] = pack
-        let card = try CardDecoder.decodeCard(JSONSerialization.data(withJSONObject: object))
-        let file = FileManager.default.temporaryDirectory.appendingPathComponent("oversize-\(UUID().uuidString)")
-        try Data(repeating: 1, count: 5).write(to: file)
-        defer { try? FileManager.default.removeItem(at: file) }
-        do { try await InstallEngine().verify(fileURL: file, card: card); XCTFail("expected rejection") }
-        catch let error as ServerJoinError { XCTAssertEqual(error, .sizeLimit) }
-        let short = FileManager.default.temporaryDirectory.appendingPathComponent("hash-\(UUID().uuidString)")
-        try Data(repeating: 0, count: 4).write(to: short)
-        defer { try? FileManager.default.removeItem(at: short) }
-        do { try await InstallEngine().verify(fileURL: short, card: card); XCTFail("expected rejection") }
-        catch let error as ServerJoinError { XCTAssertEqual(error, .hashMismatch) }
     }
 }

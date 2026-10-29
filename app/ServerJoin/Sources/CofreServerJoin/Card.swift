@@ -21,9 +21,9 @@ public struct ServerAddress: Codable, Equatable, Sendable {
         self.port = port
     }
 }
-public enum Loader: String, Codable, Sendable { case vanilla, fabric, quilt, forge, neoforge }
+public enum CardLoader: String, Codable, Sendable { case vanilla, fabric, quilt, forge, neoforge }
 public struct LoaderRequirement: Codable, Equatable, Sendable {
-    public let type: Loader
+    public let type: CardLoader
     public let version: String
 }
 public struct PackRequirement: Codable, Equatable, Sendable {

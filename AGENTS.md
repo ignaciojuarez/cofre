@@ -15,7 +15,7 @@ Cofre is a Minecraft: Java Edition launcher for iPhone and iPad. It combines the
 | `app/UI/` | CofreUI SwiftUI package: screens, tokens, facade protocols, `MockBackend` | Swift |
 | `app/Glue/AirBridge/` | The real backend: `CofreBackendAdapter.swift`, `ServerJoinAdapter.swift`, the Air ObjC bridge, pairing import, VPN | Swift + ObjC |
 | `app/Shell/` | `CofreRootViewController`, installed by patch 0002 | Swift |
-| `app/CofreKit/ServerJoin/` | `CofreServerJoin` package: card decoding, signatures, trust, install plan | Swift |
+| `app/ServerJoin/` | `CofreServerJoin` package: card decoding, signatures, trust, install plan | Swift |
 | `extensions/PacketTunnel/` | VPN appex plus `CofreTXM.js` (the JIT script), built by `.build-tools/signing/project.yml` | Swift + JS |
 | `tools/llave/` | Mac pairing helper: SwiftUI app, Rust `core/`, `pair.sh` | Swift + Rust + sh |
 | `tools/server-card/` | CLI to keygen, sign and verify server cards (test keys only) | Swift |

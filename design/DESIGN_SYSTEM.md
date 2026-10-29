@@ -1,7 +1,7 @@
 # Cofre design system
 
 > Status: spec only, nothing built. Mockups: [`ipad.html`](ipad.html) (iPad, self-contained, 124 KB) and [`../../launcher-plan/ui/index.html`](../../launcher-plan/ui/index.html) (approved iPhone, still says "Cobble").
-> Facade it binds to: `cofre/app/CofreKit/CofreKit.swift` (`AirBridge`, `TunnelService`, `JITService`, `PairingStore`, `SetupStatus`), read on 2026-10-28.
+> Facade it binds to: `cofre/app/CofreBackendAdapter/CofreBackendAdapter.swift` (`AirBridge`, `TunnelService`, `JITService`, `PairingStore`, `SetupStatus`), read on 2026-10-28.
 
 ## 0. Rules
 
@@ -245,7 +245,7 @@ NavModel { section, instance?, mod?, settingsPane, path[section] }   // one per 
 
 ## 4. Screen map
 
-**Containers:** C = compact, R = regular. **Binds:** exact `AirBridge` and CofreKit members. ⚠ = needs a facade addition (§4.2).
+**Containers:** C = compact, R = regular. **Binds:** exact `AirBridge` and CofreBackendAdapter members. ⚠ = needs a facade addition (§4.2).
 
 | ID | Screen | Container C → R | Components | Binds |
 |---|---|---|---|---|
@@ -290,8 +290,8 @@ The six `SetupStatus` fields map one-to-one to the six wizard steps, and the she
 | Install/import progress | M02, M03 | Return `AsyncThrowingStream<InstallProgress, Error>` instead of `async throws` |
 | JIT test steps | S06, X04 | `JITService.test() -> AsyncThrowingStream<JITStep, Error>` (pairing, VPN, DDI, debugger, region, detach) |
 | Signing info | S03, X06 | `SigningInfo { team, expires, deviceRegistered }` |
-| Lists | X02, X04, X05 | `renderers()`, `javaRuntimes()`, `storage()`, `clearCache()`; CF key in Keychain (CofreKit) |
-| Air screens (UIKit) | X03, P04 | `protocol AirScreens { func controlsEditor() -> UIViewController; func forgeInstaller(instanceID: String) -> UIViewController }`. It goes in **Glue**, not CofreKit, so CofreKit stays UI-agnostic. |
+| Lists | X02, X04, X05 | `renderers()`, `javaRuntimes()`, `storage()`, `clearCache()`; CF key in Keychain (CofreBackendAdapter) |
+| Air screens (UIKit) | X03, P04 | `protocol AirScreens { func controlsEditor() -> UIViewController; func forgeInstaller(instanceID: String) -> UIViewController }`. It goes in **Glue**, not CofreBackendAdapter, so CofreBackendAdapter stays UI-agnostic. |
 | Air appearance | all Air VCs | `applyAirAppearance(accentHex:cardHex:textHex:)` writes `general.accent_color`/`card_color`/`text_color` and `background_glass_style` |
 
 ---
