@@ -17,12 +17,13 @@ if (( BUILD )); then
   cp "$ROOT"/app/Glue/AirBridge/AirBridgeAdapter.* "$AIR/Natives/CofreGlue/"
   cp "$ROOT"/app/Glue/AirBridge/CofreStartup.m "$AIR/Natives/CofreGlue/"
   cp "$ROOT"/app/Glue/AirBridge/CofreTunnelService.* "$AIR/Natives/CofreGlue/"
+  cp "$ROOT"/app/Glue/AirBridge/CofrePairingImport.m "$AIR/Natives/CofreGlue/"
   python3 - <<PY2
 from pathlib import Path
 p=Path("$AIR/Natives/CMakeLists.txt")
 s=p.read_text()
 needle="  main_hook.m\n"
-for f in ("CofreGlue/AirBridgeAdapter.m", "CofreGlue/CofreStartup.m", "CofreGlue/CofreTunnelService.m"):
+for f in ("CofreGlue/AirBridgeAdapter.m", "CofreGlue/CofreStartup.m", "CofreGlue/CofreTunnelService.m", "CofreGlue/CofrePairingImport.m"):
     if f not in s: s=s.replace(needle, needle+"  "+f+"\n")
 if "NetworkExtension" not in s: s=s.replace("target_link_libraries(AngelAuraAmethyst", "target_link_libraries(AngelAuraAmethyst\n  -framework NetworkExtension")
 p.write_text(s)
@@ -32,6 +33,22 @@ PY2
   (cd "$AIR" && eval "gmake -j4 dsym package PLATFORM=2 BOOTJDK=\"$BOOTJDK\" JOBS=4 $MAKE_ARGS")
   mkdir -p "$ROOT/artifacts/Payload"; rm -rf "$APP"; unzip -q -o "$(ls -t "$ROOT/.work/air"/artifacts/*-ios.ipa | head -1)" -d "$ROOT/artifacts"
   mv "$ROOT/artifacts/Payload/AngelAuraAmethyst.app" "$APP"
+  INFO="$APP/Info.plist"
+  /usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes array" "$INFO" 2>/dev/null || true
+  /usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:0 dict" "$INFO" 2>/dev/null || true
+  /usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:0:CFBundleTypeName string iPhone Pairing File" "$INFO" 2>/dev/null || true
+  /usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:0:LSItemContentTypes array" "$INFO" 2>/dev/null || true
+  /usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:0:LSItemContentTypes:0 string com.apple.mobiledevicepairing" "$INFO" 2>/dev/null || true
+  /usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:0:LSItemContentTypes:1 string com.apple.property-list" "$INFO" 2>/dev/null || true
+  /usr/libexec/PlistBuddy -c "Add :UTImportedTypeDeclarations array" "$INFO" 2>/dev/null || true
+  /usr/libexec/PlistBuddy -c "Add :UTImportedTypeDeclarations:0 dict" "$INFO" 2>/dev/null || true
+  /usr/libexec/PlistBuddy -c "Add :UTImportedTypeDeclarations:0:UTTypeIdentifier string com.apple.mobiledevicepairing" "$INFO" 2>/dev/null || true
+  /usr/libexec/PlistBuddy -c "Add :UTImportedTypeDeclarations:0:UTTypeConformsTo array" "$INFO" 2>/dev/null || true
+  /usr/libexec/PlistBuddy -c "Add :UTImportedTypeDeclarations:0:UTTypeConformsTo:0 string public.data" "$INFO" 2>/dev/null || true
+  /usr/libexec/PlistBuddy -c "Add :UTImportedTypeDeclarations:0:UTTypeTagSpecification dict" "$INFO" 2>/dev/null || true
+  /usr/libexec/PlistBuddy -c "Add :UTImportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension string mobiledevicepairing" "$INFO" 2>/dev/null || true
+  /usr/libexec/PlistBuddy -c "Add :UTImportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension:plist string plist" "$INFO" 2>/dev/null || true
+  echo "[Cofre] document types:"; /usr/libexec/PlistBuddy -c "Print :CFBundleDocumentTypes" "$INFO"; echo "[Cofre] imported types:"; /usr/libexec/PlistBuddy -c "Print :UTImportedTypeDeclarations" "$INFO"
   rm -rf "$APP/PlugIns"
   mkdir -p "$APP/PlugIns"
   cp -R "$ROOT/.build-tools/signing/build/Build/Products/Debug-iphoneos/PacketTunnel.appex" "$APP/PlugIns/PacketTunnel.appex"
