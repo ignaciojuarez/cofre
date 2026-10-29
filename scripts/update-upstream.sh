@@ -20,10 +20,27 @@ for name in air stikjit stikdebug; do
   old=$(awk -F '\t' -v n="$name" '$1 == n { print $5 }' UPSTREAM.lock)
   url=$(awk -F '\t' -v n="$name" '$1 == n { print $2 }' UPSTREAM.lock)
   track=$(awk -F '\t' -v n="$name" '$1 == n { print $3 }' UPSTREAM.lock)
-  git -C "$sub" fetch --tags "$url"
-  if [[ -n "$to" ]]; then ref=$to; elif [[ "$track" == tags ]]; then ref=$(git -C "$sub" tag -l | grep -E '^v?[0-9]+(\.[0-9]+)+$' | sort -V | tail -1); else ref=main; fi
-  new=$(git -C "$sub" rev-parse "$ref^{commit}")
+  if [[ -n "$to" ]]; then
+    git -C "$sub" fetch --tags "$url"
+    ref=$to
+    target=$to
+  elif [[ "$track" == tags ]]; then
+    git -C "$sub" fetch --tags "$url"
+    ref=$(git -C "$sub" tag -l | grep -E '^v?[0-9]+(\.[0-9]+)+$' | sort -V | tail -1)
+    target=$ref
+  else
+    # Fetch the remote branch itself; the submodule's local "main" never moves.
+    git -C "$sub" fetch --tags "$url" main
+    ref=main
+    target=FETCH_HEAD
+  fi
+  new=$(git -C "$sub" rev-parse "$target^{commit}")
   if [[ "$new" == "$old" ]]; then echo "= $name $old"; continue; fi
+  # Never move a pin backwards (e.g. the newest tag is older than the commit we pinned).
+  if git -C "$sub" merge-base --is-ancestor "$new" "$old"; then
+    echo "= $name ${old:0:9} is already newer than $ref"
+    continue
+  fi
   changed=1; echo "→ $name ${old:0:9} → ${new:0:9} ($ref)"
   # Never use .work/<name>: that is the build tree scripts/run.sh compiles in.
   work="$ROOT/.work/update-$name"

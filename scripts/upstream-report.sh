@@ -50,6 +50,7 @@ new_tags() {
 printf '# Weekly upstream report (%s)\n\n' "$(date -u +%Y-%m-%d)" > "$REPORT"
 printf '| Upstream | Commits | Date range | Watched paths | License/NOTICE | Tags/releases | Dry-run | Verdict |\n|---|---:|---|---|---|---|---|---|\n' >> "$REPORT"
 json_rows=()
+NOTES=$(mktemp)
 for name in air stikjit stikdebug; do
   sub="$ROOT/upstream/$name"
   old=$(awk -F '\t' -v n="$name" '$1 == n {print $5}' UPSTREAM.lock)
@@ -86,9 +87,9 @@ for name in air stikjit stikdebug; do
   subjects=$(git -C "$sub" log --format='%s' "$compare_old..$compare_new" 2>/dev/null | head -15 | paste -sd '<' - | sed 's/</<br>/g')
   [[ -z "$subjects" ]] && subjects=none
   printf '| %s | %s | %s → %s | %s | %s | %s | %s | %s |\n' "$name" "$count" "$first" "$last" "${watched:-none}" "$license" "${tags:-none}" "$dry" "$verdict" >> "$REPORT"
-  printf -- '- **%s:** %s\n' "$name" "$subjects" >> "$REPORT"
+  printf -- '- **%s:** %s\n' "$name" "${subjects:-no new commits}" >> "$NOTES"
   json_rows+=("{\"name\":\"$name\",\"commits\":$count,\"verdict\":\"$verdict\"}")
-  [[ $fetch_ok == 0 ]] && printf -- '- **%s fetch:** failed\n' "$name" >> "$REPORT"
+  [[ $fetch_ok == 0 ]] && printf -- '- **%s fetch:** failed\n' "$name" >> "$NOTES"
 done
 
 am="$ROOT/.work/watch/amethyst.git"
@@ -102,7 +103,10 @@ if [[ -n "$am_head" && -n "${air_tracked:-}" ]] && git --git-dir="$am" merge-bas
   am_watched=$(watch_matches amethyst "$air_tracked" "$am_head")
 fi
 am_note=''; [[ $am_ok == 0 ]] && am_note=' Fetch failed.'
-printf '\n- **Amethyst-iOS watch:** %s commits beyond Air; watched paths: %s.%s\n' "$am_count" "$am_watched" "$am_note" >> "$REPORT"
+printf '\n' >> "$REPORT"
+cat "$NOTES" >> "$REPORT"
+rm -f "$NOTES"
+printf -- '- **Amethyst-iOS watch:** %s commits beyond Air; watched paths: %s.%s\n' "$am_count" "$am_watched" "$am_note" >> "$REPORT"
 air_last=$(git -C "$ROOT/upstream/air" log -1 --format=%cs "${air_tracked:-HEAD}" 2>/dev/null || printf '?')
 if [[ "$air_last" != '?' && $(age_days "$air_last") -ge 90 ]]; then
   printf -- '- **Activity:** Air quiet ≥ 90 days → consider re-basing on Amethyst.\n' >> "$REPORT"

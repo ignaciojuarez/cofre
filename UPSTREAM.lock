@@ -1,6 +1,6 @@
 # Pinned upstreams. Only scripts/update-upstream.sh edits this file. Tab-separated.
 # track: tags = newest semver tag · main = origin/main (no releases upstream)
 # name	url	track	ref	sha	spdx	license_sha256_12	updated
-air	https://github.com/herbrine8403/Amethyst-iOS-MyRemastered	tags	5.1.0-79-gc4797387	c4797387ca9a81f31fdcdd2723ec1050ca35fdb3	GPL-3.0	525f91adf41b	2026-10-28
+air	https://github.com/herbrine8403/Amethyst-iOS-MyRemastered	main	main	c4797387ca9a81f31fdcdd2723ec1050ca35fdb3	GPL-3.0	525f91adf41b	2026-10-28
 stikjit	https://github.com/StikDebug/StikJIT	main	main	32287268fa5824f9edce4cb359f5833ce0cf7b00	MPL-2.0	1f256ecad192	2026-10-28
 stikdebug	https://github.com/StikDebug/StikDebug	tags	3.1.15-1-g17b1e1d	17b1e1d90d602a228de663a10efa987a9f9e547b	AGPL-3.0	8486a10c4393	2026-10-28
