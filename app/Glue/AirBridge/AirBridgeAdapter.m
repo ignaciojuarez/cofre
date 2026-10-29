@@ -66,6 +66,22 @@ static void CofreWhenLandscape(UIWindow *window, int tries, dispatch_block_t the
                  ^{ CofreWhenLandscape(window, tries - 1, then); });
 }
 
+static void CofreFinishSurface(UIWindow *window);
+
+/// Air drops its own launch overlay on the first frame, or after 45 s when the renderer never reports one.
+/// Follow it so Cofre's overlay window can never stay on top of the game and swallow touches.
+static void CofreFinishWhenAirOverlayGone(SurfaceViewController *surface, UIWindow *window) {
+  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 500 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
+    if (!cofreLaunchOverlayWindow) return;
+    if (![[surface valueForKey:@"launchOverlayDismissed"] boolValue]) {
+      CofreFinishWhenAirOverlayGone(surface, window);
+      return;
+    }
+    NSLog(@"[Cofre] Air launch overlay gone before Completed; dismissing Cofre overlay");
+    CofreFinishSurface(window);
+  });
+}
+
 static void CofrePresentSurface(UIWindow *window, NSDictionary *metadata) {
   // As UIKit_launchMinecraftSurfaceVC does: remember who played last.
   BaseAuthenticator *account = BaseAuthenticator.current;
@@ -97,6 +113,7 @@ static void CofrePresentSurface(UIWindow *window, NSDictionary *metadata) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay.doubleValue * NSEC_PER_SEC)),
                        dispatch_get_main_queue(), ^{ CofreHideAirOverlay(surface); });
       }
+      CofreFinishWhenAirOverlayGone(surface, window);
       NSLog(@"[Cofre] launch surface presented with Cofre overlay");
     });
   });

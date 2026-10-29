@@ -5,6 +5,7 @@
 
 #include "glfw_keycodes.h"
 #include <objc/message.h>
+#include <objc/runtime.h>
 #include <string.h>
 #include <stdatomic.h>
 
@@ -120,6 +121,61 @@ void CofreSDLTextInputStateChanged(BOOL active, const char *reason) {
     });
 }
 
+// MARK: Touch diagnostics: where touches land and what sits on top, so "nothing responds" reports have evidence.
+
+static int cofreTouchLogsLeft = 30;
+static void (*CofreOriginalSendEvent)(id, SEL, UIEvent *);
+
+static NSString *CofreViewChain(UIView *view) {
+    NSMutableArray *names = [NSMutableArray array];
+    for (int i = 0; view && i < 6; i++, view = view.superview) [names addObject:NSStringFromClass(view.class)];
+    return [names componentsJoinedByString:@" < "];
+}
+
+static void CofreDiagnosticSendEvent(UIWindow *window, SEL cmd, UIEvent *event) {
+    if (event.type == UIEventTypeTouches && cofreTouchLogsLeft > 0) {
+        for (UITouch *touch in event.allTouches) {
+            if (touch.phase != UITouchPhaseBegan || cofreTouchLogsLeft <= 0) continue;
+            cofreTouchLogsLeft--;
+            CGPoint p = [touch locationInView:window];
+            NSLog(@"[Cofre] diag touch window=%@ level=%.0f key=%d at=%.0f,%.0f view=%@",
+                  NSStringFromClass(window.class), window.windowLevel, window.isKeyWindow, p.x, p.y,
+                  CofreViewChain(touch.view));
+        }
+    }
+    CofreOriginalSendEvent(window, cmd, event);
+}
+
+static void CofreDumpTouchState(NSString *when) {
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene isKindOfClass:UIWindowScene.class]) continue;
+        for (UIWindow *w in ((UIWindowScene *)scene).windows) {
+            NSLog(@"[Cofre] diag %@ window=%@ level=%.0f hidden=%d alpha=%.2f key=%d touch=%d root=%@ presented=%@ frame=%@",
+                  when, NSStringFromClass(w.class), w.windowLevel, w.hidden, w.alpha, w.isKeyWindow,
+                  w.userInteractionEnabled, NSStringFromClass(w.rootViewController.class),
+                  NSStringFromClass(w.rootViewController.presentedViewController.class),
+                  NSStringFromCGRect(w.frame));
+        }
+    }
+    UIView *game = SurfaceViewController.currentInstance.view;
+    for (UIView *v in game.subviews) {
+        NSLog(@"[Cofre] diag %@ game.subview=%@ hidden=%d alpha=%.2f touch=%d frame=%@", when,
+              NSStringFromClass(v.class), v.hidden, v.alpha, v.userInteractionEnabled, NSStringFromCGRect(v.frame));
+    }
+}
+
+static void CofreStartTouchDiagnostics(void) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        Method m = class_getInstanceMethod(UIWindow.class, @selector(sendEvent:));
+        CofreOriginalSendEvent = (void (*)(id, SEL, UIEvent *))method_setImplementation(m, (IMP)CofreDiagnosticSendEvent);
+    });
+    for (NSNumber *delay in @[@3, @15, @40]) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay.doubleValue * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{ CofreDumpTouchState([NSString stringWithFormat:@"t+%@s", delay]); });
+    }
+}
+
 @interface CofreGameOverlayView : UIView
 @end
 
@@ -135,6 +191,7 @@ void CofreSDLTextInputStateChanged(BOOL active, const char *reason) {
     if (![surface isKindOfClass:SurfaceViewController.class]) return;
     dispatch_async(dispatch_get_main_queue(), ^{
         SurfaceViewController *game = (SurfaceViewController *)surface;
+        CofreStartTouchDiagnostics();
         UIView *container = game.view;
         if (!container) return;
         for (UIView *view in container.subviews) {
