@@ -53,7 +53,7 @@ if (( BUILD )); then
   cp -R "$SIGNING/build/Build/Products/Debug-iphoneos/CofreCore.framework" "$APP/Frameworks/"
   # SwiftPM resources (CofreUI fonts) live in *_*.bundle; Bundle.module looks for them at the app root.
   for bundle in "$SIGNING"/build/Build/Products/Debug-iphoneos/*_*.bundle; do
-    rm -rf "$APP/$(basename "$bundle")"
+    rm -rf "${APP:?}/$(basename "$bundle")"
     cp -R "$bundle" "$APP/"
   done
   [[ -d "$APP/CofreUI_CofreUI.bundle" ]] || bt_die "CofreUI resources missing from the app"
