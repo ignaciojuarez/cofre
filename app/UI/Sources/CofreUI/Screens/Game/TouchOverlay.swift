@@ -20,6 +20,8 @@ public final class TouchOverlayModel {
     var trayOpen = false
     var hudHidden = false
     var tabHeld = false
+    /// The iOS keyboard is on screen, whoever opened it (⌨, the game, or SDL). ⌨ toggles it.
+    var keyboardUp = false
     /// Where the stick is centered while a thumb is on it.
     var stickCenter: CGPoint?
     var knob = CGSize.zero
@@ -36,6 +38,7 @@ public final class TouchOverlayModel {
     @ObservationIgnored private var holdTask: Task<Void, Never>?
     @ObservationIgnored private var trayOpenedByHold = false
     @ObservationIgnored private var settingsObserver: NSObjectProtocol?
+    @ObservationIgnored private var keyboardObservers: [NSObjectProtocol] = []
 
     public init(input: (any GameInputService)?, settings: TouchControlSettings = .load()) {
         self.input = input
@@ -59,6 +62,15 @@ public final class TouchOverlayModel {
                 if fresh != self.settings { self.settings = fresh }
             }
         }
+        #if canImport(UIKit)
+            keyboardObservers = [
+                (UIResponder.keyboardWillShowNotification, true), (UIResponder.keyboardWillHideNotification, false),
+            ].map { name, up in
+                NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.keyboardUp = up }
+                }
+            }
+        #endif
         scheduleIdle()
     }
 
@@ -67,6 +79,8 @@ public final class TouchOverlayModel {
         tasks = []
         idleTask?.cancel()
         if let settingsObserver { NotificationCenter.default.removeObserver(settingsObserver) }
+        keyboardObservers.forEach(NotificationCenter.default.removeObserver)
+        keyboardObservers = []
         releaseAll()
     }
 
@@ -211,7 +225,7 @@ public final class TouchOverlayModel {
         case .menu: trayOpen.toggle()
         case .chat: tap(.chat)
         case .inventory: tap(.inventory)
-        case .keyboard: input?.showKeyboard()
+        case .keyboard: toggleKeyboard()
         case .close: tap(.escape)
         case .stick: break
         }
@@ -240,8 +254,12 @@ public final class TouchOverlayModel {
         case .hideHUD:
             tap(.f1)
             hudHidden.toggle()
-        case .keyboard: input?.showKeyboard()
+        case .keyboard: toggleKeyboard()
         }
+    }
+
+    func toggleKeyboard() {
+        keyboardUp ? input?.hideKeyboard() : input?.showKeyboard()
     }
 
     // MARK: Stick
@@ -428,7 +446,7 @@ public struct TouchOverlayView: View {
         case .chat: Text("Chat")
         case .inventory: Text("Inventory")
         case .menu: Text("More")
-        case .keyboard: Text("Keyboard")
+        case .keyboard: model.keyboardUp ? Text("Hide keyboard") : Text("Keyboard")
         case .close: Text("Close")
         case .stick: Text("Move")
         }
@@ -437,7 +455,7 @@ public struct TouchOverlayView: View {
     private func button(_ c: TouchControl, frame r: CGRect) -> some View {
         let hit = TouchLayout.hitRect(r)
         let on = (c == .sneak && model.sneak.locked) || (model.trayOpen && (c == .pause || c == .menu))
-            || (model.tabHeld && c == .pause)
+            || (model.tabHeld && c == .pause) || (model.keyboardUp && c == .keyboard)
         let docked = model.screen.inWorld && (c == .chat || c == .inventory) && model.settings.style != .classic
         return OverlayButton(
             glyph: glyph(c), size: r.width, on: on, pressed: model.pressed.contains(c),
@@ -473,7 +491,8 @@ public struct TouchOverlayView: View {
     private func tray(anchor: CGRect, size: CGSize, k: CGFloat) -> some View {
         let left = model.settings.leftHanded
         return QuickTray(
-            items: TrayItem.items(for: model.settings.style), k: k, on: model.tabHeld ? [.players] : [],
+            items: TrayItem.items(for: model.settings.style), k: k,
+            on: Set([model.tabHeld ? TrayItem.players : nil, model.keyboardUp ? .keyboard : nil].compactMap { $0 }),
             select: model.select
         )
         .fixedSize()
