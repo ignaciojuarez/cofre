@@ -12,7 +12,9 @@ public struct Spinner: View {
             if reduceMotion {
                 cells(phase: -1)
             } else {
-                TimelineView(.periodic(from: .now, by: 0.25)) { ctx in cells(phase: Int(ctx.date.timeIntervalSinceReferenceDate * 4) % 4) }
+                TimelineView(.periodic(from: .now, by: 0.25)) { ctx in
+                    cells(phase: Int(ctx.date.timeIntervalSinceReferenceDate * 4) % 4)
+                }
             }
         }
         .frame(width: size, height: size)
@@ -20,7 +22,7 @@ public struct Spinner: View {
     }
 
     private func cells(phase: Int) -> some View {
-        let order = [0, 1, 3, 2] // clockwise
+        let order = [0, 1, 3, 2]  // clockwise
         let cell = (size - 2) / 2
         return VStack(spacing: 2) {
             ForEach(0..<2, id: \.self) { r in

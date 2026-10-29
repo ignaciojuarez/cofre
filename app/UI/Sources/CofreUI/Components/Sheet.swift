@@ -2,12 +2,14 @@ import SwiftUI
 
 // §2 #22 Sheet: form-sized and centered on regular, bottom sheet with detents on compact. Opaque panel, no glass.
 
-public extension View {
-    func blockSheet<C: View>(isPresented: Binding<Bool>, @ViewBuilder content: @escaping () -> C) -> some View {
+extension View {
+    public func blockSheet<C: View>(isPresented: Binding<Bool>, @ViewBuilder content: @escaping () -> C) -> some View {
         sheet(isPresented: isPresented) { BlockSheetContent(content: content()) }
     }
 
-    func blockSheet<Item: Identifiable, C: View>(item: Binding<Item?>, @ViewBuilder content: @escaping (Item) -> C) -> some View {
+    public func blockSheet<Item: Identifiable, C: View>(
+        item: Binding<Item?>, @ViewBuilder content: @escaping (Item) -> C
+    ) -> some View {
         sheet(item: item) { BlockSheetContent(content: content($0)) }
     }
 }
@@ -43,11 +45,17 @@ private struct FormSizing: ViewModifier {
 public struct SheetHeader<Trailing: View>: View {
     let title: LocalizedStringKey, trailing: Trailing
     @Environment(\.dismiss) private var dismiss
-    public init(_ title: LocalizedStringKey, @ViewBuilder trailing: () -> Trailing) { self.title = title; self.trailing = trailing() }
+    public init(_ title: LocalizedStringKey, @ViewBuilder trailing: () -> Trailing) {
+        self.title = title
+        self.trailing = trailing()
+    }
     public var body: some View {
         HStack(spacing: 10) {
-            Button { dismiss() } label: {
-                Text(verbatim: "‹").cofreFont(.header).foregroundStyle(Color.cofre.accent).frame(minWidth: 44, minHeight: 44, alignment: .leading)
+            Button {
+                dismiss()
+            } label: {
+                Text(verbatim: "‹").cofreFont(.header).foregroundStyle(Color.cofre.accent).frame(
+                    minWidth: 44, minHeight: 44, alignment: .leading)
             }
             .buttonStyle(.plain).accessibilityLabel(Text("Close"))
             Text(title).cofreFont(.header).foregroundStyle(Color.cofre.ink).accessibilityAddTraits(.isHeader)
@@ -58,6 +66,6 @@ public struct SheetHeader<Trailing: View>: View {
     }
 }
 
-public extension SheetHeader where Trailing == EmptyView {
-    init(_ title: LocalizedStringKey) { self.init(title) { EmptyView() } }
+extension SheetHeader where Trailing == EmptyView {
+    public init(_ title: LocalizedStringKey) { self.init(title) { EmptyView() } }
 }

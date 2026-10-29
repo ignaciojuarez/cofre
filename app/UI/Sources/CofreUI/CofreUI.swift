@@ -1,30 +1,33 @@
 import SwiftUI
+
 #if canImport(UIKit)
-import UIKit
+    import UIKit
 
-/// Entry points for the shell. See README.md.
-public enum CofreUI {
-    /// Registers fonts and applies the UIKit theme for Air's leftover screens. Safe to call more than once.
-    @MainActor public static func bootstrap(theme: CofreTheme = .current) {
-        CofreFonts.register()
-        CofreTheme.current = theme
-        CofreUIKitTheme.apply(theme)
-    }
-
-    /// The whole Cofre UI in one hosting controller. `CofreRootViewController` embeds this as its child.
-    @MainActor public static func makeRootViewController(services: CofreServices, nav: NavModel? = nil) -> UIViewController {
-        bootstrap()
-        let store = CofreStore(services: services)
-        let host = UIHostingController(rootView: CofreRootView(store: store, nav: nav ?? NavModel()))
-        host.view.backgroundColor = .cofre.page
-        host.overrideUserInterfaceStyle = CofreTheme.current.interfaceStyle
-        store.onThemeChange = { [weak host] t in
-            host?.overrideUserInterfaceStyle = t.interfaceStyle
-            CofreUIKitTheme.applyInterfaceStyle(t, to: host?.view.window)
+    /// Entry points for the shell. See README.md.
+    public enum CofreUI {
+        /// Registers fonts and applies the UIKit theme for Air's leftover screens. Safe to call more than once.
+        @MainActor public static func bootstrap(theme: CofreTheme = .current) {
+            CofreFonts.register()
+            CofreTheme.current = theme
+            CofreUIKitTheme.apply(theme)
         }
-        return host
+
+        /// The whole Cofre UI in one hosting controller. `CofreRootViewController` embeds this as its child.
+        @MainActor public static func makeRootViewController(services: CofreServices, nav: NavModel? = nil)
+            -> UIViewController
+        {
+            bootstrap()
+            let store = CofreStore(services: services)
+            let host = UIHostingController(rootView: CofreRootView(store: store, nav: nav ?? NavModel()))
+            host.view.backgroundColor = .cofre.page
+            host.overrideUserInterfaceStyle = CofreTheme.current.interfaceStyle
+            store.onThemeChange = { [weak host] t in
+                host?.overrideUserInterfaceStyle = t.interfaceStyle
+                CofreUIKitTheme.applyInterfaceStyle(t, to: host?.view.window)
+            }
+            return host
+        }
     }
-}
 #endif
 
 /// Web pages the UI links to: the setup site on GitHub Pages (`docs/` in the Cofre repo).
@@ -46,138 +49,160 @@ public enum CofreLinks {
 }
 
 #if canImport(UIKit)
-/// Root view: a neutral splash until setup state loads, the wizard for users who never finished it, then the
-/// adaptive shell. Users who finished once go straight to the shell on the first frame. Launch, sheets,
-/// confirmations and Air's UIKit screens are presented from here so every section shares them.
-public struct CofreRootView: View {
-    @State private var store: CofreStore
-    @State private var nav: NavModel
-    @Environment(\.horizontalSizeClass) private var sizeClass
-    private let setupStart: Int?
+    /// Root view: a neutral splash until setup state loads, the wizard for users who never finished it, then the
+    /// adaptive shell. Users who finished once go straight to the shell on the first frame. Launch, sheets,
+    /// confirmations and Air's UIKit screens are presented from here so every section shares them.
+    public struct CofreRootView: View {
+        @State private var store: CofreStore
+        @State private var nav: NavModel
+        @Environment(\.horizontalSizeClass) private var sizeClass
+        private let setupStart: Int?
 
-    /// `setupStart` forces the wizard at that step (preview host); `nil` resumes where the user left off.
-    @MainActor public init(store: CofreStore, nav: NavModel? = nil, setupStart: Int? = nil) {
-        _store = State(initialValue: store); _nav = State(initialValue: nav ?? NavModel()); self.setupStart = setupStart
-    }
-
-    public var body: some View {
-        Group {
-            if !store.setupCompleted, let setupStart {
-                SetupFlow(startAt: setupStart)
-            } else if !store.setupCompleted && !store.setupLoaded {
-                SplashView()
-            } else if store.showsSetup {
-                SetupFlow(startAt: store.resumeStep)
-            } else {
-                AdaptiveShell(nav: nav) { section in
-                    switch section {
-                    case .play: PlaySection()
-                    case .instances: InstancesSection()
-                    case .mods: ModsSection()
-                    case .settings: SettingsSection()
-                    }
-                }
-            }
+        /// `setupStart` forces the wizard at that step (preview host); `nil` resumes where the user left off.
+        @MainActor public init(store: CofreStore, nav: NavModel? = nil, setupStart: Int? = nil) {
+            _store = State(initialValue: store)
+            _nav = State(initialValue: nav ?? NavModel())
+            self.setupStart = setupStart
         }
-        .id(store.theme.accent.id)
-        .overlay(alignment: .top) { errorBanner }
-        .alert(store.pendingConfirmation?.title ?? Text(verbatim: ""), isPresented: confirming, presenting: store.pendingConfirmation) { c in
-            Button(c.actionTitle, role: .destructive) {
-                Task {
-                    await store.confirm(c)
-                    if case .deleteInstance(let i) = c, nav.instance == i.id { nav.instance = nil }
-                }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: { c in c.message }
-        .background { commands }
-        .fullScreenTakeover(isPresented: $nav.showingLaunch) { LaunchScreen().environment(store).environment(nav) }
-        .blockSheet(item: $nav.sheet) { sheet in
+
+        public var body: some View {
             Group {
-                switch sheet {
-                case .newInstance: NewInstanceSheet()
-                case .importPack: ImportPackSheet()
+                if !store.setupCompleted, let setupStart {
+                    SetupFlow(startAt: setupStart)
+                } else if !store.setupCompleted && !store.setupLoaded {
+                    SplashView()
+                } else if store.showsSetup {
+                    SetupFlow(startAt: store.resumeStep)
+                } else {
+                    AdaptiveShell(nav: nav) { section in
+                        switch section {
+                        case .play: PlaySection()
+                        case .instances: InstancesSection()
+                        case .mods: ModsSection()
+                        case .settings: SettingsSection()
+                        }
+                    }
                 }
             }
-            .environment(store).environment(nav)
-        }
-        .fullScreenTakeover(item: $nav.showingAirScreen) { route in
-            if let air = store.services.airScreens {
-                AirScreenHost(make: {
-                    switch route {
-                    case .controlsEditor: air.controlsEditor()
-                    case .forgeInstaller(let id): air.forgeInstaller(instanceID: id)
+            .id(store.theme.accent.id)
+            .overlay(alignment: .top) { errorBanner }
+            .alert(
+                store.pendingConfirmation?.title ?? Text(verbatim: ""), isPresented: confirming,
+                presenting: store.pendingConfirmation
+            ) { c in
+                Button(c.actionTitle, role: .destructive) {
+                    Task {
+                        await store.confirm(c)
+                        if case .deleteInstance(let i) = c, nav.instance == i.id { nav.instance = nil }
                     }
-                }, onClose: { nav.showingAirScreen = nil })
-                .ignoresSafeArea()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: { c in
+                c.message
             }
-        }
-        // Join server (GAP-14): a bottom sheet on compact, a centered card overlay on regular.
-        .sheet(item: serverJoinRequest(card: false), onDismiss: startPendingJoinLaunch) { request in
-            JoinServerSheet(request: request, style: .bottomSheet).environment(store).environment(nav)
-        }
-        .overlay {
-            if let request = serverJoinRequest(card: true).wrappedValue {
-                JoinServerCard(request: request) { nav.serverJoin = nil; startPendingJoinLaunch() }
+            .background { commands }
+            .fullScreenTakeover(isPresented: $nav.showingLaunch) { LaunchScreen().environment(store).environment(nav) }
+            .blockSheet(item: $nav.sheet) { sheet in
+                Group {
+                    switch sheet {
+                    case .newInstance: NewInstanceSheet()
+                    case .importPack: ImportPackSheet()
+                    }
+                }
+                .environment(store).environment(nav)
+            }
+            .fullScreenTakeover(item: $nav.showingAirScreen) { route in
+                if let air = store.services.airScreens {
+                    AirScreenHost(
+                        make: {
+                            switch route {
+                            case .controlsEditor: air.controlsEditor()
+                            case .forgeInstaller(let id): air.forgeInstaller(instanceID: id)
+                            }
+                        }, onClose: { nav.showingAirScreen = nil }
+                    )
+                    .ignoresSafeArea()
+                }
+            }
+            // Join server (GAP-14): a bottom sheet on compact, a centered card overlay on regular.
+            .sheet(item: serverJoinRequest(card: false), onDismiss: startPendingJoinLaunch) { request in
+                JoinServerSheet(request: request, style: .bottomSheet).environment(store).environment(nav)
+            }
+            .overlay {
+                if let request = serverJoinRequest(card: true).wrappedValue {
+                    JoinServerCard(request: request) {
+                        nav.serverJoin = nil
+                        startPendingJoinLaunch()
+                    }
                     .transition(.opacity)
+                }
+            }
+            .animation(.easeOut(duration: 0.15), value: serverJoinRequest(card: true).wrappedValue)
+            .onOpenURL { nav.open($0) }
+            .environment(store)
+            .environment(nav)
+            .environment(\.cofreTheme, store.theme)
+            .preferredColorScheme(store.theme.colorScheme)
+            .tint(Color.cofre.accent)
+            .task { await store.start() }
+        }
+
+        /// GAP-14. Deep links can arrive any time; the sheet waits for the `.serverJoin` capability and finished setup.
+        private func serverJoinRequest(card: Bool) -> Binding<ServerJoinRequest?> {
+            Binding(
+                get: {
+                    store.can(.serverJoin) && store.setupCompleted && (sizeClass == .regular) == card
+                        ? nav.serverJoin : nil
+                },
+                set: { nav.serverJoin = $0 })
+        }
+
+        /// "Launch & Join" waits for the sheet to finish closing, so the launch takeover can present.
+        private func startPendingJoinLaunch() {
+            guard let id = store.pendingJoinLaunch else { return }
+            store.pendingJoinLaunch = nil
+            // The install made or changed a profile, so reload instances first.
+            Task {
+                await store.refreshLibrary()
+                startLaunch(store, nav, instanceID: id)
             }
         }
-        .animation(.easeOut(duration: 0.15), value: serverJoinRequest(card: true).wrappedValue)
-        .onOpenURL { nav.open($0) }
-        .environment(store)
-        .environment(nav)
-        .environment(\.cofreTheme, store.theme)
-        .preferredColorScheme(store.theme.colorScheme)
-        .tint(Color.cofre.accent)
-        .task { await store.start() }
-    }
 
-    /// GAP-14. Deep links can arrive any time; the sheet waits for the `.serverJoin` capability and finished setup.
-    private func serverJoinRequest(card: Bool) -> Binding<ServerJoinRequest?> {
-        Binding(get: { store.can(.serverJoin) && store.setupCompleted && (sizeClass == .regular) == card ? nav.serverJoin : nil },
-                set: { nav.serverJoin = $0 })
-    }
+        private var confirming: Binding<Bool> {
+            Binding(get: { store.pendingConfirmation != nil }, set: { if !$0 { store.pendingConfirmation = nil } })
+        }
 
-    /// "Launch & Join" waits for the sheet to finish closing, so the launch takeover can present.
-    private func startPendingJoinLaunch() {
-        guard let id = store.pendingJoinLaunch else { return }
-        store.pendingJoinLaunch = nil
-        // The install made or changed a profile, so reload instances first.
-        Task { await store.refreshLibrary(); startLaunch(store, nav, instanceID: id) }
-    }
+        @ViewBuilder private var errorBanner: some View {
+            if let err = store.lastError {
+                Banner(err, icon: .cross, tone: .danger) { BlockButton("OK", size: .small) { store.lastError = nil } }
+                    .padding(.horizontal, 16).padding(.top, 8)
+                    .frame(maxWidth: 560)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
 
-    private var confirming: Binding<Bool> {
-        Binding(get: { store.pendingConfirmation != nil }, set: { if !$0 { store.pendingConfirmation = nil } })
-    }
-
-    @ViewBuilder private var errorBanner: some View {
-        if let err = store.lastError {
-            Banner(err, icon: .cross, tone: .danger) { BlockButton("OK", size: .small) { store.lastError = nil } }
-                .padding(.horizontal, 16).padding(.top, 8)
-                .frame(maxWidth: 560)
-                .transition(.move(edge: .top).combined(with: .opacity))
+        /// App-wide shortcuts (§3.4). Section shortcuts live on NavChrome; pane shortcuts on their buttons.
+        private var commands: some View {
+            ZStack {
+                Button("New instance") { nav.sheet = .newInstance }.keyboardShortcut("n", modifiers: .command)
+                Button("Import pack") { nav.sheet = .importPack }.keyboardShortcut("i", modifiers: [.command, .shift])
+                Button("Settings") { nav.section = .settings }.keyboardShortcut(",", modifiers: .command)
+                Button("Show log") {
+                    nav.section = .settings
+                    nav.settingsPane = .logs
+                }.keyboardShortcut("l", modifiers: .command)
+            }
+            .opacity(0).allowsHitTesting(false).accessibilityHidden(true)
         }
     }
 
-    /// App-wide shortcuts (§3.4). Section shortcuts live on NavChrome; pane shortcuts on their buttons.
-    private var commands: some View {
-        ZStack {
-            Button("New instance") { nav.sheet = .newInstance }.keyboardShortcut("n", modifiers: .command)
-            Button("Import pack") { nav.sheet = .importPack }.keyboardShortcut("i", modifiers: [.command, .shift])
-            Button("Settings") { nav.section = .settings }.keyboardShortcut(",", modifiers: .command)
-            Button("Show log") { nav.section = .settings; nav.settingsPane = .logs }.keyboardShortcut("l", modifiers: .command)
+    /// First frame for users who haven't finished setup, while their saved state loads. No wizard flash.
+    private struct SplashView: View {
+        var body: some View {
+            AppIcon(size: 64)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(PageBackground())
+                .accessibilityLabel(Text(verbatim: "Cofre"))
         }
-        .opacity(0).allowsHitTesting(false).accessibilityHidden(true)
     }
-}
-
-/// First frame for users who haven't finished setup, while their saved state loads. No wizard flash.
-private struct SplashView: View {
-    var body: some View {
-        AppIcon(size: 64)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(PageBackground())
-            .accessibilityLabel(Text(verbatim: "Cofre"))
-    }
-}
 #endif

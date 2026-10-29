@@ -7,7 +7,7 @@ public struct BlockToggleStyle: ToggleStyle {
     public func makeBody(configuration: Configuration) -> some View { BlockSwitch(configuration: configuration) }
 }
 
-public extension ToggleStyle where Self == BlockToggleStyle { static var block: Self { .init() } }
+extension ToggleStyle where Self == BlockToggleStyle { public static var block: Self { .init() } }
 
 private struct BlockSwitch: View {
     let configuration: ToggleStyleConfiguration
@@ -55,9 +55,9 @@ private struct BlockSwitch: View {
 
     private var onOffLabels: Bool {
         #if canImport(UIKit)
-        UIAccessibility.isOnOffSwitchLabelsEnabled
+            UIAccessibility.isOnOffSwitchLabelsEnabled
         #else
-        false
+            false
         #endif
     }
 }

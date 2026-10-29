@@ -9,11 +9,17 @@ public struct SelectButton<Value: Hashable>: View {
     var compact = false
 
     public init(_ title: LocalizedStringKey, selection: Binding<Value>, options: [(Value, String)]) {
-        self.title = title; _selection = selection; self.options = options
+        self.title = title
+        _selection = selection
+        self.options = options
     }
 
     /// Small trailing variant for rows ("0.16.14 ▾").
-    public func compactStyle() -> Self { var c = self; c.compact = true; return c }
+    public func compactStyle() -> Self {
+        var c = self
+        c.compact = true
+        return c
+    }
 
     public var body: some View {
         Menu {
@@ -22,9 +28,12 @@ public struct SelectButton<Value: Hashable>: View {
             }
         } label: {
             if compact {
-                HStack(spacing: 4) { Text(verbatim: current); Text(verbatim: "▾") }
-                    .cofreFont(.label).foregroundStyle(Color.cofre.muted)
-                    .frame(minHeight: 44)
+                HStack(spacing: 4) {
+                    Text(verbatim: current)
+                    Text(verbatim: "▾")
+                }
+                .cofreFont(.label).foregroundStyle(Color.cofre.muted)
+                .frame(minHeight: 44)
             } else {
                 HStack(spacing: 8) {
                     Text(verbatim: current).cofreFont(.title2).lineLimit(1)

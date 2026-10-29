@@ -10,11 +10,18 @@ public struct BlockSlider: View {
     let accessibilityText: ((Double) -> String)?
     let note: LocalizedStringKey?
 
-    public init(_ title: LocalizedStringKey, value: Binding<Double>, in range: ClosedRange<Double>, step: Double = 1,
-                note: LocalizedStringKey? = nil, accessibilityValue: ((Double) -> String)? = nil,
-                valueText: @escaping (Double) -> String) {
-        self.title = title; _value = value; self.range = range; self.step = step
-        self.valueText = valueText; self.note = note; self.accessibilityText = accessibilityValue
+    public init(
+        _ title: LocalizedStringKey, value: Binding<Double>, in range: ClosedRange<Double>, step: Double = 1,
+        note: LocalizedStringKey? = nil, accessibilityValue: ((Double) -> String)? = nil,
+        valueText: @escaping (Double) -> String
+    ) {
+        self.title = title
+        _value = value
+        self.range = range
+        self.step = step
+        self.valueText = valueText
+        self.note = note
+        self.accessibilityText = accessibilityValue
     }
 
     public var body: some View {
@@ -42,7 +49,8 @@ private struct SliderTrack: View {
 
     var body: some View {
         GeometryReader { g in
-            let w = g.size.width, f = (value - range.lowerBound) / (range.upperBound - range.lowerBound)
+            let w = g.size.width
+            let f = (value - range.lowerBound) / (range.upperBound - range.lowerBound)
             let x = (w - 14) * f
             ZStack(alignment: .leading) {
                 Rectangle().fill(Color.cofre.well)
@@ -57,11 +65,12 @@ private struct SliderTrack: View {
             }
             .frame(maxHeight: .infinity)
             .contentShape(Rectangle())
-            .gesture(DragGesture(minimumDistance: 0).onChanged { d in
-                let p = min(max(0, (d.location.x - 7) / max(1, w - 14)), 1)
-                let raw = range.lowerBound + p * (range.upperBound - range.lowerBound)
-                value = min(max((raw / step).rounded() * step, range.lowerBound), range.upperBound)
-            })
+            .gesture(
+                DragGesture(minimumDistance: 0).onChanged { d in
+                    let p = min(max(0, (d.location.x - 7) / max(1, w - 14)), 1)
+                    let raw = range.lowerBound + p * (range.upperBound - range.lowerBound)
+                    value = min(max((raw / step).rounded() * step, range.lowerBound), range.upperBound)
+                })
         }
         .blockPointer()
     }

@@ -11,26 +11,35 @@ public struct KeyCap: View {
             .padding(.horizontal, 5).padding(.bottom, 1)
             .frame(minWidth: 20, minHeight: 20)
             .background(Color.cofre.well)
-            .overlay(alignment: .bottom) { Color.cofre.lip.frame(height: 2).padding(.horizontal, 2).padding(.bottom, 2) }
+            .overlay(alignment: .bottom) {
+                Color.cofre.lip.frame(height: 2).padding(.horizontal, 2).padding(.bottom, 2)
+            }
             .overlay { Rectangle().strokeBorder(Color.cofre.outline, lineWidth: 2) }
     }
 }
 
 public enum ControllerButton: String, CaseIterable, Sendable {
-    case a = "A", b = "B", x = "X", y = "Y", lb = "LB", rb = "RB", menu = "≡"
+    case a = "A"
+    case b = "B"
+    case x = "X"
+    case y = "Y"
+    case lb = "LB"
+    case rb = "RB"
+    case menu = "≡"
 
     /// Glyph from the connected controller so it matches the user's hardware.
     var systemSymbol: String? {
         guard let input = GCController.current?.physicalInputProfile else { return nil }
-        let name: String = switch self {
-        case .a: GCInputButtonA
-        case .b: GCInputButtonB
-        case .x: GCInputButtonX
-        case .y: GCInputButtonY
-        case .lb: GCInputLeftShoulder
-        case .rb: GCInputRightShoulder
-        case .menu: GCInputButtonMenu
-        }
+        let name: String =
+            switch self {
+            case .a: GCInputButtonA
+            case .b: GCInputButtonB
+            case .x: GCInputButtonX
+            case .y: GCInputButtonY
+            case .lb: GCInputLeftShoulder
+            case .rb: GCInputRightShoulder
+            case .menu: GCInputButtonMenu
+            }
         return input.buttons[name]?.sfSymbolsName
     }
 }
@@ -54,7 +63,10 @@ public struct ControllerGlyph: View {
 /// One shortcut hint: key caps + label.
 public struct KeyHint: View {
     let keys: String, label: LocalizedStringKey
-    public init(_ keys: String, _ label: LocalizedStringKey) { self.keys = keys; self.label = label }
+    public init(_ keys: String, _ label: LocalizedStringKey) {
+        self.keys = keys
+        self.label = label
+    }
     public var body: some View {
         HStack(spacing: 4) {
             ForEach(Array(keys.split(separator: " ").enumerated()), id: \.offset) { KeyCap(String($0.element)) }
@@ -72,8 +84,14 @@ public struct HintStrip: View {
         Group {
             if controller {
                 HStack(spacing: 12) {
-                    hint(.a, "Play"); hint(.b, "Back"); hint(.y, "Search")
-                    HStack(spacing: 3) { ControllerGlyph(.lb); ControllerGlyph(.rb); Text("Section") }
+                    hint(.a, "Play")
+                    hint(.b, "Back")
+                    hint(.y, "Search")
+                    HStack(spacing: 3) {
+                        ControllerGlyph(.lb)
+                        ControllerGlyph(.rb)
+                        Text("Section")
+                    }
                     hint(.menu, "Menu")
                     KeyHint("⌘1–4", "Sections")
                 }
@@ -86,10 +104,15 @@ public struct HintStrip: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .GCControllerDidConnect)) { _ in controller = true }
-        .onReceive(NotificationCenter.default.publisher(for: .GCControllerDidDisconnect)) { _ in controller = GCController.current != nil }
+        .onReceive(NotificationCenter.default.publisher(for: .GCControllerDidDisconnect)) { _ in
+            controller = GCController.current != nil
+        }
     }
 
     private func hint(_ b: ControllerButton, _ label: LocalizedStringKey) -> some View {
-        HStack(spacing: 3) { ControllerGlyph(b); Text(label) }
+        HStack(spacing: 3) {
+            ControllerGlyph(b)
+            Text(label)
+        }
     }
 }

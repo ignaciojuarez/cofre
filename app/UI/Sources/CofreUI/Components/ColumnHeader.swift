@@ -9,15 +9,23 @@ public struct ColumnHeader<Trailing: View>: View {
     @Environment(\.widthClass) private var width
     @Environment(\.columnHeaderAccessory) private var accessory
 
-    public init(_ title: LocalizedStringKey, @ViewBuilder trailing: () -> Trailing) { self.title = Text(title); self.trailing = trailing() }
+    public init(_ title: LocalizedStringKey, @ViewBuilder trailing: () -> Trailing) {
+        self.title = Text(title)
+        self.trailing = trailing()
+    }
     @_disfavoredOverload
-    public init(_ title: String, @ViewBuilder trailing: () -> Trailing) { self.title = Text(verbatim: title); self.trailing = trailing() }
+    public init(_ title: String, @ViewBuilder trailing: () -> Trailing) {
+        self.title = Text(verbatim: title)
+        self.trailing = trailing()
+    }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
                 if isPushed {
-                    Button { dismiss() } label: {
+                    Button {
+                        dismiss()
+                    } label: {
                         Text(verbatim: "‹").cofreFont(.header).foregroundStyle(Color.cofre.accent)
                             .frame(minWidth: 44, minHeight: 44, alignment: .leading)
                     }
@@ -38,8 +46,8 @@ public struct ColumnHeader<Trailing: View>: View {
     }
 }
 
-public extension ColumnHeader where Trailing == EmptyView {
-    init(_ title: LocalizedStringKey) { self.init(title) { EmptyView() } }
+extension ColumnHeader where Trailing == EmptyView {
+    public init(_ title: LocalizedStringKey) { self.init(title) { EmptyView() } }
     @_disfavoredOverload
-    init(_ title: String) { self.init(title) { EmptyView() } }
+    public init(_ title: String) { self.init(title) { EmptyView() } }
 }

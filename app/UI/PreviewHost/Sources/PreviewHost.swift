@@ -32,9 +32,13 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         switch screen {
         case "instances": nav.section = .instances
         case "mods": nav.section = .mods
-        case "modpage": nav.section = .mods; nav.mod = .project("iris")
+        case "modpage":
+            nav.section = .mods
+            nav.mod = .project("iris")
         case "settings": nav.section = .settings
-        case "jit": nav.section = .settings; nav.settingsPane = .jitJava
+        case "jit":
+            nav.section = .settings
+            nav.settingsPane = .jitJava
         case "launch": nav.showingLaunch = true
         case "worlds": nav.playPane = 1
         case "join":
@@ -42,11 +46,15 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             if let mock = services.backend as? MockBackend {
                 // "live" reads the card like the app: resolving, then first visit.
                 let state = args.string(forKey: "joinState")
-                mock.serverJoinScenario = state == "live" ? nil : state.flatMap(MockServerJoin.Scenario.init(rawValue:)) ?? .firstVisit
+                mock.serverJoinScenario =
+                    state == "live" ? nil : state.flatMap(MockServerJoin.Scenario.init(rawValue:)) ?? .firstVisit
                 if mock.serverJoinScenario == .resolving { mock.stepDelay = 60 }
             }
-            if let link = args.string(forKey: "joinURL").flatMap(URL.init(string:)) { nav.open(link) }
-            else { nav.serverJoin = ServerJoinRequest(server: MockServerJoin.ironwood.address) }
+            if let link = args.string(forKey: "joinURL").flatMap(URL.init(string:)) {
+                nav.open(link)
+            } else {
+                nav.serverJoin = ServerJoinRequest(server: MockServerJoin.ironwood.address)
+            }
         default: break
         }
 
@@ -67,7 +75,8 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         }
         window.overrideUserInterfaceStyle = theme.interfaceStyle
         if let canvas = args.string(forKey: "canvas").flatMap(Self.size(from:)) {
-            window.rootViewController = CanvasController(child: root, canvas: canvas, snapshot: args.string(forKey: "snapshot") ?? screen)
+            window.rootViewController = CanvasController(
+                child: root, canvas: canvas, snapshot: args.string(forKey: "snapshot") ?? screen)
         } else {
             window.rootViewController = root
         }
@@ -86,7 +95,9 @@ final class CanvasController: UIViewController {
     let child: UIViewController, canvas: CGSize, snapshot: String
 
     init(child: UIViewController, canvas: CGSize, snapshot: String) {
-        self.child = child; self.canvas = canvas; self.snapshot = snapshot
+        self.child = child
+        self.canvas = canvas
+        self.snapshot = snapshot
         super.init(nibName: nil, bundle: nil)
     }
     required init?(coder: NSCoder) { fatalError() }
@@ -113,11 +124,13 @@ final class CanvasController: UIViewController {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [self] in
-            let format = UIGraphicsImageRendererFormat(); format.scale = 2
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = 2
             let image = UIGraphicsImageRenderer(size: canvas, format: format).image { _ in
                 child.view.drawHierarchy(in: CGRect(origin: .zero, size: canvas), afterScreenUpdates: true)
             }
-            let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("\(snapshot).png")
+            let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent(
+                "\(snapshot).png")
             try? image.pngData()?.write(to: url)
             print("[CofrePreviewHost] wrote \(url.path)")
         }

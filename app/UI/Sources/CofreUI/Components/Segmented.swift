@@ -11,8 +11,14 @@ public struct Segmented<Value: Hashable>: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.cofreTheme) private var theme
 
-    public init(_ title: LocalizedStringKey, selection: Binding<Value>, options: [(Value, LocalizedStringKey)], size: ControlSize = .regular) {
-        self.title = title; _selection = selection; self.options = options; self.size = size
+    public init(
+        _ title: LocalizedStringKey, selection: Binding<Value>, options: [(Value, LocalizedStringKey)],
+        size: ControlSize = .regular
+    ) {
+        self.title = title
+        _selection = selection
+        self.options = options
+        self.size = size
     }
 
     public var body: some View {
@@ -56,7 +62,9 @@ private struct SegmentButton: View {
                         Color.cofre.face
                             .overlay(alignment: .top) { Color.cofre.faceBevel.frame(height: 2) }
                             .overlay(alignment: .bottom) { Color.cofre.faceLip.frame(height: 2) }
-                    } else if hovering { Color.cofre.hover }
+                    } else if hovering {
+                        Color.cofre.hover
+                    }
                 }
                 .contentShape(Rectangle().inset(by: small ? -10 : -8))
         }

@@ -1,191 +1,226 @@
 #if canImport(UIKit)
-import SwiftUI
+    import SwiftUI
 
-// P01 Play home + Worlds. AdaptiveSplit: side by side on regular, a Play · Worlds segmented control on compact.
+    // P01 Play home + Worlds. AdaptiveSplit: side by side on regular, a Play · Worlds segmented control on compact.
 
-public struct PlaySection: View {
-    @Environment(NavModel.self) private var nav
-    public init() {}
-    public var body: some View {
-        @Bindable var nav = nav
-        AdaptiveSplit(primaryMin: 480, secondaryWidth: 380, fallback: .segmented("Play", "Worlds")) {
-            PlayHomePane()
-        } secondary: {
-            WorldsPane()
+    public struct PlaySection: View {
+        @Environment(NavModel.self) private var nav
+        public init() {}
+        public var body: some View {
+            @Bindable var nav = nav
+            AdaptiveSplit(primaryMin: 480, secondaryWidth: 380, fallback: .segmented("Play", "Worlds")) {
+                PlayHomePane()
+            } secondary: {
+                WorldsPane()
+            }
+            .selection($nav.playPane)
         }
-        .selection($nav.playPane)
     }
-}
 
-public struct PlayHomePane: View {
-    @Environment(CofreStore.self) private var store
-    @Environment(NavModel.self) private var nav
-    @Environment(\.widthClass) private var width
-    public init() {}
+    public struct PlayHomePane: View {
+        @Environment(CofreStore.self) private var store
+        @Environment(NavModel.self) private var nav
+        @Environment(\.widthClass) private var width
+        public init() {}
 
-    public var body: some View {
-        VStack(spacing: 0) {
-            ColumnHeader("Play") { AccountChip() }
-            PaneScroll {
-                if store.setupCompleted, store.setup.pairing.isFailed {
-                    // Setup finished once: a live failure is a banner here, never the wizard again.
-                    Banner("Your pairing key is missing. Run the Mac step again.", icon: .key, tone: .danger) {
-                        BlockButton("Fix", size: .small) { nav.section = .settings; nav.settingsPane = .jitJava }
-                    }
-                }
-                if !store.libraryLoaded {
-                    Row("Loading instances…", leading: { Spinner() })
-                } else if let inst = store.activeInstance {
-                    if inst.updatesAvailable > 0 {
-                        Banner("\(inst.updatesAvailable) mod updates for \(inst.name)", icon: .book) {
-                            BlockButton("Review", size: .small) { nav.section = .mods; nav.mod = .installed }
-                        }
-                    }
-                    hero(inst)
-                    controls(inst)
-                    AdaptiveGrid(minItem: 120) {
-                        Stat(store.isJITReady ? "OK" : "Off", label: "JIT · auto", tone: store.isJITReady ? .success : .danger)
-                        Stat(store.preferences.autoRAM ? "Auto" : "\(store.preferences.ramMB / 1024) GB", label: "Memory")
-                        Stat("\(Int(store.preferences.resolution * 100))%", label: "Resolution")
-                        Stat("\(store.preferences.fpsCap)", label: "FPS cap")
-                    }
-                    let recent = store.instances.filter { $0.id != inst.id }.prefix(3)
-                    if !recent.isEmpty {
-                        ListSection("Recent") {
-                            ForEach(Array(recent)) { i in
-                                Row(i.name, subtitle: [i.loaderLabel, Fmt.agoLong(i.lastPlayed)].compactMap { $0 }.joined(separator: " · ")) {
-                                    InstanceGlyph(icon: i.icon, size: 24)
-                                } trailing: {
-                                    BlockButton("Play", size: .small) { startLaunch(store, nav, instanceID: i.id) }
-                                }
+        public var body: some View {
+            VStack(spacing: 0) {
+                ColumnHeader("Play") { AccountChip() }
+                PaneScroll {
+                    if store.setupCompleted, store.setup.pairing.isFailed {
+                        // Setup finished once: a live failure is a banner here, never the wizard again.
+                        Banner("Your pairing key is missing. Run the Mac step again.", icon: .key, tone: .danger) {
+                            BlockButton("Fix", size: .small) {
+                                nav.section = .settings
+                                nav.settingsPane = .jitJava
                             }
                         }
                     }
-                    if store.can(.controllerNavigation) { HintStrip() }
-                } else {
-                    EmptyState("No instances yet", message: "Make one, or import a modpack.", icon: .grass) {
-                        BlockButton("New instance", role: .primary) { nav.sheet = .newInstance }
-                    }
-                }
-            }
-        }
-    }
-
-    private func hero(_ inst: InstanceSummary) -> some View {
-        PixelScene(seed: 11, pixels: .init(width: 240, height: 110))
-            .frame(height: width == .compact ? 170 : 230)
-            .frame(minWidth: 0, maxWidth: .infinity)
-            .clipped()
-            .overlay {
-                LinearGradient(colors: [.clear, .black.opacity(0.55)], startPoint: .center, endPoint: .bottom).accessibilityHidden(true)
-            }
-            .overlay(alignment: .bottomLeading) {
-                HStack(alignment: .bottom, spacing: 14) {
-                    InstanceGlyph(icon: inst.icon, size: width == .compact ? 36 : 48).shadow(color: .black, radius: 0, y: 2)
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(verbatim: inst.name).cofreFont(.display).foregroundStyle(.white).lineLimit(2).minimumScaleFactor(0.7)
-                            .shadow(color: .black, radius: 0, y: 2)
-                        HStack(spacing: 4) {
-                            Badge(loader: inst.loader, version: inst.gameVersion)
-                            if let n = inst.modCount { Badge("\(n) mods") }
-                            Badge(store.isJITReady ? "Ready" : "JIT off", tone: store.isJITReady ? .success : .danger)
+                    if !store.libraryLoaded {
+                        Row("Loading instances…", leading: { Spinner() })
+                    } else if let inst = store.activeInstance {
+                        if inst.updatesAvailable > 0 {
+                            Banner("\(inst.updatesAvailable) mod updates for \(inst.name)", icon: .book) {
+                                BlockButton("Review", size: .small) {
+                                    nav.section = .mods
+                                    nav.mod = .installed
+                                }
+                            }
+                        }
+                        hero(inst)
+                        controls(inst)
+                        AdaptiveGrid(minItem: 120) {
+                            Stat(
+                                store.isJITReady ? "OK" : "Off", label: "JIT · auto",
+                                tone: store.isJITReady ? .success : .danger)
+                            Stat(
+                                store.preferences.autoRAM ? "Auto" : "\(store.preferences.ramMB / 1024) GB",
+                                label: "Memory")
+                            Stat("\(Int(store.preferences.resolution * 100))%", label: "Resolution")
+                            Stat("\(store.preferences.fpsCap)", label: "FPS cap")
+                        }
+                        let recent = store.instances.filter { $0.id != inst.id }.prefix(3)
+                        if !recent.isEmpty {
+                            ListSection("Recent") {
+                                ForEach(Array(recent)) { i in
+                                    Row(
+                                        i.name,
+                                        subtitle: [i.loaderLabel, Fmt.agoLong(i.lastPlayed)].compactMap { $0 }.joined(
+                                            separator: " · ")
+                                    ) {
+                                        InstanceGlyph(icon: i.icon, size: 24)
+                                    } trailing: {
+                                        BlockButton("Play", size: .small) { startLaunch(store, nav, instanceID: i.id) }
+                                    }
+                                }
+                            }
+                        }
+                        if store.can(.controllerNavigation) { HintStrip() }
+                    } else {
+                        EmptyState("No instances yet", message: "Make one, or import a modpack.", icon: .grass) {
+                            BlockButton("New instance", role: .primary) { nav.sheet = .newInstance }
                         }
                     }
                 }
-                .padding(width == .compact ? 12 : 18)
             }
-            .overlay { Rectangle().strokeBorder(Color.cofre.outline, lineWidth: 2) }
-            .accessibilityElement(children: .combine)
-    }
+        }
 
-    private func instanceBinding(_ inst: InstanceSummary) -> Binding<String> {
-        Binding<String>(get: { inst.id }, set: { (id: String) -> Void in
-            Task { @MainActor in await store.selectInstance(id) }
-        })
-    }
+        private func hero(_ inst: InstanceSummary) -> some View {
+            PixelScene(seed: 11, pixels: .init(width: 240, height: 110))
+                .frame(height: width == .compact ? 170 : 230)
+                .frame(minWidth: 0, maxWidth: .infinity)
+                .clipped()
+                .overlay {
+                    LinearGradient(colors: [.clear, .black.opacity(0.55)], startPoint: .center, endPoint: .bottom)
+                        .accessibilityHidden(true)
+                }
+                .overlay(alignment: .bottomLeading) {
+                    HStack(alignment: .bottom, spacing: 14) {
+                        InstanceGlyph(icon: inst.icon, size: width == .compact ? 36 : 48).shadow(
+                            color: .black, radius: 0, y: 2)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(verbatim: inst.name).cofreFont(.display).foregroundStyle(.white).lineLimit(2)
+                                .minimumScaleFactor(0.7)
+                                .shadow(color: .black, radius: 0, y: 2)
+                            HStack(spacing: 4) {
+                                Badge(loader: inst.loader, version: inst.gameVersion)
+                                if let n = inst.modCount { Badge("\(n) mods") }
+                                Badge(
+                                    store.isJITReady ? "Ready" : "JIT off", tone: store.isJITReady ? .success : .danger)
+                            }
+                        }
+                    }
+                    .padding(width == .compact ? 12 : 18)
+                }
+                .overlay { Rectangle().strokeBorder(Color.cofre.outline, lineWidth: 2) }
+                .accessibilityElement(children: .combine)
+        }
 
-    @ViewBuilder private func controls(_ inst: InstanceSummary) -> some View {
-        let picker = SelectButton("Instance", selection: instanceBinding(inst),
-                                  options: store.instances.map { ($0.id, $0.name) })
+        private func instanceBinding(_ inst: InstanceSummary) -> Binding<String> {
+            Binding<String>(
+                get: { inst.id },
+                set: { (id: String) -> Void in
+                    Task { @MainActor in await store.selectInstance(id) }
+                })
+        }
+
+        @ViewBuilder private func controls(_ inst: InstanceSummary) -> some View {
+            let picker = SelectButton(
+                "Instance", selection: instanceBinding(inst),
+                options: store.instances.map { ($0.id, $0.name) }
+            )
             .keyboardShortcut("k", modifiers: .command)
-        let play = BlockButton("Play", icon: .play, role: .primary, size: .large, fullWidth: true) { startLaunch(store, nav) }
+            let play = BlockButton("Play", icon: .play, role: .primary, size: .large, fullWidth: true) {
+                startLaunch(store, nav)
+            }
             .keyboardShortcut(.return, modifiers: .command)
-        if width == .compact {
-            VStack(spacing: 8) { picker; play }
-        } else {
-            HStack(spacing: 8) { picker; play.frame(width: 220) }
+            if width == .compact {
+                VStack(spacing: 8) {
+                    picker
+                    play
+                }
+            } else {
+                HStack(spacing: 8) {
+                    picker
+                    play.frame(width: 220)
+                }
+            }
         }
     }
-}
 
-/// A server. With a server card (GAP-14): a "Modded" badge and Join, which opens the Join server sheet.
-/// While its install runs with the sheet closed, the row shows the percent.
-struct ServerRow: View {
-    let server: ServerSummary
-    @Environment(CofreStore.self) private var store
-    @Environment(NavModel.self) private var nav
+    /// A server. With a server card (GAP-14): a "Modded" badge and Join, which opens the Join server sheet.
+    /// While its install runs with the sheet closed, the row shows the percent.
+    struct ServerRow: View {
+        let server: ServerSummary
+        @Environment(CofreStore.self) private var store
+        @Environment(NavModel.self) private var nav
 
-    var body: some View {
-        let modded = server.hasServerCard && store.can(.serverJoin)
-        let progress = modded ? store.serverJoinProgress(address: server.address) : nil
-        Row(server.name) {
-            HStack(spacing: 6) {
-                if modded { Badge("Modded", tone: .accent) }
-                SubtitleText(text: Text(verbatim: server.detail ?? server.address))
-            }
-        } leading: {
-            PixelIcon(.cmd, size: 26)
-        } trailing: {
-            HStack(spacing: 8) {
-                if let progress {
-                    Meta("\(Int((progress * 100).rounded()))%")
-                } else if let ms = server.pingMS {
-                    Meta("\(ms) ms", tone: ms < 100 ? .success : .warn)
+        var body: some View {
+            let modded = server.hasServerCard && store.can(.serverJoin)
+            let progress = modded ? store.serverJoinProgress(address: server.address) : nil
+            Row(server.name) {
+                HStack(spacing: 6) {
+                    if modded { Badge("Modded", tone: .accent) }
+                    SubtitleText(text: Text(verbatim: server.detail ?? server.address))
                 }
-                if modded {
-                    BlockButton("Join", size: .small) {
-                        nav.serverJoin = ServerJoinRequest(server: server.address)
+            } leading: {
+                PixelIcon(.cmd, size: 26)
+            } trailing: {
+                HStack(spacing: 8) {
+                    if let progress {
+                        Meta("\(Int((progress * 100).rounded()))%")
+                    } else if let ms = server.pingMS {
+                        Meta("\(ms) ms", tone: ms < 100 ? .success : .warn)
                     }
-                    .accessibilityLabel(Text("Join \(server.name)"))
-                }
-            }
-        }
-    }
-}
-
-/// Worlds and servers. New worlds are made in game, so there's no "+ New" here.
-public struct WorldsPane: View {
-    @Environment(CofreStore.self) private var store
-    @State private var addingServer = false
-    @State private var serverName = ""
-    @State private var serverAddress = ""
-    public init() {}
-    public var body: some View {
-        VStack(spacing: 0) {
-            ColumnHeader("Worlds")
-            PaneScroll(spacing: 5) {
-                if store.worlds.isEmpty {
-                    EmptyState("No worlds yet", message: "Play once and your worlds show up here.", icon: .grass)
-                } else {
-                    WorldRows(worlds: store.worlds)
-                }
-                if !store.servers.isEmpty {
-                    ListSection("Servers") {
-                        ForEach(store.servers) { s in ServerRow(server: s) }
+                    if modded {
+                        BlockButton("Join", size: .small) {
+                            nav.serverJoin = ServerJoinRequest(server: server.address)
+                        }
+                        .accessibilityLabel(Text("Join \(server.name)"))
                     }
-                    .padding(.top, 6)
-                }
-                if store.can(.addServer) {
-                    BlockButton("+ Add server") { serverName = ""; serverAddress = ""; addingServer = true }
                 }
             }
         }
-        .alert("Add server", isPresented: $addingServer) {
-            TextField("Name", text: $serverName)
-            TextField("Address", text: $serverAddress).textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
-            Button("Add") { Task { await store.addServer(name: serverName, address: serverAddress) } }
-            Button("Cancel", role: .cancel) {}
+    }
+
+    /// Worlds and servers. New worlds are made in game, so there's no "+ New" here.
+    public struct WorldsPane: View {
+        @Environment(CofreStore.self) private var store
+        @State private var addingServer = false
+        @State private var serverName = ""
+        @State private var serverAddress = ""
+        public init() {}
+        public var body: some View {
+            VStack(spacing: 0) {
+                ColumnHeader("Worlds")
+                PaneScroll(spacing: 5) {
+                    if store.worlds.isEmpty {
+                        EmptyState("No worlds yet", message: "Play once and your worlds show up here.", icon: .grass)
+                    } else {
+                        WorldRows(worlds: store.worlds)
+                    }
+                    if !store.servers.isEmpty {
+                        ListSection("Servers") {
+                            ForEach(store.servers) { s in ServerRow(server: s) }
+                        }
+                        .padding(.top, 6)
+                    }
+                    if store.can(.addServer) {
+                        BlockButton("+ Add server") {
+                            serverName = ""
+                            serverAddress = ""
+                            addingServer = true
+                        }
+                    }
+                }
+            }
+            .alert("Add server", isPresented: $addingServer) {
+                TextField("Name", text: $serverName)
+                TextField("Address", text: $serverAddress).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    .keyboardType(.URL)
+                Button("Add") { Task { await store.addServer(name: serverName, address: serverAddress) } }
+                Button("Cancel", role: .cancel) {}
+            }
         }
     }
-}
 #endif

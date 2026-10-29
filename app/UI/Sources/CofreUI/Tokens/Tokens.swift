@@ -1,11 +1,12 @@
 import SwiftUI
+
 #if canImport(UIKit)
-import UIKit
-/// What tokens resolve to: `UIColor` in the app, `NSColor` in the Mac helper.
-public typealias PlatformColor = UIColor
+    import UIKit
+    /// What tokens resolve to: `UIColor` in the app, `NSColor` in the Mac helper.
+    public typealias PlatformColor = UIColor
 #else
-import AppKit
-public typealias PlatformColor = NSColor
+    import AppKit
+    public typealias PlatformColor = NSColor
 #endif
 
 // DESIGN_SYSTEM §1.1. This is the only file that writes hex values.
@@ -14,7 +15,10 @@ public typealias PlatformColor = NSColor
 public struct ColorPair: Sendable, Hashable {
     public let dark: UInt32
     public let light: UInt32
-    public init(dark: UInt32, light: UInt32) { self.dark = dark; self.light = light }
+    public init(dark: UInt32, light: UInt32) {
+        self.dark = dark
+        self.light = light
+    }
     public init(_ both: UInt32) { self.init(dark: both, light: both) }
 }
 
@@ -28,7 +32,11 @@ public struct Palette: Sendable, Hashable {
     public var stone: (dark: [UInt32], light: [UInt32])
 
     public static func == (a: Palette, b: Palette) -> Bool { a.page == b.page && a.ink == b.ink && a.panel == b.panel }
-    public func hash(into h: inout Hasher) { h.combine(page); h.combine(ink); h.combine(panel) }
+    public func hash(into h: inout Hasher) {
+        h.combine(page)
+        h.combine(ink)
+        h.combine(panel)
+    }
 
     public static let purple = Palette(
         page: .init(dark: 0x0f0d17, light: 0xece7f7),
@@ -60,19 +68,24 @@ public struct AccentFamily: Sendable, Hashable, Identifiable {
     public let name: String
     public var face, faceBevel, faceLip, accent, onFace: ColorPair
 
-    public static let purple = AccentFamily(id: "purple", name: "Amethyst",
+    public static let purple = AccentFamily(
+        id: "purple", name: "Amethyst",
         face: .init(0x5b3fd6), faceBevel: .init(dark: 0x8a74ff, light: 0x8069ef), faceLip: .init(0x3a2694),
         accent: .init(dark: 0x9a86ff, light: 0x5333c9), onFace: .init(0xffffff))
-    public static let emerald = AccentFamily(id: "emerald", name: "Emerald",
+    public static let emerald = AccentFamily(
+        id: "emerald", name: "Emerald",
         face: .init(0x1a7a43), faceBevel: .init(0x4cc27e), faceLip: .init(0x0f5a2f),
         accent: .init(dark: 0x57d58c, light: 0x136336), onFace: .init(0xffffff))
-    public static let copper = AccentFamily(id: "copper", name: "Copper",
+    public static let copper = AccentFamily(
+        id: "copper", name: "Copper",
         face: .init(0xb4531f), faceBevel: .init(0xe0814a), faceLip: .init(0x7a3410),
         accent: .init(dark: 0xf09a62, light: 0x9a3f0e), onFace: .init(0xffffff))
-    public static let diamond = AccentFamily(id: "diamond", name: "Diamond",
+    public static let diamond = AccentFamily(
+        id: "diamond", name: "Diamond",
         face: .init(0x13788c), faceBevel: .init(0x3fb3c9), faceLip: .init(0x0a4c59),
         accent: .init(dark: 0x5ad1e8, light: 0x0d6475), onFace: .init(0xffffff))
-    public static let redstone = AccentFamily(id: "redstone", name: "Redstone",
+    public static let redstone = AccentFamily(
+        id: "redstone", name: "Redstone",
         face: .init(0xb02a2a), faceBevel: .init(0xe05a5a), faceLip: .init(0x6e1414),
         accent: .init(dark: 0xf07a68, light: 0xa3301d), onFace: .init(0xffffff))
 
@@ -81,7 +94,10 @@ public struct AccentFamily: Sendable, Hashable, Identifiable {
 
 /// Fixed colors used only inside pixel art (icons and scenes). Not themeable on purpose.
 enum PixelArtColors {
-    static let sky: [UInt32] = [0x0a0f2c, 0x121338, 0x1d1648, 0x2a1a58, 0x3d1f68, 0x5a2774, 0x7e3279, 0xa6437c, 0xcc5a78, 0xe8786a, 0xf2985c, 0xf6b85a]
+    static let sky: [UInt32] = [
+        0x0a0f2c, 0x121338, 0x1d1648, 0x2a1a58, 0x3d1f68, 0x5a2774, 0x7e3279, 0xa6437c, 0xcc5a78, 0xe8786a, 0xf2985c,
+        0xf6b85a,
+    ]
     static let starBright: UInt32 = 0xffffff, starDim: UInt32 = 0x8c86c4
     static let sunCore: UInt32 = 0xfff2c4, sunRim: UInt32 = 0xffd27a
     static let cloud: UInt32 = 0x4a3478, cloudTop: UInt32 = 0x6a4a98
@@ -109,13 +125,17 @@ enum PixelArtColors {
         "cross": ["R": 0xf07a68],
     ]
     /// Ore tints used by sample data and instance icons.
-    static let oreTints: [String: UInt32] = ["gold": 0xf0b84f, "redstone": 0xf07a68, "diamond": 0x5ad1e8, "amethyst": 0xb07bff, "emerald": 0x45c27a, "copper": 0xf08a3a, "lapis": 0x9a86ff]
+    static let oreTints: [String: UInt32] = [
+        "gold": 0xf0b84f, "redstone": 0xf07a68, "diamond": 0x5ad1e8, "amethyst": 0xb07bff, "emerald": 0x45c27a,
+        "copper": 0xf08a3a, "lapis": 0x9a86ff,
+    ]
 }
 
 extension PlatformColor {
     convenience init(hex: UInt32, alpha: CGFloat = 1) {
-        self.init(red: CGFloat((hex >> 16) & 0xff) / 255, green: CGFloat((hex >> 8) & 0xff) / 255,
-                  blue: CGFloat(hex & 0xff) / 255, alpha: alpha)
+        self.init(
+            red: CGFloat((hex >> 16) & 0xff) / 255, green: CGFloat((hex >> 8) & 0xff) / 255,
+            blue: CGFloat(hex & 0xff) / 255, alpha: alpha)
     }
 }
 

@@ -4,7 +4,10 @@ import SwiftUI
 
 public struct XPProgressStyle: ProgressViewStyle {
     let tone: Tone, small: Bool
-    public init(tone: Tone = .success, small: Bool = false) { self.tone = tone; self.small = small }
+    public init(tone: Tone = .success, small: Bool = false) {
+        self.tone = tone
+        self.small = small
+    }
 
     public func makeBody(configuration: Configuration) -> some View {
         Group {
@@ -22,8 +25,8 @@ public struct XPProgressStyle: ProgressViewStyle {
     }
 }
 
-public extension ProgressViewStyle where Self == XPProgressStyle {
-    static func xp(_ tone: Tone = .success, small: Bool = false) -> Self { .init(tone: tone, small: small) }
+extension ProgressViewStyle where Self == XPProgressStyle {
+    public static func xp(_ tone: Tone = .success, small: Bool = false) -> Self { .init(tone: tone, small: small) }
 }
 
 struct XPBar: View {
@@ -31,7 +34,8 @@ struct XPBar: View {
     var body: some View {
         let color = tone == .neutral ? Color.cofre.inkSoft : Color.cofre.tone(tone)
         GeometryReader { g in
-            let inner = g.size.width - 8, seg: CGFloat = 11
+            let inner = g.size.width - 8
+            let seg: CGFloat = 11
             let count = Int((inner * min(max(fraction, 0), 1)) / seg)
             HStack(spacing: 2) {
                 ForEach(0..<max(count, 0), id: \.self) { _ in Rectangle().fill(color).frame(width: 9) }

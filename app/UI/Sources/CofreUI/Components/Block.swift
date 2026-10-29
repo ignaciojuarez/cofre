@@ -2,7 +2,10 @@ import SwiftUI
 
 // §2 #1 Block and §1.4 geometry: 2 pt outline, bevel on top, lip below, square.
 
-public enum BlockKind: Sendable, Hashable { case panel, raised, well, button, primary, tinted(Tone) }
+public enum BlockKind: Sendable, Hashable {
+    case panel, raised, well, button, primary
+    case tinted(Tone)
+}
 
 public struct BlockBackground: View {
     let kind: BlockKind
@@ -14,23 +17,28 @@ public struct BlockBackground: View {
     @Environment(\.cofreTheme) private var theme
 
     public init(_ kind: BlockKind = .panel, lip: CGFloat = 2, selected: Bool = false) {
-        self.kind = kind; self.lip = lip; self.selected = selected
+        self.kind = kind
+        self.lip = lip
+        self.selected = selected
     }
 
     init(_ kind: BlockKind, lip: CGFloat, selected: Bool, flat: Bool) {
-        self.init(kind, lip: lip, selected: selected); self.flat = flat
+        self.init(kind, lip: lip, selected: selected)
+        self.flat = flat
     }
 
     public var body: some View {
-        let c = Color.cofre, m = theme.block
-        let (fill, bevel, shade): (Color, Color?, Color?) = switch kind {
-        case .panel: (selected ? c.raised : c.panel, c.bevel, c.lip)
-        case .raised: (c.raised, c.bevel, c.lip)
-        case .well: (c.well, nil, nil)
-        case .button: (c.button, c.buttonBevel, c.lip)
-        case .primary: (c.face, c.faceBevel, c.faceLip)
-        case .tinted(let tone): (c.tint(tone), c.bevel, c.lip)
-        }
+        let c = Color.cofre
+        let m = theme.block
+        let (fill, bevel, shade): (Color, Color?, Color?) =
+            switch kind {
+            case .panel: (selected ? c.raised : c.panel, c.bevel, c.lip)
+            case .raised: (c.raised, c.bevel, c.lip)
+            case .well: (c.well, nil, nil)
+            case .button: (c.button, c.buttonBevel, c.lip)
+            case .primary: (c.face, c.faceBevel, c.faceLip)
+            case .tinted(let tone): (c.tint(tone), c.bevel, c.lip)
+            }
         Rectangle().fill(fill)
             .overlay(alignment: .top) {
                 if let bevel, !flat { bevel.frame(height: m.bevel).padding([.horizontal, .top], m.outline) }
@@ -39,36 +47,38 @@ public struct BlockBackground: View {
                 if let shade, !flat, lip > 0 { shade.frame(height: lip).padding([.horizontal, .bottom], m.outline) }
             }
             .overlay(alignment: .leading) {
-                if selected { c.accent.frame(width: m.selectionBar).padding(.vertical, m.outline).padding(.leading, m.outline) }
+                if selected {
+                    c.accent.frame(width: m.selectionBar).padding(.vertical, m.outline).padding(.leading, m.outline)
+                }
             }
             .overlay { Rectangle().strokeBorder(c.outline, lineWidth: m.outline) }
             .accessibilityHidden(true)
     }
 }
 
-public extension View {
+extension View {
     /// Puts a block behind the view (§2 #1).
-    func block(_ kind: BlockKind = .panel, lip: CGFloat = 2, selected: Bool = false) -> some View {
+    public func block(_ kind: BlockKind = .panel, lip: CGFloat = 2, selected: Bool = false) -> some View {
         background(BlockBackground(kind, lip: lip, selected: selected))
     }
 
     /// Large blocks (rows, cards): hover overlay only, no pointer morph (§2 shared states).
-    func blockHover() -> some View { modifier(BlockHover()) }
+    public func blockHover() -> some View { modifier(BlockHover()) }
 
     /// Accent ring 2 pt outside the outline, square. Turns the system focus effect off.
-    func blockFocusRing() -> some View { modifier(FocusRing()) }
+    public func blockFocusRing() -> some View { modifier(FocusRing()) }
 
     /// Small controls: hover overlay plus the pointer morphing to the rectangle. The Mac keeps its arrow pointer.
-    @ViewBuilder func blockPointer() -> some View {
+    @ViewBuilder public func blockPointer() -> some View {
         #if os(iOS)
-        contentShape(.hoverEffect, Rectangle()).hoverEffect(.highlight)
+            contentShape(.hoverEffect, Rectangle()).hoverEffect(.highlight)
         #else
-        self
+            self
         #endif
     }
 
     /// Visual can be smaller than 44 pt; the hit area never is (§1.3).
-    func minimumHitArea(_ size: CGFloat = 44) -> some View { modifier(HitArea(size: size)) }
+    public func minimumHitArea(_ size: CGFloat = 44) -> some View { modifier(HitArea(size: size)) }
 }
 
 struct BlockHover: ViewModifier {
@@ -101,7 +111,8 @@ struct HitArea: ViewModifier {
     func body(content: Content) -> some View {
         content.background {
             GeometryReader { g in
-                let dx = max(0, (size - g.size.width) / 2), dy = max(0, (size - g.size.height) / 2)
+                let dx = max(0, (size - g.size.width) / 2)
+                let dy = max(0, (size - g.size.height) / 2)
                 Color.clear.contentShape(Rectangle().inset(by: -max(dx, dy)))
             }
         }
@@ -134,8 +145,9 @@ enum StoneTexture {
         if let hit = cache[light] { return hit }
         let pal = light ? CofreTheme.current.palette.stone.light : CofreTheme.current.palette.stone.dark
         var rng = Mulberry32(seed: 5)
-        let ctx = CGContext(data: nil, width: 64, height: 64, bitsPerComponent: 8, bytesPerRow: 0,
-                            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        let ctx = CGContext(
+            data: nil, width: 64, height: 64, bitsPerComponent: 8, bytesPerRow: 0,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
         // 32×32 art pixels, each drawn 4× (rows from the top, like the mockups).
         for y in stride(from: 0, to: 32, by: 2) {
             for x in stride(from: 0, to: 32, by: 2) {
@@ -155,10 +167,10 @@ struct Mulberry32 {
     var a: UInt32
     init(seed: UInt32) { a = seed }
     mutating func next() -> Double {
-        a = a &+ 0x6D2B79F5
+        a = a &+ 0x6D2B_79F5
         var t = UInt32(a)
         t = (t ^ (t >> 15)) &* (1 | t)
         t = (t &+ ((t ^ (t >> 7)) &* (61 | t))) ^ t
-        return Double(t ^ (t >> 14)) / 4294967296
+        return Double(t ^ (t >> 14)) / 4_294_967_296
     }
 }

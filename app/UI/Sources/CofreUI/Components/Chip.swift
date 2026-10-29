@@ -5,7 +5,10 @@ import SwiftUI
 public struct Chip: View {
     let title: Text
     @Binding var isOn: Bool
-    public init(_ title: LocalizedStringKey, isOn: Binding<Bool>) { self.title = Text(title); _isOn = isOn }
+    public init(_ title: LocalizedStringKey, isOn: Binding<Bool>) {
+        self.title = Text(title)
+        _isOn = isOn
+    }
 
     public var body: some View {
         ChipFace(title: title, isOn: isOn) { isOn.toggle() }
@@ -17,8 +20,12 @@ public struct ChipGroup<Value: Hashable>: View {
     let options: [(Value, LocalizedStringKey)]
     let title: LocalizedStringKey
 
-    public init(_ title: LocalizedStringKey = "Filter", selection: Binding<Value>, options: [(Value, LocalizedStringKey)]) {
-        self.title = title; _selection = selection; self.options = options
+    public init(
+        _ title: LocalizedStringKey = "Filter", selection: Binding<Value>, options: [(Value, LocalizedStringKey)]
+    ) {
+        self.title = title
+        _selection = selection
+        self.options = options
     }
 
     public var body: some View {

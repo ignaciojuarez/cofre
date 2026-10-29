@@ -6,12 +6,16 @@ public struct Badge: View {
     let text: Text, tone: Tone, big: Bool
 
     public init(_ text: LocalizedStringKey, tone: Tone = .neutral, big: Bool = false) {
-        self.text = Text(text); self.tone = tone; self.big = big
+        self.text = Text(text)
+        self.tone = tone
+        self.big = big
     }
 
     @_disfavoredOverload
     public init(_ text: String, tone: Tone = .neutral, big: Bool = false) {
-        self.text = Text(verbatim: text); self.tone = tone; self.big = big
+        self.text = Text(verbatim: text)
+        self.tone = tone
+        self.big = big
     }
 
     public var body: some View {
@@ -29,10 +33,10 @@ public struct Badge: View {
 }
 
 #if canImport(UIKit)
-public extension Badge {
-    /// Loader badge ("Fabric 1.21.1") with the loader's tone.
-    init(loader: Loader, version: String? = nil) {
-        self.init([loader.displayName, version].compactMap { $0 }.joined(separator: " "), tone: loader.tone)
+    extension Badge {
+        /// Loader badge ("Fabric 1.21.1") with the loader's tone.
+        public init(loader: Loader, version: String? = nil) {
+            self.init([loader.displayName, version].compactMap { $0 }.joined(separator: " "), tone: loader.tone)
+        }
     }
-}
 #endif

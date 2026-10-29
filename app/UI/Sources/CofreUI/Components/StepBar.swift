@@ -6,7 +6,10 @@ public struct StepBar: View {
     let steps: [LocalizedStringKey], current: Int
     @Environment(\.widthClass) private var width
 
-    public init(steps: [LocalizedStringKey], current: Int) { self.steps = steps; self.current = current }
+    public init(steps: [LocalizedStringKey], current: Int) {
+        self.steps = steps
+        self.current = current
+    }
 
     public var body: some View {
         HStack(alignment: .top, spacing: 6) {

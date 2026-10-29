@@ -15,24 +15,39 @@ public struct Row<Leading: View, Trailing: View>: View {
 
     @Environment(\.dynamicTypeSize) private var typeSize
 
-    public init(_ title: LocalizedStringKey, subtitle: LocalizedStringKey? = nil, isSelected: Bool = false,
-                @ViewBuilder leading: () -> Leading, @ViewBuilder trailing: () -> Trailing) {
-        self.title = Text(title); self.subtitle = subtitle.map { AnyView(SubtitleText(text: Text($0))) }
-        self.isSelected = isSelected; self.leading = leading(); self.trailing = trailing()
+    public init(
+        _ title: LocalizedStringKey, subtitle: LocalizedStringKey? = nil, isSelected: Bool = false,
+        @ViewBuilder leading: () -> Leading, @ViewBuilder trailing: () -> Trailing
+    ) {
+        self.title = Text(title)
+        self.subtitle = subtitle.map { AnyView(SubtitleText(text: Text($0))) }
+        self.isSelected = isSelected
+        self.leading = leading()
+        self.trailing = trailing()
     }
 
     @_disfavoredOverload
-    public init(_ title: String, subtitle: String? = nil, isSelected: Bool = false,
-                @ViewBuilder leading: () -> Leading, @ViewBuilder trailing: () -> Trailing) {
-        self.title = Text(verbatim: title); self.subtitle = subtitle.map { AnyView(SubtitleText(text: Text(verbatim: $0))) }
-        self.isSelected = isSelected; self.leading = leading(); self.trailing = trailing()
+    public init(
+        _ title: String, subtitle: String? = nil, isSelected: Bool = false,
+        @ViewBuilder leading: () -> Leading, @ViewBuilder trailing: () -> Trailing
+    ) {
+        self.title = Text(verbatim: title)
+        self.subtitle = subtitle.map { AnyView(SubtitleText(text: Text(verbatim: $0))) }
+        self.isSelected = isSelected
+        self.leading = leading()
+        self.trailing = trailing()
     }
 
     /// Subtitle built from views (e.g. a Badge plus text).
-    public init<S: View>(_ title: String, isSelected: Bool = false, @ViewBuilder subtitleView: () -> S,
-                         @ViewBuilder leading: () -> Leading, @ViewBuilder trailing: () -> Trailing) {
-        self.title = Text(verbatim: title); self.subtitle = AnyView(subtitleView())
-        self.isSelected = isSelected; self.leading = leading(); self.trailing = trailing()
+    public init<S: View>(
+        _ title: String, isSelected: Bool = false, @ViewBuilder subtitleView: () -> S,
+        @ViewBuilder leading: () -> Leading, @ViewBuilder trailing: () -> Trailing
+    ) {
+        self.title = Text(verbatim: title)
+        self.subtitle = AnyView(subtitleView())
+        self.isSelected = isSelected
+        self.leading = leading()
+        self.trailing = trailing()
     }
 
     public var body: some View {
@@ -58,8 +73,16 @@ public struct Row<Leading: View, Trailing: View>: View {
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
-    public func rowStyle(_ style: RowStyle) -> Self { var c = self; c.style = style; return c }
-    public func dimmed(_ dimmed: Bool = true) -> Self { var c = self; c.isDimmed = dimmed; return c }
+    public func rowStyle(_ style: RowStyle) -> Self {
+        var c = self
+        c.style = style
+        return c
+    }
+    public func dimmed(_ dimmed: Bool = true) -> Self {
+        var c = self
+        c.isDimmed = dimmed
+        return c
+    }
 }
 
 struct SubtitleText: View {
@@ -70,33 +93,44 @@ struct SubtitleText: View {
     }
 }
 
-public extension Row where Leading == EmptyView {
-    init(_ title: LocalizedStringKey, subtitle: LocalizedStringKey? = nil, isSelected: Bool = false, @ViewBuilder trailing: () -> Trailing) {
+extension Row where Leading == EmptyView {
+    public init(
+        _ title: LocalizedStringKey, subtitle: LocalizedStringKey? = nil, isSelected: Bool = false,
+        @ViewBuilder trailing: () -> Trailing
+    ) {
         self.init(title, subtitle: subtitle, isSelected: isSelected, leading: { EmptyView() }, trailing: trailing)
     }
     @_disfavoredOverload
-    init(_ title: String, subtitle: String? = nil, isSelected: Bool = false, @ViewBuilder trailing: () -> Trailing) {
+    public init(
+        _ title: String, subtitle: String? = nil, isSelected: Bool = false, @ViewBuilder trailing: () -> Trailing
+    ) {
         self.init(title, subtitle: subtitle, isSelected: isSelected, leading: { EmptyView() }, trailing: trailing)
     }
 }
 
-public extension Row where Trailing == EmptyView {
-    init(_ title: LocalizedStringKey, subtitle: LocalizedStringKey? = nil, isSelected: Bool = false, @ViewBuilder leading: () -> Leading) {
+extension Row where Trailing == EmptyView {
+    public init(
+        _ title: LocalizedStringKey, subtitle: LocalizedStringKey? = nil, isSelected: Bool = false,
+        @ViewBuilder leading: () -> Leading
+    ) {
         self.init(title, subtitle: subtitle, isSelected: isSelected, leading: leading, trailing: { EmptyView() })
     }
     @_disfavoredOverload
-    init(_ title: String, subtitle: String? = nil, isSelected: Bool = false, @ViewBuilder leading: () -> Leading) {
+    public init(_ title: String, subtitle: String? = nil, isSelected: Bool = false, @ViewBuilder leading: () -> Leading)
+    {
         self.init(title, subtitle: subtitle, isSelected: isSelected, leading: leading, trailing: { EmptyView() })
     }
 }
 
-public extension Row where Leading == EmptyView, Trailing == EmptyView {
-    init(_ title: LocalizedStringKey, subtitle: LocalizedStringKey? = nil, isSelected: Bool = false) {
-        self.init(title, subtitle: subtitle, isSelected: isSelected, leading: { EmptyView() }, trailing: { EmptyView() })
+extension Row where Leading == EmptyView, Trailing == EmptyView {
+    public init(_ title: LocalizedStringKey, subtitle: LocalizedStringKey? = nil, isSelected: Bool = false) {
+        self.init(
+            title, subtitle: subtitle, isSelected: isSelected, leading: { EmptyView() }, trailing: { EmptyView() })
     }
     @_disfavoredOverload
-    init(_ title: String, subtitle: String? = nil, isSelected: Bool = false) {
-        self.init(title, subtitle: subtitle, isSelected: isSelected, leading: { EmptyView() }, trailing: { EmptyView() })
+    public init(_ title: String, subtitle: String? = nil, isSelected: Bool = false) {
+        self.init(
+            title, subtitle: subtitle, isSelected: isSelected, leading: { EmptyView() }, trailing: { EmptyView() })
     }
 }
 
@@ -105,14 +139,17 @@ public struct RowIndex: View {
     let n: Int
     public init(_ n: Int) { self.n = n }
     public var body: some View {
-        Text(verbatim: String(format: "%02d", n)).cofreFont(.label).foregroundStyle(Color.cofre.muted).accessibilityHidden(true)
+        Text(verbatim: String(format: "%02d", n)).cofreFont(.label).foregroundStyle(Color.cofre.muted)
+            .accessibilityHidden(true)
     }
 }
 
 /// Trailing chevron for rows that push.
 public struct Chevron: View {
     public init() {}
-    public var body: some View { Text(verbatim: "›").cofreFont(.button).foregroundStyle(Color.cofre.muted).accessibilityHidden(true) }
+    public var body: some View {
+        Text(verbatim: "›").cofreFont(.button).foregroundStyle(Color.cofre.muted).accessibilityHidden(true)
+    }
 }
 
 /// Pressed state for tappable rows: the block sinks into a well (§1.4).
@@ -122,7 +159,8 @@ public struct RowButtonStyle: ButtonStyle {
         configuration.label
             .overlay {
                 if configuration.isPressed {
-                    Color.cofre.well.opacity(0.55).overlay(alignment: .top) { Color.cofre.lip.frame(height: 2) }.padding(2).allowsHitTesting(false)
+                    Color.cofre.well.opacity(0.55).overlay(alignment: .top) { Color.cofre.lip.frame(height: 2) }
+                        .padding(2).allowsHitTesting(false)
                 }
             }
             .blockFocusRing()
@@ -135,11 +173,15 @@ public struct ToggleRow: View {
     @Binding var isOn: Bool
 
     public init(_ title: LocalizedStringKey, subtitle: LocalizedStringKey? = nil, isOn: Binding<Bool>) {
-        self.title = Text(title); self.subtitle = subtitle.map { Text($0) }; _isOn = isOn
+        self.title = Text(title)
+        self.subtitle = subtitle.map { Text($0) }
+        _isOn = isOn
     }
     @_disfavoredOverload
     public init(_ title: String, subtitle: String? = nil, isOn: Binding<Bool>) {
-        self.title = Text(verbatim: title); self.subtitle = subtitle.map { Text(verbatim: $0) }; _isOn = isOn
+        self.title = Text(verbatim: title)
+        self.subtitle = subtitle.map { Text(verbatim: $0) }
+        _isOn = isOn
     }
 
     public var body: some View {
@@ -161,7 +203,10 @@ public struct ToggleRow: View {
 public struct ValueRow: View {
     let title: Text, value: Text, accent: Bool, chevron: Bool
     public init(_ title: LocalizedStringKey, value: String, accent: Bool = false, chevron: Bool = true) {
-        self.title = Text(title); self.value = Text(verbatim: value); self.accent = accent; self.chevron = chevron
+        self.title = Text(title)
+        self.value = Text(verbatim: value)
+        self.accent = accent
+        self.chevron = chevron
     }
     public var body: some View {
         HStack(spacing: 10) {

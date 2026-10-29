@@ -7,12 +7,19 @@ public struct Banner<Action: View>: View {
     var spoken: String?
 
     public init(_ title: LocalizedStringKey, icon: PixelGlyph, tone: Tone = .warn, @ViewBuilder action: () -> Action) {
-        self.title = Text(title); self.icon = icon; self.tone = tone; self.action = action()
+        self.title = Text(title)
+        self.icon = icon
+        self.tone = tone
+        self.action = action()
     }
 
     @_disfavoredOverload
     public init(_ title: String, icon: PixelGlyph, tone: Tone = .warn, @ViewBuilder action: () -> Action) {
-        self.title = Text(verbatim: title); self.icon = icon; self.tone = tone; self.action = action(); spoken = title
+        self.title = Text(verbatim: title)
+        self.icon = icon
+        self.tone = tone
+        self.action = action()
+        spoken = title
     }
 
     public var body: some View {
@@ -23,14 +30,22 @@ public struct Banner<Action: View>: View {
         }
         .padding(.leading, 12).padding(.trailing, 8).padding(.vertical, 7)
         .frame(minHeight: 44)
-        .background(BlockBackground(.panel).overlay { Color.cofre.tint(tone == .neutral ? .accent : tone, amount: 0.16).padding(2) })
+        .background(
+            BlockBackground(.panel).overlay {
+                Color.cofre.tint(tone == .neutral ? .accent : tone, amount: 0.16).padding(2)
+            }
+        )
         .accessibilityElement(children: .combine)
         .onAppear { if tone == .danger, let spoken { AccessibilityNotification.Announcement(spoken).post() } }
     }
 }
 
-public extension Banner where Action == EmptyView {
-    init(_ title: LocalizedStringKey, icon: PixelGlyph, tone: Tone = .warn) { self.init(title, icon: icon, tone: tone) { EmptyView() } }
+extension Banner where Action == EmptyView {
+    public init(_ title: LocalizedStringKey, icon: PixelGlyph, tone: Tone = .warn) {
+        self.init(title, icon: icon, tone: tone) { EmptyView() }
+    }
     @_disfavoredOverload
-    init(_ title: String, icon: PixelGlyph, tone: Tone = .warn) { self.init(title, icon: icon, tone: tone) { EmptyView() } }
+    public init(_ title: String, icon: PixelGlyph, tone: Tone = .warn) {
+        self.init(title, icon: icon, tone: tone) { EmptyView() }
+    }
 }

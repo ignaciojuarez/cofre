@@ -13,9 +13,16 @@ public struct Field: View {
     @FocusState private var editing: Bool
     @Environment(\.isEnabled) private var enabled
 
-    public init(_ title: LocalizedStringKey, text: Binding<String>, prompt: LocalizedStringKey? = nil, kind: Kind = .plain,
-                error: String? = nil, trailingNote: LocalizedStringKey? = nil) {
-        self.title = title; _text = text; self.prompt = prompt; self.kind = kind; self.error = error; self.trailingNote = trailingNote
+    public init(
+        _ title: LocalizedStringKey, text: Binding<String>, prompt: LocalizedStringKey? = nil, kind: Kind = .plain,
+        error: String? = nil, trailingNote: LocalizedStringKey? = nil
+    ) {
+        self.title = title
+        _text = text
+        self.prompt = prompt
+        self.kind = kind
+        self.error = error
+        self.trailingNote = trailingNote
     }
 
     public var body: some View {
@@ -55,13 +62,15 @@ public struct Field: View {
         let placeholder = Text(prompt ?? title).foregroundStyle(Color.cofre.muted)
         switch kind {
         case .secure: SecureField(text: $text, prompt: placeholder) { Text(title) }
-        case .mono: TextField(text: $text, prompt: placeholder, axis: .vertical) { Text(title) }
-            .autocorrectionDisabled()
-            #if os(iOS)
-            .textInputAutocapitalization(.never)
-            #endif
-        case .search: TextField(text: $text, prompt: placeholder) { Text(title) }
-            .autocorrectionDisabled().submitLabel(.search)
+        case .mono:
+            TextField(text: $text, prompt: placeholder, axis: .vertical) { Text(title) }
+                .autocorrectionDisabled()
+                #if os(iOS)
+                    .textInputAutocapitalization(.never)
+                #endif
+        case .search:
+            TextField(text: $text, prompt: placeholder) { Text(title) }
+                .autocorrectionDisabled().submitLabel(.search)
         case .plain: TextField(text: $text, prompt: placeholder) { Text(title) }
         }
     }

@@ -9,7 +9,9 @@ public struct BlockButtonStyle: ButtonStyle {
     let role: Role, size: Size, fullWidth: Bool
 
     public init(_ role: Role = .secondary, size: Size = .regular, fullWidth: Bool = true) {
-        self.role = role; self.size = size; self.fullWidth = fullWidth
+        self.role = role
+        self.size = size
+        self.fullWidth = fullWidth
     }
 
     public func makeBody(configuration: Configuration) -> some View {
@@ -17,8 +19,10 @@ public struct BlockButtonStyle: ButtonStyle {
     }
 }
 
-public extension ButtonStyle where Self == BlockButtonStyle {
-    static func block(_ role: BlockButtonStyle.Role = .secondary, size: BlockButtonStyle.Size = .regular, fullWidth: Bool? = nil) -> Self {
+extension ButtonStyle where Self == BlockButtonStyle {
+    public static func block(
+        _ role: BlockButtonStyle.Role = .secondary, size: BlockButtonStyle.Size = .regular, fullWidth: Bool? = nil
+    ) -> Self {
         BlockButtonStyle(role, size: size, fullWidth: fullWidth ?? (size != .small))
     }
 }
@@ -33,9 +37,11 @@ private struct BlockButtonBody: View {
     @State private var hovering = false
 
     var body: some View {
-        let m = theme.block, pressed = configuration.isPressed && enabled
+        let m = theme.block
+        let pressed = configuration.isPressed && enabled
         let ghost = role == .ghost || role == .ghostDestructive
-        let lip: CGFloat = !enabled || ghost ? 0 : pressed ? m.pressedLip : (size == .small ? m.smallButtonLip : m.buttonLip)
+        let lip: CGFloat =
+            !enabled || ghost ? 0 : pressed ? m.pressedLip : (size == .small ? m.smallButtonLip : m.buttonLip)
         let height: CGFloat = ghost ? 34 : size == .small ? 30 : size == .large ? 50 : 42
 
         configuration.label
@@ -48,7 +54,8 @@ private struct BlockButtonBody: View {
             .frame(maxWidth: fullWidth ? .infinity : nil, minHeight: height)
             .background {
                 if !ghost {
-                    ButtonFace(role: role, lip: lip, flat: !enabled, hovering: hovering, darken: pressed && reduceMotion)
+                    ButtonFace(
+                        role: role, lip: lip, flat: !enabled, hovering: hovering, darken: pressed && reduceMotion)
                 } else if hovering {
                     Color.cofre.hover
                 }
@@ -85,21 +92,40 @@ public struct BlockButton: View {
     let title: Text, icon: PixelGlyph?, iconTint: Color?, role: BlockButtonStyle.Role, size: BlockButtonStyle.Size
     let fullWidth: Bool?, isLoading: Bool, action: () -> Void
 
-    public init(_ title: LocalizedStringKey, icon: PixelGlyph? = nil, iconTint: Color? = nil, role: BlockButtonStyle.Role = .secondary,
-                size: BlockButtonStyle.Size = .regular, fullWidth: Bool? = nil, isLoading: Bool = false, action: @escaping () -> Void) {
-        self.init(text: Text(title), icon: icon, iconTint: iconTint, role: role, size: size, fullWidth: fullWidth, isLoading: isLoading, action: action)
+    public init(
+        _ title: LocalizedStringKey, icon: PixelGlyph? = nil, iconTint: Color? = nil,
+        role: BlockButtonStyle.Role = .secondary,
+        size: BlockButtonStyle.Size = .regular, fullWidth: Bool? = nil, isLoading: Bool = false,
+        action: @escaping () -> Void
+    ) {
+        self.init(
+            text: Text(title), icon: icon, iconTint: iconTint, role: role, size: size, fullWidth: fullWidth,
+            isLoading: isLoading, action: action)
     }
 
     @_disfavoredOverload
-    public init(_ title: String, icon: PixelGlyph? = nil, iconTint: Color? = nil, role: BlockButtonStyle.Role = .secondary,
-                size: BlockButtonStyle.Size = .regular, fullWidth: Bool? = nil, isLoading: Bool = false, action: @escaping () -> Void) {
-        self.init(text: Text(verbatim: title), icon: icon, iconTint: iconTint, role: role, size: size, fullWidth: fullWidth, isLoading: isLoading, action: action)
+    public init(
+        _ title: String, icon: PixelGlyph? = nil, iconTint: Color? = nil, role: BlockButtonStyle.Role = .secondary,
+        size: BlockButtonStyle.Size = .regular, fullWidth: Bool? = nil, isLoading: Bool = false,
+        action: @escaping () -> Void
+    ) {
+        self.init(
+            text: Text(verbatim: title), icon: icon, iconTint: iconTint, role: role, size: size, fullWidth: fullWidth,
+            isLoading: isLoading, action: action)
     }
 
-    init(text: Text, icon: PixelGlyph?, iconTint: Color?, role: BlockButtonStyle.Role, size: BlockButtonStyle.Size,
-         fullWidth: Bool?, isLoading: Bool, action: @escaping () -> Void) {
-        self.title = text; self.icon = icon; self.iconTint = iconTint; self.role = role; self.size = size
-        self.fullWidth = fullWidth; self.isLoading = isLoading; self.action = action
+    init(
+        text: Text, icon: PixelGlyph?, iconTint: Color?, role: BlockButtonStyle.Role, size: BlockButtonStyle.Size,
+        fullWidth: Bool?, isLoading: Bool, action: @escaping () -> Void
+    ) {
+        self.title = text
+        self.icon = icon
+        self.iconTint = iconTint
+        self.role = role
+        self.size = size
+        self.fullWidth = fullWidth
+        self.isLoading = isLoading
+        self.action = action
     }
 
     public var body: some View {
@@ -108,7 +134,8 @@ public struct BlockButton: View {
                 if isLoading {
                     Spinner(size: size == .small ? 11 : 14)
                 } else if let icon {
-                    PixelIcon(icon, size: size == .small ? 11 : size == .large ? 18 : 15, tint: iconTint).accessibilityHidden(true)
+                    PixelIcon(icon, size: size == .small ? 11 : size == .large ? 18 : 15, tint: iconTint)
+                        .accessibilityHidden(true)
                 }
                 title
             }
@@ -121,8 +148,14 @@ public struct BlockButton: View {
 /// Icon-only block button. Needs an accessibility label.
 public struct IconButton: View {
     let glyph: PixelGlyph, label: LocalizedStringKey, size: BlockButtonStyle.Size, action: () -> Void
-    public init(_ glyph: PixelGlyph, label: LocalizedStringKey, size: BlockButtonStyle.Size = .small, action: @escaping () -> Void) {
-        self.glyph = glyph; self.label = label; self.size = size; self.action = action
+    public init(
+        _ glyph: PixelGlyph, label: LocalizedStringKey, size: BlockButtonStyle.Size = .small,
+        action: @escaping () -> Void
+    ) {
+        self.glyph = glyph
+        self.label = label
+        self.size = size
+        self.action = action
     }
     public var body: some View {
         Button(action: action) { PixelIcon(glyph, size: size == .small ? 12 : 16) }
