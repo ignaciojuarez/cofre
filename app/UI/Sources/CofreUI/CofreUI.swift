@@ -33,12 +33,17 @@ import SwiftUI
 /// Web pages the UI links to: the setup site on GitHub Pages (`docs/` in the Cofre repo).
 /// Only hosts in `allowedHosts`; a unit test fails otherwise, because users paste what these pages show into Terminal.
 public enum CofreLinks {
-    public static let allowedHosts: Set<String> = ["ignaciojuarez.github.io"]
+    public static let allowedHosts: Set<String> = ["ignaciojuarez.github.io", "github.com"]
     /// The setup site. Step 1 is how to get Cofre.
     public static let site = URL(string: "https://ignaciojuarez.github.io/cofre/")!
-    /// The one Mac command that puts the pairing key into Cofre over the cable, with its steps.
+    /// The steps for the one Mac command that puts the pairing key into Cofre over the cable.
     public static let pairing = URL(string: "https://ignaciojuarez.github.io/cofre/pair/")!
-    public static let all = [site, pairing]
+    /// The script that command runs (Cofre's GitHub release; same as `docs/app.js`).
+    public static let pairScript = URL(
+        string: "https://github.com/ignaciojuarez/cofre/releases/latest/download/pair.sh")!
+    /// What the user pastes into Terminal. Copy and Share hand over exactly this.
+    public static let pairCommand = "curl -fsSL \(pairScript.absoluteString) | sh"
+    public static let all = [site, pairing, pairScript]
 
     /// "ignaciojuarez.github.io/cofre/pair": host and path without the scheme or trailing slash, for display.
     public static func short(_ url: URL) -> String {

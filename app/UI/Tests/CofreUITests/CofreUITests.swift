@@ -129,7 +129,10 @@
             for url in CofreLinks.all {
                 XCTAssertEqual(url.scheme, "https", url.absoluteString)
                 XCTAssertTrue(CofreLinks.allowedHosts.contains(url.host() ?? ""), url.absoluteString)
+                if url.host() == "github.com" { XCTAssertTrue(url.path().hasPrefix("/ignaciojuarez/cofre/")) }
             }
+            // The command Copy and Share hand over is the site's (docs/app.js) and runs only that script.
+            XCTAssertEqual(CofreLinks.pairCommand, "curl -fsSL \(CofreLinks.pairScript.absoluteString) | sh")
         }
 
         func testMockLaunchStreamFinishes() async throws {

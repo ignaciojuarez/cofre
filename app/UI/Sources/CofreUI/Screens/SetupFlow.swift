@@ -1,6 +1,5 @@
 #if canImport(UIKit)
     import SwiftUI
-    import UniformTypeIdentifiers
 
     // S01–S08. Six checks, one per `SetupState` field. Each step checks itself and moves on when it passes:
     // Developer Mode, key found, VPN allowed and JIT OK advance on their own, and the JIT test starts by itself.
@@ -9,8 +8,6 @@
     public struct SetupFlow: View {
         @Environment(CofreStore.self) private var store
         @State private var step: Int
-        /// Set by "Do Step 3 first" on Developer Mode, so finishing the Mac step comes back to it.
-        @State private var returnTo: Int?
         private let startAt: Int?
 
         static let stepNames: [LocalizedStringKey] = ["Dev Mode", "Trust", "Pairing", "VPN", "JIT", "Account"]
@@ -26,13 +23,7 @@
                 Group {
                     switch step {
                     case 0: WelcomeStep(next: { step = store.firstOpenStep })
-                    case 1:
-                        DevModeStep(
-                            step: $step, next: next,
-                            macStepFirst: {
-                                returnTo = 1
-                                step = 3
-                            })
+                    case 1: DevModeStep(step: $step, next: next)
                     case 2: TrustStep(step: $step, next: next)
                     case 3: PairingStep(step: $step, next: next)
                     case 4: VPNStep(step: $step, next: next)
@@ -57,14 +48,8 @@
             }
         }
 
-        /// The next check that isn't ready, after this one (or back to Developer Mode after "Do Step 3 first").
+        /// The next check that isn't ready, after this one. Steps run in order; none can be skipped.
         private func next() {
-            if let r = returnTo, !store.setup.all[r - 1].isReady {
-                returnTo = nil
-                step = r
-                return
-            }
-            returnTo = nil
             step = (step..<6).first { !store.setup.all[$0].isReady }.map { $0 + 1 } ?? 7
         }
     }
@@ -141,7 +126,7 @@
 
     private struct DevModeStep: View {
         @Binding var step: Int
-        let next: () -> Void, macStepFirst: () -> Void
+        let next: () -> Void
         @Environment(CofreStore.self) private var store
         @Environment(\.scenePhase) private var scenePhase
         var body: some View {
@@ -169,16 +154,11 @@
                 Row("Developer Mode → On", leading: { RowIndex(3) })
                 Row("Restart → Turn On (or Enable)", leading: { RowIndex(4) })
             }
-            Text("No switch? Do Step 3 · Connect to a Mac, then come back.").cofreFont(.secondary).foregroundStyle(
-                Color.cofre.muted)
             if s.isReady {
                 BlockButton("Next", role: .primary, action: next).keyboardShortcut(.defaultAction)
             } else {
-                BlockButton("Open Settings app", role: .primary) { store.backend.openDeveloperModeSettings() }
-                HStack(spacing: 8) {
-                    BlockButton("Do Step 3 first", action: macStepFirst)
-                    BlockButton("Check again") { Task { await store.backend.recheckSetup() } }
-                }
+                BlockButton("Open Settings", role: .primary) { store.backend.openDeveloperModeSettings() }
+                BlockButton("Check again") { Task { await store.backend.recheckSetup() } }
             }
         }
     }
@@ -223,13 +203,12 @@
         let next: () -> Void
         @Environment(CofreStore.self) private var store
         @Environment(\.widthClass) private var width
-        @State private var choosing = false
 
         var body: some View {
             let ok = store.setup.pairing.isReady
             StepHeader(
                 index: 3, glyph: .key, kicker: "Pairing key", title: "Connect to a Mac",
-                lede: "Run one command on a Mac with this device plugged in. The key comes straight here.", step: $step)
+                lede: "The key comes here over the cable.", step: $step)
             if ok {
                 Banner("Key found", icon: .check, tone: .success)
                 if store.pairingFromFile { DeleteCopyNote() }
@@ -237,18 +216,11 @@
                 PairingGuide()
             }
             if case .failed(let msg) = store.setup.pairing { Banner(msg, icon: .cross, tone: .danger) }
-            NeverShareBanner()
-            HStack(spacing: 8) {
-                if width > .compact { BlockButton("Back") { step -= 1 }.frame(width: 140) }
-                if ok {
+            if ok {
+                HStack(spacing: 8) {
+                    if width > .compact { BlockButton("Back") { step -= 1 }.frame(width: 140) }
                     BlockButton("Next", role: .primary, action: next).keyboardShortcut(.defaultAction)
-                } else {
-                    BlockButton("I have a file", icon: .paper, role: .ghost, fullWidth: false) { choosing = true }
-                    Spacer(minLength: 0)
                 }
-            }
-            .fileImporter(isPresented: $choosing, allowedContentTypes: UTType.pairingFiles + [.data]) { r in
-                if let (_, data) = readPicked(r.map { [$0] }) { store.importPairing(data) }
             }
             if width > .compact {
                 HStack(spacing: 10) {
@@ -257,13 +229,6 @@
                     KeyHint("esc", "back")
                 }
             }
-        }
-    }
-
-    /// "Never share this file." Visible wherever the pairing file can be picked: S04, X04 (Llave has its own).
-    struct NeverShareBanner: View {
-        var body: some View {
-            Banner("Never share this file. It's a key to your iPhone.", icon: .shield, tone: .warn)
         }
     }
 

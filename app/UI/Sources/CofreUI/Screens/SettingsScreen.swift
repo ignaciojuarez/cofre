@@ -1,6 +1,5 @@
 #if canImport(UIKit)
     import SwiftUI
-    import UniformTypeIdentifiers
 
     // X00 index (Game · Controls · System) + panes X01–X07. On compact the index is the root list and each pane is
     // pushed (§3.5 #1); on regular the pane opens beside it in a readable column.
@@ -257,7 +256,6 @@
 
     struct JITJavaContent: View {
         @Environment(CofreStore.self) private var store
-        @State private var choosingPairing = false
         var body: some View {
             let s = store.setup
             if s.jit.isReady {
@@ -286,12 +284,9 @@
             }
             if store.jitTesting || !store.jitSteps.isEmpty { JITStepRows() }
             if !s.pairing.isReady { PairingGuide() } else if store.pairingFromFile { DeleteCopyNote() }
-            HStack(spacing: 8) {
-                BlockButton("Test JIT", isLoading: store.jitTesting) { Task { await store.testJIT() } }
-                    .keyboardShortcut("j", modifiers: [.command, .option])
-                BlockButton("I have a file") { choosingPairing = true }
-            }
-            NeverShareBanner()
+            BlockButton("Test JIT", isLoading: store.jitTesting) { Task { await store.testJIT() } }
+                .keyboardShortcut("j", modifiers: [.command, .option])
+            if s.pairing.isReady { KeyFileCard(title: "Replace the key file") }
             ListSection("Java", spacing: 4) {
                 Row(
                     "Runtime",
@@ -310,9 +305,6 @@
                         "Env variables",
                         trailing: { Meta(n == 0 ? String(localized: "None") : String(localized: "\(n) set")) })
                 }
-            }
-            .fileImporter(isPresented: $choosingPairing, allowedContentTypes: UTType.pairingFiles + [.data]) { r in
-                if let (_, data) = readPicked(r.map { [$0] }) { store.importPairing(data) }
             }
         }
     }

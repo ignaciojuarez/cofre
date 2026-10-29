@@ -204,49 +204,164 @@
     }
 
     /// Getting the pairing key: one command on a Mac with this device plugged in. The key arrives over the cable,
-    /// so this rechecks setup while it's on screen. Shared by Setup S04 and Settings X04; show it only while pairing isn't ready.
+    /// so this rechecks setup while it's on screen. Shared by Setup S04 and Settings X04; show it only while pairing
+    /// isn't ready. Three steps with the command where it's used, then the key-file fallback.
     struct PairingGuide: View {
-        var url: URL = CofreLinks.pairing
         @Environment(CofreStore.self) private var store
+        @State private var copied = false
 
         var body: some View {
-            ListSection(spacing: 4) {
-                Row("Plug into a Mac with a cable", leading: { RowIndex(1) })
-                Row("Run one command on the Mac", leading: { RowIndex(2) })
-                Row("Unlock, tap Trust, enter your passcode", leading: { RowIndex(3) })
-            }
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 12) {
-                    link
-                    Spacer(minLength: 0)
-                    share
+            VStack(spacing: 8) {
+                VStack(spacing: 12) {
+                    CableArt()
+                    HStack(spacing: 8) {
+                        Spinner(size: 12)
+                        Text("Waiting for your key…").cofreFont(.secondary).foregroundStyle(Color.cofre.inkSoft)
+                    }
                 }
-                VStack(alignment: .leading, spacing: 10) {
-                    link
-                    share
-                }
-            }
-            .padding(12).frame(maxWidth: .infinity, alignment: .leading).block(.well)
-            Row("Waiting for your key…", leading: { Spinner() }, trailing: { Meta("Auto") })
+                .padding(.vertical, 16).frame(maxWidth: .infinity).block(.well)
                 .task {
                     while !Task.isCancelled {
                         try? await Task.sleep(for: .seconds(3))
                         await store.backend.recheckSetup()
                     }
                 }
+                step(1, "Plug this iPhone into a Mac")
+                VStack(alignment: .leading, spacing: 10) {
+                    stepTitle(2, "On the Mac, run this in Terminal")
+                    Text(verbatim: CofreLinks.pairCommand).cofreFont(.code).foregroundStyle(Color.cofre.ink)
+                        .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                        .padding(10).frame(maxWidth: .infinity, alignment: .leading).block(.well)
+                    HStack(spacing: 8) {
+                        BlockButton(copied ? "Copied" : "Copy", icon: copied ? .check : .paper, role: .primary) {
+                            UIPasteboard.general.string = CofreLinks.pairCommand
+                            UINotificationFeedbackGenerator().notificationOccurred(.success)
+                            copied = true
+                            Task {
+                                try? await Task.sleep(for: .seconds(2))
+                                copied = false
+                            }
+                        }
+                        ShareLink(item: CofreLinks.pairCommand) { Text("Share") }.buttonStyle(.block(.secondary))
+                    }
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 12) { terminalKeys }
+                        VStack(alignment: .leading, spacing: 6) { terminalKeys }
+                    }
+                }
+                .padding(12).frame(maxWidth: .infinity, alignment: .leading).block(.panel)
+                step(3, "Tap Trust on this iPhone, then your passcode")
+            }
+            KeyFileCard()
         }
 
-        private var link: some View {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("The command is at").cofreFont(.label).foregroundStyle(Color.cofre.muted)
-                Text(verbatim: CofreLinks.short(url)).cofreFont(.title2).foregroundStyle(Color.cofre.accent)
-                    .textSelection(.enabled)
+        /// How to run it, as key caps: open Terminal, paste, run.
+        @ViewBuilder private var terminalKeys: some View {
+            KeyHint("⌘ Space", "Terminal")
+            KeyHint("⌘ V", "paste")
+            KeyHint("↩", "run")
+        }
+
+        private func step(_ n: Int, _ title: LocalizedStringKey) -> some View {
+            stepTitle(n, title).padding(12).frame(maxWidth: .infinity, alignment: .leading).block(.panel)
+        }
+
+        private func stepTitle(_ n: Int, _ title: LocalizedStringKey) -> some View {
+            HStack(spacing: 10) {
+                RowIndex(n)
+                Text(title).cofreFont(.rowTitle).foregroundStyle(Color.cofre.ink)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .accessibilityElement(children: .combine)
         }
+    }
 
-        private var share: some View {
-            ShareLink(item: url) { Text("Send to Mac") }.buttonStyle(.block(size: .small))
+    /// "I have a key file": the `.mobiledevicepairing` file the Mac command saves when it can't place the key over
+    /// the cable. Says never to share it, since it's a key to the iPhone.
+    struct KeyFileCard: View {
+        var title: LocalizedStringKey = "I have a key file"
+        @Environment(CofreStore.self) private var store
+        @State private var choosing = false
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 8) {
+                Button {
+                    choosing = true
+                } label: {
+                    HStack(spacing: 12) {
+                        PixelIcon(.paper, size: 26)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(title).cofreFont(.rowTitle).foregroundStyle(Color.cofre.ink)
+                            Text("The .mobiledevicepairing file the Mac made").cofreFont(.secondary)
+                                .foregroundStyle(Color.cofre.muted).fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 8)
+                        Chevron()
+                    }
+                    .padding(12).frame(maxWidth: .infinity, minHeight: 56).contentShape(Rectangle()).block(.panel)
+                }
+                .buttonStyle(.plain)
+                HStack(spacing: 6) {
+                    PixelIcon(.shield, size: 12)
+                    Text("Never share this file. It's a key to your iPhone.").cofreFont(.secondary)
+                        .foregroundStyle(Color.cofre.muted).fixedSize(horizontal: false, vertical: true)
+                }
+                .accessibilityElement(children: .combine)
+            }
+            .fileImporter(isPresented: $choosing, allowedContentTypes: UTType.pairingFiles + [.data]) { r in
+                if let (_, data) = readPicked(r.map { [$0] }) { store.importPairing(data) }
+            }
+        }
+    }
+
+    /// A Mac and an iPhone joined by a cable, with a dot running from Mac to iPhone: the key on its way.
+    /// Still when Reduce Motion is on.
+    struct CableArt: View {
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+        private static let rows = [
+            "..kkkkkkkkkkkkkkkkkkkk..............kkkkkkkkk",
+            "..kssssssssssssssssssk..............ksskkkssk",
+            "..kssssssssssssssssssk..............ksssssssk",
+            "..ksswswwwwwwwwwwssssk..............ksssssssk",
+            "..kssssssssssssssssssk..............ksYYssssk",
+            "..ksswswwwwwsGsssssssk..............kYssYYYYk",
+            "..kssssssssssssssssssk..............ksYYssYsk",
+            "..kssssssssssssssssssk..............ksssssssk",
+            "..kssssssssssssssssssk..............ksssssssk",
+            "..kssssssssssssssssssk..............kswwwwwsk",
+            "..kssssssssssssssssssk..............ksssssssk",
+            "..kkkkkkkkkkkkkkkkkkkk..............ksssssssk",
+            "ggggggggggggggggggggggggcccc........kkkkkkkkk",
+            ".kkkkkkkkkkkkkkkkkkkkkk....c............c....",
+            "...........................cccccccccccccc....",
+        ]
+        /// The cable, from the Mac's side to the iPhone's port.
+        private static let cable: [(x: Int, y: Int)] =
+            (24...27).map { ($0, 12) } + [(27, 13)] + (27...40).map { ($0, 14) } + [(40, 13)]
+
+        var body: some View {
+            TimelineView(.periodic(from: .now, by: 0.12)) { context in
+                let tick = reduceMotion ? -1 : Int(context.date.timeIntervalSinceReferenceDate / 0.12)
+                PixelArt(frame(dot: tick < 0 ? nil : tick % (Self.cable.count + 6)), palette: palette, pixel: 5)
+            }
+            .accessibilityElement()
+            .accessibilityLabel(Text("A Mac connected to this iPhone with a cable"))
+        }
+
+        private func frame(dot: Int?) -> [String] {
+            guard let dot, dot < Self.cable.count else { return Self.rows }
+            var rows = Self.rows.map(Array.init)
+            let p = Self.cable[dot]
+            rows[p.y][p.x] = "D"
+            return rows.map { String($0) }
+        }
+
+        private var palette: [Character: Color] {
+            [
+                "k": Color.cofre.muted, "s": Color.cofre.panel, "w": Color.cofre.accent, "g": Color.cofre.inkSoft,
+                "c": Color.cofre.inkSoft, "Y": Color.cofre.warn, "G": Color.cofre.success, "D": Color.cofre.warn,
+            ]
         }
     }
 #endif
