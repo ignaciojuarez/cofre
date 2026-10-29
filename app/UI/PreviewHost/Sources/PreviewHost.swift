@@ -3,7 +3,7 @@ import SwiftUI
 import UIKit
 
 // Launch arguments (all optional):
-//   -screen play|worlds|instances|mods|modpage|settings|jit|about|setup|launch|join|gameExit   (default play)
+//   -screen play|worlds|instances|mods|modpage|settings|jit|about|controls|setup|launch|join|gameExit   (default play)
 //   -exitReason memory|renderer|missingLibrary|mods|java|unknown|quit   Why the game stopped (-screen gameExit)
 //   -exitDetails YES    Open its Details sheet
 //   -joinState firstVisit|needsAttention|keyChanged|installing|update|error|ready|resolving|live   Join server sheet state
@@ -54,9 +54,9 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         case "jit":
             nav.section = .settings
             nav.settingsPane = .jitJava
-        case "about":
+        case "about", "controls":
             nav.section = .settings
-            nav.settingsPane = .about
+            nav.settingsPane = screen == "about" ? .about : .touch
         case "launch": nav.showingLaunch = true
         case "worlds": nav.playPane = 1
         case "join":

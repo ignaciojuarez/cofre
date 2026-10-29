@@ -25,7 +25,7 @@
                         }),
                     options: [
                         (.auto, "Auto"), (.touch, "Touch"), (.controller, "Controller"),
-                        (.keyboardMouse, "Keyboard & mouse"),
+                        (.keyboardMouse, "Keyboard"),
                     ])
                 Text(
                     "Auto switches to a controller or keyboard the moment you use one, and back to touch when you touch the screen."
@@ -100,9 +100,17 @@
         var body: some View {
             Button(action: pick) {
                 VStack(spacing: 6) {
-                    TouchOverlayPreview(style: style, state: style == .minimal ? .active : .rest)
-                        .scaleEffect(0.19, anchor: .topLeading)
-                        .frame(width: 874 * 0.19, height: 402 * 0.19, alignment: .topLeading)
+                    // Rendered at iPhone landscape size, then scaled to the tile so three fit in portrait too.
+                    Color.clear
+                        .aspectRatio(874 / 402, contentMode: .fit)
+                        .overlay(alignment: .topLeading) {
+                            GeometryReader { g in
+                                TouchOverlayPreview(style: style, state: style == .minimal ? .active : .rest)
+                                    .frame(width: 874, height: 402)
+                                    .scaleEffect(g.size.width / 874, anchor: .topLeading)
+                            }
+                        }
+                        .clipped()
                         .allowsHitTesting(false)
                     Text(verbatim: style.title).cofreFont(.chip).foregroundStyle(Color.cofre.ink)
                 }
