@@ -296,14 +296,27 @@
         @State private var ownFolder = true
         @State private var fabricAPI = true
         @State private var creating = false
+        /// From Mods: pre-fills the form, then switches to the new instance (and installs `thenInstall`) there.
+        private let plan: NewInstancePlan?
 
-        public init() {}
+        public init(plan: NewInstancePlan? = nil) {
+            self.plan = plan
+            if let plan {
+                _name = State(initialValue: plan.name)
+                _loader = State(initialValue: plan.loader)
+                // Empty: the newest release, once the list loads.
+                _version = State(initialValue: plan.version)
+            }
+        }
 
         public var body: some View {
             VStack(spacing: 0) {
                 SheetHeader("New instance")
                 ScrollView {
                     VStack(alignment: .leading, spacing: 10) {
+                        if let mod = plan?.thenInstall {
+                            Row("Adds \(mod.title)", leading: { ProjectIcon(project: mod, size: 22) })
+                        }
                         SectionLabel("Name")
                         Field("Name", text: $name)
                         SectionLabel("Version")
@@ -356,6 +369,7 @@
                     .padding(16)
                 }
             }
+            .onDisappear { store.newInstancePlan = nil }
             .task(id: "\(kind.rawValue)-\(versionsAttempt)") {
                 do {
                     versions = try await store.backend.gameVersions(kind)
@@ -397,8 +411,13 @@
                     ownFolder: ownFolder, fabricAPI: fabricAPI)
                 creating = false
                 // On failure the sheet stays open; the error shows in the banner.
-                if let made {
-                    dismiss()
+                guard let made else { return }
+                dismiss()
+                if let plan {
+                    // From Mods: stay there, on the new instance.
+                    await store.selectInstance(made.id)
+                    if let mod = plan.thenInstall { store.install(projectID: mod.id) }
+                } else {
                     nav.instance = made.id
                     nav.section = .instances
                 }

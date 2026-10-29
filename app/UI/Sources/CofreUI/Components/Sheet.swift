@@ -7,15 +7,19 @@ extension View {
         sheet(isPresented: isPresented) { BlockSheetContent(content: content()) }
     }
 
+    /// `hugsContent`: a short sheet as tall as its content on compact, and fitted to it on regular (iOS 18).
     public func blockSheet<Item: Identifiable, C: View>(
-        item: Binding<Item?>, @ViewBuilder content: @escaping (Item) -> C
+        item: Binding<Item?>, hugsContent: Bool = false, onDismiss: (() -> Void)? = nil,
+        @ViewBuilder content: @escaping (Item) -> C
     ) -> some View {
-        sheet(item: item) { BlockSheetContent(content: content($0)) }
+        sheet(item: item, onDismiss: onDismiss) { BlockSheetContent(content: content($0), hugsContent: hugsContent) }
     }
 }
 
 struct BlockSheetContent<C: View>: View {
     let content: C
+    var hugsContent = false
+    @State private var height: CGFloat = 320
     @Environment(\.horizontalSizeClass) private var sizeClass
     #if canImport(UIKit)
         @Environment(\.sizeClasses) private var measured
@@ -35,10 +39,13 @@ struct BlockSheetContent<C: View>: View {
             .environment(\.widthClass, compact ? .compact : .medium)
             .environment(\.isPushed, false)
             .modifier(ReapplySizeClasses())
+            .fixedSize(horizontal: false, vertical: hugsContent)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
+            .frame(width: hugsContent && !compact ? 420 : nil)
             .presentationBackground(Color.cofre.panel)
-            .presentationDetents(compact ? [.medium, .large] : [.large])
+            .presentationDetents(hugsContent ? [.height(height)] : compact ? [.medium, .large] : [.large])
             .presentationDragIndicator(compact ? .visible : .hidden)
-            .modifier(FormSizing())
+            .modifier(FormSizing(fitted: hugsContent))
             .background {
                 // Esc: a hidden cancel button works even when nothing in the sheet has focus.
                 Button("Close") { dismiss() }.keyboardShortcut(.cancelAction)
@@ -59,8 +66,13 @@ private struct ReapplySizeClasses: ViewModifier {
 }
 
 private struct FormSizing: ViewModifier {
+    var fitted = false
     func body(content: Content) -> some View {
-        if #available(iOS 18.0, macOS 15.0, *) { content.presentationSizing(.form) } else { content }
+        if #available(iOS 18.0, macOS 15.0, *) {
+            if fitted { content.presentationSizing(.fitted) } else { content.presentationSizing(.form) }
+        } else {
+            content
+        }
     }
 }
 

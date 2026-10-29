@@ -7,10 +7,12 @@
 
     public struct ModsSection: View {
         @Environment(NavModel.self) private var nav
+        @Environment(CofreStore.self) private var store
         @Environment(\.widthClass) private var width
         public init() {}
         public var body: some View {
             @Bindable var nav = nav
+            @Bindable var store = store
             AdaptiveListDetail(selection: $nav.mod, defaultSelection: width == .compact ? nil : .installed) {
                 ModsBrowserPane()
             } detail: { route in
@@ -19,6 +21,10 @@
                 case .project(let id): ModPagePane(id: id)
                 }
             }
+            // "Make an instance for it" opens P04 once this sheet is gone.
+            .blockSheet(item: $store.misfit, hugsContent: true) {
+                if store.newInstancePlan != nil { nav.sheet = .newInstance }
+            } content: { MisfitSheet(misfit: $0).environment(store) }
         }
     }
 
@@ -49,7 +55,7 @@
                             (.mods, "Mods"), (.modpacks, "Packs"), (.shaders, "Shaders"), (.resourcePacks, "Resource"),
                             (.dataPacks, "Data"),
                         ])
-                    if let inst {
+                    if let inst, !store.activeCantRunMods {
                         ToggleRow("Fits \(inst.loaderLabel)", isOn: $store.query.onlyFitting)
                     }
                 }
@@ -76,10 +82,15 @@
                 } else if store.results.isEmpty && store.searching {
                     Row("Searching…", leading: { Spinner() }).padding(.horizontal, width == .compact ? 16 : 20)
                     Spacer(minLength: 0)
+                } else if store.results.isEmpty && store.activeCantRunMods {
+                    ScrollView { ModsHero().padding(.horizontal, width == .compact ? 16 : 20).padding(.top, 6) }
                 } else if store.results.isEmpty {
                     EmptyState("No results", message: "Try another name, or turn off Fits.", icon: .book)
                 } else {
                     BlockList {
+                        if store.activeCantRunMods {
+                            ModsHero().padding(.vertical, 6).blockListRow(horizontal: width == .compact ? 16 : 20)
+                        }
                         ForEach(store.results) { p in
                             let selected = width != .compact && nav.mod == .project(p.id)
                             Button {
@@ -95,7 +106,7 @@
                                         BlockButton(
                                             "Get", role: .primary, size: .small,
                                             isLoading: store.installing.contains(p.id)
-                                        ) { store.install(projectID: p.id) }
+                                        ) { Task { await store.get(p) } }
                                     }
                                 }
                                 .dimmed(!p.fits)
@@ -193,9 +204,13 @@
                         } else if store.versions[id] == nil {
                             if store.versionsError[id] == nil { Row("Loading versions…", leading: { Spinner() }) }
                         } else {
-                            let name = versions.first { $0.id == chosen }?.name ?? ""
-                            BlockButton("Install \(name)", role: .primary, isLoading: store.installing.contains(id)) {
-                                store.install(projectID: id, versionID: chosen)
+                            let name = versions.first { $0.id == chosen }?.name
+                            // Nothing fits this instance: Get offers one that runs it instead.
+                            BlockButton(
+                                name.map { "Install \($0)" } ?? "Get", role: .primary,
+                                isLoading: store.installing.contains(id)
+                            ) {
+                                Task { await store.get(p, versionID: chosen) }
                             }
                             .keyboardShortcut(.return, modifiers: .command)
                         }

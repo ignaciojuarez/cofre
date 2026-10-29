@@ -115,7 +115,7 @@ public enum CofreLinks {
             .blockSheet(item: $nav.sheet) { sheet in
                 Group {
                     switch sheet {
-                    case .newInstance: NewInstanceSheet()
+                    case .newInstance: NewInstanceSheet(plan: store.newInstancePlan)
                     case .importPack: ImportPackSheet()
                     }
                 }

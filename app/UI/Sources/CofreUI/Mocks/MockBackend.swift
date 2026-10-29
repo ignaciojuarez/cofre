@@ -297,12 +297,12 @@
             ].compactMapValues { URL(string: cdn + $0) }
             func p(
                 _ id: String, _ title: String, _ author: String, _ summary: String, _ tint: String, _ dl: Int,
-                installed: Bool = false, fits: Bool = true
+                installed: Bool = false, fits: Bool = true, loaders: [Loader] = [.fabric, .quilt]
             ) -> ProjectSummary {
                 ProjectSummary(
                     id: id, title: title, author: author, summary: summary, iconURL: icons[id],
                     iconTintHex: t[tint], downloads: dl,
-                    updated: Date().addingTimeInterval(-3 * 86400), loaders: [.fabric, .quilt], clientSide: true,
+                    updated: Date().addingTimeInterval(-3 * 86400), loaders: loaders, clientSide: true,
                     fits: fits, installed: installed)
             }
             return [
@@ -313,7 +313,7 @@
                     42_000_000),
                 p("xaero", "Xaero's Minimap", "xaero96", "Map in a corner", "emerald", 31_000_000),
                 p("lithium", "Lithium", "jellysquid3", "Faster game logic", "gold", 39_000_000, installed: true),
-                p("create", "Create", "simibubi", "Gears & machines", "copper", 12_000_000),
+                p("create", "Create", "simibubi", "Gears & machines", "copper", 12_000_000, loaders: [.forge, .neoforge]),
                 p("modmenu", "Mod Menu", "Prospector", "Mod list in game", "lapis", 60_000_000, installed: true),
                 p("culling", "Entity Culling", "tr7zw", "Skips hidden mobs", "emerald", 28_000_000),
                 p("fabric-api", "Fabric API", "modmuss50", "Core library", "gold", 140_000_000, installed: true),
@@ -324,18 +324,32 @@
         public func search(_ query: ProjectQuery) async throws -> [ProjectSummary] {
             if offline { throw URLError(.notConnectedToInternet) }
             let q = query.text.lowercased()
-            return Self.projects.filter { q.isEmpty || $0.title.lowercased().contains(q) }.map {
+            let inst = instanceList.first { $0.id == query.instanceID }
+            return Self.projects.filter { q.isEmpty || $0.title.lowercased().contains(q) }.compactMap {
                 var p = $0
                 p.source = query.source
+                if inst?.loader == .vanilla { p.installed = false }
+                // Like Modrinth's loader facet: Vanilla filters by version only.
+                if let inst, inst.loader != .vanilla, query.kind == .mods {
+                    p.fits = p.loaders.contains(inst.loader)
+                    if query.onlyFitting && !p.fits { return nil }
+                }
                 return p
             }
         }
         public func versions(projectID: String, instanceID: String) async throws -> [ProjectVersion] {
             if failVersions { throw URLError(.timedOut) }
+            // Fits like the adapter: the instance's loader and exact game version.
+            let inst = instanceList.first { $0.id == instanceID }
+            let loaders = Self.projects.first { $0.id == projectID }?.loaders ?? []
+            func fits(_ game: String) -> Bool {
+                guard let inst, inst.loader != .vanilla else { return false }
+                return inst.gameVersion == game && (loaders.isEmpty || loaders.contains(inst.loader))
+            }
             return [
-                ProjectVersion(id: "\(projectID)-188", name: "1.8.8", gameVersions: "1.21.1", fits: true),
-                ProjectVersion(id: "\(projectID)-187", name: "1.8.7", gameVersions: "1.21.1", fits: true),
-                ProjectVersion(id: "\(projectID)-181", name: "1.8.1", gameVersions: "1.21", fits: false),
+                ProjectVersion(id: "\(projectID)-188", name: "1.8.8", gameVersions: "1.21.1", fits: fits("1.21.1")),
+                ProjectVersion(id: "\(projectID)-187", name: "1.8.7", gameVersions: "1.21.1", fits: fits("1.21.1")),
+                ProjectVersion(id: "\(projectID)-181", name: "1.8.1", gameVersions: "1.21", fits: fits("1.21")),
             ]
         }
         public func dependencies(versionID: String, instanceID: String) async throws -> [ProjectDependency] {

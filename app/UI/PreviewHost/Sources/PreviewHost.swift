@@ -8,6 +8,12 @@ import UIKit
 //   -joinURL cofre://join?server=…   Opens the sheet through the deep-link route instead
 //   -setupStep 0…7      Setup step for -screen setup
 //   -failVersions YES   Mod versions fail to load (-screen modpage)
+//   -instance vanilla   Active instance (mock IDs: survival create cobblemon skyblock vanilla)
+//   -instances a,b      Keep only these mock instances
+//   -fits NO            Turn the Mods "Fits" switch off
+//   -get iris           Tap Get on this mod once the library loads (the misfit sheet, or an install)
+//   -plan YES           Open New instance pre-filled from Mods: Vanilla's "Make a mods instance", or with -get
+//                       the misfit sheet's "Make an instance for it"
 //   -type xl|ax3        Dynamic Type override
 //   -appearance light   Light theme
 //   -canvas 1376x1032   Lay the UI out at this point size (scaled to fit) and write a full-size PNG
@@ -60,11 +66,31 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         default: break
         }
 
+        if let mock = services.backend as? MockBackend, let keep = args.string(forKey: "instances") {
+            let ids = keep.split(separator: ",").map(String.init)
+            mock.instanceList.removeAll { !ids.contains($0.id) }
+        }
+
         // Fresh setup progress every launch, so a finished run doesn't hide `-screen setup`.
         let defaults = UserDefaults(suiteName: "app.cofre.ui.previewhost.setup")!
         defaults.removePersistentDomain(forName: "app.cofre.ui.previewhost.setup")
         let store = CofreStore(services: services, defaults: defaults)
         if screen == "launch" { store.play("survival") }
+        store.activeInstanceID = args.string(forKey: "instance")
+        if args.object(forKey: "fits") != nil { store.query.onlyFitting = args.bool(forKey: "fits") }
+        let get = args.string(forKey: "get"), plan = args.bool(forKey: "plan")
+        if get != nil || plan {
+            Task { @MainActor in
+                while !store.libraryLoaded { try? await Task.sleep(for: .milliseconds(100)) }
+                if let p = MockBackend.projects.first(where: { $0.id == get }) { await store.get(p) }
+                if plan {
+                    // With -get: the misfit sheet's "Make an instance for it".
+                    store.newInstancePlan = store.misfit?.plan ?? store.planNewInstance()
+                    store.misfit = nil
+                    nav.sheet = .newInstance
+                }
+            }
+        }
         let setupStep = args.object(forKey: "setupStep") != nil ? args.integer(forKey: "setupStep") : nil
         let root = UIHostingController(rootView: CofreRootView(store: store, nav: nav, setupStart: setupStep))
         root.view.backgroundColor = .cofre.page

@@ -45,6 +45,10 @@
         public var installed: [ContentKind: [InstalledItem]] = [:]
         public var installing: Set<String> = []
         public var importProgress: InstallProgress?
+        /// "Get" on a mod the active instance can't run: the sheet offering where it can go instead.
+        public var misfit: ModMisfit?
+        /// Pre-fills P04 New instance when it opens from Mods.
+        public var newInstancePlan: NewInstancePlan?
 
         // Launch
         public var launch: LaunchProgress?
@@ -409,6 +413,93 @@
             }
         }
 
+        /// Mods need a loader: on Vanilla, the Mods list leads with "Make a mods instance" instead of the Fits switch.
+        /// Resource and data packs work on Vanilla, so they browse as usual.
+        public var activeCantRunMods: Bool { activeInstance?.loader == .vanilla && query.kind == .mods }
+
+        /// The modded instance to offer "Switch to": the most recently played.
+        public var moddedInstance: InstanceSummary? {
+            instances.filter { $0.loader != .vanilla }.max { ($0.lastPlayed ?? .distantPast) < ($1.lastPlayed ?? .distantPast) }
+        }
+
+        /// "Get": installs when the active instance runs some version of the mod, otherwise opens `misfit`.
+        public func get(_ project: ProjectSummary, versionID: String? = nil) async {
+            guard let inst = activeInstance else { return }
+            guard query.kind == .mods else { return install(projectID: project.id, versionID: versionID) }
+            if inst.loader != .vanilla, let versionID {
+                return install(projectID: project.id, versionID: versionID)
+            }
+            // The Get spinner shows while this checks; `install` takes it over.
+            installing.insert(project.id)
+            let list: [ProjectVersion]
+            do { list = try await backend.versions(projectID: project.id, instanceID: inst.id) } catch {
+                installing.remove(project.id)
+                lastError = error.localizedDescription
+                return
+            }
+            versions[project.id] = list
+            if inst.loader != .vanilla, list.contains(where: \.fits) { return install(projectID: project.id) }
+            let supported = Set(list.flatMap(\.gameVersionList))
+            var fitting: InstanceSummary?
+            for c in Self.candidates(for: project, supported: supported, in: instances, excluding: inst.id) {
+                if let v = try? await backend.versions(projectID: project.id, instanceID: c.id), v.contains(where: \.fits) {
+                    fitting = c
+                    break
+                }
+            }
+            installing.remove(project.id)
+            misfit = ModMisfit(
+                project: project, instance: inst, fitting: fitting,
+                plan: planNewInstance(for: project, supported: supported))
+        }
+
+        /// Misfit sheet → "Get it in <instance>": switches to it, then installs.
+        public func install(_ project: ProjectSummary, in instance: InstanceSummary) async {
+            misfit = nil
+            await selectInstance(instance.id)
+            install(projectID: project.id)
+        }
+
+        /// What P04 opens with from Mods: the active version (or the newest the mod supports), the most popular
+        /// loader the mod supports, and a name that isn't taken yet.
+        public func planNewInstance(for project: ProjectSummary? = nil, supported: Set<String> = []) -> NewInstancePlan {
+            let active = activeInstance
+            let order = [active?.loader].compactMap { $0 }.filter { $0 != .vanilla } + [.fabric, .neoforge, .forge, .quilt]
+            let loaders = project?.loaders ?? []
+            let loader = order.first { loaders.isEmpty || loaders.contains($0) } ?? .fabric
+            let version =
+                active.map(\.gameVersion).flatMap { supported.isEmpty || supported.contains($0) ? $0 : nil }
+                ?? Self.newestRelease(supported) ?? active?.gameVersion ?? ""
+            var name = version.isEmpty ? loader.displayName : "\(loader.displayName) \(version)"
+            let taken = Set(instances.map(\.name))
+            if taken.contains(name) {
+                let base = name
+                name = (2...).lazy.map { "\(base) \($0)" }.first { !taken.contains($0) }!
+            }
+            return NewInstancePlan(name: name, version: version, loader: loader, thenInstall: project)
+        }
+
+        /// Other modded instances that likely run `project`, most recently played first. `get` confirms each one
+        /// with `versions(projectID:instanceID:)`.
+        static func candidates(
+            for project: ProjectSummary, supported: Set<String>, in instances: [InstanceSummary], excluding id: String
+        ) -> [InstanceSummary] {
+            instances
+                .filter {
+                    $0.id != id && $0.loader != .vanilla
+                        && (project.loaders.isEmpty || project.loaders.contains($0.loader))
+                        && (supported.isEmpty || supported.contains($0.gameVersion))
+                }
+                .sorted { ($0.lastPlayed ?? .distantPast) > ($1.lastPlayed ?? .distantPast) }
+        }
+
+        /// The highest plain release ("1.21.4", "26.3"); snapshots and pre-releases don't count.
+        static func newestRelease(_ versions: Set<String>) -> String? {
+            let parts = { (v: String) in v.split(separator: ".").compactMap { Int($0) } }
+            return versions.filter { v in !v.isEmpty && parts(v).count == v.split(separator: ".").count }
+                .max { parts($0).lexicographicallyPrecedes(parts($1)) }
+        }
+
         public func importPack(_ url: URL, intoInstance: Bool = false) {
             importProgress = InstallProgress(title: url.deletingPathExtension().lastPathComponent, fraction: 0)
             Task {
@@ -501,6 +592,30 @@
 
         private func run(_ body: @escaping () async throws -> Void) async {
             do { try await body() } catch { lastError = error.localizedDescription }
+        }
+    }
+
+    /// "Get" on a mod the active instance can't run (Vanilla, another loader or another version).
+    public struct ModMisfit: Identifiable, Equatable {
+        public var project: ProjectSummary
+        /// The active instance.
+        public var instance: InstanceSummary
+        /// Another instance it runs in, most recently played. `nil` offers a new instance instead.
+        public var fitting: InstanceSummary?
+        public var plan: NewInstancePlan
+        public var id: String { project.id }
+    }
+
+    /// Pre-fills P04 New instance. `thenInstall` is installed into the new instance once it's made.
+    public struct NewInstancePlan: Equatable {
+        public var name: String, version: String, loader: Loader
+        public var thenInstall: ProjectSummary?
+    }
+
+    extension ProjectVersion {
+        /// `gameVersions` is a display string ("1.21, 1.21.1").
+        var gameVersionList: [String] {
+            gameVersions.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
         }
     }
 
