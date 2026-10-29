@@ -140,7 +140,8 @@
             var last: LaunchProgress?
             for try await p in mock.launch(instanceID: "survival", accountID: nil) { last = p }
             XCTAssertEqual(last?.finished, true)
-            XCTAssertEqual(last?.stage, 8)
+            XCTAssertEqual(last?.stage, 7)
+            XCTAssertEqual(last?.of, 7)
         }
 
         func testStoreLoadsAndRunsJITTest() async {

@@ -293,7 +293,7 @@
             activeInstanceID = id
             launchError = nil
             launchLog = []
-            launch = LaunchProgress(stage: 1, of: 8, title: "JIT")
+            launch = LaunchProgress(stage: 1, of: 7, title: "JIT")
             Task {
                 for await line in backend.logLines(.launcher) {
                     launchLog.append(line)

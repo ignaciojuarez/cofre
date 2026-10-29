@@ -186,7 +186,7 @@
         // MARK: GAP-01 LaunchControl
         private var launchTask: Task<Void, Never>?
         public static let launchStages = [
-            "JIT", "Java 21", "Libraries", "Assets", "Mods", "Renderer · MobileGlues", "First frame", "In game",
+            "JIT", "Game files", "Renderer · MobileGlues", "Java 21", "Starting Minecraft", "Loading", "In game",
         ]
         public func launch(instanceID: String, accountID: String?) -> AsyncThrowingStream<LaunchProgress, Error> {
             AsyncThrowingStream { c in
@@ -197,12 +197,12 @@
                             c.finish()
                             return
                         }
-                        let detail = title == "Assets" ? "assets 2,431/3,904" : nil
+                        let detail = title == "Game files" ? "assets 2,431/3,904" : nil
                         c.yield(
                             LaunchProgress(
                                 stage: i + 1, of: stages.count, title: title,
                                 fraction: Double(i) / Double(stages.count), detail: detail))
-                        await pause(title == "Assets" ? 4 : 1.2)
+                        await pause(title == "Game files" ? 4 : 1.2)
                     }
                     c.yield(
                         LaunchProgress(
