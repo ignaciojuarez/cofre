@@ -488,26 +488,43 @@
         }
     }
 
-    // MARK: About (X06 second half): expiry, versions, source, licenses
+    // MARK: About (X06 second half): Cofre, its maker, expiry, credits
 
     struct AboutContent: View {
         @Environment(CofreStore.self) private var store
         @State private var showingOFL = false
+        /// Open-source projects Cofre is built on: name, role · license, repo.
+        private static let credits: [(String, String, URL)] = [
+            ("Air", "Game engine · GPL-3.0", URL(string: "https://github.com/herbrine8403/Amethyst-iOS-MyRemastered")!),
+            ("Amethyst", "Launcher Air grew from · GPL-3.0", URL(string: "https://github.com/AngelAuraMC/Amethyst-iOS")!),
+            ("StikJIT", "JIT · MPL-2.0", URL(string: "https://github.com/StikDebug/StikJIT")!),
+            ("idevice", "Pairing · MIT", URL(string: "https://github.com/jkcoxson/idevice")!),
+        ]
         var body: some View {
             let info = store.backend.appInfo()
+            VStack(spacing: 6) {
+                AppIcon(size: 64)
+                Text(verbatim: "Cofre").cofreFont(.title).foregroundStyle(Color.cofre.ink)
+                Text(verbatim: "Version \(info.version)").cofreFont(.label).foregroundStyle(Color.cofre.muted)
+            }
+            .frame(maxWidth: .infinity).padding(.vertical, 8)
+            .accessibilityElement(children: .combine)
             ListSection(spacing: 4) {
+                Link(destination: CofreLinks.author) { ValueRow("Made by Ignacio", value: "@ignaciojb") }
+                    .buttonStyle(RowButtonStyle())
+                Link(destination: info.sourceURL) { ValueRow("Source code", value: "GitHub") }
+                    .buttonStyle(RowButtonStyle())
                 if let s = store.signing {
                     Row("Works until", trailing: { Meta(s.expires.formatted(date: .abbreviated, time: .omitted)) })
                 }
-                Row("Version \(info.version) · Air \(info.airVersion)")
-                Link(destination: info.sourceURL) { ValueRow("Source code", value: "GitHub") }.buttonStyle(
-                    RowButtonStyle())
             }
-            ListSection("Licenses", spacing: 4) {
-                Row("Air", subtitle: "GPL-3.0")
-                Row("Amethyst", subtitle: "GPL-3.0")
-                Row("StikJIT", subtitle: "MPL-2.0")
-                Row("idevice", subtitle: "MIT")
+            ListSection("Credits", spacing: 4) {
+                ForEach(Self.credits, id: \.0) { name, role, url in
+                    // Air's own version helps when reporting engine bugs upstream.
+                    let detail = name == "Air" && !info.airVersion.isEmpty ? "\(role) · \(info.airVersion)" : role
+                    Link(destination: url) { Row(name, subtitle: detail, trailing: { Chevron() }) }
+                        .buttonStyle(RowButtonStyle())
+                }
                 Button {
                     showingOFL = true
                 } label: {

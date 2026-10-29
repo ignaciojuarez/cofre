@@ -333,9 +333,11 @@
             }
         }
         public func appInfo() -> AppInfo {
-            AppInfo(
-                version: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
-                airVersion: "Air", sourceURL: URL(string: "https://github.com/ignaciojuarez/cofre")!)
+            let info = Bundle.main.infoDictionary ?? [:]
+            let version = info["CofreVersion"] as? String ?? "", build = info["CofreBuild"] as? String ?? ""
+            return AppInfo(
+                version: build.isEmpty ? version : "\(version) (\(build))",
+                airVersion: info["CFBundleShortVersionString"] as? String ?? "", sourceURL: CofreLinks.source)
         }
         public func renderers() async -> [RendererOption] {
             let candidates: [(String, String, String, String?)] = [

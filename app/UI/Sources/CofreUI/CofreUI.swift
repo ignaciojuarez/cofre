@@ -44,6 +44,9 @@ public enum CofreLinks {
     /// What the user pastes into Terminal. Copy and Share hand over exactly this.
     public static let pairCommand = "curl -fsSL \(pairScript.absoluteString) | sh"
     public static let all = [site, pairing, pairScript]
+    /// Settings → About: the repo and the author's X profile.
+    public static let source = URL(string: "https://github.com/ignaciojuarez/cofre")!
+    public static let author = URL(string: "https://x.com/ignaciojb")!
 
     /// "ignaciojuarez.github.io/cofre/pair": host and path without the scheme or trailing slash, for display.
     public static func short(_ url: URL) -> String {

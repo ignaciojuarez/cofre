@@ -575,7 +575,7 @@
         }
         public func appInfo() -> AppInfo {
             AppInfo(
-                version: "1.0", airVersion: "5.1", sourceURL: URL(string: "https://github.com/ignaciojuarez/cofre")!)
+                version: "0.1 (92a200d)", airVersion: "6.0.0", sourceURL: CofreLinks.source)
         }
 
         // MARK: GAP-09 SystemCatalog
