@@ -28,6 +28,9 @@
 #import "ios_uikit_bridge.h"
 #import "utils.h"
 #import <AuthenticationServices/AuthenticationServices.h>
+#import <QuartzCore/CAMetalLayer.h>
+#include <objc/runtime.h>
+#include <stdatomic.h>
 
 static NSError *CofreAirError(NSString *message) {
   return [NSError errorWithDomain:@"CofreAir"
@@ -68,6 +71,31 @@ static void CofreWhenLandscape(UIWindow *window, int tries, dispatch_block_t the
 
 static void CofreFinishSurface(UIWindow *window);
 
+// Metal renderers (Metallum) never go through Air's GL swap, so Air's first-frame notification never comes
+// and the launch would wait for Air's 45 s timeout with Cofre's overlay window catching every touch. The
+// first drawable any CAMetalLayer takes after the game surface is up is the game's first frame.
+static atomic_bool cofreAwaitingFirstDrawable;
+static id (*CofreOriginalNextDrawable)(id, SEL);
+
+static id CofreNextDrawable(CAMetalLayer *layer, SEL cmd) {
+  if (atomic_exchange(&cofreAwaitingFirstDrawable, false)) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+      NSLog(@"[Cofre] first Metal drawable; game is presenting");
+      [NSNotificationCenter.defaultCenter postNotificationName:@"PojavFirstFrameRendered" object:nil];
+    });
+  }
+  return CofreOriginalNextDrawable(layer, cmd);
+}
+
+static void CofreArmFirstDrawable(void) {
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    Method m = class_getInstanceMethod(CAMetalLayer.class, @selector(nextDrawable));
+    CofreOriginalNextDrawable = (id (*)(id, SEL))method_setImplementation(m, (IMP)CofreNextDrawable);
+  });
+  atomic_store(&cofreAwaitingFirstDrawable, true);
+}
+
 /// Air drops its own launch overlay on the first frame, or after 45 s when the renderer never reports one.
 /// Follow it so Cofre's overlay window can never stay on top of the game and swallow touches.
 static void CofreFinishWhenAirOverlayGone(SurfaceViewController *surface, UIWindow *window) {
@@ -100,6 +128,7 @@ static void CofrePresentSurface(UIWindow *window, NSDictionary *metadata) {
     // landscape first, as Air's own Play button does.
     AmeGameLandscapeLockEnter();
     CofreWhenLandscape(window, 40, ^{
+      CofreArmFirstDrawable();
       SurfaceViewController *surface = [[SurfaceViewController alloc] initWithMetadata:metadata];
       [CofreGameOverlayHost installOnSurface:surface];
       window.alpha = 0;
