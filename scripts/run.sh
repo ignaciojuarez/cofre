@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"; APP_ROOT="$ROOT"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_TOOLS="${BUILD_TOOLS:-<local-volume>/Developer/kiwios/tools/build-runners}"
 source "$BUILD_TOOLS/lib/common.sh"; source "$BUILD_TOOLS/lib/device.sh"; source "$BUILD_TOOLS/lib/relay.sh"
 source "$ROOT/scripts/run.config"; [[ ! -f "$ROOT/scripts/run.local.config" ]] || source "$ROOT/scripts/run.local.config"
 BUILD=0; SQIM=0
+export RELAY_HOST RELAY_DEVICE_ID
 for a in "$@"; do case "$a" in --build) BUILD=1;; --sqim) SQIM=1;; --relay-host=*) RELAY_HOST=${a#*=};; --device=*) RELAY_DEVICE_ID=${a#*=};; *) bt_die "unknown option: $a";; esac; done
 APP="$ROOT/artifacts/Payload/$APP_BUNDLE_NAME"
 if (( BUILD )); then
@@ -31,10 +32,10 @@ PY2
   rm -rf "$ROOT/artifacts/Payload/PlugIns" "$ROOT/artifacts/Payload/Cofre.app/PlugIns" 2>/dev/null || true
   cp -R "$ROOT"/app/Resources/AppIcon/*.appiconset "$AIR/Natives/Assets.xcassets/"
   (cd "$AIR" && eval "gmake -j4 dsym package PLATFORM=2 BOOTJDK=\"$BOOTJDK\" JOBS=4 $MAKE_ARGS")
-  mkdir -p "$ROOT/artifacts/Payload"; rm -rf "$APP"; unzip -q -o "$(ls -t "$ROOT/.work/air"/artifacts/*-ios.ipa | head -1)" -d "$ROOT/artifacts"
+  mkdir -p "$ROOT/artifacts/Payload"; rm -rf "$APP"; IPA=$(find "$ROOT/.work/air/artifacts" -maxdepth 1 -type f -name "*-ios.ipa" -print -quit); [[ -n "$IPA" && -f "$IPA" ]] || bt_die "no IPA artifact"; unzip -q -o "$IPA" -d "$ROOT/artifacts"
   mv "$ROOT/artifacts/Payload/AngelAuraAmethyst.app" "$APP"
   INFO="$APP/Info.plist"
-  /usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes array" "$INFO" 2>/dev/null || true
+  /usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes array" "$INFO" 2>/dev/null || /usr/libexec/PlistBuddy -c "Print :CFBundleDocumentTypes" "$INFO" >/dev/null || bt_die "plist document types failed"
   /usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:0 dict" "$INFO" 2>/dev/null || true
   /usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:0:CFBundleTypeName string iPhone Pairing File" "$INFO" 2>/dev/null || true
   /usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:0:LSItemContentTypes array" "$INFO" 2>/dev/null || true
@@ -49,7 +50,7 @@ PY2
   /usr/libexec/PlistBuddy -c "Add :UTImportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension array" "$INFO" 2>/dev/null || true
   /usr/libexec/PlistBuddy -c "Add :UTImportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension:0 string mobiledevicepairing" "$INFO" 2>/dev/null || true
   /usr/libexec/PlistBuddy -c "Add :UTImportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension:1 string plist" "$INFO" 2>/dev/null || true
-  echo "[Cofre] document types:"; /usr/libexec/PlistBuddy -c "Print :CFBundleDocumentTypes" "$INFO"; echo "[Cofre] imported types:"; /usr/libexec/PlistBuddy -c "Print :UTImportedTypeDeclarations" "$INFO"
+  echo "[Cofre] document types:"; /usr/libexec/PlistBuddy -c "Print :CFBundleDocumentTypes" "$INFO" >/dev/null || bt_die "document types missing"; echo "[Cofre] imported types:"; /usr/libexec/PlistBuddy -c "Print :UTImportedTypeDeclarations" "$INFO" >/dev/null || bt_die "imported types missing"
   rm -rf "$APP/PlugIns"
   mkdir -p "$APP/PlugIns"
   cp -R "$ROOT/.build-tools/signing/build/Build/Products/Debug-iphoneos/PacketTunnel.appex" "$APP/PlugIns/PacketTunnel.appex"

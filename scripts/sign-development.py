@@ -4,17 +4,24 @@ root=Path(__file__).resolve().parents[1]; app=root/'artifacts/Payload/Cofre.app'
 products=root/'.build-tools/signing/build/Build/Products/Debug-iphoneos'
 app_profile=products/'Cofre.app/embedded.mobileprovision'; tunnel_profile=products/'PacketTunnel.appex/embedded.mobileprovision'
 if not app_profile.exists() or not tunnel_profile.exists(): raise SystemExit('build .build-tools/signing first to generate both profiles')
-identity='Apple Development: Ignacio Juarez (SIGNING_IDENTITY)'; bundle='com.ignaciojuarez.cofre'
+import os
+identity=os.environ.get('SIGNING_IDENTITY') or (_ for _ in ()).throw(SystemExit('SIGNING_IDENTITY is required'))
+team=os.environ.get('TEAM_ID') or (_ for _ in ()).throw(SystemExit('TEAM_ID is required'))
+bundle=os.environ.get('BUNDLE_ID','com.ignaciojuarez.cofre'); tunnel_bundle=os.environ.get('TUNNEL_BUNDLE_ID','com.ignaciojuarez.cofre.tunnel')
+if not bundle.startswith('com.') or not tunnel_bundle.startswith(bundle+'.'): raise SystemExit('invalid bundle IDs')
 def profile_ent(path): return plistlib.loads(subprocess.check_output(['security','cms','-D','-i',str(path)]))['Entitlements']
 ae=dict(profile_ent(app_profile)); te=dict(profile_ent(tunnel_profile))
 for e in (ae,te): assert e.get('get-task-allow') is True
 assert ae.get('com.apple.developer.kernel.increased-memory-limit') is True
 assert ae.get('com.apple.developer.kernel.extended-virtual-addressing') is True
 assert 'packet-tunnel-provider' in te.get('com.apple.developer.networking.networkextension', [])
-assert ae.get('application-identifier') == 'APPLE_TEAM_ID.'+bundle
-assert te.get('application-identifier') == 'APPLE_TEAM_ID.'+bundle+'.tunnel'
+assert ae.get('application-identifier') == team+'.'+bundle
+assert te.get('application-identifier') == team+'.'+bundle+'.tunnel'
 assert 'OLD_DEVICE_UDID' in plistlib.loads(subprocess.check_output(['security','cms','-D','-i',str(app_profile)]))['ProvisionedDevices']
-info=plistlib.loads((app/'Info.plist').read_bytes()); info['CFBundleIdentifier']=bundle; info['CFBundleDisplayName']='Cofre'; (app/'Info.plist').write_bytes(plistlib.dumps(info)); (app/'embedded.mobileprovision').write_bytes(app_profile.read_bytes())
+info=plistlib.loads((app/'Info.plist').read_bytes()); info['CFBundleIdentifier']=bundle
+if not appex.exists(): raise SystemExit('missing appex')
+appex_info=plistlib.loads((appex/'Info.plist').read_bytes())
+if appex_info.get('CFBundleIdentifier') != tunnel_bundle: raise SystemExit('appex bundle ID mismatch'); info['CFBundleDisplayName']='Cofre'; (app/'Info.plist').write_bytes(plistlib.dumps(info)); (app/'embedded.mobileprovision').write_bytes(app_profile.read_bytes())
 # Appex first, as required by iOS nested-code verification.
 if not appex.exists(): raise SystemExit('missing PacketTunnel.appex in Cofre.app/PlugIns')
 (appex/'embedded.mobileprovision').write_bytes(tunnel_profile.read_bytes())
