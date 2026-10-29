@@ -87,8 +87,7 @@
                             } label: {
                                 Row(p.title, subtitle: "\(p.summary) · \(Fmt.count(p.downloads))", isSelected: selected)
                                 {
-                                    PixelIcon(
-                                        .ore, size: 28, tint: p.iconTintHex.map { Color(uiColor: UIColor(hex: $0)) })
+                                    ProjectIcon(project: p, size: 28)
                                 } trailing: {
                                     if p.installed {
                                         Badge("✓", tone: .success).accessibilityLabel(Text("Installed"))
@@ -119,6 +118,7 @@
     public struct ModPagePane: View {
         let id: String
         @Environment(CofreStore.self) private var store
+        @Environment(\.widthClass) private var width
         @State private var versionID: String?
         public init(id: String) { self.id = id }
 
@@ -135,7 +135,7 @@
                 if let p {
                     PaneScroll(readable: true) {
                         HStack(alignment: .top, spacing: 14) {
-                            PixelIcon(.ore, size: 64, tint: p.iconTintHex.map { Color(uiColor: UIColor(hex: $0)) })
+                            ProjectIcon(project: p, size: 64)
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(verbatim: p.title).cofreFont(.title).foregroundStyle(Color.cofre.ink)
                                     .accessibilityAddTraits(.isHeader)
@@ -180,10 +180,18 @@
                                     Meta(d.installed ? "Installed" : "Adds", tone: d.installed ? .success : .warn)
                                 })
                         }
+                        if !p.installed, let err = store.versionsError[id] {
+                            Banner(String(localized: "Couldn't load versions"), icon: .cross, tone: .danger) {
+                                BlockButton("Try again", size: .small, fullWidth: false) {
+                                    Task { await store.loadProject(id) }
+                                }
+                            }
+                            Text(verbatim: err).cofreFont(.secondary).foregroundStyle(Color.cofre.muted)
+                        }
                         if p.installed {
                             Banner("Installed in \(store.activeInstance?.name ?? "")", icon: .check, tone: .success)
                         } else if store.versions[id] == nil {
-                            Row("Loading versions…", leading: { Spinner() })
+                            if store.versionsError[id] == nil { Row("Loading versions…", leading: { Spinner() }) }
                         } else {
                             let name = versions.first { $0.id == chosen }?.name ?? ""
                             BlockButton("Install \(name)", role: .primary, isLoading: store.installing.contains(id)) {
@@ -191,9 +199,11 @@
                             }
                             .keyboardShortcut(.return, modifiers: .command)
                         }
-                        HStack(spacing: 10) {
-                            KeyHint("⌘ ↩", "install")
-                            KeyHint("esc", "back to results")
+                        if width > .compact {
+                            HStack(spacing: 10) {
+                                KeyHint("⌘ ↩", "install")
+                                KeyHint("esc", "back to results")
+                            }
                         }
                     }
                 } else {
@@ -201,6 +211,33 @@
                 }
             }
             .task(id: "\(id)-\(store.activeInstance?.id ?? "")") { await store.loadProject(id) }
+        }
+    }
+
+    /// The project's own icon, drawn blocky. The tinted ore stands in while it loads, or when there's no icon.
+    struct ProjectIcon: View {
+        let project: ProjectSummary, size: CGFloat
+        var body: some View {
+            Group {
+                if let url = project.iconURL {
+                    AsyncImage(url: url) { phase in
+                        if let image = phase.image {
+                            image.interpolation(.none).resizable().scaledToFill()
+                        } else {
+                            placeholder
+                        }
+                    }
+                } else {
+                    placeholder
+                }
+            }
+            .frame(width: size, height: size)
+            .clipped()
+            .overlay { Rectangle().strokeBorder(Color.cofre.outline, lineWidth: 2) }
+            .accessibilityHidden(true)
+        }
+        private var placeholder: some View {
+            PixelIcon(.ore, size: size, tint: project.iconTintHex.map { Color(uiColor: UIColor(hex: $0)) })
         }
     }
 

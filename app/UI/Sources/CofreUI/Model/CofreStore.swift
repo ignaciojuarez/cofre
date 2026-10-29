@@ -39,6 +39,8 @@
         public var searching = false
         public var searchError: String?
         public var versions: [String: [ProjectVersion]] = [:]
+        /// Why a project's versions didn't load, so M02 shows Try again instead of a spinner.
+        public var versionsError: [String: String] = [:]
         public var dependencies: [String: [ProjectDependency]] = [:]
         public var installed: [ContentKind: [InstalledItem]] = [:]
         public var installing: Set<String> = []
@@ -377,14 +379,19 @@
         }
 
         public func loadProject(_ id: String) async {
-            guard let inst = activeInstance?.id else { return }
-            await run {
-                let v = try await self.backend.versions(projectID: id, instanceID: inst)
-                self.versions[id] = v
+            guard let inst = activeInstance?.id else {
+                versionsError[id] = String(localized: "Pick an instance first.")
+                return
+            }
+            versionsError[id] = nil
+            do {
+                let v = try await backend.versions(projectID: id, instanceID: inst)
+                versions[id] = v
                 if let first = v.first(where: \.fits) {
-                    self.dependencies[first.id] = try await self.backend.dependencies(
-                        versionID: first.id, instanceID: inst)
+                    dependencies[first.id] = try await backend.dependencies(versionID: first.id, instanceID: inst)
                 }
+            } catch is CancellationError {} catch {
+                versionsError[id] = error.localizedDescription
             }
         }
 

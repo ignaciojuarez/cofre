@@ -7,6 +7,7 @@ import UIKit
 //   -joinState firstVisit|needsAttention|keyChanged|installing|update|error|ready|resolving|live   Join server sheet state
 //   -joinURL cofre://join?server=…   Opens the sheet through the deep-link route instead
 //   -setupStep 0…7      Setup step for -screen setup
+//   -failVersions YES   Mod versions fail to load (-screen modpage)
 //   -type xl|ax3        Dynamic Type override
 //   -appearance light   Light theme
 //   -canvas 1376x1032   Lay the UI out at this point size (scaled to fit) and write a full-size PNG
@@ -35,6 +36,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         case "modpage":
             nav.section = .mods
             nav.mod = .project("iris")
+            (services.backend as? MockBackend)?.failVersions = args.bool(forKey: "failVersions")
         case "settings": nav.section = .settings
         case "jit":
             nav.section = .settings

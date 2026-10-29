@@ -234,6 +234,7 @@
     struct ControlsEditorContent: View {
         @Environment(CofreStore.self) private var store
         @Environment(NavModel.self) private var nav
+        @Environment(\.widthClass) private var width
         var body: some View {
             Text("Drag and resize buttons. Opens full screen.").cofreFont(.body).foregroundStyle(Color.cofre.inkSoft)
             if store.services.airScreens == nil {
@@ -242,12 +243,14 @@
             BlockButton("Open controls editor", icon: .cmd, role: .primary) { nav.showingAirScreen = .controlsEditor }
                 .keyboardShortcut("k", modifiers: [.command, .shift])
                 .disabled(store.services.airScreens == nil)
-            ListSection("Keys") {
-                KeyHint("⌘Z", "Undo")
-                KeyHint("⌫", "Delete")
-                KeyHint("← →", "Nudge 1 pt · with ⇧, 10 pt")
-                KeyHint("⌘D", "Duplicate")
-                KeyHint("tab", "Next button")
+            if width > .compact {
+                ListSection("Keys") {
+                    KeyHint("⌘Z", "Undo")
+                    KeyHint("⌫", "Delete")
+                    KeyHint("← →", "Nudge 1 pt · with ⇧, 10 pt")
+                    KeyHint("⌘D", "Duplicate")
+                    KeyHint("tab", "Next button")
+                }
             }
         }
     }

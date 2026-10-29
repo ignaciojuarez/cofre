@@ -17,6 +17,8 @@
         private var joinedServers: Set<String> = []
         /// Makes `search` throw, for the offline state.
         public var offline = false
+        /// Makes `versions` throw, for M02's Try again state.
+        public var failVersions = false
         private var worldList: [String: [WorldSummary]] = [:]
         private var extraServers: [ServerSummary] = []
         private var cfKey: String? = "cf_live_••••3f9a"
@@ -280,12 +282,26 @@
         // MARK: GAP-05 ProjectCatalog
         public static let projects: [ProjectSummary] = {
             let t = PixelArtColors.oreTints
+            // Real Modrinth icons. Offline (tests, Xcode previews) the tinted ore stands in.
+            let cdn = "https://cdn.modrinth.com/data/"
+            let icons = [
+                "sodium": "AANobbMI/295862f4724dc3f78df3447ad6072b2dcd3ef0c9_96.webp",
+                "iris": "YL57xq9U/18d0e7f076d3d6ed5bedd472b853909aac5da202_96.webp",
+                "xaero": "1bokaNcj/354080f65407e49f486fcf9c4580e82c45ae63b8_96.webp",
+                "lithium": "gvQqBUqZ/bcc8686c13af0143adf4285d741256af824f70b7_96.webp",
+                "create": "LNytGWDc/61d716699bcf1ec42ed4926a9e1c7311be6087e2_96.webp",
+                "modmenu": "mOgUt4GM/5a20ed1450a0e1e79a1fe04e61bb4e5878bf1d20.png",
+                "culling": "NNAgCjsB/7873452d6cede4daed12da3d7d8c193ab88b4fd6_96.webp",
+                "fabric-api": "P7dR8mSH/icon.png",
+                // Continuity and AppleSkin have none, so the fallback shows too.
+            ].compactMapValues { URL(string: cdn + $0) }
             func p(
                 _ id: String, _ title: String, _ author: String, _ summary: String, _ tint: String, _ dl: Int,
                 installed: Bool = false, fits: Bool = true
             ) -> ProjectSummary {
                 ProjectSummary(
-                    id: id, title: title, author: author, summary: summary, iconTintHex: t[tint], downloads: dl,
+                    id: id, title: title, author: author, summary: summary, iconURL: icons[id],
+                    iconTintHex: t[tint], downloads: dl,
                     updated: Date().addingTimeInterval(-3 * 86400), loaders: [.fabric, .quilt], clientSide: true,
                     fits: fits, installed: installed)
             }
@@ -315,7 +331,8 @@
             }
         }
         public func versions(projectID: String, instanceID: String) async throws -> [ProjectVersion] {
-            [
+            if failVersions { throw URLError(.timedOut) }
+            return [
                 ProjectVersion(id: "\(projectID)-188", name: "1.8.8", gameVersions: "1.21.1", fits: true),
                 ProjectVersion(id: "\(projectID)-187", name: "1.8.7", gameVersions: "1.21.1", fits: true),
                 ProjectVersion(id: "\(projectID)-181", name: "1.8.1", gameVersions: "1.21", fits: false),
