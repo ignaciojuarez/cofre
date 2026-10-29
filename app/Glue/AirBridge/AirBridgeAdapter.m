@@ -53,6 +53,9 @@ static void CofreHideAirOverlay(SurfaceViewController *surface) {
 }
 
 static void CofrePresentSurface(UIWindow *window, NSDictionary *metadata) {
+  // As UIKit_launchMinecraftSurfaceVC does: remember who played last.
+  setPrefObject(@"internal.selected_account",
+                BaseAuthenticator.current.authData[@"accountId"]);
   dispatch_async(dispatch_get_main_queue(), ^{
     UIViewController *launcher = window.rootViewController;
     UIWindow *overlay = [[UIWindow alloc] initWithWindowScene:window.windowScene];
