@@ -4,6 +4,8 @@
 // screen and falls back to Air's UI on nil.
 #import "AirBridgeAdapter.h"
 #import "CofreTunnelService.h"
+#import "LauncherPreferences.h"
+#import "utils.h"
 #import <UIKit/UIKit.h>
 #import <dlfcn.h>
 #import <objc/message.h>
@@ -34,6 +36,20 @@ static Class CofreCoreEntryClass(void) {
   return entry;
 }
 
+/// On iOS 26+ JIT comes from a debugger-made code region. Detaching after it
+/// leaves dyld unable to load the unsigned libraries newer Minecraft needs (JNA
+/// for 26.3), so keep Cofre's debugger attached for breakpoints only and let
+/// Air patch dyld through it, as Air does on these devices.
+static void CofreConfigureAirJIT(void) {
+  DeviceGetJITFlags(YES);
+  if (!DeviceNeedsDebugJITMapping()) {
+    return;
+  }
+  setPrefBool(@"debug.debug_always_attached_jit", YES);
+  setPrefBool(@"java.dyld_bypass", YES);
+  NSLog(@"[Cofre] JIT mode=attached dyld_bypass=on");
+}
+
 /// Starts CofreCore with the Air bridge exactly once. Safe to call from any
 /// launch path.
 static void CofreEnsureStarted(void) {
@@ -47,6 +63,7 @@ static void CofreEnsureStarted(void) {
     ((void (*)(id, SEL, id))objc_msgSend)(entry, @selector(startWithBridge:),
                                           bridge);
     [bridge ensureAutomaticMemoryDefault];
+    CofreConfigureAirJIT();
   });
 }
 
