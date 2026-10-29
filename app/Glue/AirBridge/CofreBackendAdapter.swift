@@ -271,7 +271,8 @@
                                 case 4, 5: (5, "Starting Minecraft")
                                 case 6: (6, "Loading")
                                 case 7: (7, "In game")
-                                default: (2, "Game files")
+                                // Air's first stages run once its game view is up, so they count as past Game files.
+                                default: (3, "Renderer")
                                 }
                                 NSLog("[Cofre] launch Air stage=%d title=%@ fraction=%.3f", airStage, mapped.1, fraction)
                                 continuation.yield(LaunchProgress(stage: mapped.0, of: 7, title: mapped.1, fraction: fraction))

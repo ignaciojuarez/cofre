@@ -19,7 +19,7 @@ import UIKit
         else { return }
         let report = CofreLogStore().gameExitReport(code: code, instance: bridge.flatMap(instanceLabel))
         NSLog("[Cofre] game exit screen reason=%@ crashReport=%d", report.reason.rawValue, report.files.count > 1)
-        let host = UIHostingController(rootView: GameExitView(report: report, close: close))
+        let host = UIHostingController(rootView: GameExitView(report: report, close: AppExit.close))
         host.view.backgroundColor = .cofre.page
         host.overrideUserInterfaceStyle = CofreTheme.current.interfaceStyle
         let w = UIWindow(windowScene: scene)
@@ -41,11 +41,4 @@ import UIKit
         return version.isEmpty ? name : "\(name) · \(version)"
     }
 
-    /// Java can't start twice in one process, and iOS has no relaunch (Air's Restart only exits), so Close goes to the
-    /// Home Screen and ends the process, like Air's own exit.
-    private static func close() {
-        NSLog("[Cofre] game exit: closing Cofre")
-        UIApplication.shared.perform(NSSelectorFromString("suspend"))
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { exit(0) }
-    }
 }

@@ -150,7 +150,10 @@
                                 }.joined(separator: "\n")
                             }
                         }
-                        if p?.finished == true || store.launchError != nil {
+                        if store.launchError != nil, gameStarted {
+                            // The game view is up and Java can't start again in this session.
+                            BlockButton("Close Cofre", role: .primary) { AppExit.close() }
+                        } else if p?.finished == true || store.launchError != nil {
                             BlockButton("Close", role: .primary) { close() }
                         } else {
                             BlockButton("Hide") { showHideConfirmation = true }
@@ -184,5 +187,8 @@
             nav.showingLaunch = false
             Task { await store.cancelLaunch() }
         }
+
+        /// Stage 3 (Renderer) onward runs inside Air's game view, after Java has been handed the launch.
+        private var gameStarted: Bool { (store.launch?.stage ?? 0) >= 3 }
     }
 #endif

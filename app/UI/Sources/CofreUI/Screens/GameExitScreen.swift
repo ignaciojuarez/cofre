@@ -6,6 +6,16 @@
     // lake: what happened, one next step, Close Cofre. Share log, Copy details and the raw log come after. Side by
     // side in iPhone landscape (where the game runs), stacked in portrait and on iPad.
 
+    /// Java can't start twice in one process, and iOS has no relaunch (Air's Restart only exits), so closing goes to
+    /// the Home Screen and ends the process, like Air's own exit.
+    public enum AppExit {
+        @MainActor public static func close() {
+            NSLog("[Cofre] game exit: closing Cofre")
+            UIApplication.shared.perform(NSSelectorFromString("suspend"))
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { exit(0) }
+        }
+    }
+
     /// The whole screen for a hosting controller: measures its window like `CofreRootView`.
     public struct GameExitView: View {
         let report: GameExitReport, close: () -> Void, showDetails: Bool
