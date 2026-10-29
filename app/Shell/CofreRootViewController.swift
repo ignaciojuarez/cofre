@@ -1,6 +1,9 @@
 import UIKit
 import CofreUI
 
+@_silgen_name("CofreMakeControlsEditor") private func CofreMakeControlsEditor() -> Unmanaged<UIViewController>?
+@_silgen_name("CofreMakeForgeInstaller") private func CofreMakeForgeInstaller(_ instanceID: UnsafePointer<CChar>) -> Unmanaged<UIViewController>?
+
 /// Host for Cofre's production SwiftUI shell inside Air's existing UIKit scene.
 @objc(CofreRootViewController)
 public final class CofreRootViewController: UIViewController {
@@ -19,8 +22,8 @@ public final class CofreRootViewController: UIViewController {
 
 @MainActor
 private final class AirScreensAdapter: NSObject, AirScreens {
-    func controlsEditor() -> UIViewController { unavailable("controls editor") }
-    func forgeInstaller(instanceID: String) -> UIViewController { unavailable("Forge installer") }
+    func controlsEditor() -> UIViewController { CofreMakeControlsEditor()?.takeUnretainedValue() ?? unavailable("controls editor") }
+    func forgeInstaller(instanceID: String) -> UIViewController { instanceID.withCString { CofreMakeForgeInstaller($0)?.takeUnretainedValue() ?? unavailable("Forge installer") } }
     private func unavailable(_ name: String) -> UIViewController {
         let vc = UIViewController(); vc.view.backgroundColor = .systemBackground; vc.title = "Unavailable"; NSLog("[Cofre] %@ unavailable", name); return vc
     }

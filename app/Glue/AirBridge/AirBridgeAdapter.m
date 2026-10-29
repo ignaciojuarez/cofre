@@ -6,6 +6,11 @@
 #import "ServerService.h"
 #import "ServerItem.h"
 #import "WorldItem.h"
+#import "installer/modpack/ModrinthAPI.h"
+#import "installer/modpack/CurseForgeAPI.h"
+#import "ModpackImportService.h"
+#import "CustomControlsViewController.h"
+#import "installer/ForgeInstallViewController.h"
 #import "LauncherPreferences.h"
 #import "JavaLauncher.h"
 #import "LauncherPreferences.h"
@@ -44,4 +49,14 @@
 - (void)setPreferenceObject:(NSString *)key value:(id)value { setPrefObject(key, value); }
 - (NSDictionary *)preferencesForProfile:(NSString *)profile { return @{ @"ramMB":@(ame141_currentLaunchAllocMem()), @"renderer":getPrefObject(@"renderer") ?: @"Auto", @"resolution":@(getPrefFloat(@"resolution")), @"fsr":@(getPrefBool(@"fsr1.enable")), @"java":getPrefObject(@"javaVersion") ?: @"auto", @"jvmArgs":getPrefObject(@"javaArgs") ?: @"" }; }
 - (void)launchProfile:(NSString *)profile accountID:(NSString *)accountID progress:(void (^)(NSString *))progress { [_profiles setSelectedProfileName:profile]; if(progress) progress(@"preparing"); NSDictionary *p=[_profiles selectedProfile]; NSString *version=p[@"lastVersionId"]; NSLog(@"[Cofre] launch profile=%@ version=%@",profile,version); if(progress) progress(@"starting"); int rc=launchJVM(accountID, p, 0, 0, 8); NSLog(@"[Cofre] launch result=%d",rc); if(progress) progress(rc==0?@"running":@"failed"); }
+- (void)searchProjects:(NSDictionary *)filters source:(NSInteger)source completion:(void (^)(NSArray *, NSError *))completion { if (source == 2 && ![CurseForgeAPI isAPIKeyConfigured]) { if(completion) completion(@[], [NSError errorWithDomain:@"CofreAir" code:401 userInfo:@{NSLocalizedDescriptionKey:@"CurseForge requires an API key"}]); return; } id api=source==2?[CurseForgeAPI sharedInstance]:[ModrinthAPI sharedInstance]; [api searchModWithFilters:filters completion:completion]; }
+- (void)projectVersions:(NSString *)projectID source:(NSInteger)source completion:(void (^)(NSArray *, NSError *))completion { id api=source==2?[CurseForgeAPI sharedInstance]:[ModrinthAPI sharedInstance]; [api getVersionsForModWithID:projectID completion:completion]; }
+- (void)searchServers:(NSDictionary *)filters source:(NSInteger)source completion:(void (^)(NSArray *, NSError *))completion { [[ServerService sharedService] searchServersWithAPI:(source==2?ServerDownloadAPICurseForge:ServerDownloadAPIModrinth) filters:filters completion:^(NSArray<ServerItem *> *items,NSError *error){ NSMutableArray *out=[NSMutableArray array]; for(ServerItem *s in items) [out addObject:@{@"id":s.serverID?:@"",@"title":s.title?:@"",@"description":s.serverDescription?:@"",@"address":s.serverAddress?:@"",@"downloads":s.downloads?:@0,@"author":s.author?:@"",@"source":@(s.apiSource)}]; if(completion) completion(out,error); }]; }
+- (void)installProject:(NSDictionary *)data profile:(NSString *)profile progress:(void (^)(double, NSString *))progress completion:(void (^)(NSError *))completion { ModItem *item=[[ModItem alloc] initWithOnlineData:data]; item.selectedVersionDownloadURL=data[@"downloadURL"]; item.version=data[@"version"]; [[ModService sharedService] downloadMod:item toProfile:profile progress:^(NSProgress *p){ if(progress) progress(p.fractionCompleted,@"Downloading"); } completion:completion]; }
+- (void)importPack:(NSURL *)url profile:(NSString *)profile progress:(void (^)(double, NSString *))progress completion:(void (^)(NSError *))completion { ModpackImportService *service=[ModpackImportService new]; NSError *error=nil; NSDictionary *info=[service parseModpackAtURL:url error:&error]; BOOL ok=info && [service importModpack:info progress:progress error:&error]; if(completion) completion(ok?nil:error); }
+- (UIViewController *)controlsEditor { return [CustomControlsViewController new]; }
+- (UIViewController *)forgeInstaller:(NSString *)instanceID { return [ForgeInstallViewController new]; }
 @end
+
+UIViewController *CofreMakeControlsEditor(void) { return [[CofreAirBridgeAdapter new] controlsEditor]; }
+UIViewController *CofreMakeForgeInstaller(const char *instanceID) { return [[CofreAirBridgeAdapter new] forgeInstaller:[NSString stringWithUTF8String:instanceID ?: ""]]; }
