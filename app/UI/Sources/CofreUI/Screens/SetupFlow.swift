@@ -90,7 +90,8 @@ private struct WelcomeStep: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             PixelScene(seed: 11, pixels: .init(width: 240, height: 84))
-                .frame(height: 150).clipped()
+                // The scene's ideal width (428 pt at this height) must not widen the card on small iPhones.
+                .frame(height: 150).frame(minWidth: 0, maxWidth: .infinity).clipped()
                 .overlay(alignment: .bottomLeading) {
                     HStack(spacing: 10) {
                         AppIcon(size: 40)

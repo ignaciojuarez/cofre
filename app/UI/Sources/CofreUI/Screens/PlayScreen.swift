@@ -74,6 +74,7 @@ public struct PlayHomePane: View {
     private func hero(_ inst: InstanceSummary) -> some View {
         PixelScene(seed: 11, pixels: .init(width: 240, height: 110))
             .frame(height: width == .compact ? 170 : 230)
+            .frame(minWidth: 0, maxWidth: .infinity)
             .clipped()
             .overlay {
                 LinearGradient(colors: [.clear, .black.opacity(0.55)], startPoint: .center, endPoint: .bottom).accessibilityHidden(true)

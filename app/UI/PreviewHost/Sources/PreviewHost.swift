@@ -3,7 +3,7 @@ import SwiftUI
 import UIKit
 
 // Launch arguments (all optional):
-//   -screen play|instances|mods|modpage|settings|setup|launch   (default play)
+//   -screen play|instances|mods|modpage|settings|jit|setup|launch   (default play)
 //   -setupStep 0…7      Setup step for -screen setup
 //   -type xl|ax3        Dynamic Type override
 //   -appearance light   Light theme
@@ -32,6 +32,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         case "mods": nav.section = .mods
         case "modpage": nav.section = .mods; nav.mod = .project("iris")
         case "settings": nav.section = .settings
+        case "jit": nav.section = .settings; nav.settingsPane = .jitJava
         case "launch": nav.showingLaunch = true
         default: break
         }

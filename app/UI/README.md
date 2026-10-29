@@ -121,7 +121,7 @@ swift test                     # macOS: the 2 AppKit token and font tests
 cd PreviewHost                 # regenerate with `xcodegen` after editing project.yml
 xcodebuild -project CofrePreviewHost.xcodeproj -scheme CofrePreviewHost -destination 'generic/platform=iOS Simulator' build
 xcrun simctl install <UDID> <DerivedData>/Build/Products/Debug-iphonesimulator/CofrePreviewHost.app
-xcrun simctl launch <UDID> app.cofre.ui.previewhost -screen mods          # play|instances|mods|modpage|settings|setup|launch
+xcrun simctl launch <UDID> app.cofre.ui.previewhost -screen mods          # play|instances|mods|modpage|settings|jit|setup|launch
 xcrun simctl launch <UDID> app.cofre.ui.previewhost -screen setup -setupStep 3 -type xl
 xcrun simctl launch <UDID> app.cofre.ui.previewhost -screen play -canvas 1376x1032 -snapshot ipad13   # PNG in app Documents
 ```
