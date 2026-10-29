@@ -84,7 +84,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
                     NSLog("[Cofre] JIT disk image mounted")
                 }
                 step = "debugger"
-                // Blocks until the game exits: CofreTXM.js stays attached. Reply once it has attached.
+                // Blocks until CofreTXM.js detaches (right after the game's code region) or the game exits. Reply once
+                // it has attached.
                 try StikJIT.enableJIT(
                     targetPID: Int32(pid), pairingFile: url, configuration: configuration, script: .custom(scriptURL),
                     forceScript: true,

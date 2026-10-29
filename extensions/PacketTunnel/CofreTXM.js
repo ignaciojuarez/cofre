@@ -1,7 +1,8 @@
 // Cofre's debugger protocol implementation. No StikDebug source is incorporated.
 // Air requests: f00d/x16=0 detach, 1 region, 2 extension, 3 detach policy,
 // 4 patch. brk #0x69 is Air's script probe until Air sends its extension (2), answered with 0x690000E0
-// like the universal script; after that it allocates x0 bytes. Keep attached until process exit.
+// like the universal script; after that it allocates x0 bytes. With policy 3 on (Air's default), detach right
+// after that allocation: the JVM's own signals stall while a debugger holds the process.
 function le(hex) {
     if (!/^[0-9a-f]{16}$/i.test(hex)) throw Error('Invalid register');
     return BigInt('0x' + hex.match(/../g).reverse().join(''));
@@ -47,6 +48,7 @@ function runCofre() {
     log('COFRE_ATTACHED');
     stop = checked('c');
     let extended = false;
+    let detachAfterRegion = false;
     while (!/^[WX]/.test(stop)) {
         let pc = /(?:^|;)20:([0-9a-f]{16});/i.exec(stop);
         let request = pc ? parseStop(stop, checked('m' + checkedRange(le(pc[1]), 4n, 4n).address.toString(16) + ',4')) : null;
@@ -59,6 +61,7 @@ function runCofre() {
         }
         let address = request.legacy ? 0n : request.x0;
         let size = request.legacy ? request.x0 : request.x1;
+        let detach = request.op === 0n && !request.legacy;
         if (request.legacy && !extended) {
             // Anything but this value makes Air abort with "Support for legacy script has been removed".
             writeRegister('0', PROBE_REPLY, request.tid);
@@ -84,6 +87,7 @@ function runCofre() {
             }
             writeRegister('0', address, request.tid);
             log('COFRE_REGION_READY');
+            detach = request.legacy && detachAfterRegion;
         } else if (request.op === 4n) {
             checkedRange(address, size, 1048576n);
             for (let offset = 0n; offset < size; offset += 4096n) {
@@ -96,12 +100,19 @@ function runCofre() {
             }
         } else if (request.op === 2n) {
             extended = true;
-        } else if (![0n, 3n].includes(request.op)) {
+        } else if (request.op === 3n) {
+            // Off only when Air runs "always attached"; it then routes its own exceptions away from the debugger.
+            detachAfterRegion = request.x0 !== 0n;
+        } else if (request.op !== 0n) {
             throw Error('Unsupported JIT request');
         }
         // Air's known extension operations are implemented above; never eval target memory.
-        // Detach requests/policy are deliberately ignored: S3 is not yet proven on TXM.
         writeRegister('20', request.pc + 4n, request.tid);
+        if (detach) {
+            checked('D');
+            log('COFRE_DETACHED');
+            return;
+        }
         stop = checked('c');
     }
     log('COFRE_EXITED');
