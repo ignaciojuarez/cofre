@@ -18,6 +18,7 @@ import UIKit
 //   -canvas 1376x1032   Lay the UI out at this point size (scaled to fit) and write a full-size PNG
 //                       to Documents/<snapshot>.png, e.g. an iPad 13" window on an 11" simulator.
 //   -snapshot name      File name for -canvas output
+//   -touch a|b|c|ipad|settings|sheet   Touch-controls design mock (-screen touch)
 
 @main
 final class AppDelegate: UIResponder, UIApplicationDelegate {}
@@ -85,7 +86,9 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         }
         let setupStep = args.object(forKey: "setupStep") != nil ? args.integer(forKey: "setupStep") : nil
         let root: UIViewController =
-            screen == "gameExit"
+            screen == "touch"
+            ? UIHostingController(rootView: TouchControlsMockPage(args.string(forKey: "touch") ?? "sheet"))
+            : screen == "gameExit"
             ? UIHostingController(
                 rootView: GameExitView(
                     report: MockGameExit.report(
