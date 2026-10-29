@@ -940,6 +940,7 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
                                      return;
                                    }
                                    [self pickRendererForProfile:profile metadata:task.metadata];
+                                   [self setGameLanguageForProfile:profile metadata:task.metadata];
                                    NSLog(@"[Cofre] launch files ready; starting the game");
                                    UIWindow *window = UIWindow.mainWindow;
                                    stageObserver = [NSNotificationCenter.defaultCenter
@@ -993,6 +994,39 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
   profiles[name] = profile;
   [self persistInstanceProfiles:profiles selected:name error:nil];
   NSLog(@"[Cofre] renderer auto -> Metal for Minecraft %@", game);
+}
+// Air's Java launcher sets Minecraft to Chinese (lang:zh_cn) when options.txt
+// has no language. Write the phone's language first; Air only fills a missing
+// one. Also undo that Chinese default on phones not set to Chinese.
+- (void)setGameLanguageForProfile:(NSString *)name metadata:(NSDictionary *)metadata {
+  NSString *game = metadata[@"inheritsFrom"] ?: metadata[@"id"] ?: @"";
+  NSArray<NSString *> *parts = [game componentsSeparatedByString:@"."];
+  // 1.10 and older need "en_US"; lowercase crashes the oldest versions.
+  BOOL legacy = [parts.firstObject isEqualToString:@"1"] && parts.count > 1 && parts[1].integerValue < 11;
+  NSLocale *locale = [NSLocale localeWithLocaleIdentifier:NSLocale.preferredLanguages.firstObject ?: @"en-US"];
+  NSString *language = locale.languageCode.lowercaseString ?: @"en";
+  NSString *region = locale.countryCode ?: ([language isEqualToString:@"en"] ? @"us" : language);
+  region = legacy ? region.uppercaseString : region.lowercaseString;
+  NSString *lang = [NSString stringWithFormat:@"lang:%@_%@", language, region];
+
+  NSString *path = [amePCLVersionGameDirAbsolute(_profiles.profiles[name], nil)
+      stringByAppendingPathComponent:@"options.txt"];
+  NSString *text = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil] ?: @"";
+  NSMutableArray<NSString *> *lines = [[text componentsSeparatedByString:@"\n"] mutableCopy];
+  NSUInteger i = [lines indexOfObjectPassingTest:^BOOL(NSString *line, NSUInteger idx, BOOL *stop) {
+    return [line hasPrefix:@"lang:"];
+  }];
+  if (i == NSNotFound) {
+    [lines insertObject:lang atIndex:0];
+  } else if ([lines[i].lowercaseString isEqualToString:@"lang:zh_cn"] && ![language isEqualToString:@"zh"]) {
+    lines[i] = lang;
+  } else {
+    return;
+  }
+  [NSFileManager.defaultManager createDirectoryAtPath:path.stringByDeletingLastPathComponent
+                          withIntermediateDirectories:YES attributes:nil error:nil];
+  [[lines componentsJoinedByString:@"\n"] writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:nil];
+  NSLog(@"[Cofre] game %@ for Minecraft %@", lang, game);
 }
 - (void)hideCofreLaunchOverlay {
   NSLog(@"[Cofre] launch overlay hidden; Java may continue");
