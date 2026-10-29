@@ -30,6 +30,8 @@ regular, shell width ≥ 1100 pt  → 248 pt sidebar (+ pinned, JIT, account)
 
 Layout reads `horizontalSizeClass` plus measured width (`WidthClass.resolve`), never the device. All selection lives
 in `NavModel`, so resizing a Stage Manager window keeps it. ⌃⌘S toggles sidebar ↔ rail, ⌘1–⌘4 switch sections.
+The size classes themselves come from the window size (`SizeClasses`: regular from 700 pt wide), not UIKit, because
+Air forces every UIKit trait collection to regular. Sheets and covers reuse the root's values.
 
 ## Shell entry point (for the adapter)
 

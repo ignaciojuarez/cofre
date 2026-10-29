@@ -55,7 +55,6 @@ public enum CofreLinks {
     public struct CofreRootView: View {
         @State private var store: CofreStore
         @State private var nav: NavModel
-        @Environment(\.horizontalSizeClass) private var sizeClass
         private let setupStart: Int?
 
         /// `setupStart` forces the wizard at that step (preview host); `nil` resumes where the user left off.
@@ -66,7 +65,13 @@ public enum CofreLinks {
         }
 
         public var body: some View {
-            Group {
+            // Size classes come from the window, not UIKit (see `SizeClasses`).
+            GeometryReader { root(SizeClasses($0.size)) }
+        }
+
+        private func root(_ classes: SizeClasses) -> some View {
+            let regular = classes.horizontal == .regular
+            return Group {
                 if !store.setupCompleted, let setupStart {
                     SetupFlow(startAt: setupStart)
                 } else if !store.setupCompleted && !store.setupLoaded {
@@ -125,11 +130,13 @@ public enum CofreLinks {
                 }
             }
             // Join server (GAP-14): a bottom sheet on compact, a centered card overlay on regular.
-            .sheet(item: serverJoinRequest(card: false), onDismiss: startPendingJoinLaunch) { request in
+            .sheet(item: serverJoinRequest(card: false, regular: regular), onDismiss: startPendingJoinLaunch) {
+                request in
                 JoinServerSheet(request: request, style: .bottomSheet).environment(store).environment(nav)
+                    .sizeClasses(nil)
             }
             .overlay {
-                if let request = serverJoinRequest(card: true).wrappedValue {
+                if let request = serverJoinRequest(card: true, regular: regular).wrappedValue {
                     JoinServerCard(request: request) {
                         nav.serverJoin = nil
                         startPendingJoinLaunch()
@@ -137,7 +144,7 @@ public enum CofreLinks {
                     .transition(.opacity)
                 }
             }
-            .animation(.easeOut(duration: 0.15), value: serverJoinRequest(card: true).wrappedValue)
+            .animation(.easeOut(duration: 0.15), value: serverJoinRequest(card: true, regular: regular).wrappedValue)
             .onOpenURL { nav.open($0) }
             .environment(store)
             .environment(nav)
@@ -145,13 +152,14 @@ public enum CofreLinks {
             .preferredColorScheme(store.theme.colorScheme)
             .tint(Color.cofre.accent)
             .task { await store.start() }
+            .sizeClasses(classes)
         }
 
         /// GAP-14. Deep links can arrive any time; the sheet waits for the `.serverJoin` capability and finished setup.
-        private func serverJoinRequest(card: Bool) -> Binding<ServerJoinRequest?> {
+        private func serverJoinRequest(card: Bool, regular: Bool) -> Binding<ServerJoinRequest?> {
             Binding(
                 get: {
-                    store.can(.serverJoin) && store.setupCompleted && (sizeClass == .regular) == card
+                    store.can(.serverJoin) && store.setupCompleted && regular == card
                         ? nav.serverJoin : nil
                 },
                 set: { nav.serverJoin = $0 })

@@ -17,21 +17,44 @@ extension View {
 struct BlockSheetContent<C: View>: View {
     let content: C
     @Environment(\.horizontalSizeClass) private var sizeClass
+    #if canImport(UIKit)
+        @Environment(\.sizeClasses) private var measured
+    #endif
     @Environment(\.dismiss) private var dismiss
+
+    private var compact: Bool {
+        #if canImport(UIKit)
+            return (measured?.horizontal ?? sizeClass) == .compact
+        #else
+            return sizeClass == .compact
+        #endif
+    }
 
     var body: some View {
         content
-            .environment(\.widthClass, sizeClass == .compact ? .compact : .medium)
+            .environment(\.widthClass, compact ? .compact : .medium)
             .environment(\.isPushed, false)
+            .modifier(ReapplySizeClasses())
             .presentationBackground(Color.cofre.panel)
-            .presentationDetents(sizeClass == .compact ? [.medium, .large] : [.large])
-            .presentationDragIndicator(sizeClass == .compact ? .visible : .hidden)
+            .presentationDetents(compact ? [.medium, .large] : [.large])
+            .presentationDragIndicator(compact ? .visible : .hidden)
             .modifier(FormSizing())
             .background {
                 // Esc: a hidden cancel button works even when nothing in the sheet has focus.
                 Button("Close") { dismiss() }.keyboardShortcut(.cancelAction)
                     .opacity(0).allowsHitTesting(false).accessibilityHidden(true)
             }
+    }
+}
+
+/// Sheets read UIKit's size classes again; reapply the root's measured ones (see `SizeClasses`).
+private struct ReapplySizeClasses: ViewModifier {
+    func body(content: Content) -> some View {
+        #if canImport(UIKit)
+            content.sizeClasses(nil)
+        #else
+            content
+        #endif
     }
 }
 

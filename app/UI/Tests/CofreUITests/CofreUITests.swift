@@ -17,6 +17,57 @@
             XCTAssertEqual(WidthClass.resolve(sizeClass: .regular, width: 1376), .expanded)
         }
 
+        func testSizeClassBreakpoints() {
+            func classes(_ w: CGFloat, _ h: CGFloat) -> [UserInterfaceSizeClass] {
+                let c = SizeClasses(CGSize(width: w, height: h))
+                return [c.horizontal, c.vertical]
+            }
+            XCTAssertEqual(classes(402, 778), [.compact, .regular])  // iPhone 17 Pro
+            XCTAssertEqual(classes(750, 381), [.regular, .compact])  // same, landscape
+            XCTAssertEqual(classes(744, 1133), [.regular, .regular])  // iPad mini
+            XCTAssertEqual(classes(320, 1024), [.compact, .regular])  // Slide Over
+        }
+
+        // Air reports regular/regular everywhere: a 402 pt window must still read compact.
+        func testWindowSizeBeatsUIKitSizeClasses() {
+            let seen = probeSizeClasses(uikit: .regular, measured: nil)
+            XCTAssertEqual(seen["root"], .compact)
+        }
+
+        // Sheets get the root's classes, not their own UIKit ones (compact on an iPhone simulator).
+        func testSheetsReuseTheRootSizeClasses() throws {
+            guard UIApplication.shared.connectedScenes.first is UIWindowScene else { throw XCTSkip("no window scene") }
+            let seen = probeSizeClasses(uikit: .compact, measured: SizeClasses(CGSize(width: 1000, height: 1000)))
+            XCTAssertEqual(seen["root"], .regular)
+            XCTAssertEqual(seen["sheet"], .regular)
+        }
+
+        /// Hosts a probe plus a `blockSheet` probe in a 402 × 874 window whose UIKit size classes are `uikit`.
+        /// `measured: nil` measures the window like `CofreRootView`.
+        private func probeSizeClasses(uikit: UIUserInterfaceSizeClass, measured: SizeClasses?)
+            -> [String: UserInterfaceSizeClass]
+        {
+            let seen = SeenSizeClasses()
+            let view = GeometryReader { g in
+                SizeClassProbe(seen: seen, key: "root")
+                    .blockSheet(isPresented: .constant(true)) { SizeClassProbe(seen: seen, key: "sheet") }
+                    .sizeClasses(measured ?? SizeClasses(g.size))
+            }
+            let host = UIHostingController(rootView: view)
+            host.traitOverrides.horizontalSizeClass = uikit
+            host.traitOverrides.verticalSizeClass = uikit
+            let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene
+            let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow()
+            window.frame = CGRect(x: 0, y: 0, width: 402, height: 874)
+            window.rootViewController = host
+            window.makeKeyAndVisible()
+            let end = Date().addingTimeInterval(scene == nil ? 0.3 : 3)
+            while seen.values["sheet"] == nil, Date() < end { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
+            host.dismiss(animated: false)
+            window.isHidden = true
+            return seen.values
+        }
+
         // §1.1: every text pair passes WCAG AA (4.5:1) in both themes, for every X07 accent.
         func testTextContrastPassesAA() {
             let saved = CofreTheme.current
@@ -263,6 +314,14 @@
             return (max(l1, l2) + 0.05) / (min(l1, l2) + 0.05)
         }
     }
+    @MainActor private final class SeenSizeClasses { var values: [String: UserInterfaceSizeClass] = [:] }
+
+    private struct SizeClassProbe: View {
+        let seen: SeenSizeClasses, key: String
+        @Environment(\.horizontalSizeClass) private var sizeClass
+        var body: some View { Color.clear.onAppear { seen.values[key] = sizeClass } }
+    }
+
     /// An `OptionalActions` conformer that implements nothing, to check the defaults.
     private final class MinimalActions: OptionalActions {}
 #endif

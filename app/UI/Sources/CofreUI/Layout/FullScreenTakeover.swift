@@ -20,9 +20,11 @@
     struct TakeoverContent<C: View>: View {
         let content: C
         @Environment(\.horizontalSizeClass) private var sizeClass
+        @Environment(\.sizeClasses) private var measured
         var body: some View {
             content
-                .environment(\.widthClass, sizeClass == .compact ? .compact : .medium)
+                .environment(\.widthClass, (measured?.horizontal ?? sizeClass) == .compact ? .compact : .medium)
+                .sizeClasses(nil)
                 .presentationBackground(Color.cofre.page)
                 .statusBarHidden(false)
         }
