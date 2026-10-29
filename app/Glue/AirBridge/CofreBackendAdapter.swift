@@ -356,8 +356,16 @@
                 ("libmobileglues.dylib", "MobileGlues", "OpenGL 4 · modern packs", "libmobileglues.dylib"),
                 ("libtinygl4angle.dylib", "ANGLE", "OpenGL ES on Metal", "libtinygl4angle.dylib"),
                 ("libOSMesa.8.dylib", "Zink", "OpenGL on Vulkan", "libOSMesa.8.dylib"),
+                ("libltw.dylib", "LTW", "OpenGL 3 · light", "libltw.dylib"),
+                ("libMoltenVK.dylib", "Vulkan", "MoltenVK", "libMoltenVK.dylib"),
+                ("libMobileGL.dylib", "MobileGL", "Direct Vulkan", "libMobileGL.dylib"),
+                ("libMobileGL-gles.dylib", "MobileGL GLES", "Direct GLES", "libMobileGL-gles.dylib"),
                 ("libgl4es_114.dylib", "GL4ES", "Legacy · 1.16 and older", "libgl4es_114.dylib"),
                 ("libgl4eszl2.dylib", "Krypton", "OpenGL 3 · light", "libgl4eszl2.dylib"),
+                ("libSimpleFPEWrapper.dylib", "SimpleFPEWrapper", "Fixed-function compatibility", "libSimpleFPEWrapper.dylib"),
+                ("libvgpu.dylib", "VGPU", "Legacy OpenGL", "libvgpu.dylib"),
+                ("libOSMesaVirgl.dylib", "VirGL", "Mesa compatibility", "libOSMesaVirgl.dylib"),
+                ("libnggl4es.dylib", "NG-GL4ES", "Shader translation", "libnggl4es.dylib"),
             ]
             let current = preferenceStore.stringValue(.renderer, profile: nil)
             return candidates.compactMap { id, name, detail, file in
