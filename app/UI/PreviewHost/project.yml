@@ -1,0 +1,40 @@
+# Preview host for CofreUI: renders the real screens with mock data on a simulator.
+# Generate with `xcodegen` in this folder. Never install on physical devices.
+name: CofrePreviewHost
+options:
+  bundleIdPrefix: app.cofre
+  deploymentTarget:
+    iOS: "17.0"
+packages:
+  CofreUI:
+    path: ..
+targets:
+  CofrePreviewHost:
+    type: application
+    platform: iOS
+    sources: [Sources]
+    dependencies:
+      - package: CofreUI
+    info:
+      path: Sources/Info.plist
+      properties:
+        CFBundleDisplayName: Cofre UI
+        UILaunchScreen: {}
+        UIRequiresFullScreen: false
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+          UISceneConfigurations:
+            UIWindowSceneSessionRoleApplication:
+              - UISceneConfigurationName: Default
+                UISceneDelegateClassName: $(PRODUCT_MODULE_NAME).SceneDelegate
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.cofre.ui.previewhost
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SWIFT_VERSION: "5.0"
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "-"
+        DEVELOPMENT_TEAM: ""
+        ENABLE_PREVIEWS: YES
