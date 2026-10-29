@@ -9,3 +9,5 @@ Third-party components:
 
 Brand disclaimer: Cofre is an independent project and is not affiliated with Apple, Mojang, Microsoft, Air, Amethyst, StikDebug, or StikJIT.
 Source, pinned upstream revisions, patches, and build instructions are provided with each release.
+
+StikJIT integration: upstream/stikjit is included under MPL-2.0. Its source files remain under that license; CofreTXM.js is original Cofre code and does not copy StikDebug (AGPL-3.0) code.
