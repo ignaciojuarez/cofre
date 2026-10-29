@@ -52,6 +52,19 @@ static void CofreHideAirOverlay(SurfaceViewController *surface) {
   cancel.enabled = NO;
 }
 
+/// Runs `then` once `window` is landscape, polling every 50 ms up to `tries`.
+static void CofreWhenLandscape(UIWindow *window, int tries, dispatch_block_t then) {
+  CGSize size = window.bounds.size;
+  if (size.width > size.height || tries <= 0) {
+    NSLog(@"[Cofre] launch surface size=%.0fx%.0f", size.width, size.height);
+    then();
+    return;
+  }
+  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 50 * NSEC_PER_MSEC),
+                 dispatch_get_main_queue(),
+                 ^{ CofreWhenLandscape(window, tries - 1, then); });
+}
+
 static void CofrePresentSurface(UIWindow *window, NSDictionary *metadata) {
   // As UIKit_launchMinecraftSurfaceVC does: remember who played last.
   BaseAuthenticator *account = BaseAuthenticator.current;
@@ -66,19 +79,24 @@ static void CofrePresentSurface(UIWindow *window, NSDictionary *metadata) {
     [overlay makeKeyAndVisible];
     cofreLaunchOverlayWindow = overlay;
 
-    SurfaceViewController *surface = [[SurfaceViewController alloc] initWithMetadata:metadata];
-    window.alpha = 0;
-    window.rootViewController = surface;
-    [window makeKeyAndVisible];
-    [UIView animateWithDuration:0.2 animations:^{ window.alpha = 1; }];
+    // Minecraft sizes its window from the surface's first layout, so turn to
+    // landscape first, as Air's own Play button does.
+    AmeGameLandscapeLockEnter();
+    CofreWhenLandscape(window, 40, ^{
+      SurfaceViewController *surface = [[SurfaceViewController alloc] initWithMetadata:metadata];
+      window.alpha = 0;
+      window.rootViewController = surface;
+      [window makeKeyAndVisible];
+      [UIView animateWithDuration:0.2 animations:^{ window.alpha = 1; }];
 
-    // SurfaceViewController creates these private views during init/viewDidLoad.
-    // Repeat briefly so Air's own spinner and Cancel button never flash through.
-    for (NSNumber *delay in @[@0, @0.05, @0.2, @0.5, @1.0]) {
-      dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay.doubleValue * NSEC_PER_SEC)),
-                     dispatch_get_main_queue(), ^{ CofreHideAirOverlay(surface); });
-    }
-    NSLog(@"[Cofre] launch surface presented with Cofre overlay");
+      // SurfaceViewController creates these private views during init/viewDidLoad.
+      // Repeat briefly so Air's own spinner and Cancel button never flash through.
+      for (NSNumber *delay in @[@0, @0.05, @0.2, @0.5, @1.0]) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay.doubleValue * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{ CofreHideAirOverlay(surface); });
+      }
+      NSLog(@"[Cofre] launch surface presented with Cofre overlay");
+    });
   });
 }
 
@@ -921,6 +939,7 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
                                      emitFailure(@"Air couldn't read this version's files.");
                                      return;
                                    }
+                                   [self pickRendererForProfile:profile metadata:task.metadata];
                                    NSLog(@"[Cofre] launch files ready; starting the game");
                                    UIWindow *window = UIWindow.mainWindow;
                                    stageObserver = [NSNotificationCenter.defaultCenter
@@ -956,6 +975,24 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
                                    CofrePresentSurface(window, task.metadata);
                                  }];
   });
+}
+// Air's "auto" always picks ANGLE. Minecraft 26+ rejects ANGLE's OpenGL
+// ("glGetError mismatch") and its Vulkan fallback fails to compile shaders, so
+// unless the player chose a renderer, run 26+ on Air's Metal path. For older
+// versions Air treats Metal as auto, so saving it in the instance is safe.
+- (void)pickRendererForProfile:(NSString *)name metadata:(NSDictionary *)metadata {
+  NSString *game = metadata[@"inheritsFrom"] ?: metadata[@"id"];
+  NSString *chosen = _profiles.profiles[name][@"renderer"];
+  if (!chosen.length)
+    chosen = getPrefObject(@"video.renderer");
+  if (game.integerValue < 26 || (chosen.length && ![chosen isEqualToString:@"auto"]))
+    return;
+  NSMutableDictionary *profile = [_profiles.profiles[name] mutableCopy];
+  profile[@"renderer"] = @RENDERER_NAME_METAL;
+  NSMutableDictionary *profiles = [_profiles.profiles mutableCopy];
+  profiles[name] = profile;
+  [self persistInstanceProfiles:profiles selected:name error:nil];
+  NSLog(@"[Cofre] renderer auto -> Metal for Minecraft %@", game);
 }
 - (void)hideCofreLaunchOverlay {
   NSLog(@"[Cofre] launch overlay hidden; Java may continue");
