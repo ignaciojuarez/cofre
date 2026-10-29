@@ -1,7 +1,7 @@
 import XCTest
 @testable import CofreServerJoin
 final class ServerJoinTests: XCTestCase {
-    let examples = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("../launcher-plan/server-join/examples")
+    let examples = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("plan/server-join/examples")
     func card(_ name: String) throws -> Data { try Data(contentsOf: examples.appendingPathComponent(name + ".json")) }
     func testEveryValidFixture() throws { for n in ["fabric-modrinth","forge-curseforge-restricted","ios-override","update-diff"] { XCTAssertNoThrow(try CardDecoder.decodeCard(card(n))) } }
     func testEveryMaliciousFixture() throws { for n in ["http-malicious","path-malicious","wildcard-malicious","missing-required-invalid"] { XCTAssertThrowsError(try CardDecoder.decodeCard(card(n))) } }

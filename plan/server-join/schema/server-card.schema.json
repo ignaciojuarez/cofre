@@ -1,0 +1,16 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://cofre.dev/server-card-envelope.schema.json",
+  "title":"Cofre Server Card Envelope",
+  "type":"object",
+  "additionalProperties":false,
+  "required":["format","payload","key_id","public_key","signature"],
+  "properties":{
+    "format":{"const":"cofre-card-envelope/1"},
+    "payload":{"type":"string","pattern":"^[A-Za-z0-9_-]+$"},
+    "key_id":{"type":"string","minLength":1},
+    "public_key":{"type":"string","pattern":"^[A-Za-z0-9_-]{43}$"},
+    "signature":{"type":"string","pattern":"^[A-Za-z0-9_-]{86}$"},
+    "previous_key_signature":{"type":"string","pattern":"^[A-Za-z0-9_-]{86}$"}
+  }
+}

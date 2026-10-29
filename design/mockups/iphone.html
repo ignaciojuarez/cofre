@@ -1,0 +1,987 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cobble: app flow mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Pixelify+Sans:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Tokens follow playhorizon.dev's block theme. */
+:root {
+  --page:#0f0d17; --plate-soft:#221e34; --plate:#2b2641; --rule:#120f1c;
+  --ink:#ecedf3; --ink-soft:#c5c7d1; --muted:#a29cb8; --accent:#9a86ff;
+  --danger:#f07a68; --success:#45c27a; --warn:#f0b84f;
+  --side:#0b0a11; --panel:#1a1727; --raised:#221e34; --button:#2b2641; --button-bevel:#3d3560;
+  --well:#0c0b12; --bevel:#342d52; --lip:#07060b; --outline:#05040a;
+  --face:#5b3fd6; --face-bevel:#8a74ff; --face-lip:#3a2694; --on-face:#fff;
+  --font:"Geist",ui-sans-serif,system-ui,sans-serif; --mono:"Geist Mono",ui-monospace,monospace; --pixel:"Pixelify Sans","Geist",sans-serif;
+  --edges: inset 0 2px 0 var(--bevel), inset 0 -2px 0 var(--lip);
+  --stone: none;
+  color-scheme: dark;
+}
+:root[data-theme="light"] {
+  --page:#ece7f7; --plate-soft:#e9e3f8; --plate:#ddd4f3; --rule:#e4ddf4;
+  --ink:#1b1530; --ink-soft:#3b3354; --muted:#585071; --accent:#5333c9;
+  --danger:#a3301d; --success:#136336; --warn:#7a4f00;
+  --side:#e2dbf2; --panel:#f8f6fd; --raised:#e9e3f8; --button:#ddd4f3; --button-bevel:#f4f0fe;
+  --well:#f3f0fb; --bevel:#ffffff; --lip:#c3b8e2; --outline:#2b2244;
+  --face:#5b3fd6; --face-bevel:#8069ef; --face-lip:#3a2694;
+  color-scheme: light;
+}
+*,*::before,*::after { box-sizing:border-box; font-feature-settings:"liga" 0,"clig" 0,"calt" 0; }
+html { background:var(--page); color:var(--ink); font:400 15px/1.55 var(--font); -webkit-font-smoothing:antialiased; font-variant-ligatures:no-common-ligatures; }
+body { margin:0; position:relative; isolation:isolate; }
+body::before { content:""; position:fixed; inset:0; z-index:-1; background:var(--stone) 0 0/128px 128px repeat; image-rendering:pixelated; pointer-events:none; }
+h1,h2,h3,p { margin:0; }
+button { font:inherit; color:inherit; }
+code { font:0.86em/1.5 var(--mono); background:var(--well); box-shadow:0 0 0 1px var(--outline); padding:1px 5px; }
+
+/* ───────── Page chrome ───────── */
+.nav { position:sticky; top:0; z-index:20; height:60px; background:var(--side); box-shadow:0 2px 0 var(--outline); }
+.nav-in { max-width:1520px; margin:0 auto; height:100%; display:flex; align-items:center; gap:20px; padding:0 32px; }
+.mark { display:flex; align-items:center; gap:10px; font:700 20px/1 var(--pixel); letter-spacing:.02em; }
+.nav a { color:var(--muted); text-decoration:none; font:500 15px/1 var(--pixel); padding:9px 12px; }
+.nav a:hover { color:var(--ink); background:var(--raised); }
+.nav .links { display:flex; gap:2px; margin-left:auto; }
+.theme { border:2px solid var(--outline); background:var(--button); box-shadow:inset 0 2px 0 var(--button-bevel), inset 0 -4px 0 var(--lip); height:36px; padding:0 14px 3px; font:500 14px/1 var(--pixel); cursor:pointer; color:var(--ink); }
+.hero { position:relative; isolation:isolate; overflow:hidden; border-bottom:2px solid var(--outline); background-size:cover; background-position:70% 100%; image-rendering:pixelated; }
+.hero::before { content:""; position:absolute; inset:0; z-index:-1; background:linear-gradient(90deg, color-mix(in srgb,var(--page) 94%,transparent) 0%, color-mix(in srgb,var(--page) 75%,transparent) 42%, transparent 75%), linear-gradient(180deg, transparent 55%, color-mix(in srgb,var(--page) 70%,transparent)); }
+.hero-in { max-width:1520px; margin:0 auto; padding:88px 32px 150px; }
+.kick { display:flex; gap:14px; font:400 11px/1.5 var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin-bottom:20px; }
+.kick span { color:var(--ink); }
+.display { font:700 64px/1.02 var(--pixel); max-width:13ch; text-wrap:balance; }
+.lede { margin-top:18px; max-width:56ch; color:var(--ink-soft); font-size:17px; }
+.facts { display:grid; grid-template-columns:repeat(4,minmax(0,220px)); gap:8px; margin-top:36px; }
+.fact { background:var(--panel); border:2px solid var(--outline); box-shadow:var(--edges); padding:14px 16px; }
+.fact b { display:block; font:700 30px/1 var(--pixel); }
+.fact small { font:400 11px/1.4 var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--muted); }
+.note { margin-top:20px; font:400 11px/1.6 var(--mono); letter-spacing:.04em; color:var(--muted); max-width:78ch; }
+.note b { color:var(--warn); font-weight:500; }
+.section { max-width:1520px; margin:0 auto; padding:88px 32px 8px; }
+.shead { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px 48px; align-items:end; margin-bottom:40px; }
+.shead .kick { grid-column:1/-1; margin:0; }
+.title { font:600 44px/1.05 var(--pixel); }
+.shead p { color:var(--muted); max-width:60ch; }
+.shots { display:flex; flex-wrap:wrap; gap:36px 28px; }
+.shot { margin:0; }
+.shot figcaption { display:flex; gap:12px; margin-top:14px; font-size:13px; color:var(--muted); max-width:340px; }
+.shot figcaption span { font:400 11px/1.9 var(--mono); letter-spacing:.04em; color:var(--accent); }
+.shot figcaption b { color:var(--ink); font-weight:500; }
+
+/* ───────── Phone ───────── */
+.phone { width:340px; height:736px; padding:9px; border-radius:54px; background:#05040a; box-shadow:0 0 0 2px #2b2641, 0 0 0 4px #05040a, 0 40px 60px -30px rgba(0,0,0,.7); position:relative; }
+.phone.land { width:736px; height:340px; }
+.screen { position:relative; height:100%; border-radius:45px; overflow:hidden; background:var(--page); isolation:isolate; }
+.screen::before { content:""; position:absolute; inset:0; z-index:-1; background:var(--stone) 0 0/128px 128px repeat; image-rendering:pixelated; opacity:.9; }
+.island { position:absolute; top:10px; left:50%; translate:-50% 0; width:96px; height:28px; border-radius:20px; background:#000; z-index:9; }
+.land .island { display:none; }
+.sbar { position:absolute; top:0; left:0; right:0; height:46px; display:flex; justify-content:space-between; align-items:center; padding:4px 30px 0 34px; z-index:8; font:600 14.5px/1 -apple-system,"SF Pro Text",var(--font); color:var(--ink); }
+.sbar.light { color:#fff; }
+.sbar .ic { display:flex; gap:6px; align-items:center; }
+.sbar svg { display:block; fill:currentColor; }
+.vpn { font:700 9.5px/1 -apple-system,var(--font); border:1.4px solid currentColor; border-radius:3px; padding:2px 3px; }
+.app { position:absolute; inset:46px 0 0; display:flex; flex-direction:column; }
+.app.full { top:0; }
+.body { flex:1; min-height:0; display:flex; flex-direction:column; gap:10px; padding:8px 16px 14px; overflow:hidden; }
+.grow { flex:1; }
+.top { display:flex; align-items:center; gap:10px; padding:6px 16px 4px; min-height:38px; }
+.back { font:600 22px/1 var(--pixel); color:var(--accent); width:18px; }
+.top .tt { font:600 17px/1 var(--pixel); }
+.top .end { margin-left:auto; }
+.tabbar { flex:none; display:grid; grid-template-columns:repeat(4,1fr); height:78px; background:var(--side); box-shadow:0 -2px 0 var(--outline); padding-bottom:22px; position:relative; }
+.tabbar a { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; font:500 11.5px/1 var(--pixel); color:var(--muted); text-decoration:none; }
+.tabbar a .px { opacity:.55; }
+.tabbar a.on { color:var(--ink); box-shadow:inset 0 3px 0 var(--accent); background:var(--raised); }
+.tabbar a.on .px { opacity:1; }
+.homebar { position:absolute; bottom:8px; left:50%; translate:-50% 0; width:120px; height:5px; border-radius:3px; background:var(--ink); opacity:.55; z-index:9; }
+
+/* ───────── In-app type ───────── */
+.k { font:400 10px/1.5 var(--mono); letter-spacing:.07em; text-transform:uppercase; color:var(--muted); }
+.k .ok, .ok { color:var(--success); }
+.k .bad, .bad { color:var(--danger); }
+.k .warn, .warn { color:var(--warn); }
+.h { font:600 26px/1.08 var(--pixel); text-wrap:balance; }
+.h.xl { font-size:31px; font-weight:700; }
+.h.md { font-size:21px; }
+.l { font-size:13px; line-height:1.45; color:var(--muted); }
+.lbl { font:400 10px/1 var(--mono); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin:4px 0 -2px; }
+.micro { font:400 10px/1.5 var(--mono); letter-spacing:.03em; color:var(--muted); }
+.c { text-align:center; }
+.mono { font-family:var(--mono); }
+
+/* ───────── Blocks ───────── */
+.b { background:var(--panel); border:2px solid var(--outline); box-shadow:var(--edges); }
+.list { display:grid; gap:5px; }
+.r { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:10px; padding:8px 11px; min-height:40px; }
+.r.two { grid-template-columns:minmax(0,1fr) auto; }
+.r .ix { font:400 10px/1 var(--mono); color:var(--muted); letter-spacing:.04em; }
+.r .t { font-size:13.5px; font-weight:500; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.r .s { display:block; font-size:11px; font-weight:400; color:var(--muted); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.r .m { font:400 10px/1 var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--muted); white-space:nowrap; }
+.r.sel { box-shadow:var(--edges), inset 4px 0 0 var(--accent); background:var(--raised); }
+.r.dim { opacity:.5; }
+.r.big { padding:10px 11px; }
+.well { background:var(--well); border:2px solid var(--outline); }
+.split { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.tri { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+.mini { padding:9px 8px 8px; text-align:center; }
+.mini b { display:block; font:700 20px/1 var(--pixel); }
+.mini small { font:400 9px/1.3 var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+.row { display:flex; align-items:center; gap:8px; }
+
+/* Buttons */
+.btn { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; height:42px; padding:0 14px 3px; border:2px solid var(--outline); background:var(--button); color:var(--ink); font:500 15px/1 var(--pixel); box-shadow:inset 0 2px 0 var(--button-bevel), inset 0 -4px 0 var(--lip); cursor:pointer; white-space:nowrap; }
+.btn.p { background:var(--face); color:var(--on-face); box-shadow:inset 0 2px 0 var(--face-bevel), inset 0 -4px 0 var(--face-lip); }
+.btn.lg { height:50px; font-size:19px; }
+.btn.sm { width:auto; height:30px; padding:0 10px 2px; font-size:13px; box-shadow:inset 0 2px 0 var(--button-bevel), inset 0 -3px 0 var(--lip); }
+.btn.p.sm { box-shadow:inset 0 2px 0 var(--face-bevel), inset 0 -3px 0 var(--face-lip); }
+.btn.g { background:transparent; border-color:transparent; box-shadow:none; color:var(--muted); height:34px; }
+.btn:active { transform:translateY(1px); }
+.btn.ok-state { background:color-mix(in srgb,var(--success) 25%,var(--panel)); }
+
+/* Badges */
+.bd { display:inline-flex; align-items:center; height:19px; padding:0 6px 1px; font:500 11px/1 var(--pixel); letter-spacing:.03em; text-transform:uppercase; border:2px solid var(--outline); background:var(--well); color:var(--ink-soft); white-space:nowrap; }
+.bd.fab { background:color-mix(in srgb,var(--accent) 22%,var(--panel)); color:var(--ink); }
+.bd.forge { background:color-mix(in srgb,var(--warn) 24%,var(--panel)); color:var(--ink); }
+.bd.neo { background:color-mix(in srgb,var(--danger) 24%,var(--panel)); color:var(--ink); }
+.bd.qlt { background:color-mix(in srgb,#5ad1e8 22%,var(--panel)); color:var(--ink); }
+.bd.ok { background:color-mix(in srgb,var(--success) 24%,var(--panel)); color:var(--ink); }
+.bd.bad { background:color-mix(in srgb,var(--danger) 26%,var(--panel)); color:var(--ink); }
+.bd.upd { background:color-mix(in srgb,var(--warn) 26%,var(--panel)); color:var(--ink); }
+.bd.big { height:26px; font-size:15px; padding:0 9px 2px; }
+
+/* Controls */
+.sw { position:relative; width:40px; height:22px; flex:none; background:var(--well); border:2px solid var(--outline); cursor:pointer; }
+.sw::after { content:""; position:absolute; top:2px; left:2px; width:14px; height:14px; background:var(--button); box-shadow:inset 0 2px 0 var(--button-bevel), inset 0 -2px 0 var(--lip); outline:2px solid var(--outline); outline-offset:-2px; transition:left .12s steps(3); }
+.sw.on { background:var(--face); }
+.sw.on::after { left:20px; background:#fff; box-shadow:inset 0 -2px 0 #c9c0ef; }
+.seg { display:flex; gap:2px; padding:2px; background:var(--well); box-shadow:0 0 0 2px var(--outline); }
+.seg button { flex:1; height:28px; border:0; background:none; color:var(--muted); font:500 13px/1 var(--pixel); cursor:pointer; padding:0 4px 1px; white-space:nowrap; }
+.seg button.on { background:var(--face); color:#fff; box-shadow:inset 0 2px 0 var(--face-bevel), inset 0 -2px 0 var(--face-lip); }
+.seg.sm button { height:24px; font-size:12px; }
+.fld { display:flex; align-items:center; gap:8px; height:38px; padding:0 10px; background:var(--well); border:2px solid var(--outline); font-size:13px; color:var(--ink); }
+.fld.ph { color:var(--muted); }
+.fld .end { margin-left:auto; }
+.sel-b { display:flex; align-items:center; justify-content:space-between; gap:8px; height:42px; padding:0 12px 2px; font:500 15px/1 var(--pixel); }
+.chips { display:flex; gap:5px; flex-wrap:nowrap; overflow:hidden; }
+.chip { height:26px; padding:0 9px 1px; font:500 12px/1 var(--pixel); border:2px solid var(--outline); background:var(--button); box-shadow:inset 0 2px 0 var(--button-bevel), inset 0 -2px 0 var(--lip); color:var(--ink-soft); display:flex; align-items:center; white-space:nowrap; cursor:pointer; }
+.chip.on { background:var(--face); color:#fff; box-shadow:inset 0 2px 0 var(--face-bevel), inset 0 -2px 0 var(--face-lip); }
+input.rng { -webkit-appearance:none; appearance:none; width:100%; height:22px; background:transparent; margin:0; cursor:pointer; --v:50%; }
+input.rng::-webkit-slider-runnable-track { height:12px; border:2px solid var(--outline); background:linear-gradient(90deg,var(--face) 0 var(--v),var(--well) var(--v)); }
+input.rng::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:22px; margin-top:-7px; background:#fff; border:2px solid var(--outline); box-shadow:inset 0 -3px 0 #c9c0ef; }
+input.rng::-moz-range-track { height:8px; border:2px solid var(--outline); background:var(--well); }
+input.rng::-moz-range-progress { height:8px; background:var(--face); }
+input.rng::-moz-range-thumb { width:10px; height:18px; border-radius:0; background:#fff; border:2px solid var(--outline); }
+.pg { height:16px; background:var(--well); border:2px solid var(--outline); padding:2px; }
+.pg i { display:block; height:100%; background:repeating-linear-gradient(90deg,var(--success) 0 9px,color-mix(in srgb,var(--success) 55%,#000) 9px 11px); }
+.steps { display:flex; gap:4px; flex:1; }
+.steps i { flex:1; height:8px; background:var(--well); box-shadow:0 0 0 2px var(--outline); }
+.steps i.d { background:var(--face); }
+.steps i.c { background:var(--accent); }
+.drop { display:flex; flex-direction:column; align-items:center; gap:6px; padding:16px 12px; background:var(--well); outline:2px dashed var(--muted); outline-offset:-6px; border:2px solid var(--outline); text-align:center; }
+.drop b { font:500 15px/1 var(--pixel); }
+.scene { background-size:cover; background-position:50% 100%; image-rendering:pixelated; position:relative; }
+.radio { width:16px; height:16px; border:2px solid var(--outline); background:var(--well); flex:none; display:grid; place-items:center; }
+.radio.on::after { content:""; width:6px; height:6px; background:var(--accent); box-shadow:0 0 0 1px var(--outline); }
+.console { padding:10px 10px; font:400 10.2px/1.65 var(--mono); color:var(--ink-soft); background:var(--well); border:2px solid var(--outline); white-space:pre; overflow:hidden; }
+.console .ti { color:var(--muted); }
+.console .tg { color:var(--accent); }
+.console .w { color:var(--warn); }
+.console .g { color:var(--success); }
+.sw-row { display:flex; gap:6px; }
+.swatch { width:28px; height:28px; border:2px solid var(--outline); box-shadow:inset 0 2px 0 rgba(255,255,255,.25), inset 0 -3px 0 rgba(0,0,0,.35); }
+.swatch.on { outline:2px solid var(--ink); outline-offset:2px; }
+.stack { display:flex; height:16px; border:2px solid var(--outline); }
+.stack i { display:block; height:100%; }
+.legend { display:flex; gap:12px; font:400 10px/1 var(--mono); color:var(--muted); letter-spacing:.04em; text-transform:uppercase; }
+.legend i { display:inline-block; width:8px; height:8px; margin-right:5px; border:1px solid var(--outline); }
+.sp { width:14px; height:14px; display:grid; grid-template-columns:1fr 1fr; gap:2px; }
+.sp i { background:var(--accent); animation:blink 1s steps(1) infinite; }
+.sp i:nth-child(2){animation-delay:.25s} .sp i:nth-child(4){animation-delay:.5s} .sp i:nth-child(3){animation-delay:.75s}
+@keyframes blink { 50% { opacity:.2; } }
+.pend { width:12px; height:12px; border:2px solid var(--muted); opacity:.6; }
+
+/* iOS system alert stays native */
+.ov { position:absolute; inset:0; z-index:7; background:rgba(0,0,0,.42); display:grid; place-items:center; backdrop-filter:blur(1.5px); }
+.alert { width:252px; border-radius:16px; overflow:hidden; background:rgba(44,44,48,.94); color:#fff; text-align:center; font-family:-apple-system,"SF Pro Text",var(--font); backdrop-filter:blur(20px); }
+.alert .a1 { padding:18px 16px 15px; }
+.alert h4 { margin:0 0 4px; font-size:16px; font-weight:600; line-height:1.25; }
+.alert p { font-size:12.5px; line-height:1.35; color:rgba(255,255,255,.85); }
+.alert .ab { display:grid; grid-template-columns:1fr 1fr; border-top:.5px solid rgba(255,255,255,.2); }
+.alert .ab span { padding:11px 0; font-size:16px; color:#0a84ff; }
+.alert .ab span + span { border-left:.5px solid rgba(255,255,255,.2); }
+
+/* Landscape controls editor */
+.game { position:absolute; inset:0 260px 0 0; overflow:hidden; }
+.game .scene { position:absolute; inset:0; filter:saturate(1.05); }
+.ctl { position:absolute; display:grid; place-items:center; font:600 13px/1 var(--pixel); color:#fff; background:rgba(15,13,23,.45); border:2px solid rgba(236,237,243,.55); }
+.ctl.sel { outline:2px dashed #fff; outline-offset:3px; background:rgba(91,63,214,.55); }
+.hotbar { position:absolute; bottom:12px; left:50%; translate:-50% 0; display:flex; border:2px solid #05040a; background:rgba(15,13,23,.6); }
+.hotbar i { width:26px; height:26px; border:2px solid rgba(236,237,243,.35); display:grid; place-items:center; }
+.hotbar i.on { border-color:#fff; }
+.cross { position:absolute; top:50%; left:50%; width:14px; height:14px; translate:-50% -50%; background:linear-gradient(#fff,#fff) center/2px 14px no-repeat, linear-gradient(#fff,#fff) center/14px 2px no-repeat; opacity:.85; }
+.tool { position:absolute; display:flex; gap:4px; background:var(--panel); border:2px solid var(--outline); box-shadow:var(--edges); padding:4px; }
+.tool span { font:500 11px/1 var(--pixel); padding:5px 7px 6px; background:var(--button); border:2px solid var(--outline); color:var(--ink); }
+.tool span.del { color:var(--danger); }
+.edbar { position:absolute; top:12px; left:14px; right:14px; display:flex; gap:6px; }
+.panel { position:absolute; top:0; right:0; bottom:0; width:260px; background:var(--side); box-shadow:-2px 0 0 var(--outline); padding:14px 14px 12px 16px; display:flex; flex-direction:column; gap:7px; overflow:hidden; }
+.panel .r { min-height:32px; padding:5px 9px; }
+
+/* Design system strip */
+.sys { display:grid; grid-template-columns:1.2fr 1fr 1fr; gap:8px; }
+.sys .b { padding:18px; }
+.sw-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:6px; margin-top:12px; }
+.sw-grid div { height:44px; border:2px solid var(--outline); position:relative; }
+.sw-grid small { display:block; font:400 10px/1.3 var(--mono); color:var(--muted); margin-top:4px; }
+.typ p { margin-top:10px; }
+.foot { margin-top:96px; background:var(--side); border-top:2px solid var(--outline); overflow:hidden; }
+.foot-in { max-width:1520px; margin:0 auto; padding:48px 32px 0; }
+.foot-in p { color:var(--muted); font-size:13px; max-width:80ch; }
+.word { font:700 clamp(120px,22vw,340px)/.8 var(--pixel); color:var(--raised); letter-spacing:.02em; margin:28px 0 -0.12em; user-select:none; white-space:nowrap; }
+.px { display:inline-block; flex:none; line-height:0; }
+.px svg { display:block; shape-rendering:crispEdges; }
+@media (max-width:900px){ .shead{grid-template-columns:1fr} .display{font-size:44px} .facts{grid-template-columns:1fr 1fr} .sys{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+
+<header class="nav"><div class="nav-in">
+  <div class="mark"><i class="px" data-i="cobble" data-s="22"></i>Cobble</div>
+  <nav class="links"><a href="#setup">Setup</a><a href="#play">Play</a><a href="#mods">Mods</a><a href="#settings">Settings</a><a href="#system">System</a></nav>
+  <button class="theme" id="theme">Light</button>
+</div></header>
+
+<section class="hero" data-scene="11" data-sw="240" data-sh="84">
+  <div class="hero-in">
+    <p class="kick"><span>Mockup</span>23 screens · iPhone 17 Pro · iOS 26/27</p>
+    <h1 class="display">One app, then play.</h1>
+    <p class="lede">Air's launcher, JIT and a local VPN in one development-signed app. Set it up once, then it just plays.</p>
+    <div class="facts">
+      <div class="fact"><b>6</b><small>Setup checks</small></div>
+      <div class="fact"><b>1×</b><small>Computer, for pairing</small></div>
+      <div class="fact"><b>0</b><small>Extra apps</small></div>
+      <div class="fact"><b>100</b><small>iPhones a year</small></div>
+    </div>
+    <p class="note"><b>Distribution:</b> TestFlight strips get-task-allow, which means no JIT. Cobble ships as a development-signed build installed from a link: registered UDIDs only, and each build expires after 1 year.</p>
+  </div>
+</section>
+
+<!-- ═════════════════════════ 01 SETUP ═════════════════════════ -->
+<section class="section" id="setup">
+  <div class="shead">
+    <p class="kick"><span>01</span>Setup</p>
+    <h2 class="title">Set up once</h2>
+    <p>Six checks, about five minutes. Each screen checks itself and moves on when it passes.</p>
+  </div>
+  <div class="shots">
+
+    <!-- S01 Welcome -->
+    <figure class="shot"><div class="phone"><div class="screen" data-sb="light">
+      <div class="app full">
+        <div class="scene" data-scene="7" data-sw="120" data-sh="128" style="height:318px">
+          <div style="position:absolute;left:18px;bottom:16px;display:flex;align-items:center;gap:10px">
+            <i class="px" data-i="cobble" data-s="40"></i>
+            <span style="font:700 30px/1 var(--pixel);color:#fff;letter-spacing:.02em;text-shadow:0 2px 0 #05040a">Cobble</span>
+          </div>
+        </div>
+        <div class="body" style="padding-top:18px">
+          <p class="k">Java Edition · iPhone</p>
+          <h1 class="h xl">Java Edition.<br>In your pocket.</h1>
+          <p class="l">Mods, packs, shaders. All on this phone.</p>
+          <div class="tri" style="margin-top:4px">
+            <div class="b mini"><b>6</b><small>Checks</small></div>
+            <div class="b mini"><b>5</b><small>Minutes</small></div>
+            <div class="b mini"><b>1×</b><small>Computer</small></div>
+          </div>
+          <div class="grow"></div>
+          <button class="btn p lg">Set up</button>
+          <p class="micro c">Unofficial. Not from Mojang or Microsoft.</p>
+        </div>
+      </div>
+    </div></div><figcaption><span>S01</span><div><b>Welcome.</b> One button.</div></figcaption></figure>
+
+    <!-- S02 Developer Mode -->
+    <figure class="shot"><div class="phone"><div class="screen">
+      <div class="app">
+        <div class="top"><span class="back">‹</span><div class="steps"><i class="c"></i><i></i><i></i><i></i><i></i><i></i></div><span class="k">1/6</span></div>
+        <div class="body">
+          <i class="px" data-i="cmd" data-s="44" style="margin-top:6px"></i>
+          <p class="k">Step 01 · Developer Mode</p>
+          <h2 class="h">Turn on Developer Mode</h2>
+          <div class="b r two"><span class="t">Developer Mode</span><span class="bd bad">Off</span></div>
+          <div class="list">
+            <div class="b r"><span class="ix">01</span><span class="t">Open Settings</span><span class="m">›</span></div>
+            <div class="b r"><span class="ix">02</span><span class="t">Privacy &amp; Security</span><span class="m">›</span></div>
+            <div class="b r"><span class="ix">03</span><span class="t">Developer Mode → On</span><span class="m"></span></div>
+            <div class="b r"><span class="ix">04</span><span class="t">Restart → Turn On</span><span class="m"></span></div>
+          </div>
+          <p class="micro">No toggle? Open Cobble once, then check again.</p>
+          <div class="grow"></div>
+          <button class="btn p">Open Settings</button>
+          <button class="btn">Check again</button>
+        </div>
+      </div>
+    </div></div><figcaption><span>S02</span><div><b>Developer Mode.</b> Checked live and passes on its own.</div></figcaption></figure>
+
+    <!-- S03 Trust -->
+    <figure class="shot"><div class="phone"><div class="screen">
+      <div class="app">
+        <div class="top"><span class="back">‹</span><div class="steps"><i class="d"></i><i class="c"></i><i></i><i></i><i></i><i></i></div><span class="k">2/6</span></div>
+        <div class="body">
+          <i class="px" data-i="shield" data-s="44" style="margin-top:6px"></i>
+          <p class="k">Step 02 · Trust</p>
+          <h2 class="h">Signed for this iPhone</h2>
+          <div class="list">
+            <div class="b r"><i class="px" data-i="check" data-s="14"></i><span class="t">Installed</span><span class="m ok">OK</span></div>
+            <div class="b r"><i class="px" data-i="check" data-s="14"></i><span class="t">Device registered</span><span class="m ok">Yes</span></div>
+            <div class="b r"><i class="px" data-i="check" data-s="14"></i><span class="t">Signed by</span><span class="m">Ignacio J.</span></div>
+            <div class="b r"><i class="px" data-i="check" data-s="14"></i><span class="t">Works until</span><span class="m">28 Oct 2027</span></div>
+          </div>
+          <div class="well" style="padding:10px 12px">
+            <p class="k" style="margin-bottom:4px">Asked to trust?</p>
+            <p class="micro" style="color:var(--ink-soft)">Settings › General › VPN &amp; Device Management › Trust</p>
+          </div>
+          <div class="grow"></div>
+          <button class="btn p">Next</button>
+        </div>
+      </div>
+    </div></div><figcaption><span>S03</span><div><b>Trust.</b> Usually passes with nothing to do. Shows the fallback path.</div></figcaption></figure>
+
+    <!-- S04 Pairing -->
+    <figure class="shot"><div class="phone"><div class="screen">
+      <div class="app">
+        <div class="top"><span class="back">‹</span><div class="steps"><i class="d"></i><i class="d"></i><i class="c"></i><i></i><i></i><i></i></div><span class="k">3/6</span></div>
+        <div class="body">
+          <i class="px" data-i="key" data-s="44" style="margin-top:6px"></i>
+          <p class="k">Step 03 · Pairing file</p>
+          <h2 class="h">Import pairing</h2>
+          <p class="l">Made once, on any computer.</p>
+          <div class="list">
+            <div class="b r"><span class="ix">01</span><span class="t">Get iloader</span><span class="m">Mac · Win · Linux</span></div>
+            <div class="b r"><span class="ix">02</span><span class="t">Plug in, tap Trust</span><span class="m"></span></div>
+            <div class="b r"><span class="ix">03</span><span class="t">Pairing file → Export</span><span class="m"></span></div>
+            <div class="b r"><span class="ix">04</span><span class="t">AirDrop to iPhone</span><span class="m"></span></div>
+          </div>
+          <div class="drop"><i class="px" data-i="paper" data-s="26"></i><b>pairingFile.plist</b><span class="micro">Tap to choose</span></div>
+          <div class="grow"></div>
+          <button class="btn p">Choose</button>
+          <p class="micro c">Stays on this iPhone. Never uploaded.</p>
+        </div>
+      </div>
+    </div></div><figcaption><span>S04</span><div><b>Pairing file.</b> The only computer step.</div></figcaption></figure>
+
+    <!-- S05 VPN + alert -->
+    <figure class="shot"><div class="phone"><div class="screen">
+      <div class="app">
+        <div class="top"><span class="back">‹</span><div class="steps"><i class="d"></i><i class="d"></i><i class="d"></i><i class="c"></i><i></i><i></i></div><span class="k">4/6</span></div>
+        <div class="body">
+          <i class="px" data-i="portal" data-s="44" style="margin-top:6px"></i>
+          <p class="k">Step 04 · Local VPN</p>
+          <h2 class="h">Allow local VPN</h2>
+          <p class="l">Lets Cobble reach this iPhone's debugger.</p>
+          <div class="b" style="padding:14px 12px;display:flex;align-items:center;justify-content:space-between">
+            <div class="c"><i class="px" data-i="cobble" data-s="26"></i><div class="micro">App</div></div>
+            <div style="flex:1;border-top:2px dashed var(--muted);margin:0 8px 14px"></div>
+            <div class="c"><i class="px" data-i="portal" data-s="26"></i><div class="micro">Loop</div></div>
+            <div style="flex:1;border-top:2px dashed var(--muted);margin:0 8px 14px"></div>
+            <div class="c"><i class="px" data-i="cmd" data-s="26"></i><div class="micro">10.7.0.1</div></div>
+          </div>
+          <div class="list">
+            <div class="b r two"><span class="t">Leaves iPhone</span><span class="m ok">Never</span></div>
+            <div class="b r two"><span class="t">Browsing</span><span class="m ok">Untouched</span></div>
+          </div>
+          <div class="grow"></div>
+          <button class="btn p">Allow VPN</button>
+        </div>
+      </div>
+      <div class="ov"><div class="alert"><div class="a1"><h4>“Cobble” Would Like to Add VPN Configurations</h4><p>All network activity on this iPhone may be filtered or monitored when using VPN.</p></div><div class="ab"><span style="font-weight:600">Allow</span><span>Don’t Allow</span></div></div></div>
+    </div></div><figcaption><span>S05</span><div><b>Local VPN.</b> Built in, no LocalDevVPN. The iOS prompt is native.</div></figcaption></figure>
+
+    <!-- S06 JIT test -->
+    <figure class="shot"><div class="phone"><div class="screen" data-vpn>
+      <div class="app">
+        <div class="top"><span class="back">‹</span><div class="steps"><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="c"></i><i></i></div><span class="k">5/6</span></div>
+        <div class="body">
+          <i class="px" data-i="bolt" data-s="44" style="margin-top:6px"></i>
+          <p class="k">Step 05 · JIT test</p>
+          <h2 class="h">JIT works</h2>
+          <div class="list">
+            <div class="b r"><i class="px" data-i="check" data-s="14"></i><span class="t">Pairing</span><span class="m ok">Valid</span></div>
+            <div class="b r"><i class="px" data-i="check" data-s="14"></i><span class="t">Local VPN</span><span class="m ok">On</span></div>
+            <div class="b r"><i class="px" data-i="check" data-s="14"></i><span class="t">Disk image</span><span class="m ok">Mounted</span></div>
+            <div class="b r"><i class="px" data-i="check" data-s="14"></i><span class="t">Debugger</span><span class="m ok">Attached</span></div>
+            <div class="b r"><i class="px" data-i="check" data-s="14"></i><span class="t">JIT region</span><span class="m ok">64 MB</span></div>
+            <div class="b r"><i class="px" data-i="check" data-s="14"></i><span class="t">Detach</span><span class="m ok">Done</span></div>
+          </div>
+          <div class="b r two" style="background:color-mix(in srgb,var(--success) 16%,var(--panel))"><span><span class="t">Ready</span><span class="s">TXM · iPhone 17 Pro · iOS 26.1</span></span><span class="bd ok big">JIT</span></div>
+          <div class="grow"></div>
+          <button class="btn p">Next</button>
+        </div>
+      </div>
+    </div></div><figcaption><span>S06</span><div><b>JIT test.</b> Real attach. Errors say exactly which step failed.</div></figcaption></figure>
+
+    <!-- S07 Account -->
+    <figure class="shot"><div class="phone"><div class="screen" data-vpn>
+      <div class="app">
+        <div class="top"><span class="back">‹</span><div class="steps"><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="c"></i></div><span class="k">6/6</span></div>
+        <div class="body">
+          <i class="px" data-i="head" data-s="44" style="margin-top:6px"></i>
+          <p class="k">Step 06 · Account</p>
+          <h2 class="h">Sign in</h2>
+          <p class="l">Your account must own Java Edition.</p>
+          <button class="btn"><i class="px" data-i="ms" data-s="15"></i>Sign in with Microsoft</button>
+          <div class="b r"><i class="px" data-i="head" data-s="30"></i><span><span class="t">Steve_42</span><span class="s">Microsoft · owns game</span></span><i class="px" data-i="check" data-s="14"></i></div>
+          <div class="well" style="padding:10px 12px"><p class="micro" style="color:var(--ink-soft)">Game files download from Mojang.<br>Never bundled, never shared.</p></div>
+          <div class="grow"></div>
+          <button class="btn p">Finish</button>
+        </div>
+      </div>
+    </div></div><figcaption><span>S07</span><div><b>Account.</b> Microsoft only (owning the game is required).</div></figcaption></figure>
+
+    <!-- S08 Ready -->
+    <figure class="shot"><div class="phone"><div class="screen" data-sb="light" data-vpn>
+      <div class="app full">
+        <div class="scene" data-scene="23" data-sw="120" data-sh="80" style="height:210px">
+          <div style="position:absolute;inset:auto 0 18px;display:grid;place-items:center"><span class="bd ok big" style="font-size:17px;height:30px">All set</span></div>
+        </div>
+        <div class="body" style="padding-top:16px">
+          <p class="k"><span class="ok">Ready</span> · 6/6 checks</p>
+          <h1 class="h xl">You're set.</h1>
+          <p class="l">Tap Play. JIT runs by itself.</p>
+          <div class="list">
+            <div class="b r"><i class="px" data-i="check" data-s="14"></i><span class="t">Developer Mode</span><span class="m ok">On</span></div>
+            <div class="b r"><i class="px" data-i="check" data-s="14"></i><span class="t">Pairing · VPN · JIT</span><span class="m ok">OK</span></div>
+            <div class="b r"><i class="px" data-i="check" data-s="14"></i><span class="t">Steve_42</span><span class="m ok">Signed in</span></div>
+          </div>
+          <div class="well" style="padding:9px 12px"><p class="micro"><span class="warn">Tip:</span> iOS updates break pairing.<br>Settings › General › Software Update › Automatic Updates: Off.</p></div>
+          <div class="grow"></div>
+          <button class="btn p lg"><i class="px" data-i="play" data-s="16"></i>Play</button>
+        </div>
+      </div>
+    </div></div><figcaption><span>S08</span><div><b>Ready.</b> Summary, plus a warning about auto-updates.</div></figcaption></figure>
+  </div>
+</section>
+
+<!-- ═════════════════════════ 02 PLAY ═════════════════════════ -->
+<section class="section" id="play">
+  <div class="shead">
+    <p class="kick"><span>02</span>Play</p>
+    <h2 class="title">Tap Play</h2>
+    <p>Home shows one instance and one button. Instances cover Vanilla, Fabric, Quilt, Forge and NeoForge, each in its own folder.</p>
+  </div>
+  <div class="shots">
+
+    <!-- P01 Home -->
+    <figure class="shot"><div class="phone"><div class="screen" data-vpn data-tab="play">
+      <div class="app">
+        <div class="top"><div class="mark" style="font-size:15px"><i class="px" data-i="cobble" data-s="20"></i>Cobble</div><span class="end b" style="padding:3px;line-height:0"><i class="px" data-i="head" data-s="22"></i></span></div>
+        <div class="body">
+          <div class="b scene" data-scene="31" data-sw="120" data-sh="56" style="height:128px">
+            <i class="px" data-i="grass" data-s="38" style="position:absolute;left:12px;bottom:12px;filter:drop-shadow(0 2px 0 #05040a)"></i>
+          </div>
+          <p class="k">Fabric 1.21.1 · <span class="ok">Ready</span></p>
+          <h2 class="h">Survival+</h2>
+          <p class="l" style="margin-top:-4px">142 mods · Sodium, Create, JEI</p>
+          <div class="seg"><button class="on">Play</button><button>Worlds</button><button>Servers</button></div>
+          <div class="row">
+            <div class="b sel-b" style="flex:1">Survival+<span class="m mono" style="font-size:12px;color:var(--muted)">▾</span></div>
+            <button class="btn p" style="width:118px;height:42px;font-size:17px"><i class="px" data-i="play" data-s="13"></i>Play</button>
+          </div>
+          <div class="list">
+            <div class="b r"><span class="ix">01</span><span class="t">JIT</span><span class="m ok">Auto · ready</span></div>
+            <div class="b r"><span class="ix">02</span><span class="t">Steve_42</span><span class="m">Microsoft</span></div>
+            <div class="b r"><span class="ix">03</span><span class="t">6 GB · MobileGlues</span><span class="m">70% res</span></div>
+          </div>
+        </div>
+      </div>
+    </div></div><figcaption><span>P01</span><div><b>Home.</b> Instance, status, Play. Worlds and Servers are tabs.</div></figcaption></figure>
+
+    <!-- P02 Launching -->
+    <figure class="shot"><div class="phone"><div class="screen" data-vpn data-sb="light">
+      <div class="app full">
+        <div class="scene" data-scene="47" data-sw="120" data-sh="84" style="height:230px"></div>
+        <div class="body" style="padding-top:16px">
+          <p class="k">Survival+ · Fabric 1.21.1</p>
+          <h2 class="h">Launching…</h2>
+          <div class="pg"><i style="width:62%"></i></div>
+          <p class="k">Step 5 of 8 · assets 2,431/3,904</p>
+          <div class="list">
+            <div class="b r"><i class="px" data-i="check" data-s="14"></i><span class="t">JIT ready</span><span class="m">0.8 s</span></div>
+            <div class="b r"><i class="px" data-i="check" data-s="14"></i><span class="t">Java 21 · libraries</span><span class="m">OK</span></div>
+            <div class="b r"><span class="sp"><i></i><i></i><i></i><i></i></span><span class="t">Assets</span><span class="m">62%</span></div>
+            <div class="b r dim"><span class="pend"></span><span class="t">142 mods</span><span class="m"></span></div>
+            <div class="b r dim"><span class="pend"></span><span class="t">First frame</span><span class="m"></span></div>
+          </div>
+          <p class="micro c">Keep Cobble open while it loads.</p>
+          <div class="split"><button class="btn">Log</button><button class="btn">Cancel</button></div>
+        </div>
+      </div>
+    </div></div><figcaption><span>P02</span><div><b>Launch.</b> Air's 8 stages shown as an XP-style bar.</div></figcaption></figure>
+
+    <!-- P03 Instances -->
+    <figure class="shot"><div class="phone"><div class="screen" data-vpn data-tab="inst">
+      <div class="app">
+        <div class="top"><span class="tt" style="font-size:22px">Instances</span><button class="btn p sm end">+ New</button></div>
+        <div class="body">
+          <div class="fld ph">⌕ Search</div>
+          <div class="list">
+            <div class="b r big sel"><i class="px" data-i="grass" data-s="30"></i><span><span class="t">Survival+</span><span class="s"><span class="bd fab">Fabric 1.21.1</span>&nbsp; 142 mods · 4.1 GB</span></span><span class="m">⋯</span></div>
+            <div class="b r big"><i class="px" data-i="ore" data-c="#f0b84f" data-s="30"></i><span><span class="t">Create: Above &amp; Beyond</span><span class="s"><span class="bd forge">Forge 1.20.1</span>&nbsp; 189 · 5.8 GB</span></span><span class="m">⋯</span></div>
+            <div class="b r big"><i class="px" data-i="ore" data-c="#f07a68" data-s="30"></i><span><span class="t">Cobblemon</span><span class="s"><span class="bd neo">NeoForge 1.21.1</span>&nbsp; 64 · 2.2 GB</span></span><span class="m">⋯</span></div>
+            <div class="b r big"><i class="px" data-i="ore" data-c="#5ad1e8" data-s="30"></i><span><span class="t">Skyblock</span><span class="s"><span class="bd qlt">Quilt 1.20.4</span>&nbsp; 23 · 0.9 GB</span></span><span class="m">⋯</span></div>
+            <div class="b r big"><i class="px" data-i="stone" data-s="30"></i><span><span class="t">Vanilla</span><span class="s"><span class="bd">Vanilla 26.3</span>&nbsp; 0.6 GB</span></span><span class="m">⋯</span></div>
+          </div>
+          <div class="grow"></div>
+          <div class="split"><button class="btn"><i class="px" data-i="chest" data-s="16"></i>Import pack</button><button class="btn">Files</button></div>
+        </div>
+      </div>
+    </div></div><figcaption><span>P03</span><div><b>Instances.</b> Loader badge, mod count, size. ⋯ opens edit, export, duplicate, delete.</div></figcaption></figure>
+
+    <!-- P04 New instance -->
+    <figure class="shot"><div class="phone"><div class="screen" data-vpn data-tab="inst">
+      <div class="app">
+        <div class="top"><span class="back">‹</span><span class="tt">New instance</span></div>
+        <div class="body" style="gap:8px">
+          <p class="lbl">Name</p>
+          <div class="fld">Survival+</div>
+          <p class="lbl">Version</p>
+          <div class="row"><div class="b sel-b" style="flex:1;height:38px">1.21.1<span class="mono" style="font-size:12px;color:var(--muted)">▾</span></div>
+            <div class="seg sm" style="flex:1.3"><button class="on">Release</button><button>Snap</button><button>Old</button></div></div>
+          <p class="lbl">Loader</p>
+          <div class="tri">
+            <div class="b mini"><i class="px" data-i="stone" data-s="20"></i><small style="display:block;margin-top:4px">Vanilla</small></div>
+            <div class="b mini r sel" style="display:block"><i class="px" data-i="book" data-s="20"></i><small style="display:block;margin-top:4px;color:var(--ink)">Fabric</small></div>
+            <div class="b mini"><i class="px" data-i="ore" data-c="#5ad1e8" data-s="20"></i><small style="display:block;margin-top:4px">Quilt</small></div>
+            <div class="b mini"><i class="px" data-i="ore" data-c="#f0b84f" data-s="20"></i><small style="display:block;margin-top:4px">Forge</small></div>
+            <div class="b mini"><i class="px" data-i="ore" data-c="#f07a68" data-s="20"></i><small style="display:block;margin-top:4px">NeoForge</small></div>
+            <div class="b mini"><i class="px" data-i="chest" data-s="20"></i><small style="display:block;margin-top:4px">From pack</small></div>
+          </div>
+          <div class="list">
+            <div class="b r two"><span class="t">Loader version</span><span class="m">0.16.14 ▾</span></div>
+            <div class="b r two"><span class="t">Own folder</span><span class="sw on"></span></div>
+            <div class="b r two"><span class="t">Add Fabric API</span><span class="sw on"></span></div>
+            <div class="b r two"><span class="t">Java</span><span class="m">Auto · 21</span></div>
+          </div>
+          <div class="grow"></div>
+          <button class="btn p">Create</button>
+        </div>
+      </div>
+    </div></div><figcaption><span>P04</span><div><b>New instance.</b> Version, loader, its own folder, Java picked automatically.</div></figcaption></figure>
+  </div>
+</section>
+
+<!-- ═════════════════════════ 03 MODS ═════════════════════════ -->
+<section class="section" id="mods">
+  <div class="shead">
+    <p class="kick"><span>03</span>Mods</p>
+    <h2 class="title">Find, install, toggle</h2>
+    <p>Modrinth and CurseForge in one search. Only mods that fit the instance are shown, and dependencies install with them. Import .mrpack and .zip packs, toggle any mod.</p>
+  </div>
+  <div class="shots">
+
+    <!-- M01 Browser -->
+    <figure class="shot"><div class="phone"><div class="screen" data-vpn data-tab="mods">
+      <div class="app">
+        <div class="top"><span class="tt" style="font-size:22px">Get mods</span><span class="end bd fab">Survival+</span></div>
+        <div class="body" style="gap:8px">
+          <div class="seg"><button class="on">Modrinth</button><button>CurseForge</button></div>
+          <div class="fld ph">⌕ Search mods</div>
+          <div class="chips"><span class="chip on">Mods</span><span class="chip">Packs</span><span class="chip">Shaders</span><span class="chip">Resource</span><span class="chip">Data</span></div>
+          <div class="row" style="justify-content:space-between"><span class="k">Fits Fabric 1.21.1</span><span class="sw on"></span></div>
+          <div class="list">
+            <div class="b r"><i class="px" data-i="ore" data-c="#5ad1e8" data-s="28"></i><span><span class="t">Sodium</span><span class="s">Faster rendering · 74M</span></span><span class="bd ok">✓</span></div>
+            <div class="b r"><i class="px" data-i="ore" data-c="#b07bff" data-s="28"></i><span><span class="t">Iris Shaders</span><span class="s">Shaders · 42M</span></span><button class="btn p sm">Get</button></div>
+            <div class="b r"><i class="px" data-i="ore" data-c="#45c27a" data-s="28"></i><span><span class="t">Xaero's Minimap</span><span class="s">Map in a corner · 31M</span></span><button class="btn p sm">Get</button></div>
+            <div class="b r"><i class="px" data-i="ore" data-c="#f0b84f" data-s="28"></i><span><span class="t">Lithium</span><span class="s">Faster game logic · 39M</span></span><span class="bd ok">✓</span></div>
+            <div class="b r"><i class="px" data-i="ore" data-c="#f08a3a" data-s="28"></i><span><span class="t">Create</span><span class="s">Gears &amp; machines · 12M</span></span><button class="btn p sm">Get</button></div>
+          </div>
+        </div>
+      </div>
+    </div></div><figcaption><span>M01</span><div><b>Browse.</b> Mods, packs, shaders, resource and data packs.</div></figcaption></figure>
+
+    <!-- M02 Mod page -->
+    <figure class="shot"><div class="phone"><div class="screen" data-vpn data-tab="mods">
+      <div class="app">
+        <div class="top"><span class="back">‹</span><span class="tt">Get mods</span></div>
+        <div class="body" style="gap:9px">
+          <div class="row" style="gap:12px"><i class="px" data-i="ore" data-c="#b07bff" data-s="52"></i>
+            <div><h2 class="h md">Iris Shaders</h2><p class="l">by coderbot · Modrinth</p><div class="row" style="gap:4px;margin-top:4px"><span class="bd fab">Fabric</span><span class="bd qlt">Quilt</span></div></div></div>
+          <div class="tri"><div class="b mini"><b>42M</b><small>Downloads</small></div><div class="b mini"><b class="ok">✓</b><small>Fits 1.21.1</small></div><div class="b mini"><b>3d</b><small>Updated</small></div></div>
+          <p class="l">Shaders on modern versions. Works with Sodium.</p>
+          <p class="lbl">Versions</p>
+          <div class="list">
+            <div class="b r sel"><span class="radio on"></span><span class="t">1.8.8 · 1.21.1</span><span class="bd ok">Release</span></div>
+            <div class="b r"><span class="radio"></span><span class="t">1.8.7 · 1.21.1</span><span class="bd">Release</span></div>
+            <div class="b r dim"><span class="radio"></span><span class="t">1.8.1 · 1.21</span><span class="bd bad">No fit</span></div>
+          </div>
+          <div class="b r"><i class="px" data-i="book" data-s="18"></i><span><span class="t">Needs Sodium</span><span class="s">Dependency</span></span><span class="m ok">Installed</span></div>
+          <div class="grow"></div>
+          <button class="btn p">Install 1.8.8</button>
+        </div>
+      </div>
+    </div></div><figcaption><span>M02</span><div><b>Mod page.</b> Pick a version. Dependencies resolve automatically.</div></figcaption></figure>
+
+    <!-- M03 Import pack -->
+    <figure class="shot"><div class="phone"><div class="screen" data-vpn data-tab="inst">
+      <div class="app">
+        <div class="top"><span class="back">‹</span><span class="tt">Import pack</span></div>
+        <div class="body">
+          <div class="list">
+            <div class="b r big"><i class="px" data-i="chest" data-s="28"></i><span><span class="t">From Files</span><span class="s">.mrpack · .zip</span></span><span class="m">›</span></div>
+            <div class="b r big"><i class="px" data-i="ore" data-c="#45c27a" data-s="28"></i><span><span class="t">Modrinth packs</span><span class="s">Browse</span></span><span class="m">›</span></div>
+            <div class="b r big"><i class="px" data-i="ore" data-c="#f08a3a" data-s="28"></i><span><span class="t">CurseForge packs</span><span class="s">Browse · needs key</span></span><span class="m">›</span></div>
+          </div>
+          <p class="lbl">Importing</p>
+          <div class="b" style="padding:12px;display:grid;gap:9px">
+            <div class="row" style="justify-content:space-between"><span style="font:600 16px/1 var(--pixel)">Fabulously Optimized</span><span class="bd fab">Fabric 1.21.1</span></div>
+            <div class="pg"><i style="width:68%"></i></div>
+            <p class="k">Mods 87/128 · 41 MB/s</p>
+            <div class="list" style="gap:3px">
+              <div class="r" style="min-height:26px;padding:3px 0"><i class="px" data-i="check" data-s="12"></i><span class="t" style="font-size:12.5px">Manifest</span><span class="m">OK</span></div>
+              <div class="r" style="min-height:26px;padding:3px 0"><i class="px" data-i="check" data-s="12"></i><span class="t" style="font-size:12.5px">Fabric 0.16.14</span><span class="m">OK</span></div>
+              <div class="r" style="min-height:26px;padding:3px 0"><span class="sp"><i></i><i></i><i></i><i></i></span><span class="t" style="font-size:12.5px">Mods</span><span class="m">68%</span></div>
+              <div class="r dim" style="min-height:26px;padding:3px 0"><span class="pend"></span><span class="t" style="font-size:12.5px">Overrides · configs</span><span class="m"></span></div>
+            </div>
+          </div>
+          <div class="grow"></div>
+          <button class="btn">Hide · keep going</button>
+        </div>
+      </div>
+    </div></div><figcaption><span>M03</span><div><b>Import pack.</b> Files, Modrinth or CurseForge. Downloads run in the background.</div></figcaption></figure>
+
+    <!-- M04 Mod manager -->
+    <figure class="shot"><div class="phone"><div class="screen" data-vpn data-tab="mods">
+      <div class="app">
+        <div class="top"><span class="back">‹</span><span class="tt">Installed</span><span class="end k">Survival+</span></div>
+        <div class="body" style="gap:8px">
+          <div class="seg sm"><button class="on">Mods</button><button>Shaders</button><button>Packs</button><button>Data</button><button>Worlds</button></div>
+          <div class="row"><div class="fld ph" style="flex:1;height:32px">⌕ Filter</div><button class="btn p sm">Update 3</button></div>
+          <div class="list">
+            <div class="b r"><i class="px" data-i="ore" data-c="#5ad1e8" data-s="24"></i><span><span class="t">Sodium</span><span class="s">0.6.13</span></span><span class="sw on"></span></div>
+            <div class="b r"><i class="px" data-i="ore" data-c="#b07bff" data-s="24"></i><span><span class="t">Iris Shaders</span><span class="s">1.8.8</span></span><span class="sw on"></span></div>
+            <div class="b r"><i class="px" data-i="ore" data-c="#f08a3a" data-s="24"></i><span><span class="t">Create <span class="bd upd" style="margin-left:4px">Update</span></span><span class="s">6.0.4 → 6.0.6</span></span><span class="sw on"></span></div>
+            <div class="b r dim"><i class="px" data-i="ore" data-c="#45c27a" data-s="24"></i><span><span class="t">Xaero's Minimap</span><span class="s">Off</span></span><span class="sw"></span></div>
+            <div class="b r"><i class="px" data-i="book" data-s="24"></i><span><span class="t">JEI</span><span class="s">19.21.0</span></span><span class="sw on"></span></div>
+            <div class="b r"><i class="px" data-i="ore" data-c="#f07a68" data-s="24"></i><span><span class="t">Better Glass <span class="bd bad" style="margin-left:4px">Needs dep</span></span><span class="s">Fabric API missing · fix</span></span><span class="sw on"></span></div>
+          </div>
+          <p class="micro c">142 on · 6 off · 3.4 GB · swipe to delete</p>
+        </div>
+      </div>
+    </div></div><figcaption><span>M04</span><div><b>Manager.</b> Toggle, update, delete. The same screen covers shaders, packs, data packs and worlds.</div></figcaption></figure>
+  </div>
+</section>
+
+<!-- ═════════════════════════ 04 SETTINGS ═════════════════════════ -->
+<section class="section" id="settings">
+  <div class="shead">
+    <p class="kick"><span>04</span>Settings</p>
+    <h2 class="title">Every Air setting, sorted</h2>
+    <p>Game, Controls and System hold everything Air already has: RAM, renderers, MobileGlues, FSR, touch and controller, gyro, Java, mirrors, keys, logs and looks.</p>
+  </div>
+  <div class="shots">
+
+    <!-- X01 Game settings -->
+    <figure class="shot"><div class="phone"><div class="screen" data-vpn data-tab="set">
+      <div class="app">
+        <div class="top"><span class="tt" style="font-size:22px">Settings</span></div>
+        <div class="body" style="gap:7px">
+          <div class="seg"><button class="on">Game</button><button>Controls</button><button>System</button></div>
+          <p class="lbl">Memory</p>
+          <div class="b" style="padding:10px 11px;display:grid;gap:8px">
+            <div class="row" style="justify-content:space-between"><span class="t" style="font-size:13.5px;font-weight:500">Auto RAM</span><span class="sw"></span></div>
+            <input class="rng" type="range" min="1024" max="8192" step="256" value="6144" data-out="ram">
+            <div class="row" style="justify-content:space-between"><span class="k"><span data-o="ram">6,144</span> MB of 8 GB</span><span class="k warn">Keep ≤ 75%</span></div>
+          </div>
+          <p class="lbl">Graphics</p>
+          <div class="list">
+            <div class="b r two"><span class="t">Renderer</span><span class="m" style="color:var(--accent)">MobileGlues ›</span></div>
+            <div class="b" style="padding:8px 11px;display:grid;gap:4px"><div class="row" style="justify-content:space-between"><span class="t" style="font-size:13.5px;font-weight:500">Resolution</span><span class="m mono" style="font-size:10px;color:var(--muted)"><span data-o="res">70</span>%</span></div><input class="rng" type="range" min="25" max="100" value="70" data-out="res"></div>
+            <div class="b" style="padding:8px 11px;display:grid;gap:6px"><span class="t" style="font-size:13.5px;font-weight:500">FSR 1.0 upscale</span><div class="seg sm"><button>Off</button><button class="on">Ultra</button><button>Quality</button><button>Perf</button></div></div>
+            <div class="b r two"><span class="t">FPS overlay</span><span class="sw on"></span></div>
+            <div class="b r two"><span class="t">VSync</span><span class="sw"></span></div>
+            <div class="b r two"><span class="t">Mute with switch</span><span class="sw on"></span></div>
+          </div>
+        </div>
+      </div>
+    </div></div><figcaption><span>X01</span><div><b>Game.</b> RAM slider, renderer, resolution, FSR, HUD, VSync, audio.</div></figcaption></figure>
+
+    <!-- X02 Renderer -->
+    <figure class="shot"><div class="phone"><div class="screen" data-vpn data-tab="set">
+      <div class="app">
+        <div class="top"><span class="back">‹</span><span class="tt">Renderer</span></div>
+        <div class="body" style="gap:6px">
+          <div class="list" style="gap:4px">
+            <div class="b r sel"><span class="radio on"></span><span><span class="t">Auto</span><span class="s">Picks per version</span></span><span class="bd ok">Best</span></div>
+            <div class="b r"><span class="radio"></span><span><span class="t">MobileGlues</span><span class="s">OpenGL 4 · modern packs</span></span><span class="m"></span></div>
+            <div class="b r"><span class="radio"></span><span><span class="t">Zink · MoltenVK</span><span class="s">OpenGL on Vulkan</span></span><span class="m"></span></div>
+            <div class="b r"><span class="radio"></span><span><span class="t">LTW</span><span class="s">OpenGL 3 · light</span></span><span class="m"></span></div>
+            <div class="b r"><span class="radio"></span><span><span class="t">Krypton</span><span class="s">Fast · older packs</span></span><span class="m"></span></div>
+            <div class="b r"><span class="radio"></span><span><span class="t">ANGLE</span><span class="s">OpenGL ES on Metal</span></span><span class="m"></span></div>
+            <div class="b r"><span class="radio"></span><span><span class="t">gl4es</span><span class="s">Legacy · 1.16 and older</span></span><span class="m"></span></div>
+          </div>
+          <p class="lbl">MobileGlues</p>
+          <div class="list" style="gap:4px">
+            <div class="b r two"><span class="t">Shader cache</span><span class="m">512 MB ▾</span></div>
+            <div class="b r two"><span class="t">Multidraw</span><span class="m">Auto ▾</span></div>
+            <div class="b r two"><span class="t">Compute shaders</span><span class="sw on"></span></div>
+          </div>
+        </div>
+      </div>
+    </div></div><figcaption><span>X02</span><div><b>Renderer.</b> All of Air's renderers, plus MobileGlues tuning (GL version, error filter and timer query under ⋯).</div></figcaption></figure>
+
+    <!-- X03 Controls (landscape) -->
+    <figure class="shot"><div class="phone land"><div class="screen" data-nosb>
+      <div class="game">
+        <div class="scene" data-scene="61" data-sw="160" data-sh="74"></div>
+        <div class="edbar"><span class="btn sm">≡</span><span class="btn sm">+ Add</span><span class="btn sm">Undo</span><span class="btn p sm" style="margin-left:auto">Save</span></div>
+        <div class="cross"></div>
+        <div class="ctl" style="left:66px;bottom:104px;width:38px;height:38px">▲</div>
+        <div class="ctl" style="left:26px;bottom:64px;width:38px;height:38px">◀</div>
+        <div class="ctl" style="left:106px;bottom:64px;width:38px;height:38px">▶</div>
+        <div class="ctl" style="left:66px;bottom:24px;width:38px;height:38px">▼</div>
+        <div class="ctl sel" style="right:26px;bottom:34px;width:60px;height:60px">Jump</div>
+        <div class="ctl" style="right:98px;bottom:56px;width:50px;height:38px;font-size:12px">Sneak</div>
+        <div class="ctl" style="right:30px;top:60px;width:44px;height:44px">E</div>
+        <div class="ctl" style="right:84px;top:60px;width:44px;height:44px">T</div>
+        <div class="tool" style="right:10px;bottom:108px"><span>Size 110%</span><span>Opacity 60%</span><span class="del">Delete</span></div>
+        <div class="hotbar"><i class="on"><i class="px" data-i="grass" data-s="16"></i></i><i><i class="px" data-i="ore" data-c="#5ad1e8" data-s="16"></i></i><i><i class="px" data-i="chest" data-s="16"></i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+      <div class="panel">
+        <p class="k">Controls</p>
+        <div class="seg sm"><button class="on">Touch</button><button>Controller</button></div>
+        <div class="b r two"><span class="t">Layout</span><span class="m">Default ▾</span></div>
+        <div class="b r two"><span class="t">Gyro aim</span><span class="sw on"></span></div>
+        <div class="b r two"><span class="t">Virtual mouse</span><span class="sw"></span></div>
+        <div class="b r two"><span class="t">Hotbar swipe</span><span class="sw on"></span></div>
+        <div class="b r two"><span class="t">TouchController mod</span><span class="sw on"></span></div>
+        <div class="b" style="padding:5px 9px 3px"><div class="row" style="justify-content:space-between"><span class="t" style="font-size:12.5px;font-weight:500">Button size</span><span class="m mono" style="font-size:10px;color:var(--muted)"><span data-o="bs">100</span>%</span></div><input class="rng" type="range" min="50" max="150" value="100" data-out="bs"></div>
+      </div>
+    </div></div><figcaption><span>X03</span><div><b>Controls editor.</b> Drag and resize buttons. Also gyro, mouse, haptics, gestures, controller mapping, TouchController.</div></figcaption></figure>
+
+    <!-- X04 JIT & Java -->
+    <figure class="shot"><div class="phone"><div class="screen" data-vpn data-tab="set">
+      <div class="app">
+        <div class="top"><span class="back">‹</span><span class="tt">JIT &amp; Java</span></div>
+        <div class="body" style="gap:7px">
+          <div class="b r two" style="background:color-mix(in srgb,var(--success) 16%,var(--panel));padding:11px"><span class="row"><i class="px" data-i="bolt" data-s="26"></i><span><span class="t" style="font:600 18px/1 var(--pixel)">JIT ready</span><span class="s">Attaches at each launch</span></span></span><span class="bd ok">On</span></div>
+          <div class="list" style="gap:4px">
+            <div class="b r two"><span class="t">Device</span><span class="m">TXM · 17 Pro</span></div>
+            <div class="b r two"><span class="t">Local VPN</span><span class="m ok">On</span></div>
+            <div class="b r two"><span class="t">Pairing file</span><span class="m ok">Valid</span></div>
+            <div class="b r two"><span class="t">Disk image</span><span class="m ok">Mounted</span></div>
+          </div>
+          <div class="split"><button class="btn">Test JIT</button><button class="btn">New pairing</button></div>
+          <p class="lbl">Java</p>
+          <div class="list" style="gap:4px">
+            <div class="b r two"><span class="t">Runtime</span><span class="m">Auto per version ›</span></div>
+            <div class="b r two"><span class="t">Installed</span><span class="row" style="gap:3px"><span class="bd">8</span><span class="bd">17</span><span class="bd">21</span><span class="bd">25</span></span></div>
+          </div>
+          <div class="fld mono" style="font-size:11.5px">-XX:+UseG1GC -Xss2m</div>
+          <div class="b r two"><span class="t">Env variables</span><span class="m">2 set ›</span></div>
+        </div>
+      </div>
+    </div></div><figcaption><span>X04</span><div><b>JIT and Java.</b> Live status, re-test, swap the pairing file, Java runtimes, JVM args, env.</div></figcaption></figure>
+
+    <!-- X05 Accounts & downloads -->
+    <figure class="shot"><div class="phone"><div class="screen" data-vpn data-tab="set">
+      <div class="app">
+        <div class="top"><span class="back">‹</span><span class="tt">Accounts &amp; data</span></div>
+        <div class="body" style="gap:7px">
+          <div class="b r sel"><i class="px" data-i="head" data-s="26"></i><span><span class="t">Steve_42</span><span class="s">Microsoft · active</span></span><i class="px" data-i="check" data-s="14"></i></div>
+          <button class="btn"><i class="px" data-i="ms" data-s="13"></i>Add account</button>
+          <p class="lbl">Downloads</p>
+          <div class="list" style="gap:4px">
+            <div class="b" style="padding:7px 11px;display:grid;gap:6px"><span class="t" style="font-size:13.5px;font-weight:500">Source</span><div class="seg sm"><button class="on">Official</button><button>Mirror</button></div></div>
+            <div class="b r two"><span class="t">Verify files</span><span class="sw on"></span></div>
+          </div>
+          <p class="lbl">CurseForge key</p>
+          <div class="fld mono" style="font-size:12px">••••••••••••3f9a<span class="end bd ok">Keychain</span></div>
+          <p class="micro">Your own key. Never bundled.</p>
+          <p class="lbl">Storage · 6.1 GB</p>
+          <div class="stack"><i style="width:67%;background:var(--face)"></i><i style="width:13%;background:var(--accent)"></i><i style="width:20%;background:var(--muted)"></i></div>
+          <div class="row" style="justify-content:space-between"><span class="legend"><span><i style="background:var(--face)"></i>Game</span><span><i style="background:var(--accent)"></i>Java</span><span><i style="background:var(--muted)"></i>Cache</span></span><button class="btn sm">Clear cache</button></div>
+        </div>
+      </div>
+    </div></div><figcaption><span>X05</span><div><b>Accounts and data.</b> Accounts, mirrors, file checks, the user's own CurseForge key, storage.</div></figcaption></figure>
+
+    <!-- X06 Logs & about -->
+    <figure class="shot"><div class="phone"><div class="screen" data-vpn data-tab="set">
+      <div class="app">
+        <div class="top"><span class="back">‹</span><span class="tt">Logs</span></div>
+        <div class="body" style="gap:7px">
+          <div class="seg sm"><button class="on">Latest</button><button>Crash</button><button>Launcher</button></div>
+<div class="console"><span class="ti">18:02:11</span> <span class="tg">[JIT]</span> region 64 MB ready
+<span class="ti">18:02:11</span> <span class="tg">[JIT]</span> detached
+<span class="ti">18:02:12</span> <span class="tg">[Java]</span> OpenJDK 21.0.5
+<span class="ti">18:02:19</span> <span class="tg">[Fabric]</span> Loading 142 mods
+<span class="ti">18:02:41</span> <span class="tg">[Render]</span> MobileGlues · GL 4.6
+<span class="ti">18:02:44</span> <span class="w">[WARN]</span> Shader cache cold
+<span class="ti">18:03:02</span> <span class="g">[Client]</span> Joined world</div>
+          <button class="btn p">Share log</button>
+          <div class="split"><button class="btn" style="font-size:13px">Crash report</button><button class="btn" style="font-size:13px">Export .mrpack</button></div>
+          <p class="lbl">About</p>
+          <div class="list" style="gap:4px">
+            <div class="b r two"><span class="t">Works until</span><span class="m">28 Oct 2027</span></div>
+            <div class="b r two"><span class="t">Version</span><span class="m">1.0 · Air 5.1</span></div>
+            <div class="b r two"><span class="t">Source code</span><span class="m" style="color:var(--accent)">GitHub ›</span></div>
+          </div>
+        </div>
+      </div>
+    </div></div><figcaption><span>X06</span><div><b>Logs and about.</b> Share or export, the expiry date, and source and license links (required by the GPL).</div></figcaption></figure>
+
+    <!-- X07 More -->
+    <figure class="shot"><div class="phone"><div class="screen" data-vpn data-tab="set">
+      <div class="app">
+        <div class="top"><span class="back">‹</span><span class="tt">More</span></div>
+        <div class="body" style="gap:7px">
+          <p class="lbl">Look</p>
+          <div class="b" style="padding:8px 11px;display:grid;gap:6px"><span class="t" style="font-size:13.5px;font-weight:500">Theme</span><div class="seg sm"><button class="on">Dark</button><button>Light</button><button>Auto</button></div></div>
+          <div class="b r two"><span class="t">Accent</span><span class="sw-row"><i class="swatch on" style="background:#5b3fd6"></i><i class="swatch" style="background:#45c27a"></i><i class="swatch" style="background:#f0b84f"></i><i class="swatch" style="background:#f07a68"></i><i class="swatch" style="background:#5ad1e8"></i></span></div>
+          <div class="list" style="gap:4px">
+            <div class="b r two"><span class="t">App icon · background</span><span class="m">Pixel ›</span></div>
+            <div class="b r two"><span class="t">Language</span><span class="m">English ›</span></div>
+          </div>
+          <p class="lbl">Play together</p>
+          <div class="b r two"><span class="t">LAN room</span><span class="m">Terracotta ›</span></div>
+          <p class="lbl">Extras</p>
+          <div class="list" style="gap:4px">
+            <div class="b r two"><span class="t">AirPlay fullscreen</span><span class="sw on"></span></div>
+            <div class="b r two"><span class="t">Microphone</span><span class="sw"></span></div>
+            <div class="b r two"><span class="t">Capes (Cosmetica)</span><span class="sw"></span></div>
+            <div class="b r two"><span class="t">Check for updates</span><span class="sw on"></span></div>
+          </div>
+          <button class="btn g">Reset all settings</button>
+        </div>
+      </div>
+    </div></div><figcaption><span>X07</span><div><b>More.</b> Theme, accent, icon, language, LAN rooms, AirPlay, mic, capes, updates.</div></figcaption></figure>
+  </div>
+</section>
+
+<!-- ═════════════════════════ 05 SYSTEM ═════════════════════════ -->
+<section class="section" id="system">
+  <div class="shead">
+    <p class="kick"><span>05</span>System</p>
+    <h2 class="title">Blocks, not cards</h2>
+    <p>Styled after playhorizon.dev: square blocks with a 2 px outline, a bevel on top and a 4 px lip below. Pixelify Sans for anything you tap, Geist for reading, Geist Mono for labels. All art here is drawn in code.</p>
+  </div>
+  <div class="sys">
+    <div class="b"><p class="k">Color</p>
+      <div class="sw-grid">
+        <div style="background:var(--page)"></div><div style="background:var(--panel)"></div><div style="background:var(--button)"></div><div style="background:var(--face)"></div><div style="background:var(--accent)"></div><div style="background:var(--success)"></div>
+      </div>
+      <div class="sw-grid" style="margin-top:4px"><small>page</small><small>panel</small><small>button</small><small>face</small><small>accent</small><small>success</small></div>
+      <div class="row" style="gap:8px;margin-top:18px;flex-wrap:wrap"><span class="bd fab">Fabric</span><span class="bd forge">Forge</span><span class="bd neo">NeoForge</span><span class="bd qlt">Quilt</span><span class="bd ok">Ready</span><span class="bd upd">Update</span><span class="bd bad">Off</span></div>
+    </div>
+    <div class="b typ"><p class="k">Type</p>
+      <p style="font:700 34px/1 var(--pixel)">Pixelify Sans</p>
+      <p style="font:500 17px/1.4 var(--font)">Geist: body and row titles.</p>
+      <p class="k" style="font-size:12px">Geist Mono · labels · 6,144 MB</p>
+    </div>
+    <div class="b" style="display:grid;gap:8px;align-content:start"><p class="k">Controls</p>
+      <button class="btn p">Primary</button><button class="btn">Secondary</button>
+      <div class="row"><span class="sw on"></span><span class="sw"></span><div class="seg sm" style="flex:1"><button class="on">On</button><button>Off</button></div></div>
+      <div class="pg"><i style="width:45%"></i></div>
+    </div>
+  </div>
+</section>
+
+<footer class="foot"><div class="foot-in">
+  <p>Mockup for planning only. Unofficial: not an official Minecraft product, and not approved by or associated with Mojang or Microsoft. Built on Air (GPL-3.0) and StikJIT (MPL-2.0).</p>
+  <div class="word">cobble</div>
+</div></footer>
+
+<script>
+// Pixel icons: row strings, one char per pixel, "." is transparent.
+const ICONS = {
+  cobble:{p:{a:'#8f8aa3',b:'#6f6a85',c:'#55506b',d:'#3e3a52',e:'#9a86ff'},r:['aabbaabc','abccbaab','bcddcbab','eeeeeeee','abaabcca','bccabbab','cbdcabcd','dccbcddc']},
+  grass:{p:{G:'#6cbf3f',g:'#4f9a2e',d:'#7a5230',D:'#946640'},r:['GGGGGGGG','GgGGGgGG','gGdGgGdg','dDdDDdDd','DdDDdDDD','DDdDDDdD','dDDDdDDd','DDdDDDDD']},
+  stone:{p:{S:'#8b8b93',s:'#6e6e78',d:'#a3a3ab'},r:['SsSSdSSs','SSsSSSsS','dSSsSdSS','SSSSsSSs','SsdSSSsS','sSSSsSdS','SSsSSSSs','SdSSsSSS']},
+  ore:{p:{S:'#8b8b93',s:'#6e6e78',C:'@',c:'@d'},r:['ssSsssSs','sCCssSss','sCcsssCs','ssssSCCs','SsssscCs','sCCsssss','sCcssSss','ssssssss']},
+  book:{p:{P:'#5b3fd6',p:'#8a74ff',Y:'#f0b84f',w:'#ecedf3'},r:['.PPPPPP.','PppppppP','PpYYYppP','PppppppP','PpYYpppP','PppppppP','PPPPPPPP','.wwwwww.']},
+  gear:{p:{g:'#8f88a8',G:'#c5c7d1'},r:['...gg...','.g.GG.g.','..GGGG..','gGG..GGg','gGG..GGg','..GGGG..','.g.GG.g.','...gg...']},
+  play:{p:{c:'currentColor'},r:['.c......','.cc.....','.ccc....','.cccc...','.cccc...','.ccc....','.cc.....','.c......']},
+  bolt:{p:{Y:'#f0b84f',y:'#c98a1c'},r:['....YYY.','...YYY..','..YYY...','.YYYYYY.','...YYY..','..YYy...','.YYy....','Yy......']},
+  portal:{p:{O:'#2a1f4a',P:'#7b4dff',p:'#b394ff'},r:['OOOOOOOO','OPpPPpPO','OpPPpPPO','OPPpPPpO','OpPPPpPO','OPpPpPPO','OPPpPPpO','OOOOOOOO']},
+  cmd:{p:{o:'#c98244',O:'#8a5226',g:'#b9bcc4',k:'#2b2b33'},r:['OoOoOoOo','oOOOOOOO','OOggggOo','oOgkkgOO','OOgkkgOo','oOggggOO','OOOOOOOo','oOoOoOoO']},
+  key:{p:{Y:'#f0b84f',y:'#b27a12'},r:['..........','.YYY......','Y.y.Y.....','Yy.yYYYYYY','Y.y.Y..Y.Y','.YYY......','..........']},
+  shield:{p:{S:'#45c27a',s:'#2f8f57',W:'#ecedf3'},r:['SSSSSSSS','SssssssS','SsssssWS','SssssWsS','SWsssWsS','SsWsWssS','.SsWssS.','..SSSS..']},
+  check:{p:{G:'#45c27a'},r:['......G','.....GG','G...GG.','GG.GG..','.GGG...','..G....']},
+  paper:{p:{W:'#ecedf3',l:'#a29cb8',F:'#c5c7d1'},r:['WWWWW..','WWWWWF.','WllllWF','WWWWWWW','WllllWW','WWWWWWW','WlllWWW','WWWWWWW']},
+  chest:{p:{B:'#a8642f',b:'#6e3d17',Y:'#f0b84f',k:'#2b1608'},r:['bbbbbbbb','bBBBBBBb','bBBBBBBb','bbbYYbbb','kkkYYkkk','bBBBBBBb','bBBBBBBb','bbbbbbbb']},
+  head:{p:{H:'#3b2a1a',S:'#c99a74',s:'#b0805a',E:'#ecedf3',B:'#4a5bd6',M:'#7a4a3a'},r:['HHHHHHHH','HHHHHHHH','HSSSSSSH','SEBSSBES','SSSssSSS','SSsMMsSS','SSSSSSSS','SSSSSSSS']},
+  ms:{p:{R:'#f25022',G:'#7fba00',B:'#00a4ef',Y:'#ffb900'},r:['RR.GG','RR.GG','.....','BB.YY','BB.YY']},
+};
+function shade(hex,f){const n=parseInt(hex.slice(1),16);const c=[n>>16,(n>>8)&255,n&255].map(v=>Math.round(v*f));return '#'+c.map(v=>v.toString(16).padStart(2,'0')).join('');}
+function iconSVG(name,size,color){
+  const d=ICONS[name]; if(!d) return '';
+  const h=d.r.length, w=Math.max(...d.r.map(r=>r.length)), k=size/Math.max(w,h);
+  let rects='';
+  d.r.forEach((row,y)=>[...row].forEach((ch,x)=>{
+    let f=d.p[ch]; if(!f) return;
+    if(f==='@') f=color; else if(f==='@d') f=shade(color,.62);
+    rects+=`<rect x="${x}" y="${y}" width="1.02" height="1.02" fill="${f}"/>`;
+  }));
+  return `<svg width="${Math.round(w*k)}" height="${Math.round(h*k)}" viewBox="0 0 ${w} ${h}">${rects}</svg>`;
+}
+document.querySelectorAll('.px[data-i]').forEach(el=>el.innerHTML=iconSVG(el.dataset.i,+el.dataset.s||16,el.dataset.c||'#5ad1e8'));
+
+// Seeded pixel scenes: dithered dusk sky, blocky terraces, oak silhouettes.
+function rng(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+const BAYER=[[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]];
+function scene(seed,W,H){
+  const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');const r=rng(seed);
+  const sky=['#0a0f2c','#121338','#1d1648','#2a1a58','#3d1f68','#5a2774','#7e3279','#a6437c','#cc5a78','#e8786a','#f2985c','#f6b85a'];
+  const hz=Math.round(H*.66);
+  for(let y=0;y<hz;y++){const t=Math.pow(y/hz,1.35)*(sky.length-1),i=Math.floor(t),f=t-i;
+    for(let xx=0;xx<W;xx++){x.fillStyle=(f*16>BAYER[y&3][xx&3])?sky[Math.min(i+1,sky.length-1)]:sky[i];x.fillRect(xx,y,1,1);}}
+  for(let s=0;s<W*H/90;s++){const sx=Math.floor(r()*W),sy=Math.floor(r()*hz*.45);x.fillStyle=r()>.7?'#ffffff':'#8c86c4';x.fillRect(sx,sy,1,1);}
+  const sunX=Math.round(W*(.55+r()*.25)),sunY=hz-Math.round(H*.05),sr=Math.round(H*.13);
+  for(let yy=-sr;yy<=sr;yy++)for(let xx=-sr;xx<=sr;xx++){const d=xx*xx+yy*yy;if(d<=sr*sr){x.fillStyle=d<(sr*.55)**2?'#fff2c4':'#ffd27a';x.fillRect(sunX+xx,sunY+yy,1,1);}}
+  for(let k=0;k<3;k++){const cw=8+Math.floor(r()*14),cx=Math.floor(r()*W),cy=4+Math.floor(r()*hz*.45);x.fillStyle='#4a3478';x.fillRect(cx,cy,cw,2);x.fillStyle='#6a4a98';x.fillRect(cx+2,cy-1,cw-5,1);}
+  const layer=(base,amp,step,col,top)=>{let h=base;const hs=[];for(let xx=0;xx<W;xx+=step){h+=Math.round((r()-.5)*amp);h=Math.max(base-amp*2,Math.min(base+amp,h));for(let k=0;k<step;k++)hs.push(h);}
+    for(let xx=0;xx<W;xx++){x.fillStyle=col;x.fillRect(xx,hs[xx],1,H-hs[xx]);x.fillStyle=top;x.fillRect(xx,hs[xx],1,1);}return hs;};
+  layer(hz-Math.round(H*.16),5,4,'#3a2470','#53359a');
+  layer(hz-Math.round(H*.04),3,3,'#241a4d','#33276a');
+  const g=layer(hz+Math.round(H*.1),2,5,'#130f2e','#2b6b3a');
+  for(let k=0;k<Math.round(W/14);k++){const tx=Math.floor(r()*(W-6))+3,ty=g[tx];x.fillStyle='#0d0a22';x.fillRect(tx,ty-3,1,3);x.fillRect(tx-2,ty-7,5,4);x.fillRect(tx-1,ty-8,3,1);}
+  return c.toDataURL();
+}
+function paintScenes(){document.querySelectorAll('[data-scene]').forEach(el=>{el.style.backgroundImage=`url(${scene(+el.dataset.scene,+el.dataset.sw||120,+el.dataset.sh||80)})`;});}
+paintScenes();
+
+// Stone texture behind everything, rebuilt per theme.
+function stone(){const light=document.documentElement.dataset.theme==='light';
+  const pal=light?['#ece7f7','#e7e1f4','#e2dbf1','#efebf9']:['#0f0d17','#121020','#0d0b14','#151225'];
+  const c=document.createElement('canvas');c.width=c.height=32;const x=c.getContext('2d');const r=rng(5);
+  for(let y=0;y<32;y+=2)for(let xx=0;xx<32;xx+=2){x.fillStyle=pal[Math.floor(r()*r()*pal.length*1.6)%pal.length];x.fillRect(xx,y,2,2);}
+  document.documentElement.style.setProperty('--stone',`url(${c.toDataURL()})`);}
+stone();
+
+// Status bar, Dynamic Island, tab bar and home indicator.
+const SIG='<svg width="17" height="11" viewBox="0 0 17 11"><rect x="0" y="7" width="3" height="4" rx=".7"/><rect x="4.5" y="5" width="3" height="6" rx=".7"/><rect x="9" y="2.5" width="3" height="8.5" rx=".7"/><rect x="13.5" y="0" width="3" height="11" rx=".7"/></svg>';
+const WIFI='<svg width="15" height="11" viewBox="0 0 15 11"><path d="M7.5 2.2c2.1 0 4 .8 5.4 2.1l1.1-1.1A9.2 9.2 0 0 0 7.5.6 9.2 9.2 0 0 0 1 3.2l1.1 1.1a7.7 7.7 0 0 1 5.4-2.1Zm0 3.1c1.2 0 2.3.5 3.2 1.2l1.1-1.1a6.2 6.2 0 0 0-8.6 0l1.1 1.1c.9-.7 2-1.2 3.2-1.2Zm0 3.1c.4 0 .8.1 1.1.4L7.5 10 6.4 8.8c.3-.3.7-.4 1.1-.4Z"/></svg>';
+const BAT='<svg width="25" height="12" viewBox="0 0 25 12"><rect x=".5" y=".5" width="21" height="11" rx="3.2" fill="none" stroke="currentColor" opacity=".45"/><rect x="2" y="2" width="15" height="8" rx="1.8"/><path d="M23 4v4c.8-.3 1.3-1 1.3-2S23.8 4.3 23 4Z" opacity=".45"/></svg>';
+const TABS=[['play','play','Play'],['inst','grass','Instances'],['mods','book','Mods'],['set','gear','Settings']];
+document.querySelectorAll('.screen').forEach(s=>{
+  if(!('nosb' in s.dataset)){
+    s.insertAdjacentHTML('afterbegin',`<div class="island"></div><div class="sbar ${s.dataset.sb||''}"><span>9:41</span><span class="ic">${SIG}${WIFI}${'vpn' in s.dataset?'<b class="vpn">VPN</b>':''}${BAT}</span></div>`);
+    s.insertAdjacentHTML('beforeend','<div class="homebar"></div>');
+  }
+  if(s.dataset.tab){const app=s.querySelector('.app');
+    app.insertAdjacentHTML('beforeend',`<nav class="tabbar">${TABS.map(([k,i,l])=>`<a class="${k===s.dataset.tab?'on':''}">${iconSVG(i,18).replace('<svg','<span class="px"><svg').replace('</svg>','</svg></span>')}${l}</a>`).join('')}</nav>`);}
+});
+
+// Light interactivity: switches, segments, chips, sliders, theme.
+document.addEventListener('click',e=>{
+  const sw=e.target.closest('.sw'); if(sw){sw.classList.toggle('on');return;}
+  const b=e.target.closest('.seg button'); if(b){b.parentNode.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));return;}
+  const ch=e.target.closest('.chip'); if(ch){ch.parentNode.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x===ch));}
+});
+const fmt=n=>(+n).toLocaleString('en-US');
+document.querySelectorAll('input.rng').forEach(i=>{const upd=()=>{i.style.setProperty('--v',((i.value-i.min)/(i.max-i.min)*100)+'%');document.querySelectorAll(`[data-o="${i.dataset.out}"]`).forEach(o=>o.textContent=fmt(i.value));};i.addEventListener('input',upd);upd();});
+document.getElementById('theme').addEventListener('click',e=>{const r=document.documentElement;const light=r.dataset.theme!=='light';r.dataset.theme=light?'light':'dark';e.target.textContent=light?'Dark':'Light';stone();});
+</script>
+</body>
+</html>

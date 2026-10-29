@@ -1,0 +1,161 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Cofre · Join server sheet</title>
+<style>
+@font-face{font-family:Pix;src:url(../../app/UI/Sources/CofreUI/Resources/Fonts/PixelifySans-SemiBold.ttf)}
+@font-face{font-family:Pix;font-weight:500;src:url(../../app/UI/Sources/CofreUI/Resources/Fonts/PixelifySans-Medium.ttf)}
+@font-face{font-family:Pix;font-weight:700;src:url(../../app/UI/Sources/CofreUI/Resources/Fonts/PixelifySans-Bold.ttf)}
+@font-face{font-family:Geist;src:url(../../app/UI/Sources/CofreUI/Resources/Fonts/Geist-Regular.ttf)}
+@font-face{font-family:Geist;font-weight:500;src:url(../../app/UI/Sources/CofreUI/Resources/Fonts/Geist-Medium.ttf)}
+@font-face{font-family:Mono;src:url(../../app/UI/Sources/CofreUI/Resources/Fonts/GeistMono-Regular.ttf)}
+:root{--page:#0f0d17;--panel:#1a1727;--raised:#221e34;--btn:#2b2641;--btnB:#3d3560;--well:#0c0b12;--bevel:#342d52;--lip:#07060b;--out:#05040a;
+--ink:#ecedf3;--soft:#c5c7d1;--muted:#a29cb8;--accent:#9a86ff;--face:#5b3fd6;--faceB:#8a74ff;--faceL:#3a2694;--ok:#45c27a;--warn:#f0b84f;--bad:#f07a68}
+*{box-sizing:border-box;margin:0}
+body{background:#08070d;font:13px/1.45 Geist,system-ui;color:var(--ink);padding:16px;-webkit-font-smoothing:antialiased}
+.grid{display:grid;grid-template-columns:repeat(2,352px);gap:20px;width:724px}
+.cap{font:11px Mono;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:0 0 8px 2px}
+.cap b{color:var(--accent);font-weight:400}
+.sheet{background:var(--page);border:2px solid var(--out);box-shadow:inset 0 2px 0 var(--bevel);padding:10px 16px 18px;border-radius:14px 14px 0 0;position:relative}
+.grab{width:36px;height:5px;background:#3a3450;margin:0 auto 12px;border-radius:3px}
+.hd{display:flex;gap:12px;align-items:center;margin-bottom:14px}
+.hd .t{flex:1;min-width:0}
+.hd h2{font:600 21px/1.1 Pix;letter-spacing:.01em}
+.hd .s{font:11px Mono;color:var(--muted);letter-spacing:.04em;margin-top:3px}
+.dot{display:inline-block;width:6px;height:6px;background:var(--ok);margin-right:5px;vertical-align:1px}
+.x{width:30px;height:30px;background:var(--btn);border:2px solid var(--out);box-shadow:inset 0 2px 0 var(--btnB),inset 0 -3px 0 var(--lip);display:grid;place-items:center;color:var(--muted);font:500 13px Pix}
+.lbl{font:11px Mono;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px}
+.blk{background:var(--panel);border:2px solid var(--out);box-shadow:inset 0 2px 0 var(--bevel),inset 0 -2px 0 var(--lip)}
+.row{display:flex;align-items:center;gap:10px;padding:9px 12px;min-height:44px}
+.blk .row+.row{border-top:2px solid var(--out)}
+.row .m{flex:1;min-width:0}
+.row .n{font:500 13.5px Geist}
+.row .d{font-size:11.5px;color:var(--muted)}
+.meta{font:11px Mono;color:var(--muted);letter-spacing:.05em;white-space:nowrap}
+.badge{font:500 10px Pix;text-transform:uppercase;letter-spacing:.04em;padding:2px 5px;border:2px solid var(--out)}
+.b-fab{background:#362f56;color:#cfc4ff}.b-ok{background:#24403b;color:#8fe3b1}.b-warn{background:#4d3e31;color:var(--warn)}.b-bad{background:#4d2f37;color:#ffb0a3}
+.ic{width:28px;height:28px;flex:none;image-rendering:pixelated;border:2px solid var(--out)}
+.ic.big{width:46px;height:46px}
+.stack{display:flex}.stack .ic{width:22px;height:22px;margin-right:-6px}
+.more{font:500 10px Pix;color:var(--soft);background:var(--btn);border:2px solid var(--out);height:22px;padding:0 4px;display:grid;place-items:center;margin-left:2px}
+.chev{color:var(--muted);font:600 14px Pix}
+.sw{width:40px;height:22px;background:var(--well);border:2px solid var(--out);position:relative;flex:none}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;background:#5a5370;box-shadow:inset 0 2px 0 #7b7396}
+.sw.on{background:var(--face)}.sw.on::after{left:20px;background:#fff;box-shadow:inset 0 -2px 0 #c9bcff}
+.btnL{height:50px;width:100%;background:var(--face);border:2px solid var(--out);box-shadow:inset 0 2px 0 var(--faceB),inset 0 -4px 0 var(--faceL);color:#fff;font:500 18px Pix;display:flex;align-items:center;justify-content:center;gap:10px;margin-top:14px}
+.btnL small{font:11px Mono;opacity:.8;letter-spacing:.04em}
+.btnM{height:42px;width:100%;background:var(--btn);border:2px solid var(--out);box-shadow:inset 0 2px 0 var(--btnB),inset 0 -4px 0 var(--lip);color:var(--ink);font:500 15px Pix;display:grid;place-items:center;margin-top:8px}
+.foot{font:11px Mono;color:var(--muted);text-align:center;margin-top:8px;letter-spacing:.03em}
+.trust{display:flex;gap:9px;align-items:flex-start;font-size:11.5px;color:var(--soft);margin-top:14px;padding:9px 11px;background:#17142a;border:2px solid var(--out)}
+.trust svg{flex:none;margin-top:1px}
+.ban{padding:10px 12px;display:flex;gap:10px;align-items:flex-start}
+.ban .n{font:500 13.5px Geist}
+.ban.warn{background:#2a2233;box-shadow:inset 4px 0 0 var(--warn)}
+.ban.info{background:#221e3a;box-shadow:inset 4px 0 0 var(--accent)}
+.get{font:500 12px Pix;background:var(--btn);border:2px solid var(--out);box-shadow:inset 0 2px 0 var(--btnB),inset 0 -3px 0 var(--lip);padding:5px 9px;color:var(--ink);white-space:nowrap}
+.ok{color:var(--ok);font:600 13px Pix}
+.bar{height:16px;background:var(--well);border:2px solid var(--out);display:flex;gap:2px;padding:2px}
+.bar i{flex:1;background:#2a2540}.bar i.f{background:var(--face);box-shadow:inset 0 2px 0 var(--faceB)}
+.prog{display:flex;justify-content:space-between;margin-top:6px}
+.step{display:flex;align-items:center;gap:10px;padding:7px 2px}
+.step .g{width:18px;text-align:center;font:600 13px Pix}
+.step .n{flex:1;font:500 13px Geist}
+.step.todo{color:var(--muted)}
+.title2{font:600 19px Pix;margin:2px 0 10px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 2px}
+.diff .row{padding:7px 12px;min-height:38px}
+.sym{width:16px;font:600 14px Pix;text-align:center}
+.fine{font-size:11.5px;color:var(--muted);margin-top:10px}
+</style></head><body>
+<div class="grid">
+
+<!-- 1. JOIN -->
+<div><div class="cap"><b>01</b> · Join · first visit</div>
+<div class="sheet"><div class="grab"></div>
+ <div class="hd"><canvas class="ic big" data-p="grass"></canvas><div class="t"><h2>Ironwood SMP</h2><div class="s"><span class="dot"></span>12/40 online · 38 ms</div></div><div class="x">✕</div></div>
+ <div class="lbl">Needed to join</div>
+ <div class="blk">
+  <div class="row"><canvas class="ic" data-p="loader"></canvas><div class="m"><div class="n">Fabric 1.21.1</div><div class="d">Mod loader · Java 21</div></div><span class="badge b-fab">auto</span></div>
+  <div class="row"><div class="stack"><canvas class="ic" data-p="mod1"></canvas><canvas class="ic" data-p="mod2"></canvas><canvas class="ic" data-p="mod3"></canvas><span class="more">+21</span></div><div class="m" style="margin-left:6px"><div class="n">24 mods</div><div class="d" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Sodium, Create, Lithium…</div></div><span class="meta">186 MB</span><span class="chev">›</span></div>
+ </div>
+ <div class="lbl">Optional</div>
+ <div class="blk">
+  <div class="row"><canvas class="ic" data-p="tex"></canvas><div class="m"><div class="n">Ironwood Textures</div><div class="d">Recommended by server · 48 MB</div></div><div class="sw on"></div></div>
+  <div class="row"><canvas class="ic" data-p="shader"></canvas><div class="m"><div class="n">Complementary Shaders</div><div class="d">Lower FPS on iPhone · 22 MB</div></div><div class="sw"></div></div>
+  <div class="row"><canvas class="ic" data-p="map"></canvas><div class="m"><div class="n">Xaero's Minimap</div><div class="d">Only on your device · 3 MB</div></div><div class="sw on"></div></div>
+ </div>
+ <div class="trust"><svg width="14" height="16" viewBox="0 0 7 8" shape-rendering="crispEdges"><path fill="#f0b84f" d="M1 0h5v1h1v4h-1v1h-1v1h-1v1h-1v-1h-1v-1h-1v-1h-1v-4h1z"/><path fill="#1a1727" d="M3 2h1v3h-1z"/></svg><span>New server. Mods are apps that run on your device, so only join servers you trust.</span></div>
+ <div class="btnL">▶ Install &amp; Join <small>237 MB</small></div>
+ <div class="foot">Makes a new “Ironwood SMP” profile · ~1 min on Wi-Fi</div>
+</div></div>
+
+<!-- 2. NEEDS ATTENTION -->
+<div><div class="cap"><b>02</b> · Something needs you</div>
+<div class="sheet"><div class="grab"></div>
+ <div class="hd"><canvas class="ic big" data-p="grass"></canvas><div class="t"><h2>Ironwood SMP</h2><div class="s"><span class="dot"></span>12/40 online · 38 ms</div></div><div class="x">✕</div></div>
+ <div class="lbl">Won't work on iPhone</div>
+ <div class="blk">
+  <div class="ban warn"><canvas class="ic" data-p="voice"></canvas><div class="m"><div class="n">Simple Voice Chat</div><div class="d" style="font-size:11.5px;color:var(--muted)">Uses desktop-only audio. The server lets you join without it. You just won't hear voice.</div></div></div>
+ </div>
+ <div class="lbl">Download 2 mods yourself</div>
+ <div class="blk">
+  <div class="ban info"><div class="m" style="font-size:11.5px;color:var(--soft)">These authors only allow downloads from CurseForge. Tap Get, then Download. Cofre picks them up automatically.</div></div>
+  <div class="row"><canvas class="ic" data-p="mod2"></canvas><div class="m"><div class="n">Steam 'n' Rails</div><div class="d">CurseForge · 2.1 MB</div></div><span class="ok">✓</span></div>
+  <div class="row"><canvas class="ic" data-p="mod4"></canvas><div class="m"><div class="n">Farmer's Delight</div><div class="d">CurseForge · 4.6 MB</div></div><span class="get">Get ↗</span></div>
+ </div>
+ <div class="btnL" style="opacity:.42;box-shadow:none">▶ Install &amp; Join <small>1 left</small></div>
+ <div class="btnM">Not now</div>
+</div></div>
+
+<!-- 3. INSTALLING -->
+<div><div class="cap"><b>03</b> · Installing</div>
+<div class="sheet"><div class="grab"></div>
+ <div class="hd"><canvas class="ic big" data-p="grass"></canvas><div class="t"><h2>Ironwood SMP</h2><div class="s">Setting up your profile</div></div></div>
+ <div class="bar"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i><i></i><i></i><i></i></div>
+ <div class="prog"><span class="meta">148 / 237 MB</span><span class="meta">~25 s left</span></div>
+ <div style="margin-top:12px">
+  <div class="step"><span class="g" style="color:var(--ok)">✓</span><span class="n">Fabric 1.21.1</span><span class="meta">done</span></div>
+  <div class="step"><span class="g" style="color:var(--ok)">✓</span><span class="n">Java 21</span><span class="meta">already have</span></div>
+  <div class="step"><span class="g" style="color:var(--accent)">◆</span><span class="n">Mods</span><span class="meta" style="color:var(--ink)">17 / 24</span></div>
+  <div class="step todo"><span class="g">·</span><span class="n">Ironwood Textures</span><span class="meta">next</span></div>
+  <div class="step todo"><span class="g">·</span><span class="n">Xaero's Minimap</span><span class="meta">next</span></div>
+ </div>
+ <div class="trust" style="background:var(--panel)"><span style="color:var(--muted)">Keep Cofre open. If it closes, setup picks up where it stopped. Files are checked before use.</span></div>
+ <div class="btnM">Cancel</div>
+</div></div>
+
+<!-- 4. UPDATE -->
+<div><div class="cap"><b>04</b> · Server updated its pack</div>
+<div class="sheet"><div class="grab"></div>
+ <div class="hd"><canvas class="ic big" data-p="grass"></canvas><div class="t"><h2>Ironwood SMP</h2><div class="s">Pack v2.3 → <span style="color:var(--accent)">v2.4</span></div></div><div class="x">✕</div></div>
+ <div class="chips"><span class="badge b-ok">+2 new</span><span class="badge b-fab">3 updated</span><span class="badge b-bad">1 removed</span><span class="badge" style="background:var(--btn);color:var(--soft)">12 MB</span></div>
+ <div class="lbl">What changed</div>
+ <div class="blk diff">
+  <div class="row"><span class="sym" style="color:var(--ok)">+</span><div class="m"><div class="n">Sophisticated Backpacks</div></div><span class="meta">new</span></div>
+  <div class="row"><span class="sym" style="color:var(--ok)">+</span><div class="m"><div class="n">Jade</div></div><span class="meta">new</span></div>
+  <div class="row"><span class="sym" style="color:var(--accent)">↑</span><div class="m"><div class="n">Create</div></div><span class="meta">6.0.4 → 6.0.6</span></div>
+  <div class="row"><span class="sym" style="color:var(--bad)">−</span><div class="m"><div class="n">Better Clouds</div></div><span class="meta">removed</span></div>
+  <div class="row" style="color:var(--muted)"><span class="sym">…</span><div class="m" style="font-size:12px">2 more updates</div></div>
+ </div>
+ <div class="fine">Your worlds, settings and the optional mods you picked stay as they are.</div>
+ <div class="btnL">▶ Update &amp; Join <small>12 MB</small></div>
+ <div class="row" style="padding:10px 2px 0;min-height:0"><div class="m"><div class="n" style="font-size:13px">Update this server automatically</div></div><div class="sw on"></div></div>
+</div></div>
+
+</div>
+<script>
+// tiny 8x8 pixel icons
+const P={
+grass:["GGgGGGgG","gGGgGgGG","GgDgGGDg","dbdddbdd","bdbbdbbd","dbdbbdbd","bdbdbbdb","bbdbdbbd"],
+loader:["..WWWW..",".WCCCCW.","WCCWWCCW","WCW..WCW","WCW..WCW","WCCWWCCW",".WCCCCW.","..WWWW.."],
+mod1:["SSSSSSSS","SaaSSaaS","SaaSSaaS","SSSSSSSS","SSaSSaSS","SSaaaaSS","SSSSSSSS","SSSSSSSS"],
+mod2:["oooooooo","oYYooYYo","oYooooYo","oooYYooo","oooYYooo","oYooooYo","oYYooYYo","oooooooo"],
+mod3:["rrrrrrrr","rRRrrRRr","rRrrrrRr","rrrRRrrr","rrrRRrrr","rRrrrrRr","rRRrrRRr","rrrrrrrr"],
+mod4:["GGGGGGGG","GyyGGyyG","GyyGGyyG","GGGbbGGG","GGbbbbGG","GGbbbbGG","GGGGGGGG","GGGGGGGG"],
+tex:["pPpPpPpP","PpPpPpPp","pPWWWWpP","PpWCCWPp","pPWCCWpP","PpWWWWPp","pPpPpPpP","PpPpPpPp"],
+shader:["kkkkkkkk","kwkkkkwk","kkkkwkkk","kkYYkkkk","kYYYYkkk","PPPPPPPP","pPpPpPpP","PPPPPPPP"],
+map:["ttttGGtt","tGGtGGtt","tGGtttWt","ttttRtWt","ttRRRttt","tttRtGGt","tttttGGt","tttttttt"],
+voice:["..WWWW..",".WCCCCW.",".WCCCCW.",".WCCCCW.","..WWWW..","W..WW..W",".WWWWWW.","...WW..."]};
+const C={G:"#5fae3a",g:"#4b8f2c",D:"#3c7a24",d:"#7a5233",b:"#5e3d24",W:"#d9ccff",C:"#5b3fd6",S:"#6d6a80",a:"#5ee6d0",o:"#3a3150",Y:"#f0b84f",r:"#5a2a33",R:"#f07a68",y:"#c33",p:"#3d2f78",P:"#5b3fd6",k:"#0d0a1c",w:"#ffffff",t:"#2a5f8f"};
+document.querySelectorAll("canvas[data-p]").forEach(c=>{c.width=8;c.height=8;const x=c.getContext("2d"),g=P[c.dataset.p];
+g.forEach((r,y)=>[...r].forEach((ch,i)=>{if(ch==="."){x.fillStyle="#1a1727"}else x.fillStyle=C[ch]||"#888";x.fillRect(i,y,1,1)}))});
+</script>
+</body></html>
