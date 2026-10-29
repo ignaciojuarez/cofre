@@ -66,9 +66,15 @@ PY2
   /usr/libexec/PlistBuddy -c "Add :UTImportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension:0 string mobiledevicepairing" "$INFO" 2>/dev/null || true
   /usr/libexec/PlistBuddy -c "Add :UTImportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension:1 string plist" "$INFO" 2>/dev/null || true
   echo "[Cofre] document types:"; /usr/libexec/PlistBuddy -c "Print :CFBundleDocumentTypes" "$INFO" >/dev/null || bt_die "document types missing"; echo "[Cofre] imported types:"; /usr/libexec/PlistBuddy -c "Print :UTImportedTypeDeclarations" "$INFO" >/dev/null || bt_die "imported types missing"
+  bt_step "Build VPN extension"
+  SIGNING="$ROOT/.build-tools/signing"
+  (cd "$SIGNING" && xcodegen generate --spec project.yml --quiet) || bt_die "could not generate the signing project"
+  xcodebuild -project "$SIGNING/CofreSigning.xcodeproj" -scheme CofreSigning -configuration Debug \
+    -destination 'generic/platform=iOS' -derivedDataPath "$SIGNING/build" \
+    -allowProvisioningUpdates DEVELOPMENT_TEAM="$TEAM_ID" -quiet build || bt_die "VPN extension build failed"
   rm -rf "$APP/PlugIns"
   mkdir -p "$APP/PlugIns"
-  cp -R "$ROOT/.build-tools/signing/build/Build/Products/Debug-iphoneos/PacketTunnel.appex" "$APP/PlugIns/PacketTunnel.appex"
+  cp -R "$SIGNING/build/Build/Products/Debug-iphoneos/PacketTunnel.appex" "$APP/PlugIns/PacketTunnel.appex"
   python3 "$ROOT/scripts/sign-development.py"
 fi
 [[ -d "$APP" ]] || bt_die "no signed app at $APP; run with --build"
