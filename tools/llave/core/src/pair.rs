@@ -275,7 +275,14 @@ pub async fn run_pair(
                 })?
                 .vend_documents("com.ignaciojuarez.cofre")
                 .await
-                .map_err(|e| format!("Cofre placement failed: {e}"))?,
+                .map_err(|e| {
+                    PairEvent::Error {
+                        code: "PLACE_FAILED".into(),
+                        message: "Cofre placement failed".into(),
+                    }
+                    .emit();
+                    format!("Cofre placement failed: {e}")
+                })?,
         };
         let _ = afc.mk_dir("/Documents/StikJIT").await;
         let mut f = afc
