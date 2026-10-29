@@ -19,10 +19,15 @@
         public var capabilities: BackendCapabilities {
             [.deleteWorld, .addServer, .envVariables, .rendererTuning, .serverJoin]
         }
-        private let air = CofreAirBridgeAdapter()
+        private let air: any CofreAirBridging
+        public init(bridge: any CofreAirBridging) {
+            self.air = bridge
+            super.init()
+            loadPersistedSetup()
+        }
         private var launchTask: Task<Void, Never>?
         private var setup = SetupState()
-        private var setupContinuations: [AsyncStream<SetupState>.Continuation] = []
+        private var setupContinuations: [UUID: AsyncStream<SetupState>.Continuation] = [:]
         private func loadPersistedSetup() {
             let d = UserDefaults.standard
             if d.object(forKey: "cofre.setup.pairing") != nil {
@@ -44,17 +49,16 @@
                 setup.jit = d.bool(forKey: "cofre.setup.jit") ? .ready : .blocked
             }
         }
-        public override init() {
-            super.init()
-            loadPersistedSetup()
-        }
 
         public func setupState() async -> SetupState { setup }
         public func setupUpdates() -> AsyncStream<SetupState> {
             AsyncStream { continuation in
-                setupContinuations.append(continuation)
+                let id = UUID()
+                setupContinuations[id] = continuation
                 continuation.yield(setup)
-                continuation.onTermination = { _ in }
+                continuation.onTermination = { [weak self] _ in
+                    Task { @MainActor in self?.setupContinuations.removeValue(forKey: id) }
+                }
             }
         }
         public func recheckSetup() async {
@@ -68,7 +72,7 @@
             setup.jit = isJITEnabled ? .ready : .failed("Run Test JIT after pairing")
             setup.devMode = isJITEnabled ? .ready : .failed("Enable Developer Mode")
             persistSetup()
-            setupContinuations.forEach { $0.yield(setup) }
+            setupContinuations.values.forEach { $0.yield(setup) }
         }
         public func openDeveloperModeSettings() {
             UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!)
@@ -90,7 +94,7 @@
             setup.pairing = hasPairing() ? .ready : .failed("Invalid pairing file")
             setup.trust = setup.pairing
             persistSetup()
-            setupContinuations.forEach { $0.yield(setup) }
+            setupContinuations.values.forEach { $0.yield(setup) }
         }
         public func deletePairing() throws { if hasPairing() { try FileManager.default.removeItem(at: pairingURL) } }
         public var isVPNRunning: Bool { false }
@@ -113,7 +117,7 @@
             throw unavailable("loader installation")
         }
         public func worlds(instanceID: String) async throws -> [WorldSummary] {
-            try await callback { done in self.air.worldsForProfile(instanceID) { done($0) } }.map { d in
+            try await callback { done in self.air.worldsForProfile(instanceID) { done($0 as? [Any] ?? []) } }.map { d in
                 let x = d as? [String: Any] ?? [:]
                 let n = x["name"] as? String ?? "World"
                 return WorldSummary(
@@ -122,7 +126,7 @@
             }
         }
         public func servers(instanceID: String) async throws -> [ServerSummary] {
-            try await callback { done in self.air.searchServers(["query": "", "limit": "50"], source: 1) { done($0) } }
+            try await callback { done in self.air.searchServers(["query": "", "limit": "50"], source: 1) { rows, error in done(error == nil ? (rows as [Any]) : []) } }
                 .compactMap { d in
                     let x = d as? [String: Any] ?? [:]
                     guard let id = x["id"] as? String, !id.isEmpty else { return nil }
@@ -135,18 +139,20 @@
                 }
         }
         public func deleteWorld(instanceID: String, worldID: String) async throws {
-            var e: NSError?
-            guard air.deleteWorld(worldID, forProfile: instanceID, error: &e) else {
-                throw e ?? unavailable("world deletion")
+            try await withCheckedThrowingContinuation { continuation in
+                air.deleteWorld(worldID, forProfile: instanceID) { error in
+                    if let error { continuation.resume(throwing: error) } else { continuation.resume() }
+                }
             }
         }
         public func backUpWorld(instanceID: String, worldID: String) async throws -> URL {
             throw unavailable("world backup")
         }
         public func addServer(instanceID: String, name: String, address: String) async throws -> ServerSummary {
-            var e: NSError?
-            guard air.addServer(address, name: name, forProfile: instanceID, error: &e) else {
-                throw e ?? unavailable("server addition")
+            try await withCheckedThrowingContinuation { continuation in
+                air.addServer(address, name: name, forProfile: instanceID) { error in
+                    if let error { continuation.resume(throwing: error) } else { continuation.resume() }
+                }
             }
             return ServerSummary(id: address, name: name, address: address)
         }
@@ -157,7 +163,7 @@
             var p = GamePreferences()
             p.autoRAM = air.preferenceObject("java.auto_ram") as? Bool ?? true
             p.ramMB = Int(
-                air.preferencesForProfile(instanceID ?? air.profiles.selectedProfileName)["ramMB"] as? Int ?? 4096)
+                air.preferencesForProfile(instanceID ?? air.selectedProfileName())["ramMB"] as? Int ?? 4096)
             p.deviceRAMMB = p.ramMB
             p.envVariables = parseEnv(air.preferenceObject("java.env_variables") as? String ?? "")
             p.shaderCacheMB = air.preferenceObject("mobileglues.max_glsl_cache_size") as? Int ?? 512
@@ -248,7 +254,7 @@
         public func search(_ query: ProjectQuery) async throws -> [ProjectSummary] {
             let source = query.source == .curseforge ? 2 : 1
             let rows = try await callback { done in
-                self.air.searchProjects(["query": query.text, "limit": "50"], source: source) { done($0) }
+                self.air.searchProjects(["query": query.text, "limit": "50"], source: source) { rows, error in done(error == nil ? (rows as [Any]) : []) }
             }
             return rows.compactMap { d in
                 let x = d as? [String: Any] ?? [:]
@@ -340,7 +346,7 @@
         private func unavailableStream<T>(_ name: String) -> AsyncThrowingStream<T, Error> {
             AsyncThrowingStream { continuation in continuation.finish(throwing: unavailable(name)) }
         }
-        private func callback(_ body: (@escaping (NSArray) -> Void) -> Void) async throws -> NSArray {
+        private func callback(_ body: (@escaping ([Any]) -> Void) -> Void) async throws -> [Any] {
             await withCheckedContinuation { c in body { c.resume(returning: $0) } }
         }
     }

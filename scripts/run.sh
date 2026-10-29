@@ -23,11 +23,6 @@ if (( BUILD )); then
   cp "$ROOT"/app/Glue/AirBridge/CofreStartup.m "$AIR/Natives/CofreGlue/"
   cp "$ROOT"/app/Glue/AirBridge/CofreTunnelService.* "$AIR/Natives/CofreGlue/"
   cp "$ROOT"/app/Glue/AirBridge/CofreRootFactory.m "$AIR/Natives/CofreGlue/"
-  cp "$ROOT"/app/Shell/CofreRootViewController.swift "$AIR/Natives/CofreGlue/"
-  cp "$ROOT"/app/Glue/AirBridge/CofreBackendAdapter.swift "$AIR/Natives/CofreGlue/"
-  cp "$ROOT"/app/Glue/AirBridge/ServerJoinAdapter.swift "$AIR/Natives/CofreGlue/"
-  mkdir -p "$AIR/Natives/CofreGlue/CofreServerJoin"
-  cp "$ROOT"/app/CofreKit/ServerJoin/Sources/CofreServerJoin/*.swift "$AIR/Natives/CofreGlue/CofreServerJoin/"
   cp "$ROOT"/app/Glue/AirBridge/CofrePairingImport.m "$AIR/Natives/CofreGlue/"
   python3 - <<PY2
 from pathlib import Path
@@ -66,6 +61,12 @@ PY2
   /usr/libexec/PlistBuddy -c "Add :UTImportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension:0 string mobiledevicepairing" "$INFO" 2>/dev/null || true
   /usr/libexec/PlistBuddy -c "Add :UTImportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension:1 string plist" "$INFO" 2>/dev/null || true
   echo "[Cofre] document types:"; /usr/libexec/PlistBuddy -c "Print :CFBundleDocumentTypes" "$INFO" >/dev/null || bt_die "document types missing"; echo "[Cofre] imported types:"; /usr/libexec/PlistBuddy -c "Print :UTImportedTypeDeclarations" "$INFO" >/dev/null || bt_die "imported types missing"
+  bt_step "Build CofreCore framework"
+  SIGNING="$ROOT/.build-tools/signing"
+  (cd "$SIGNING" && xcodegen generate --spec project.yml --quiet) || bt_die "could not generate the signing project"
+  xcodebuild -project "$SIGNING/CofreSigning.xcodeproj" -scheme CofreSigning -configuration Debug -destination 'generic/platform=iOS' -derivedDataPath "$SIGNING/build" -allowProvisioningUpdates DEVELOPMENT_TEAM="$TEAM_ID" -quiet build || bt_die "CofreCore build failed"
+  mkdir -p "$APP/Frameworks"
+  cp -R "$SIGNING/build/Build/Products/Debug-iphoneos/CofreCore.framework" "$APP/Frameworks/"
   bt_step "Build VPN extension"
   SIGNING="$ROOT/.build-tools/signing"
   (cd "$SIGNING" && xcodegen generate --spec project.yml --quiet) || bt_die "could not generate the signing project"

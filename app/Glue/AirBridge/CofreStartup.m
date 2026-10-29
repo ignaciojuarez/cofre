@@ -1,26 +1,38 @@
 #import "AirBridgeAdapter.h"
-#import "PLProfiles.h"
 #import "CofreTunnelService.h"
 #import <UIKit/UIKit.h>
+#import <dlfcn.h>
+#import <objc/message.h>
+
+static Class CofreCoreClass(void) {
+    static Class cls;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        void *handle = dlopen("@executable_path/Frameworks/CofreCore.framework/CofreCore", RTLD_NOW | RTLD_LOCAL);
+        if (!handle) NSLog(@"[Cofre] UI fallback reason=framework missing");
+        cls = NSClassFromString(@"CofreCoreEntry");
+        if (!cls) NSLog(@"[Cofre] UI fallback reason=class missing");
+    });
+    return cls;
+}
+
 static void CofreStartAfterLaunch(void) {
-    @autoreleasepool {
-        CofreAirBridgeAdapter *bridge = [CofreAirBridgeAdapter new];
+    CofreAirBridgeAdapter *bridge = [CofreAirBridgeAdapter new];
+    Class cls = CofreCoreClass();
+    if (cls) {
+        ((void (*)(id, SEL, id))objc_msgSend)(cls, @selector(startWithBridge:), bridge);
+        if (!((id (*)(id, SEL))objc_msgSend)(cls, @selector(rootViewController))) NSLog(@"[Cofre] UI fallback reason=start failed");
         [bridge ensureAutomaticMemoryDefault];
-        NSArray *instances = [bridge instances]; NSString *profile = bridge.profiles.selectedProfileName;
-        NSLog(@"[Cofre] AirBridge connected instances=%lu profile=%@", (unsigned long)instances.count, profile ?: @"(none)");
-        if (profile.length) [bridge worldsForProfile:profile completion:^(NSArray *worlds){ NSLog(@"[Cofre] worlds=%lu", (unsigned long)worlds.count); }];
-        [CofreTunnelService installAndStart];
     }
+    [CofreTunnelService installAndStart];
 }
 
 __attribute__((constructor)) static void CofreStartup(void) {
-    // Air's globals and profile services are initialized by UIApplication startup.
-    // Defer until the launch notification instead of touching them from a Mach-O
-    // constructor (which can run before ObjC singletons are ready).
-    [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidFinishLaunchingNotification
-                                                       object:nil
-                                                        queue:[NSOperationQueue mainQueue]
-                                                   usingBlock:^(__unused NSNotification *note) {
-        CofreStartAfterLaunch();
-    }];
+    [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidFinishLaunchingNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(__unused NSNotification *note) { CofreStartAfterLaunch(); }];
+}
+
+UIViewController *CofreMakeRootViewController(void) {
+    Class cls = CofreCoreClass();
+    if (!cls) return nil;
+    return ((id (*)(id, SEL))objc_msgSend)(cls, @selector(rootViewController));
 }

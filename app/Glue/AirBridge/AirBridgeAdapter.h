@@ -1,13 +1,15 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 @class PLProfiles;
+#import "CofreAirBridging.h"
 NS_ASSUME_NONNULL_BEGIN
-@interface CofreAirBridgeAdapter : NSObject
+@interface CofreAirBridgeAdapter : NSObject <CofreAirBridging>
 @property(nonatomic, readonly) PLProfiles *profiles;
 - (NSArray<NSDictionary *> *)instances;
+- (NSString *)selectedProfileName;
 - (void)worldsForProfile:(NSString *)profile completion:(void (^)(NSArray *))completion;
-- (BOOL)deleteWorld:(NSString *)worldID forProfile:(NSString *)profile error:(NSError **)error;
-- (BOOL)addServer:(NSString *)address name:(NSString *)name forProfile:(NSString *)profile error:(NSError **)error;
+- (void)deleteWorld:(NSString *)worldID forProfile:(NSString *)profile completion:(void (^)(NSError * _Nullable))completion;
+- (void)addServer:(NSString *)address name:(NSString *)name forProfile:(NSString *)profile completion:(void (^)(NSError * _Nullable))completion;
 - (void)modsForProfile:(NSString *)profile completion:(void (^)(NSArray *))completion;
 - (BOOL)toggleMod:(id)mod error:(NSError **)error;
 - (NSArray<NSDictionary *> *)accounts;

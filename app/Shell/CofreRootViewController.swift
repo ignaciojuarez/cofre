@@ -1,43 +1,25 @@
 import CofreUI
 import UIKit
 
-@_silgen_name("CofreMakeControlsEditor") private func CofreMakeControlsEditor() -> Unmanaged<UIViewController>?
-@_silgen_name("CofreMakeForgeInstaller") private func CofreMakeForgeInstaller(_ instanceID: UnsafePointer<CChar>)
-    -> Unmanaged<UIViewController>?
-
-/// Host for Cofre's production SwiftUI shell inside Air's existing UIKit scene.
 @objc(CofreRootViewController)
 public final class CofreRootViewController: UIViewController {
-    private var child: UIViewController?
+    private let bridge: any CofreAirBridging
+    public init(bridge: any CofreAirBridging) { self.bridge = bridge; super.init(nibName: nil, bundle: nil) }
+    @available(*, unavailable) required init?(coder: NSCoder) { fatalError("CofreRootViewController requires bridge") }
     public override func viewDidLoad() {
         super.viewDidLoad()
         CofreUIKitTheme.apply()
-        let backend = CofreBackendAdapter()
-        let services = CofreServices(backend: backend, airScreens: AirScreensAdapter())
+        let backend = CofreBackendAdapter(bridge: bridge)
+        let services = CofreServices(backend: backend, airScreens: AirScreensAdapter(bridge: bridge))
         let root = CofreUI.makeRootViewController(services: services)
-        addChild(root)
-        root.view.frame = view.bounds
-        root.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        view.addSubview(root.view)
-        root.didMove(toParent: self)
-        child = root
-        NSLog("[Cofre] UI root installed")
+        addChild(root); root.view.frame = view.bounds; root.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.addSubview(root.view); root.didMove(toParent: self)
     }
 }
 
-@MainActor
-private final class AirScreensAdapter: NSObject, AirScreens {
-    func controlsEditor() -> UIViewController {
-        CofreMakeControlsEditor()?.takeUnretainedValue() ?? unavailable("controls editor")
-    }
-    func forgeInstaller(instanceID: String) -> UIViewController {
-        instanceID.withCString { CofreMakeForgeInstaller($0)?.takeUnretainedValue() ?? unavailable("Forge installer") }
-    }
-    private func unavailable(_ name: String) -> UIViewController {
-        let vc = UIViewController()
-        vc.view.backgroundColor = .systemBackground
-        vc.title = "Unavailable"
-        NSLog("[Cofre] %@ unavailable", name)
-        return vc
-    }
+@MainActor private final class AirScreensAdapter: NSObject, AirScreens {
+    let bridge: any CofreAirBridging
+    init(bridge: any CofreAirBridging) { self.bridge = bridge }
+    func controlsEditor() -> UIViewController { bridge.controlsEditor() }
+    func forgeInstaller(instanceID: String) -> UIViewController { bridge.forgeInstaller(instanceID) }
 }
