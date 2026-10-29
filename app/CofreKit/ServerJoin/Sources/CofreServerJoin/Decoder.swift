@@ -48,19 +48,18 @@ public enum CardDecoder {
         guard card.schemaVersion == "1.0.0",
             card.id.range(of: "^[a-z0-9][a-z0-9.-]{0,62}$", options: .regularExpression) != nil
         else { throw ServerJoinError.invalidCard("schema/id") }
-        guard card.security.origin.scheme == "https", card.pack.url.scheme == "https" else {
-            throw ServerJoinError.insecureURL
+        guard card.security.origin.scheme?.lowercased() == "https", card.pack.url.scheme?.lowercased() == "https",
+            card.security.origin.user == nil, card.security.origin.password == nil,
+            card.pack.url.user == nil, card.pack.url.password == nil
+        else { throw ServerJoinError.insecureURL }
+        guard card.security.allowedHosts.allSatisfy({ !$0.contains("*") }) else {
+            throw ServerJoinError.invalidCard("wildcard host")
         }
-        guard
-            card.security.allowedHosts.allSatisfy({
-                !$0.contains("*") && $0.range(of: "^[a-z0-9.-]+$", options: .regularExpression) != nil
-            })
-        else { throw ServerJoinError.invalidCard("wildcard host") }
-        guard card.security.allowedHosts.contains(card.security.origin.host ?? ""),
-            card.security.allowedHosts.contains(card.pack.url.host ?? "")
-        else { throw ServerJoinError.hostNotAllowed(card.pack.url.host ?? "") }
+        _ = try URLPolicy.validate(card.security.origin, allowedHosts: card.security.allowedHosts)
+        _ = try URLPolicy.validate(card.pack.url, allowedHosts: card.security.allowedHosts)
         guard card.pack.sha512.range(of: "^[A-Fa-f0-9]{128}$", options: .regularExpression) != nil,
-            (card.pack.sizeBytes ?? 0) <= 2_147_483_648
+            (card.pack.sizeBytes ?? card.security.maxBytes) > 0,
+            (card.pack.sizeBytes ?? card.security.maxBytes) <= min(card.security.maxBytes, 2_147_483_648)
         else { throw ServerJoinError.invalidCard("pack hash/size") }
         if let ios = card.platformOverrides?.ios {
             for path in ios.exclude where path.contains("..") || path.hasPrefix("/") {

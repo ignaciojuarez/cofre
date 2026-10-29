@@ -30,6 +30,32 @@ public final class FileHashCache: HashCache, @unchecked Sendable {
 public actor InstallEngine {
     private let cache: HashCache?
     public init(cache: HashCache? = nil) { self.cache = cache }
+    public func verify(fileURL: URL, card: ServerCard) throws {
+        let expected = card.pack.sizeBytes ?? card.security.maxBytes
+        let handle = try FileHandle(forReadingFrom: fileURL)
+        defer { try? handle.close() }
+        #if canImport(CryptoKit)
+            var hasher = SHA512()
+        #endif
+        var count: Int64 = 0
+        while let chunk = try handle.read(upToCount: 64 * 1024), !chunk.isEmpty {
+            count += Int64(chunk.count)
+            guard count <= expected else { throw ServerJoinError.sizeLimit }
+            #if canImport(CryptoKit)
+                hasher.update(data: chunk)
+            #endif
+        }
+        guard count == expected else { throw ServerJoinError.hashMismatch }
+        #if canImport(CryptoKit)
+            let digest = hasher.finalize().map { String(format: "%02x", $0) }.joined()
+            guard digest.caseInsensitiveCompare(card.pack.sha512) == .orderedSame else {
+                throw ServerJoinError.hashMismatch
+            }
+        #else
+            throw ServerJoinError.hashMismatch
+        #endif
+    }
+
     public func install(card: ServerCard, data: Data, filesystem: JoinFileSystem) throws {
         try filesystem.makeStaging(card.id)
         do {
