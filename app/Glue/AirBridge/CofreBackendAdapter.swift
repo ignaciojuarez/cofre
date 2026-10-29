@@ -50,8 +50,15 @@ public final class CofreBackendAdapter: NSObject, CofreBackend {
         setupContinuations.forEach { $0.yield(setup) }
     }
     public func openDeveloperModeSettings() { UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!) }
-    public func hasPairing() -> Bool { FileManager.default.fileExists(atPath: pairingURL.path) }
-    public func importPairing(_ data: Data) throws { try data.write(to: pairingURL, options: [.atomic, .completeFileProtection]) }
+    public func hasPairing() -> Bool {
+        guard let data = try? Data(contentsOf: pairingURL), let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil), let dict = plist as? [String: Any] else { return false }
+        return ["HostID", "SystemBUID", "UDID"].allSatisfy { (dict[$0] as? String)?.isEmpty == false } && ["HostCertificate", "HostPrivateKey", "RootCertificate", "RootPrivateKey"].allSatisfy { (dict[$0] as? Data)?.isEmpty == false }
+    }
+    public func importPairing(_ data: Data) throws {
+        let dir = pairingURL.deletingLastPathComponent(); try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try data.write(to: pairingURL, options: [.atomic, .completeFileProtection]); setup.pairing = hasPairing() ? .ready : .failed("Invalid pairing file"); setup.trust = setup.pairing
+        persistSetup(); setupContinuations.forEach { $0.yield(setup) }
+    }
     public func deletePairing() throws { if hasPairing() { try FileManager.default.removeItem(at: pairingURL) } }
     public var isVPNRunning: Bool { false }
     public func startVPN() async throws { throw CofreBackendError.unavailable("VPN control") }
