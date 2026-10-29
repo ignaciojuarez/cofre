@@ -7,7 +7,8 @@ Cofre is a Minecraft: Java Edition launcher for iPhone and iPad. It combines the
 - **The Swift layer ships as `CofreCore.framework`.** It's built by the signing project, embedded by `scripts/run.sh`, and loaded at runtime with `dlopen` by `app/Glue/AirBridge/CofreStartup.m`. Air keeps only the ObjC bridge, which is compiled through patch 0001.
   The build output is verified: the framework is embedded and signed, with CofreUI symbols present.
   On the device, look for `[Cofre] UI root installed` or `[Cofre] UI fallback reason=…` in `Documents/latestlog.txt`.
-- Device-verified so far: install, launch, AirBridge counts, and the VPN request. CofreUI on device, JIT and pairing aren't device-verified yet.
+- Device-verified so far: install, launch, AirBridge counts, the VPN, pairing through Llave, CofreUI, and JIT (the in-app test, and Play reaching Minecraft 26.3's render thread). A first game frame isn't device-verified yet.
+- **Cofre is replacing Air piece by piece.** Already Cofre-owned: version and loader catalogs, mods search and install, JIT, one-step Forge/NeoForge install, and the launch screen. Next candidates: `plan/own-air.md`.
 
 ## Where things live
 | Path | What | Language |
@@ -41,6 +42,7 @@ Cofre is a Minecraft: Java Edition launcher for iPhone and iPad. It combines the
 11. "Done" means verified: tests pass, and for device features, the device log shows the marker. Stubs and "should work" don't count.
 
 ## Where to make a change
+- **Anything Air does that holds us back** (bugs, UI we have to hide, ObjC boilerplate): prefer replacing it with a small Cofre-owned Swift 6 file (async/await, no bridging) and delete the bridge method or patch it replaced. Keep Air for the JVM, rendering, input and the game surface until replacing them is clearly cheaper. Track candidates in `plan/own-air.md`.
 - **New screen or UI behavior:** `app/UI`, plus `MockBackend` sample data and a test.
 - **New backend capability:** add it to a protocol in `app/UI/Sources/CofreUI/Facade/` with a default, then implement it in `CofreBackendAdapter.swift`. Turn on its `BackendCapabilities` flag only once it really works.
 - **Air data or ObjC access:** `app/Glue/AirBridge/AirBridgeAdapter.{h,m}`.
