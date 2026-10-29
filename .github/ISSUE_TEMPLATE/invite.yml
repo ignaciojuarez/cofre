@@ -1,0 +1,41 @@
+name: Request an invite
+description: Ask for a Cofre install link for your iPhone or iPad.
+title: "Invite: "
+labels: [invite]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for wanting to play! Invites are for friends only.
+
+        **Don't post your device ID (UDID), email, phone number or any file here.** This page is public. We'll message you privately for the rest.
+  - type: input
+    id: who
+    attributes:
+      label: Who are you?
+      description: Your name or nickname, so we know it's you.
+    validations:
+      required: true
+  - type: input
+    id: contact
+    attributes:
+      label: How should we reach you?
+      description: For example "Discord" or "the group chat". Don't write the number or address here.
+    validations:
+      required: true
+  - type: dropdown
+    id: device
+    attributes:
+      label: Device
+      options:
+        - iPhone
+        - iPad
+    validations:
+      required: true
+  - type: checkboxes
+    id: java
+    attributes:
+      label: Before you ask
+      options:
+        - label: I own Minecraft Java Edition on a Microsoft account.
+          required: true
