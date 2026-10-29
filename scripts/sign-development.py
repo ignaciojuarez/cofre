@@ -21,7 +21,11 @@ assert 'OLD_DEVICE_UDID' in plistlib.loads(subprocess.check_output(['security','
 info=plistlib.loads((app/'Info.plist').read_bytes()); info['CFBundleIdentifier']=bundle
 if not appex.exists(): raise SystemExit('missing appex')
 appex_info=plistlib.loads((appex/'Info.plist').read_bytes())
-if appex_info.get('CFBundleIdentifier') != tunnel_bundle: raise SystemExit('appex bundle ID mismatch'); info['CFBundleDisplayName']='Cofre'; (app/'Info.plist').write_bytes(plistlib.dumps(info)); (app/'embedded.mobileprovision').write_bytes(app_profile.read_bytes())
+if appex_info.get('CFBundleIdentifier') != tunnel_bundle:
+    raise SystemExit('appex bundle ID mismatch')
+info['CFBundleDisplayName']='Cofre'
+(app/'Info.plist').write_bytes(plistlib.dumps(info))
+(app/'embedded.mobileprovision').write_bytes(app_profile.read_bytes())
 # Appex first, as required by iOS nested-code verification.
 if not appex.exists(): raise SystemExit('missing PacketTunnel.appex in Cofre.app/PlugIns')
 (appex/'embedded.mobileprovision').write_bytes(tunnel_profile.read_bytes())
