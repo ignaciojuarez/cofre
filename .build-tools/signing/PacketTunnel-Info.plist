@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict>
+<key>CFBundleName</key><string>PacketTunnel</string><key>CFBundleVersion</key><string>1</string><key>CFBundleShortVersionString</key><string>1.0</string><key>CFBundleExecutable</key><string>PacketTunnel</string><key>CFBundleIdentifier</key><string>$(PRODUCT_BUNDLE_IDENTIFIER)</string><key>CFBundleDisplayName</key><string>Cofre Tunnel</string><key>CFBundlePackageType</key><string>XPC!</string>
+<key>NSExtension</key><dict><key>NSExtensionPointIdentifier</key><string>com.apple.networkextension.packet-tunnel</string><key>NSExtensionPrincipalClass</key><string>$(PRODUCT_MODULE_NAME).PacketTunnelProvider</string></dict>
+</dict></plist>

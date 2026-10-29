@@ -9,8 +9,11 @@ for a in "$@"; do case "$a" in --build) BUILD=1;; --sqim) SQIM=1;; --relay-host=
 APP="$ROOT/artifacts/Payload/$APP_BUNDLE_NAME"
 if (( BUILD )); then
   bt_step "Build ($APP_NAME)"
-  (cd "$ROOT/upstream/air" && eval "gmake -j4 dsym package PLATFORM=2 BOOTJDK=\"$BOOTJDK\" JOBS=4 $MAKE_ARGS")
-  mkdir -p "$ROOT/artifacts/Payload"; unzip -q -o "$(ls -t "$ROOT/upstream/air"/artifacts/*-ios.ipa | head -1)" -d "$ROOT/artifacts"
+  AIR="$ROOT/.work/air"
+  mkdir -p "$AIR/Natives/Assets.xcassets"
+  cp -R "$ROOT"/app/Resources/AppIcon/*.appiconset "$AIR/Natives/Assets.xcassets/"
+  (cd "$AIR" && eval "gmake -j4 dsym package PLATFORM=2 BOOTJDK=\"$BOOTJDK\" JOBS=4 $MAKE_ARGS")
+  mkdir -p "$ROOT/artifacts/Payload"; unzip -q -o "$(ls -t "$ROOT/.work/air"/artifacts/*-ios.ipa | head -1)" -d "$ROOT/artifacts"
   mv "$ROOT/artifacts/Payload/AngelAuraAmethyst.app" "$APP"
   python3 "$ROOT/scripts/sign-development.py"
 fi
