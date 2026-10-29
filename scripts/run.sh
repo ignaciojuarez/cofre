@@ -46,8 +46,9 @@ PY2
   /usr/libexec/PlistBuddy -c "Add :UTImportedTypeDeclarations:0:UTTypeConformsTo array" "$INFO" 2>/dev/null || true
   /usr/libexec/PlistBuddy -c "Add :UTImportedTypeDeclarations:0:UTTypeConformsTo:0 string public.data" "$INFO" 2>/dev/null || true
   /usr/libexec/PlistBuddy -c "Add :UTImportedTypeDeclarations:0:UTTypeTagSpecification dict" "$INFO" 2>/dev/null || true
-  /usr/libexec/PlistBuddy -c "Add :UTImportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension string mobiledevicepairing" "$INFO" 2>/dev/null || true
-  /usr/libexec/PlistBuddy -c "Add :UTImportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension:plist string plist" "$INFO" 2>/dev/null || true
+  /usr/libexec/PlistBuddy -c "Add :UTImportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension array" "$INFO" 2>/dev/null || true
+  /usr/libexec/PlistBuddy -c "Add :UTImportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension:0 string mobiledevicepairing" "$INFO" 2>/dev/null || true
+  /usr/libexec/PlistBuddy -c "Add :UTImportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension:1 string plist" "$INFO" 2>/dev/null || true
   echo "[Cofre] document types:"; /usr/libexec/PlistBuddy -c "Print :CFBundleDocumentTypes" "$INFO"; echo "[Cofre] imported types:"; /usr/libexec/PlistBuddy -c "Print :UTImportedTypeDeclarations" "$INFO"
   rm -rf "$APP/PlugIns"
   mkdir -p "$APP/PlugIns"
