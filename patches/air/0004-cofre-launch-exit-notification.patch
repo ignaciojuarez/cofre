@@ -14,10 +14,12 @@ diff --git a/Natives/PLLogOutputView.m b/Natives/PLLogOutputView.m
 +++ b/Natives/PLLogOutputView.m
 @@ -186,6 +186,8 @@ + (void)appendToLog:(NSString *)string {
  }
-
+ 
  + (void)handleExitCode:(int)code {
 +    [[NSNotificationCenter defaultCenter] postNotificationName:@"CofreAirJVMExitNotification"
 +                                                        object:nil userInfo:@{@"code": @(code)}];
      if (!current) return;
-
+     
      // 如果有错误，显示新的崩溃界面
+--
+2.39.0
