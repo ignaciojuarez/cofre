@@ -212,6 +212,7 @@
 
         var body: some View {
             VStack(spacing: 8) {
+                step(1, "Plug this \(device) into a Mac")
                 VStack(spacing: 12) {
                     CableArt()
                     HStack(spacing: 8) {
@@ -226,9 +227,8 @@
                         await store.backend.recheckSetup()
                     }
                 }
-                step(1, "Plug this iPhone into a Mac")
                 VStack(alignment: .leading, spacing: 10) {
-                    stepTitle(2, "On the Mac, run this in Terminal")
+                    stepTitle(2, "On your Mac, open the Terminal app and run this")
                     Text(verbatim: CofreLinks.pairCommand).cofreFont(.code).foregroundStyle(Color.cofre.ink)
                         .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
                         .padding(10).frame(maxWidth: .infinity, alignment: .leading).block(.well)
@@ -244,23 +244,15 @@
                         }
                         ShareLink(item: CofreLinks.pairCommand) { Text("Share") }.buttonStyle(.block(.secondary))
                     }
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 12) { terminalKeys }
-                        VStack(alignment: .leading, spacing: 6) { terminalKeys }
-                    }
                 }
                 .padding(12).frame(maxWidth: .infinity, alignment: .leading).block(.panel)
-                step(3, "Tap Trust on this iPhone, then your passcode")
+                step(3, "Tap Trust on this \(device)")
             }
             KeyFileCard()
         }
 
-        /// How to run it, as key caps: open Terminal, paste, run.
-        @ViewBuilder private var terminalKeys: some View {
-            KeyHint("⌘ Space", "Terminal")
-            KeyHint("⌘ V", "paste")
-            KeyHint("↩", "run")
-        }
+        /// "iPhone" or "iPad". Product names, so not localized.
+        private var device: String { UIDevice.current.model }
 
         private func step(_ n: Int, _ title: LocalizedStringKey) -> some View {
             stepTitle(n, title).padding(12).frame(maxWidth: .infinity, alignment: .leading).block(.panel)

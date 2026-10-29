@@ -54,9 +54,9 @@
         }
     }
 
-    /// Header shared by S02–S07: back, counter, StepBar, icon, kicker, title, lede.
+    /// Header shared by S02–S07: back, counter, StepBar, icon, title, lede.
     private struct StepHeader: View {
-        let index: Int, glyph: PixelGlyph, kicker: LocalizedStringKey, title: LocalizedStringKey,
+        let index: Int, glyph: PixelGlyph, title: LocalizedStringKey,
             lede: LocalizedStringKey?
         @Binding var step: Int
         @Environment(\.widthClass) private var width
@@ -77,8 +77,6 @@
                 .padding(.vertical, -8)
                 StepBar(steps: SetupFlow.stepNames, current: index - 1)
                 PixelIcon(glyph, size: 44).padding(.top, 6)
-                (Text(verbatim: String(format: "Step %02d · ", index)) + Text(kicker))
-                    .cofreFont(.label).foregroundStyle(Color.cofre.muted)
                 Text(title).cofreFont(.title).foregroundStyle(Color.cofre.ink).accessibilityAddTraits(.isHeader)
                 if let lede { Text(lede).cofreFont(.secondary).foregroundStyle(Color.cofre.muted) }
             }
@@ -132,7 +130,7 @@
         var body: some View {
             let s = store.setup.devMode
             StepHeader(
-                index: 1, glyph: .shield, kicker: "Developer Mode", title: "Turn on Developer Mode", lede: nil,
+                index: 1, glyph: .shield, title: "Turn on Developer Mode", lede: nil,
                 step: $step
             )
             .onChange(of: scenePhase) { _, phase in
@@ -172,7 +170,7 @@
         var body: some View {
             let s = store.signing
             StepHeader(
-                index: 2, glyph: .shield, kicker: "Trust", title: "Signed for this device", lede: nil, step: $step)
+                index: 2, glyph: .shield, title: "Signed for this device", lede: nil, step: $step)
             ListSection(spacing: 4) {
                 Row("Installed", leading: { PixelIcon(.check, size: 14) }, trailing: { Meta("OK", tone: .success) })
                 Row(
@@ -207,7 +205,7 @@
         var body: some View {
             let ok = store.setup.pairing.isReady
             StepHeader(
-                index: 3, glyph: .key, kicker: "Pairing key", title: "Connect to a Mac",
+                index: 3, glyph: .key, title: "Connect to a Mac",
                 lede: "The key comes here over the cable.", step: $step)
             if ok {
                 Banner("Key found", icon: .check, tone: .success)
@@ -248,7 +246,7 @@
         var body: some View {
             let s = store.setup.vpn
             StepHeader(
-                index: 4, glyph: .shield, kicker: "Local VPN", title: "Allow local VPN",
+                index: 4, glyph: .shield, title: "Allow local VPN",
                 lede: "Lets Cofre turn on JIT by talking to this iPhone. Nothing leaves the phone.", step: $step)
             HStack(spacing: 6) {
                 node("Cofre")
@@ -291,7 +289,7 @@
         var body: some View {
             let s = store.setup.jit
             StepHeader(
-                index: 5, glyph: .bolt, kicker: "JIT test",
+                index: 5, glyph: .bolt,
                 title: s.isReady ? "JIT works" : s.isFailed ? "JIT didn't turn on" : "Testing JIT",
                 lede: "Runs by itself. Needs Wi-Fi, or Airplane Mode for a moment.", step: $step
             )
@@ -399,7 +397,7 @@
         var body: some View {
             let s = store.setup.account
             StepHeader(
-                index: 6, glyph: .head, kicker: "Account", title: "Sign in",
+                index: 6, glyph: .head, title: "Sign in",
                 lede: "Your account must own Java Edition.", step: $step)
             BlockButton("Sign in with Microsoft", icon: .head, isLoading: s == .checking) {
                 Task { await store.signIn() }
