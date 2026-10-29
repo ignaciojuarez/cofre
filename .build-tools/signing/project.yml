@@ -30,6 +30,7 @@ targets:
       - path: ../../app/Glue/AirBridge/CofreBackendAdapter.swift
       - path: ../../app/Glue/AirBridge/ServerJoinAdapter.swift
       - path: ../../app/Glue/AirBridge/CofreCoreEntry.swift
+      - path: ../../app/Glue/AirBridge/CofreUITypes.swift
       - path: ../../app/Shell/CofreRootViewController.swift
       - path: ../../app/CofreKit/CofreJIT.swift
     dependencies:
@@ -41,6 +42,7 @@ targets:
       PRODUCT_BUNDLE_IDENTIFIER: com.ignaciojuarez.cofre.core
       DEFINES_MODULE: YES
       MACH_O_TYPE: mh_dylib
+      GENERATE_INFOPLIST_FILE: YES
       ARCHS: arm64
       SWIFT_OBJC_BRIDGING_HEADER: $(SRCROOT)/../../app/Glue/AirBridge/CofreAirBridging.h
       SWIFT_INCLUDE_PATHS: "$(SRCROOT)/../../app/UI/build/Debug-iphoneos $(SRCROOT)/../../app/CofreKit/ServerJoin/build/Debug-iphoneos"

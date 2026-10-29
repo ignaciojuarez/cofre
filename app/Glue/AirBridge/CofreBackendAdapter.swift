@@ -19,7 +19,7 @@
         public var capabilities: BackendCapabilities {
             [.deleteWorld, .addServer, .envVariables, .rendererTuning, .serverJoin]
         }
-        private let air: any CofreAirBridging
+        let air: any CofreAirBridging
         public init(bridge: any CofreAirBridging) {
             self.air = bridge
             super.init()
@@ -104,20 +104,20 @@
         public func instances() async throws -> [InstanceSummary] {
             air.instances().compactMap { d in
                 guard let id = d["id"] as? String else { return nil }
-                let loader = Loader(rawValue: (d["loader"] as? String ?? "vanilla").lowercased()) ?? .vanilla
+                let loader = UILoader(rawValue: (d["loader"] as? String ?? "vanilla").lowercased()) ?? .vanilla
                 return InstanceSummary(
                     id: id, name: d["name"] as? String ?? id, loader: loader, gameVersion: d["version"] as? String ?? ""
                 )
             }
         }
-        public func createInstance(name: String, version: String, loader: Loader) async throws -> InstanceSummary {
+        public func createInstance(name: String, version: String, loader: UILoader) async throws -> InstanceSummary {
             throw unavailable("instance creation")
         }
-        public func installLoader(instanceID: String, loader: Loader, version: String) async throws {
+        public func installLoader(instanceID: String, loader: UILoader, version: String) async throws {
             throw unavailable("loader installation")
         }
         public func worlds(instanceID: String) async throws -> [WorldSummary] {
-            try await callback { done in self.air.worldsForProfile(instanceID) { done($0 as? [Any] ?? []) } }.map { d in
+            try await callback { done in self.air.worlds(forProfile: instanceID) { done($0 as? [Any] ?? []) } }.map { d in
                 let x = d as? [String: Any] ?? [:]
                 let n = x["name"] as? String ?? "World"
                 return WorldSummary(
@@ -125,7 +125,7 @@
                     lastPlayed: nil)
             }
         }
-        public func servers(instanceID: String) async throws -> [ServerSummary] {
+        public func servers(instanceID: String) async throws -> [UIServerSummary] {
             try await callback { done in self.air.searchServers(["query": "", "limit": "50"], source: 1) { rows, error in done(error == nil ? (rows as [Any]) : []) } }
                 .compactMap { d in
                     let x = d as? [String: Any] ?? [:]
@@ -133,13 +133,13 @@
                     let address = x["address"] as? String ?? ""
                     let hasCard = UserDefaults.standard.bool(
                         forKey: "cofre.server-card.\(address.split(separator: ":").first.map(String.init) ?? address)")
-                    return ServerSummary(
+                    return UIServerSummary(
                         id: id, name: x["title"] as? String ?? id, address: address,
                         detail: x["description"] as? String, hasServerCard: hasCard)
                 }
         }
         public func deleteWorld(instanceID: String, worldID: String) async throws {
-            try await withCheckedThrowingContinuation { continuation in
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                 air.deleteWorld(worldID, forProfile: instanceID) { error in
                     if let error { continuation.resume(throwing: error) } else { continuation.resume() }
                 }
@@ -148,22 +148,22 @@
         public func backUpWorld(instanceID: String, worldID: String) async throws -> URL {
             throw unavailable("world backup")
         }
-        public func addServer(instanceID: String, name: String, address: String) async throws -> ServerSummary {
-            try await withCheckedThrowingContinuation { continuation in
+        public func addServer(instanceID: String, name: String, address: String) async throws -> UIServerSummary {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                 air.addServer(address, name: name, forProfile: instanceID) { error in
                     if let error { continuation.resume(throwing: error) } else { continuation.resume() }
                 }
             }
-            return ServerSummary(id: address, name: name, address: address)
+            return UIServerSummary(id: address, name: name, address: address)
         }
-        public func createInstance(name: String, version: String, loader: Loader, ownFolder: Bool, fabricAPI: Bool)
+        public func createInstance(name: String, version: String, loader: UILoader, ownFolder: Bool, fabricAPI: Bool)
             async throws -> InstanceSummary
         { try await createInstance(name: name, version: version, loader: loader) }
         public func preferences(instanceID: String?) async throws -> GamePreferences {
             var p = GamePreferences()
             p.autoRAM = air.preferenceObject("java.auto_ram") as? Bool ?? true
             p.ramMB = Int(
-                air.preferencesForProfile(instanceID ?? air.selectedProfileName())["ramMB"] as? Int ?? 4096)
+                air.preferences(forProfile: instanceID ?? air.selectedProfileName())["ramMB"] as? Int ?? 4096)
             p.deviceRAMMB = p.ramMB
             p.envVariables = parseEnv(air.preferenceObject("java.env_variables") as? String ?? "")
             p.shaderCacheMB = air.preferenceObject("mobileglues.max_glsl_cache_size") as? Int ?? 512
@@ -183,7 +183,7 @@
         }
 
         public func installed(_ kind: ContentKind, instanceID: String) async throws -> [InstalledItem] {
-            try await callback { done in self.air.modsForProfile(instanceID) { done($0) } }.compactMap { d in
+            try await callback { done in self.air.mods(forProfile: instanceID) { done($0) } }.compactMap { d in
                 let x = d as? [String: Any] ?? [:]
                 guard let id = x["id"] as? String ?? x["name"] as? String else { return nil }
                 return InstalledItem(
@@ -248,7 +248,7 @@
         public func gameVersions(_ kind: VersionKind) async throws -> [GameVersion] {
             throw unavailable("version catalog")
         }
-        public func loaderVersions(loader: Loader, game: String) async throws -> [String] {
+        public func loaderVersions(loader: UILoader, game: String) async throws -> [String] {
             throw unavailable("loader catalog")
         }
         public func search(_ query: ProjectQuery) async throws -> [ProjectSummary] {
@@ -285,7 +285,7 @@
                     NSLog("[Cofre] JIT status=%@", String(describing: result))
                     continuation.yield(
                         JITStep(
-                            kind: .debugger, state: result.isEnabled ? .ready : .failed,
+                            kind: .debugger, state: result.isEnabled ? .ready : .failed("JIT unavailable"),
                             detail: String(describing: result)))
                     continuation.finish()
                 }
@@ -307,11 +307,11 @@
         public func applyAirAppearance(accentHex: String, cardHex: String, textHex: String) {}
 
         private var pairingURL: URL {
-            FileManager.default.urls(for: .documentDirectory, inDomains: .userDomainMask)[0].appendingPathComponent(
+            FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent(
                 "StikJIT/pairingFile.plist")
         }
         private func logURL(_ kind: LogKind) -> URL {
-            FileManager.default.urls(for: .documentDirectory, inDomains: .userDomainMask)[0].appendingPathComponent(
+            FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent(
                 kind == .latest ? "latestlog.txt" : "latestlog.txt")
         }
         private func vpnManagerEnabled() async -> Bool {
