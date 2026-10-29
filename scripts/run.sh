@@ -11,8 +11,11 @@ APP="$ROOT/artifacts/Payload/$APP_BUNDLE_NAME"
 if (( BUILD )); then
   bt_step "Build ($APP_NAME)"
   AIR="$ROOT/.work/air"
-  find "$AIR" -name CMakeCache.txt -delete
-  find "$AIR" -type d -name CMakeFiles -prune -exec rm -rf {} +
+  # Drop only caches copied from another tree; matching ones keep native deps incremental.
+  while IFS= read -r cache; do
+    dir=$(dirname "$cache")
+    grep -qxF "CMAKE_CACHEFILE_DIR:INTERNAL=$dir" "$cache" || { rm -f "$cache"; rm -rf "$dir/CMakeFiles"; }
+  done < <(find "$AIR" -name CMakeCache.txt)
   mkdir -p "$AIR/Natives/Assets.xcassets"
   if ! grep -q "CofreMakeRootViewController" "$AIR/Natives/SceneDelegate.m"; then git -C "$AIR" apply "$ROOT/patches/air/0002-install-cofre-root.patch" || bt_die "failed to apply Cofre root patch"; fi
   mkdir -p "$AIR/Natives/CofreGlue"
