@@ -253,12 +253,26 @@ pub async fn run_pair(
     if place {
         let house = idevice::house_arrest::HouseArrestClient::connect(&provider)
             .await
-            .map_err(|e| format!("Cofre is not installed or house_arrest is unavailable: {e}"))?;
+            .map_err(|e| {
+                PairEvent::Error {
+                    code: "COFRE_MISSING".into(),
+                    message: format!("Cofre is not installed or house_arrest is unavailable: {e}"),
+                }
+                .emit();
+                "Cofre is not installed or house_arrest is unavailable".to_string()
+            })?;
         let mut afc = match house.vend_container("com.ignaciojuarez.cofre").await {
             Ok(a) => a,
             Err(_) => idevice::house_arrest::HouseArrestClient::connect(&provider)
                 .await
-                .map_err(|e| format!("Cofre placement failed: {e}"))?
+                .map_err(|e| {
+                    PairEvent::Error {
+                        code: "PLACE_FAILED".into(),
+                        message: "Cofre placement failed".into(),
+                    }
+                    .emit();
+                    format!("Cofre placement failed: {e}")
+                })?
                 .vend_documents("com.ignaciojuarez.cofre")
                 .await
                 .map_err(|e| format!("Cofre placement failed: {e}"))?,
@@ -270,31 +284,38 @@ pub async fn run_pair(
                 idevice::afc::opcode::AfcFopenMode::Wr,
             )
             .await
-            .map_err(|e| format!("Cofre placement failed: {e}"))?;
-        f.write_entire(&xml_bytes)
-            .await
-            .map_err(|e| format!("Cofre placement failed: {e}"))?;
-        f.close()
-            .await
-            .map_err(|e| format!("Cofre placement failed: {e}"))?;
-        println!("{{\"event\":\"placed\"}}");
+            .map_err(|e| {
+                PairEvent::Error {
+                    code: "PLACE_FAILED".into(),
+                    message: "Cofre placement failed".into(),
+                }
+                .emit();
+                format!("Cofre placement failed: {e}")
+            })?;
+        f.write_entire(&xml_bytes).await.map_err(|e| {
+            PairEvent::Error {
+                code: "PLACE_FAILED".into(),
+                message: "Cofre placement failed".into(),
+            }
+            .emit();
+            format!("Cofre placement failed: {e}")
+        })?;
+        f.close().await.map_err(|e| {
+            PairEvent::Error {
+                code: "PLACE_FAILED".into(),
+                message: "Cofre placement failed".into(),
+            }
+            .emit();
+            format!("Cofre placement failed: {e}")
+        })?;
+        PairEvent::Placed.emit();
     }
 
     let root = std::env::var_os("COFRE_PAIRING_DIR")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| std::path::PathBuf::from("pairings"));
     std::fs::create_dir_all(&root).map_err(|e| format!("Failed to create app pairing dir: {e}"))?;
-    let out_path = if out_path.is_absolute() {
-        out_path.to_path_buf()
-    } else {
-        root.join(out_path)
-    };
-    if out_path.parent() != Some(root.as_path()) {
-        return Err("--out must be a file directly inside the app pairing directory".into());
-    }
-    if out_path.is_symlink() || out_path.exists() {
-        return Err("refusing to overwrite existing pairing output".into());
-    }
+    let out_path = resolve_output(&root, out_path)?;
     let tmp = root.join(format!(".{}.tmp", uuid::Uuid::new_v4()));
     let mut file = OpenOptions::new()
         .write(true)
@@ -316,6 +337,22 @@ pub async fn run_pair(
     })?;
 
     Ok(())
+}
+
+pub fn resolve_output(root: &Path, requested: &Path) -> Result<std::path::PathBuf, String> {
+    std::fs::create_dir_all(root).map_err(|e| format!("Failed to create app pairing dir: {e}"))?;
+    let path = if requested.is_absolute() {
+        requested.to_path_buf()
+    } else {
+        root.join(requested)
+    };
+    if path.parent() != Some(root) || path.file_name().is_none() {
+        return Err("--out must be a file directly inside the app pairing directory".into());
+    }
+    if path.is_symlink() || path.exists() {
+        return Err("refusing to overwrite existing pairing output".into());
+    }
+    Ok(path)
 }
 
 fn is_ios_version_below(version: &str, target_major: u32, target_minor: u32) -> bool {

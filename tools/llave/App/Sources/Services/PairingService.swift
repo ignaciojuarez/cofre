@@ -22,10 +22,14 @@ public final class PairingService: PairingServiceProtocol, @unchecked Sendable {
 
                 let process = Process()
                 process.executableURL = bin
-                var args = ["pair", "--udid", device.udid, "--out", outURL.path]
+                let pairingDir = outURL.deletingLastPathComponent()
+                var args = ["pair", "--udid", device.udid, "--out", outURL.lastPathComponent]
                 if !simulate { args.append("--place") }
                 if simulate { args.append("--simulate") }
                 process.arguments = args
+                var environment = ProcessInfo.processInfo.environment
+                environment["COFRE_PAIRING_DIR"] = pairingDir.path
+                process.environment = environment
 
                 let pipe = Pipe()
                 process.standardOutput = pipe

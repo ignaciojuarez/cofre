@@ -31,7 +31,16 @@ pub async fn run_simulated_pair(out_path: &Path) -> Result<(), String> {
     sleep(Duration::from_millis(250)).await;
     PairEvent::Validated.emit();
 
-    write_simulated_pairing_file(out_path)
+    let root = std::env::var_os("COFRE_PAIRING_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| {
+            out_path
+                .parent()
+                .unwrap_or(Path::new("pairings"))
+                .to_path_buf()
+        });
+    let resolved = crate::pair::resolve_output(&root, out_path)?;
+    write_simulated_pairing_file(&resolved)
 }
 
 pub fn write_simulated_pairing_file(out_path: &Path) -> Result<(), String> {
@@ -115,7 +124,9 @@ mod tests {
     use super::*;
     #[test]
     fn simulated_file_has_pairing_keys_and_private_mode() {
-        let p = std::env::temp_dir().join(format!("llave-test-{}.plist", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("llave-test-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let p = dir.join("pairing.plist");
         write_simulated_pairing_file(&p).unwrap();
         let value = plist::Value::from_file(&p).unwrap();
         let d = value.as_dictionary().unwrap();
@@ -133,5 +144,15 @@ mod tests {
             0o600
         );
         let _ = std::fs::remove_file(p);
+        let _ = std::fs::remove_dir(dir);
+    }
+
+    #[test]
+    fn output_must_be_direct_child() {
+        let root = std::env::temp_dir().join(format!("llave-root-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        assert!(crate::pair::resolve_output(&root, &root.join("nested/file")).is_err());
+        assert!(crate::pair::resolve_output(&root, &root.join("pairing.plist")).is_ok());
+        let _ = std::fs::remove_dir_all(root);
     }
 }

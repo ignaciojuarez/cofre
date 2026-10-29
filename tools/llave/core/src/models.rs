@@ -16,6 +16,7 @@ pub enum PairEvent {
     Paired,
     WifiEnabled,
     Validated,
+    Placed,
     Warning { code: String, message: String },
     Error { code: String, message: String },
 }

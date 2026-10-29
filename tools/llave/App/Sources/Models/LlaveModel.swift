@@ -125,9 +125,9 @@ public final class LlaveModel: ObservableObject {
         case .validated:
             state = .placing(device)
         case .error(let code, let message):
-            if message.localizedCaseInsensitiveContains("not installed") {
+            if code == "COFRE_MISSING" {
                 state = .cofreMissing(device)
-            } else if code == "PAIRING_FAILED" && message.localizedCaseInsensitiveContains("placement") {
+            } else if code == "PLACE_FAILED" {
                 state = .placementFailed(device, message)
             } else {
                 state = .error(LlaveError(code: code, message: message))

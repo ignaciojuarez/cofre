@@ -134,9 +134,16 @@ final class StateMachineTests: XCTestCase {
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("export.mobiledevicepairing")
         try Data("pairing".utf8).write(to: file)
         model.startPairing(device: dev)
-        model.handlePairingEvent(.error(code: "PAIRING_FAILED", message: "placement failed"), device: dev, outURL: file)
+        model.handlePairingEvent(.error(code: "PLACE_FAILED", message: "placement failed"), device: dev, outURL: file)
         XCTAssertTrue(model.sendViaAirDrop())
         XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
+    }
+
+    func testCofreMissingCodeShowsFallbackState() {
+        let model = LlaveModel(deviceWatcherFactory: { _ in MockDeviceWatcher() }, pairingService: MockPairingService(), airDropService: MockAirDropService())
+        let dev = Device(udid: "MISSING", name: "iPhone", version: "18.0")
+        model.handlePairingEvent(.error(code: "COFRE_MISSING", message: "anything"), device: dev, outURL: URL(fileURLWithPath: "/tmp/pairing"))
+        XCTAssertEqual(model.state, .cofreMissing(dev))
     }
 
 }

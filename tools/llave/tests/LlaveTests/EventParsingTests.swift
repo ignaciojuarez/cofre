@@ -8,6 +8,7 @@ final class EventParsingTests: XCTestCase {
         XCTAssertEqual(LlaveEvent.parse(line: "{\"event\":\"paired\"}"), .paired)
         XCTAssertEqual(LlaveEvent.parse(line: "{\"event\":\"wifi_enabled\"}"), .wifiEnabled)
         XCTAssertEqual(LlaveEvent.parse(line: "{\"event\":\"validated\"}"), .validated)
+        XCTAssertEqual(LlaveEvent.parse(line: "{\"event\":\"placed\"}"), .placed)
     }
 
     func testParseErrorEvent() {
