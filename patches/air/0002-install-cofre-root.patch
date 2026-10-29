@@ -1,11 +1,16 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Cofre <cofre@example.invalid>
 Date: Thu, 29 Oct 2026 01:00:00 -0700
-Subject: [PATCH] [COFRE] Install Cofre root UI
+Subject: [PATCH 2/2] Install Cofre root UI
 
 Reason: make the production app show CofreUI while retaining Air screens behind the facade.
 Drop when: Air exposes an official root-controller integration point.
+---
+ Natives/SceneDelegate.m | 4 ++++
+ 1 file changed, 4 insertions(+)
 
+diff --git a/Natives/SceneDelegate.m b/Natives/SceneDelegate.m
+index 7e2ff3629..5cc2656a7 100644
 --- a/Natives/SceneDelegate.m
 +++ b/Natives/SceneDelegate.m
 @@ -1,4 +1,6 @@
@@ -15,12 +20,12 @@ Drop when: Air exposes an official root-controller integration point.
  #import "ios_uikit_bridge.h"
  #import "utils.h"
  #import "LauncherRootViewController.h"
-@@ -85,6 +87,8 @@
+@@ -85,6 +87,8 @@ - (void)scene:(UIScene *)scene willConnectToSession:(UISceneSession *)session op
      }
-
+ 
      [self.window makeKeyAndVisible];
 +    UIViewController *cofreRoot = CofreMakeRootViewController();
 +    if (cofreRoot) { self.window.rootViewController = cofreRoot; NSLog(@"[Cofre] UI root installed"); }
-
+ 
      // 立即应用背景（移除原来的 0.1s 延迟）：
      // 延迟会在启动时露出窗口底色形成"黑条"或"黑闪"。BackgroundManager 在其 init

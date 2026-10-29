@@ -17,23 +17,13 @@ if (( BUILD )); then
     grep -qxF "CMAKE_CACHEFILE_DIR:INTERNAL=$dir" "$cache" || { rm -f "$cache"; rm -rf "$dir/CMakeFiles"; }
   done < <(find "$AIR" -name CMakeCache.txt)
   mkdir -p "$AIR/Natives/Assets.xcassets"
-  if ! grep -q "CofreMakeRootViewController" "$AIR/Natives/SceneDelegate.m"; then git -C "$AIR" apply "$ROOT/patches/air/0002-install-cofre-root.patch" || bt_die "failed to apply Cofre root patch"; fi
-  mkdir -p "$AIR/Natives/CofreGlue"
-  cp "$ROOT"/app/Glue/AirBridge/AirBridgeAdapter.* "$AIR/Natives/CofreGlue/"
-  cp "$ROOT"/app/Glue/AirBridge/CofreStartup.m "$AIR/Natives/CofreGlue/"
-  cp "$ROOT"/app/Glue/AirBridge/CofreTunnelService.* "$AIR/Natives/CofreGlue/"
-  cp "$ROOT"/app/Glue/AirBridge/CofreRootFactory.m "$AIR/Natives/CofreGlue/"
-  cp "$ROOT"/app/Glue/AirBridge/CofrePairingImport.m "$AIR/Natives/CofreGlue/"
-  python3 - <<PY2
-from pathlib import Path
-p=Path("$AIR/Natives/CMakeLists.txt")
-s=p.read_text()
-needle="  main_hook.m\n"
-for f in ("CofreGlue/AirBridgeAdapter.m", "CofreGlue/CofreStartup.m", "CofreGlue/CofreTunnelService.m", "CofreGlue/CofrePairingImport.m", "CofreGlue/CofreRootFactory.m"):
-    if f not in s: s=s.replace(needle, needle+"  "+f+"\n")
-if "NetworkExtension" not in s: s=s.replace("target_link_libraries(AngelAuraAmethyst", "target_link_libraries(AngelAuraAmethyst\n  -framework NetworkExtension")
-p.write_text(s)
-PY2
+  # Apply every Air patch once, in order (the same patches scripts/update-upstream.sh applies).
+  for patch in "$ROOT"/patches/air/*.patch; do
+    git -C "$AIR" apply --reverse --check "$patch" 2>/dev/null && continue
+    git -C "$AIR" apply "$patch" || bt_die "Air patch does not apply: $(basename "$patch")"
+  done
+  rm -rf "$AIR/Natives/CofreGlue" && mkdir -p "$AIR/Natives/CofreGlue"
+  cp "$ROOT"/app/Glue/AirBridge/*.[hm] "$AIR/Natives/CofreGlue/"
   rm -rf "$ROOT/artifacts/Payload/PlugIns" "$ROOT/artifacts/Payload/Cofre.app/PlugIns" 2>/dev/null || true
   cp -R "$ROOT"/app/Resources/AppIcon/*.appiconset "$AIR/Natives/Assets.xcassets/"
   (cd "$AIR" && eval "gmake -j4 dsym package PLATFORM=2 BOOTJDK=\"$BOOTJDK\" JOBS=4 $MAKE_ARGS")
