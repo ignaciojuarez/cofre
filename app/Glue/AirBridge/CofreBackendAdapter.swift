@@ -12,6 +12,7 @@ public enum CofreBackendError: LocalizedError {
 /// Production bridge. Air owns the data and launch lifecycle; unsupported Air APIs are surfaced as unavailable.
 @MainActor
 public final class CofreBackendAdapter: NSObject, CofreBackend {
+    public var capabilities: BackendCapabilities { [.deleteWorld, .addServer, .envVariables, .rendererTuning] }
     private let air = CofreAirBridgeAdapter()
     private var launchTask: Task<Void, Never>?
     private var setup = SetupState()
@@ -55,8 +56,25 @@ public final class CofreBackendAdapter: NSObject, CofreBackend {
     public func installLoader(instanceID: String, loader: Loader, version: String) async throws { throw unavailable("loader installation") }
     public func worlds(instanceID: String) async throws -> [WorldSummary] { try await callback { done in self.air.worldsForProfile(instanceID) { done($0) } }.map { d in let x=d as? [String:Any] ?? [:]; let n=x["name"] as? String ?? "World"; return WorldSummary(id: x["id"] as? String ?? n, name:n, mode:x["mode"] as? String ?? "", playTime:nil, lastPlayed:nil) } }
     public func servers(instanceID: String) async throws -> [ServerSummary] { throw unavailable("server list") }
-    public func preferences(instanceID: String?) async throws -> GamePreferences { throw unavailable("preferences") }
-    public func setPreferences(_ preferences: GamePreferences, instanceID: String?) async throws { throw unavailable("preferences") }
+    public func deleteWorld(instanceID: String, worldID: String) async throws { var e: NSError?; guard air.deleteWorld(worldID, forProfile: instanceID, error: &e) else { throw e ?? unavailable("world deletion") } }
+    public func backUpWorld(instanceID: String, worldID: String) async throws -> URL { throw unavailable("world backup") }
+    public func addServer(instanceID: String, name: String, address: String) async throws -> ServerSummary { var e: NSError?; guard air.addServer(address, name: name, forProfile: instanceID, error: &e) else { throw e ?? unavailable("server addition") }; return ServerSummary(id: address, name: name, address: address) }
+    public func createInstance(name: String, version: String, loader: Loader, ownFolder: Bool, fabricAPI: Bool) async throws -> InstanceSummary { try await createInstance(name: name, version: version, loader: loader) }
+    public func preferences(instanceID: String?) async throws -> GamePreferences {
+        var p = GamePreferences(); p.autoRAM = getPref("java.auto_ram") as? Bool ?? true
+        p.ramMB = Int(air.preferencesForProfile(instanceID ?? air.profiles.selectedProfileName)["ramMB"] as? Int ?? 4096)
+        p.envVariables = parseEnv(getPref("java.env_variables") as? String ?? "")
+        p.shaderCacheMB = getPref("mobileglues.max_glsl_cache_size") as? Int ?? 512
+        p.multidraw = "\(getPref("mobileglues.multidraw_mode") as? Int ?? 0)"
+        p.computeShaders = getPref("mobileglues.enable_ext_compute_shader") as? Bool ?? true
+        return p
+    }
+    public func setPreferences(_ preferences: GamePreferences, instanceID: String?) async throws {
+        setPref("java.env_variables", preferences.envVariables.map { "\($0.key)=\($0.value)" }.joined(separator: " "))
+        setPref("mobileglues.max_glsl_cache_size", preferences.shaderCacheMB)
+        setPref("mobileglues.multidraw_mode", preferences.multidraw == "Auto" ? 0 : (Int(preferences.multidraw) ?? 0))
+        setPref("mobileglues.enable_ext_compute_shader", preferences.computeShaders)
+    }
 
     public func installed(_ kind: ContentKind, instanceID: String) async throws -> [InstalledItem] { try await callback { done in self.air.modsForProfile(instanceID) { done($0) } }.compactMap { d in let x=d as? [String:Any] ?? [:]; guard let id=x["id"] as? String ?? x["name"] as? String else { return nil }; return InstalledItem(id:id,name:x["name"] as? String ?? id,version:x["version"] as? String ?? "",enabled:x["enabled"] as? Bool ?? true,kind:kind) } }
     public func setEnabled(_ enabled: Bool, item: InstalledItem, instanceID: String) async throws { throw unavailable("mod changes") }
@@ -81,7 +99,11 @@ public final class CofreBackendAdapter: NSObject, CofreBackend {
     public func dependencies(versionID: String, instanceID: String) async throws -> [ProjectDependency] { throw unavailable("project dependencies") }
     public func install(projectID: String, versionID: String, instanceID: String) -> AsyncThrowingStream<InstallProgress, Error> { unavailableStream("content installation") }
     public func importPack(_ url: URL, instanceID: String?) -> AsyncThrowingStream<InstallProgress, Error> { unavailableStream("pack import") }
-    public func testJIT() -> AsyncThrowingStream<JITStep, Error> { unavailableStream("JIT test") }
+    public func testJIT() -> AsyncThrowingStream<JITStep, Error> {
+        AsyncThrowingStream { continuation in
+            Task { let pid = Int32(getpid()); let service = CofreJIT(tunnel: { nil }, pairingURL: { self.pairingURL }); let result = await service.enable(pid: pid); NSLog("[Cofre] JIT status=%@", String(describing: result)); continuation.yield(JITStep(kind: .debugger, state: result.isEnabled ? .ready : .failed, detail: String(describing: result))); continuation.finish() }
+        }
+    }
     public func deviceInfo() async -> DeviceInfo? { nil }
     public func signingInfo() async -> SigningInfo? { nil }
     public func appInfo() -> AppInfo { AppInfo(version: Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "", airVersion:"Air", sourceURL: URL(string:"https://github.com/ignaciojb/cofre")!) }
@@ -101,6 +123,9 @@ public final class CofreBackendAdapter: NSObject, CofreBackend {
         d.set(setup.vpn.isReady, forKey: "cofre.setup.vpn")
         d.set(setup.jit.isReady, forKey: "cofre.setup.jit")
     }
+    private func getPref(_ key: String) -> Any? { UserDefaults.standard.object(forKey: key) }
+    private func setPref(_ key: String, _ value: Any) { UserDefaults.standard.set(value, forKey: key) }
+    private func parseEnv(_ value: String) -> [String: String] { Dictionary(uniqueKeysWithValues: value.split(separator: " ").compactMap { p in let a = p.split(separator: "=", maxSplits: 1); return a.count == 2 ? (String(a[0]), String(a[1])) : nil }) }
     private func unavailable(_ name: String) -> CofreBackendError { .unavailable(name) }
     private func unavailableStream<T>(_ name: String) -> AsyncThrowingStream<T, Error> { AsyncThrowingStream { continuation in continuation.finish(throwing: unavailable(name)) } }
     private func callback(_ body: (@escaping (NSArray) -> Void) -> Void) async throws -> NSArray { await withCheckedContinuation { c in body { c.resume(returning:$0) } } }
