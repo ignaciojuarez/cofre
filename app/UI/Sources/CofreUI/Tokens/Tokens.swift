@@ -124,6 +124,17 @@ enum PixelArtColors {
         "chest": ["B": 0xa8642f, "b": 0x6e3d17, "Y": 0xf0b84f, "k": 0x2b1608],
         "head": ["H": 0x3b2a1a, "S": 0xc99a74, "s": 0xb0805a, "E": 0xecedf3, "B": 0x4a5bd6, "M": 0x7a4a3a],
         "cross": ["R": 0xf07a68],
+        "dirt": ["D": 0x8a5a36, "d": 0x6a4326, "l": 0xa6764c],
+        "cobble": ["c": 0xb0b0b6, "C": 0x88888f, "k": 0x55555c],
+        "planks": ["P": 0xb88a50, "p": 0x8a6436, "k": 0x6e4c28, "h": 0xcfa266],
+        "sand": ["S": 0xe2d29a, "s": 0xcdb97e, "l": 0xf2e8bc],
+        "gravel": ["g": 0x8c8580, "G": 0x6e6762, "l": 0xaea8a3, "k": 0x4e4846],
+        "log": ["b": 0x5e4228, "P": 0xc09456, "r": 0x9a703e],
+        "bricks": ["R": 0xb0563c, "r": 0x8c402c, "m": 0xcdc2b6],
+        "fabric": ["o": 0x38342a, "h": 0xf0e8d0, "F": 0xdccfae, "f": 0xbfb08c, "s": 0x9c8f6c],
+        "quilt": ["P": 0x9b4dff, "M": 0xd63fe8, "B": 0x35a9ff, "b": 0x4d5cff, "V": 0x8a3dff],
+        "forge": ["N": 0x1f2d50, "W": 0xeef1f6, "w": 0xa9b3c4],
+        "neoforge": ["E": 0x6b3a22, "e": 0xa8603a, "O": 0xe86a2c, "o": 0xb84a1a, "W": 0xf6f0e6, "k": 0x2a1a14],
     ]
     /// Ore tints used by sample data and instance icons.
     static let oreTints: [String: UInt32] = [

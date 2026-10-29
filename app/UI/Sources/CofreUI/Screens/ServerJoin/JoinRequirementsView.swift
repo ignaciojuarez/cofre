@@ -20,7 +20,7 @@
                         ? "Java \(req.javaMajorVersion)"
                         : "Mod loader \(req.loaderVersion) · Java \(req.javaMajorVersion)"
                 ) {
-                    PixelIcon(.gear, size: 28)
+                    PixelIcon(req.loader.glyph, size: 28)
                 } trailing: {
                     Badge("Auto", tone: req.loader.tone)
                 }

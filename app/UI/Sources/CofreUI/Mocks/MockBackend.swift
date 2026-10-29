@@ -10,8 +10,9 @@
         public var accountList = [Account(id: "steve", name: "Steve_42", kind: "Microsoft", isActive: true)]
         /// Seconds between simulated launch/test steps. 0 makes streams finish immediately.
         public var stepDelay: Double
-        /// GAP-13. Only `.serverJoin` (GAP-14), so screenshots show what ships plus the Join server sheet. Tests turn flags on.
-        public var capabilities: BackendCapabilities = [.serverJoin]
+        /// GAP-13. `.serverJoin` (GAP-14) and `.instanceIcon`, so screenshots show what ships plus the Join server sheet.
+        /// Tests turn flags on.
+        public var capabilities: BackendCapabilities = [.serverJoin, .instanceIcon]
         /// GAP-14. Where the Join server sheet starts; `nil` reads the card (resolving, then first visit, or ready once installed).
         public var serverJoinScenario: MockServerJoin.Scenario?
         private var joinedServers: Set<String> = []
@@ -32,33 +33,28 @@
                 : SetupState(
                     devMode: .ready, trust: .ready, pairing: .unknown, vpn: .unknown, jit: .unknown, account: .unknown)
             let now = Date()
-            let tint = PixelArtColors.oreTints
+            // No icons: each gets `InstanceIcon.automatic` (its loader's, or a block for vanilla).
             instanceList = [
                 InstanceSummary(
                     id: "survival", name: "Survival+", loader: .fabric, gameVersion: "1.21.1", loaderVersion: "0.16.14",
                     modCount: 142,
                     sizeBytes: 4_402_000_000, lastPlayed: now.addingTimeInterval(-7200), updatesAvailable: 3,
-                    javaVersion: "21",
-                    icon: .init(glyph: .grass)),
+                    javaVersion: "21"),
                 InstanceSummary(
                     id: "create", name: "Create: Above & Beyond", loader: .forge, gameVersion: "1.20.1",
                     loaderVersion: "47.3.0", modCount: 189,
-                    sizeBytes: 6_228_000_000, lastPlayed: now.addingTimeInterval(-86400), javaVersion: "17",
-                    icon: .init(glyph: .ore, tintHex: tint["gold"])),
+                    sizeBytes: 6_228_000_000, lastPlayed: now.addingTimeInterval(-86400), javaVersion: "17"),
                 InstanceSummary(
                     id: "cobblemon", name: "Cobblemon", loader: .neoforge, gameVersion: "1.21.1",
                     loaderVersion: "21.1.77", modCount: 64,
-                    sizeBytes: 2_362_000_000, lastPlayed: now.addingTimeInterval(-3 * 86400), javaVersion: "21",
-                    icon: .init(glyph: .ore, tintHex: tint["redstone"])),
+                    sizeBytes: 2_362_000_000, lastPlayed: now.addingTimeInterval(-3 * 86400), javaVersion: "21"),
                 InstanceSummary(
                     id: "skyblock", name: "Skyblock", loader: .quilt, gameVersion: "1.20.4", loaderVersion: "0.26.4",
                     modCount: 23,
-                    sizeBytes: 966_000_000, lastPlayed: now.addingTimeInterval(-8 * 86400), javaVersion: "17",
-                    icon: .init(glyph: .ore, tintHex: tint["diamond"])),
+                    sizeBytes: 966_000_000, lastPlayed: now.addingTimeInterval(-8 * 86400), javaVersion: "17"),
                 InstanceSummary(
                     id: "vanilla", name: "Vanilla", loader: .vanilla, gameVersion: "26.3", sizeBytes: 644_000_000,
-                    javaVersion: "21",
-                    icon: .init(glyph: .stone)),
+                    javaVersion: "21"),
             ]
             mods = [
                 InstalledItem(id: "sodium", name: "Sodium", version: "0.6.13", enabled: true),
@@ -105,6 +101,11 @@
             return i
         }
         public func installLoader(instanceID: String, loader: Loader, version: String) async throws {}
+        public func setIcon(_ glyph: PixelGlyph?, instanceID: String) async throws {
+            guard let i = instanceList.firstIndex(where: { $0.id == instanceID }) else { return }
+            instanceList[i].icon =
+                glyph.map { .init(glyph: $0) } ?? .automatic(id: instanceID, loader: instanceList[i].loader)
+        }
         public func worlds(instanceID: String) async throws -> [WorldSummary] {
             if let list = worldList[instanceID] { return list }
             let now = Date()

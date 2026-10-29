@@ -203,7 +203,9 @@
                         switch tab {
                         case 1: InstalledRows(items: store.installed[.mods] ?? [])
                         case 2: WorldRows(worlds: store.worlds, playFirst: false)
-                        case 3: GameSettingsContent(instanceID: inst.id)
+                        case 3:
+                            if store.can(.instanceIcon), inst.icon.png == nil { InstanceIconGrid(inst: inst) }
+                            GameSettingsContent(instanceID: inst.id)
                         default: overview(inst)
                         }
                     }
@@ -280,7 +282,59 @@
 
     extension InstanceSummary {
         /// Same art on every launch (`hashValue` is seeded per process).
-        var stableSeed: UInt32 { id.unicodeScalars.reduce(UInt32(7)) { ($0 &* 31 &+ $1.value) } % 50 }
+        var stableSeed: UInt32 { InstanceIcon.stableHash(id) % 50 }
+    }
+
+    /// I02 Options: Auto (the loader's icon, or this instance's block for vanilla), then every block and loader icon.
+    /// Hidden when the pack has its own PNG, which always wins.
+    private struct InstanceIconGrid: View {
+        let inst: InstanceSummary
+        @Environment(CofreStore.self) private var store
+
+        var body: some View {
+            let auto = InstanceIcon.automatic(id: inst.id, loader: inst.loader)
+            ListSection("Icon") {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 52), spacing: 6)], spacing: 6) {
+                    cell(auto.glyph, title: "Auto", on: inst.icon == auto) { set(nil) }
+                    ForEach(InstanceIcon.choices, id: \.self) { g in
+                        cell(g, title: nil, on: inst.icon != auto && inst.icon.glyph == g) { set(g) }
+                    }
+                }
+            }
+        }
+
+        private func set(_ glyph: PixelGlyph?) { Task { await store.setIcon(glyph, for: inst.id) } }
+
+        private func cell(_ glyph: PixelGlyph, title: LocalizedStringKey?, on: Bool, action: @escaping () -> Void)
+            -> some View
+        {
+            Button(action: action) {
+                VStack(spacing: 2) {
+                    PixelIcon(glyph, size: title == nil ? 28 : 20)
+                    if let title { Text(title).cofreFont(.badge).foregroundStyle(Color.cofre.ink) }
+                }
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .block(on ? .raised : .panel, selected: on)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(RowButtonStyle())
+            .blockHover()
+            .accessibilityLabel(title.map { Text($0) } ?? Text(verbatim: glyph.iconName))
+            .accessibilityAddTraits(on ? .isSelected : [])
+        }
+    }
+
+    extension PixelGlyph {
+        /// VoiceOver name for the instance icon grid.
+        var iconName: String {
+            switch self {
+            case .cobble: String(localized: "Cobblestone")
+            case .planks: String(localized: "Oak planks")
+            case .log: String(localized: "Oak log")
+            case .neoforge: "NeoForge"
+            default: rawValue.capitalized
+            }
+        }
     }
 
     // MARK: P04 New instance
@@ -335,11 +389,11 @@
                         SectionLabel("Loader")
                         AdaptiveGrid(minItem: 96, maxColumns: 3) {
                             ForEach(Loader.allCases) { l in
-                                tile(l.displayName, glyph: l == .vanilla ? .stone : .ore, tint: l, on: loader == l) {
+                                tile(l.displayName, glyph: l.glyph, on: loader == l) {
                                     loader = l
                                 }
                             }
-                            tile("From pack", glyph: .chest, tint: nil, on: false) { nav.sheet = .importPack }
+                            tile("From pack", glyph: .chest, on: false) { nav.sheet = .importPack }
                         }
                         ListSection(spacing: 4) {
                             if loader != .vanilla {
@@ -388,12 +442,10 @@
             }
         }
 
-        private func tile(_ title: String, glyph: PixelGlyph, tint: Loader?, on: Bool, action: @escaping () -> Void)
-            -> some View
-        {
+        private func tile(_ title: String, glyph: PixelGlyph, on: Bool, action: @escaping () -> Void) -> some View {
             Button(action: action) {
                 VStack(spacing: 6) {
-                    PixelIcon(glyph, size: 24, tint: tint.map { Color.cofre.tone($0.tone) })
+                    PixelIcon(glyph, size: 28)
                     Text(verbatim: title).cofreFont(.buttonS).foregroundStyle(Color.cofre.ink)
                 }
                 .frame(maxWidth: .infinity, minHeight: 64)

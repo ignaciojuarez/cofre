@@ -49,9 +49,20 @@
             case .neoforge: .neoforge
             }
         }
+        /// Its icon: grass for vanilla, else the loader's mark.
+        public var glyph: PixelGlyph {
+            switch self {
+            case .vanilla: .grass
+            case .fabric: .fabric
+            case .quilt: .quilt
+            case .forge: .forge
+            case .neoforge: .neoforge
+            }
+        }
     }
 
-    /// Instance icon: a pixel glyph plus an optional ore tint (hex), or a PNG from the pack.
+    /// Instance icon: a pixel glyph plus an optional ore tint (hex), or a PNG from the pack. Instances without one get
+    /// `automatic`.
     public struct InstanceIcon: Hashable, Sendable {
         public var glyph: PixelGlyph
         public var tintHex: UInt32?
@@ -61,6 +72,26 @@
             self.tintHex = tintHex
             self.png = png
         }
+
+        /// Vanilla instances get one of these, picked from the ID so it never changes between launches.
+        public static let blocks: [PixelGlyph] = [.dirt, .cobble, .planks, .stone, .sand, .gravel, .log, .bricks]
+        /// The Options grid: grass, the blocks, then the loaders.
+        public static let choices: [PixelGlyph] = [.grass] + blocks + [.fabric, .quilt, .forge, .neoforge]
+
+        /// Without a pack PNG or a pick: the loader's icon, or a block for vanilla.
+        public static func automatic(id: String, loader: Loader) -> InstanceIcon {
+            .init(glyph: loader == .vanilla ? blocks[Int(stableHash(id) % UInt32(blocks.count))] : loader.glyph)
+        }
+
+        /// The pack's PNG wins, then the user's pick (a `PixelGlyph` raw value), then `automatic`.
+        public static func resolve(png: Data?, picked: String?, id: String, loader: Loader) -> InstanceIcon {
+            if let png { return .init(png: png) }
+            if let glyph = picked.flatMap(PixelGlyph.init(rawValue:)) { return .init(glyph: glyph) }
+            return automatic(id: id, loader: loader)
+        }
+
+        /// Same value on every launch (`hashValue` is seeded per process).
+        static func stableHash(_ s: String) -> UInt32 { s.unicodeScalars.reduce(UInt32(7)) { $0 &* 31 &+ $1.value } }
     }
 
     public struct InstanceSummary: Identifiable, Hashable, Sendable {
@@ -82,7 +113,7 @@
             id: String, name: String, loader: Loader, gameVersion: String, loaderVersion: String? = nil,
             modCount: Int? = nil,
             sizeBytes: Int64? = nil, lastPlayed: Date? = nil, updatesAvailable: Int = 0, javaVersion: String? = nil,
-            ownFolder: Bool = true, icon: InstanceIcon = .init()
+            ownFolder: Bool = true, icon: InstanceIcon? = nil
         ) {
             self.id = id
             self.name = name
@@ -95,7 +126,7 @@
             self.updatesAvailable = updatesAvailable
             self.javaVersion = javaVersion
             self.ownFolder = ownFolder
-            self.icon = icon
+            self.icon = icon ?? .automatic(id: id, loader: loader)
         }
 
         public var loaderLabel: String {

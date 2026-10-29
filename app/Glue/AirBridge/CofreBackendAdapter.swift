@@ -24,7 +24,7 @@
     @MainActor
     public final class CofreBackendAdapter: NSObject, CofreBackend {
         public var capabilities: BackendCapabilities {
-            [.deleteWorld, .addServer, .envVariables, .rendererTuning, .serverJoin]
+            [.deleteWorld, .addServer, .envVariables, .rendererTuning, .serverJoin, .instanceIcon]
         }
         let air: any CofreAirBridging
         let modCatalog = CofreModCatalog()
@@ -113,13 +113,28 @@
                     id: id, name: d["name"] as? String ?? id, loader: loader,
                     gameVersion: d["version"] as? String ?? "",
                     loaderVersion: (d["loaderVersion"] as? String).flatMap { $0.isEmpty ? nil : $0 },
-                    ownFolder: d["ownFolder"] as? Bool ?? true
+                    ownFolder: d["ownFolder"] as? Bool ?? true,
+                    icon: .resolve(
+                        png: packIcon(d["icon"] as? String), picked: d["cofreIcon"] as? String, id: id, loader: loader)
                 )
             }
             for i in list.indices where list[i].loader != .vanilla {
                 list[i].modCount = try? await installed(.mods, instanceID: list[i].id).count
             }
             return list
+        }
+        public func setIcon(_ glyph: PixelGlyph?, instanceID: String) async throws {
+            air.setCofreIcon(glyph?.rawValue, forProfile: instanceID)
+            NSLog("[Cofre] instance icon instance=%@ icon=%@", instanceID, glyph?.rawValue ?? "auto")
+        }
+        /// A pack's own icon: Air stores a data URL or a file URL in the profile. Web URLs fall back to our icons.
+        private func packIcon(_ s: String?) -> Data? {
+            guard let s, !s.isEmpty else { return nil }
+            if s.hasPrefix("data:"), let comma = s.firstIndex(of: ",") {
+                return Data(base64Encoded: String(s[s.index(after: comma)...]))
+            }
+            if let url = URL(string: s), url.isFileURL { return try? Data(contentsOf: url) }
+            return nil
         }
         public func worlds(instanceID: String) async throws -> [WorldSummary] {
             try await callback { done in self.air.worlds(forProfile: instanceID) { done($0 as? [Any] ?? []) } }.map { d in

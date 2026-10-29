@@ -347,6 +347,16 @@
             }
         }
 
+        /// I02 Options icon grid. `nil` goes back to the automatic icon.
+        public func setIcon(_ glyph: PixelGlyph?, for id: String) async {
+            await run {
+                try await self.backend.setIcon(glyph, instanceID: id)
+                guard let i = self.instances.firstIndex(where: { $0.id == id }) else { return }
+                self.instances[i].icon =
+                    glyph.map { InstanceIcon(glyph: $0) } ?? .automatic(id: id, loader: self.instances[i].loader)
+            }
+        }
+
         public func delete(_ id: String) async {
             await run {
                 try await self.backend.delete(instanceID: id)

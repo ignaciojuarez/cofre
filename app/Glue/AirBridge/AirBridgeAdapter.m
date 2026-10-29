@@ -190,6 +190,8 @@ static void CofreLoadVersionList(void (^done)(void)) {
            @"loader": profile[@"cofreRequestedLoader"] ?: parsed[@"loader"] ?: @"vanilla",
            @"loaderVersion": profile[@"loaderVersion"] ?: parsed[@"loaderVersion"] ?: @"",
            @"fabricAPI": profile[@"cofreInstallFabricAPI"] ?: @NO,
+           @"icon": profile[@"icon"] ?: @"",
+           @"cofreIcon": profile[@"cofreIcon"] ?: @"",
            @"ownFolder": @(![amePCLVersionGameDirSubpath(profile, nil) isEqualToString:@"."])};
 }
 
@@ -487,6 +489,14 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
       }
     });
   });
+}
+
+- (void)setCofreIcon:(NSString *)icon forProfile:(NSString *)profile {
+  NSMutableDictionary *candidate = [_profiles.profiles[profile] mutableCopy];
+  if (!candidate)
+    return;
+  candidate[@"cofreIcon"] = icon;
+  [_profiles saveProfile:candidate withName:profile];
 }
 
 - (BOOL)deleteProfile:(NSString *)name error:(NSError **)error {

@@ -11,3 +11,8 @@ Brand disclaimer: Cofre is an independent project and is not affiliated with App
 Source, pinned upstream revisions, patches, and build instructions are provided with each release.
 
 StikJIT integration: upstream/stikjit is included under MPL-2.0. Its source files remain under that license; CofreTXM.js is original Cofre code and does not copy StikDebug (AGPL-3.0) code.
+
+Loader and block icons: the Fabric, Quilt, Forge and NeoForge icons in app/UI (PixelGlyph) are Cofre's own 12×12
+pixel drawings that point to each project's mark. No logo file from FabricMC, QuiltMC, MinecraftForge or NeoForged is
+copied or shipped, and those names and marks belong to their projects. The block icons (dirt, cobblestone, planks and
+so on) are also our own drawings. No Minecraft or Mojang texture files are used.

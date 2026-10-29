@@ -123,6 +123,8 @@
         public static let lanRoom = BackendCapabilities(rawValue: 1 << 9)
         /// GAP-14 Join server sheet: "Modded" badges and Join buttons on server rows, and `cofre://join` links.
         public static let serverJoin = BackendCapabilities(rawValue: 1 << 10)
+        /// I02 Options icon grid → `setIcon(_:instanceID:)`.
+        public static let instanceIcon = BackendCapabilities(rawValue: 1 << 11)
     }
 
     public protocol OptionalActions: AnyObject {
@@ -133,6 +135,8 @@
         func addServer(instanceID: String, name: String, address: String) async throws -> ServerSummary
         func createInstance(name: String, version: String, loader: Loader, ownFolder: Bool, fabricAPI: Bool)
             async throws -> InstanceSummary
+        /// The user's icon pick; `nil` goes back to `InstanceIcon.automatic`.
+        func setIcon(_ glyph: PixelGlyph?, instanceID: String) async throws
     }
 
     public struct UnsupportedAction: LocalizedError {
@@ -155,6 +159,9 @@
             async throws -> InstanceSummary
         {
             throw UnsupportedAction(name: "Creating instances")
+        }
+        public func setIcon(_ glyph: PixelGlyph?, instanceID: String) async throws {
+            throw UnsupportedAction(name: "Instance icons")
         }
     }
 

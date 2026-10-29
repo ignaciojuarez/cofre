@@ -40,6 +40,9 @@ NS_ASSUME_NONNULL_BEGIN
               completion:(void (^)(NSDictionary *_Nullable,
                                    NSError *_Nullable))completion;
 - (BOOL)deleteProfile:(NSString *)profile error:(NSError **)error;
+/// Saves the user's icon pick (a CofreUI glyph name) as the profile's
+/// cofreIcon; nil removes it.
+- (void)setCofreIcon:(nullable NSString *)icon forProfile:(NSString *)profile;
 - (void)exportProfile:(NSString *)profile
                format:(NSString *)format
            completion:

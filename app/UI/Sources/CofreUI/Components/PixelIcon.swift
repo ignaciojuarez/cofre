@@ -1,9 +1,15 @@
 import SwiftUI
 
-// §2 #16 PixelIcon: 8×8-grid glyphs drawn in code (same art as the mockups). Decorative unless it's the only content.
+// §2 #16 PixelIcon: 8×8-grid glyphs drawn in code (same art as the mockups; loaders are 12×12). Decorative unless it's
+// the only content.
 
 public enum PixelGlyph: String, CaseIterable, Sendable {
     case grass, stone, ore, book, gear, play, bolt, cmd, key, shield, check, paper, chest, head, cross
+    // Blocks for vanilla instance icons. Our own art, not Mojang's textures.
+    case dirt, cobble, planks, sand, gravel, log, bricks
+    // Loaders: our own pixel redraws of each project's mark (Fabric's cloth roll, Quilt's patches, Forge's anvil,
+    // NeoForge's fox), 12×12 so they read at 16 pt.
+    case fabric, quilt, forge, neoforge
 
     /// Row strings, one char per pixel, "." is transparent. "@" is the tint, "&" the tint shaded to 62%, "c" the foreground.
     var rows: [String] {
@@ -23,6 +29,73 @@ public enum PixelGlyph: String, CaseIterable, Sendable {
         case .chest: ["bbbbbbbb", "bBBBBBBb", "bBBBBBBb", "bbbYYbbb", "kkkYYkkk", "bBBBBBBb", "bBBBBBBb", "bbbbbbbb"]
         case .head: ["HHHHHHHH", "HHHHHHHH", "HSSSSSSH", "SEBSSBES", "SSSssSSS", "SSsMMsSS", "SSSSSSSS", "SSSSSSSS"]
         case .cross: ["R.....R", ".R...R.", "..R.R..", "...R...", "..R.R..", ".R...R.", "R.....R"]
+        case .dirt: ["DdDDlDDd", "DDDdDDDD", "lDDDDdDD", "DDdDDDDl", "DDDDlDdD", "dDlDDDDD", "DDDDdDDl", "DlDDDDdD"]
+        case .cobble: ["CcCkCCck", "CCkkcCCk", "kkCCkkkk", "cCCCCkcC", "CCCckkCC", "kkkkCCck", "CckCCCCk", "CCkkCckk"]
+        case .planks: ["PPPPPPkP", "PhPPPPkP", "PPPPPPkp", "pppppppp", "PPkPPPPP", "PPkPPhPP", "PPkPPPPP", "pppppppp"]
+        case .sand: ["SSsSSSlS", "SlSSSsSS", "SSSSlSSs", "sSSSSSSS", "SSlSSsSl", "SSSSSSSS", "SsSSlSSS", "SSSsSSsS"]
+        case .gravel: ["gGgkglGg", "lgGgGgkg", "GkglgGgl", "gGgGkgGg", "kglgGlgG", "gGgkgGkg", "lgGglgGl", "gkGgGkgg"]
+        case .log: ["bbbbbbbb", "bPPPPPPb", "bPrrrrPb", "bPrPPrPb", "bPrPPrPb", "bPrrrrPb", "bPPPPPPb", "bbbbbbbb"]
+        case .bricks: ["RRRmRRRm", "rrrmrrrm", "mmmmmmmm", "RmRRRmRR", "rmrrrmrr", "mmmmmmmm", "RRRmRRRm", "rrrmrrrm"]
+        case .fabric:
+            [
+                "......oo....",
+                ".....ohhoo..",
+                "....ohFFhso.",
+                "...ohFFFFsso",
+                "..ohFFFFFfso",
+                ".ohFFFFFffo.",
+                "ohFFFFFffo..",
+                "oFFFFFffo...",
+                "oFFFFffo....",
+                "oFFfffo.....",
+                ".offfo......",
+                "..ooo.......",
+            ]
+        case .quilt:
+            [
+                "PPP.MMM.BBB.",
+                "PPP.MMM.BBB.",
+                "PPP.MMM.BBB.",
+                "............",
+                "MMM.BBB.bbb.",
+                "MMM.BBB.bbb.",
+                "MMM.BBB.bbb.",
+                "............",
+                "VVV.bbb..VV.",
+                "VVV.bbb.VVVV",
+                "VVV.bbb.VVVV",
+                ".........VV.",
+            ]
+        case .forge:
+            [
+                "NNNNNNNNNNNN",
+                "NNNNNNNNNNNN",
+                "NNNWWWWWWWWN",
+                "NWWWWWWWWWWN",
+                "NNWWWWWWWWwN",
+                "NNNNNWWWwNNN",
+                "NNNNNWWWwNNN",
+                "NNNNWWWWWwNN",
+                "NNNWWWWWWWwN",
+                "NNNWWNNNWWwN",
+                "NNNNNNNNNNNN",
+                "NNNNNNNNNNNN",
+            ]
+        case .neoforge:
+            [
+                ".EE......EE.",
+                ".EeE....EeE.",
+                ".EeOOOOOOeE.",
+                ".OOOOOOOOOO.",
+                "OOOOOOOOOOOO",
+                "OOkWOOOOWkOO",
+                "OOkkOOOOkkOO",
+                "oOOOOWWOOOOo",
+                ".oOWWWWWWOo.",
+                "..oWWkkWWo..",
+                "...WWWWWW...",
+                "....WkkW....",
+            ]
         }
     }
 }
@@ -57,6 +130,26 @@ public struct PixelIcon: View {
         .accessibilityHidden(true)
     }
 }
+
+#if canImport(UIKit)
+    @MainActor private var menuImages: [PixelGlyph: UIImage] = [:]
+
+    extension PixelGlyph {
+        /// For native menus, which draw only images. Rendered once, kept in its own colors.
+        @MainActor public var menuImage: Image {
+            let img =
+                menuImages[self]
+                ?? {
+                    let r = ImageRenderer(content: PixelIcon(self, size: 20))
+                    r.scale = 3
+                    let made = (r.uiImage ?? UIImage()).withRenderingMode(.alwaysOriginal)
+                    menuImages[self] = made
+                    return made
+                }()
+            return Image(uiImage: img).renderingMode(.original)
+        }
+    }
+#endif
 
 /// Larger art in the PixelIcon recipe: one char per pixel, "." transparent, colors from tokens.
 /// Each art pixel is `pixel` pt, so art lines up with a PixelScene drawn at the same scale.

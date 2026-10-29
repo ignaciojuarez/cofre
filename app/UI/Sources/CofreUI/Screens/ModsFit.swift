@@ -13,18 +13,23 @@
 
         var body: some View {
             Menu {
-                ForEach(store.moddedInstances) { i in
-                    Button {
-                        Task { await store.selectInstance(i.id) }
-                    } label: {
-                        if i.id == current.id {
-                            Label { Text(verbatim: i.name) } icon: { Image(systemName: "checkmark") }
-                        } else {
+                // An inline picker checks the current one and keeps each row's loader icon.
+                Picker(
+                    "Mods for",
+                    selection: Binding(
+                        get: { current.id }, set: { id in Task { await store.selectInstance(id) } })
+                ) {
+                    ForEach(store.moddedInstances) { i in
+                        Label {
                             Text(verbatim: i.name)
+                            Text(verbatim: i.loaderLabel)
+                        } icon: {
+                            i.loader.glyph.menuImage
                         }
-                        Text(verbatim: i.loaderLabel)
+                        .tag(i.id)
                     }
                 }
+                .pickerStyle(.inline)
                 Divider()
                 Button("New mods instance", systemImage: "plus") { nav.newModsInstance(store) }
             } label: {
@@ -32,6 +37,7 @@
                     Text("For").cofreFont(.label).foregroundStyle(Color.cofre.muted)
                     Text(verbatim: current.name).cofreFont(.rowTitle).foregroundStyle(Color.cofre.ink).lineLimit(1)
                     Spacer(minLength: 4)
+                    PixelIcon(current.loader.glyph, size: 16)
                     Text(verbatim: "\(current.loaderLabel) ▾").cofreFont(.label).foregroundStyle(Color.cofre.muted)
                         .lineLimit(1).layoutPriority(1)
                 }
