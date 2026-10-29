@@ -496,9 +496,6 @@
         @MainActor public func controlsEditor() -> UIViewController {
             Self.placeholder("Controls editor", detail: "Air · CustomControlsViewController")
         }
-        @MainActor public func forgeInstaller(instanceID: String) -> UIViewController {
-            Self.placeholder("Forge installer", detail: "Air · ForgeInstallSchemeViewController")
-        }
 
         @MainActor static func placeholder(_ title: String, detail: String) -> UIViewController {
             let vc = UITableViewController(style: .insetGrouped)

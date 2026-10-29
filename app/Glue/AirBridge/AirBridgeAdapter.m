@@ -15,7 +15,6 @@
 #import "authenticator/BaseAuthenticator.h"
 #import "installer/FabricUtils.h"
 #import "installer/ForgeDirectInstaller.h"
-#import "installer/ForgeInstallViewController.h"
 #import "installer/NeoForgeDirectInstaller.h"
 #import "installer/NeoForgeVersionFetcher.h"
 #import "installer/modpack/CurseForgeAPI.h"
@@ -58,9 +57,64 @@ static NSError *CofreAirError(NSString *message) {
   return @{@"id": name, @"name": profile[@"name"] ?: name,
            @"version": profile[@"cofreGameVersion"] ?: parsed[@"minecraft"] ?: profile[@"lastVersionId"] ?: @"",
            @"loader": profile[@"cofreRequestedLoader"] ?: parsed[@"loader"] ?: @"vanilla",
-           @"loaderVersion": parsed[@"loaderVersion"] ?: @"",
+           @"loaderVersion": profile[@"loaderVersion"] ?: parsed[@"loaderVersion"] ?: @"",
            @"fabricAPI": profile[@"cofreInstallFabricAPI"] ?: @NO,
            @"ownFolder": @(![amePCLVersionGameDirSubpath(profile, nil) isEqualToString:@"."])};
+}
+
+static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
+  NSURL *url = [NSURL URLWithString:urlString];
+  if (!url) {
+    if (error)
+      *error = CofreAirError(@"The loader installer URL is invalid.");
+    return nil;
+  }
+  NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
+  request.timeoutInterval = 60.0;
+  request.cachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
+  [request setValue:@"Cofre/1.0" forHTTPHeaderField:@"User-Agent"];
+  [request setValue:@"application/java-archive,*/*;q=0.9"
+      forHTTPHeaderField:@"Accept"];
+  __block NSData *data = nil;
+  __block NSError *requestError = nil;
+  dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+  NSURLSessionDataTask *task = [[NSURLSession sharedSession]
+      dataTaskWithRequest:request
+        completionHandler:^(NSData *responseData, NSURLResponse *response,
+                            NSError *error) {
+          if (error) {
+            requestError = error;
+          } else if (![response isKindOfClass:NSHTTPURLResponse.class] ||
+                     [(NSHTTPURLResponse *)response statusCode] < 200 ||
+                     [(NSHTTPURLResponse *)response statusCode] >= 300) {
+            NSInteger status = [response isKindOfClass:NSHTTPURLResponse.class]
+                                   ? [(NSHTTPURLResponse *)response statusCode]
+                                   : 0;
+            requestError = CofreAirError(
+                [NSString stringWithFormat:
+                              @"Loader installer download failed (HTTP %ld).",
+                              (long)status]);
+          } else {
+            data = responseData;
+          }
+          dispatch_semaphore_signal(semaphore);
+        }];
+  [task resume];
+  if (dispatch_semaphore_wait(
+          semaphore, dispatch_time(DISPATCH_TIME_NOW, 70 * NSEC_PER_SEC))) {
+    [task cancel];
+    if (error)
+      *error = CofreAirError(@"The loader installer download timed out.");
+    return nil;
+  }
+  if (!data.length) {
+    if (error)
+      *error =
+          requestError
+              ?: CofreAirError(@"The loader installer download was empty.");
+    return nil;
+  }
+  return data;
 }
 
 - (NSArray<NSDictionary *> *)instances {
@@ -355,93 +409,124 @@ static NSError *CofreAirError(NSString *message) {
   });
 }
 
-// The Air screen downloads an installer; its caller must run the direct
-// installer.
-- (UIViewController *)instanceForgeInstaller:(NSString *)name {
-  ForgeInstallViewController *vc = [ForgeInstallViewController new];
-  NSDictionary *profile = _profiles.profiles[name];
-  vc.gameVersion = profile[@"cofreGameVersion"] ?: profile[@"lastVersionId"];
-  vc.isNeoForge =
-      [profile[@"cofreRequestedLoader"] isEqualToString:@"neoforge"];
-  vc.selectedScheme = 1;
-  __weak ForgeInstallViewController *weakVC = vc;
-  vc.completionHandler = ^(BOOL success, NSString *versionID, id result) {
-    ForgeInstallViewController *screen = weakVC;
-    if (!screen)
-      return;
-    if (!success)
-      return; // Air displays download failures and handles cancellation.
-    NSDictionary *details =
-        [result isKindOfClass:NSDictionary.class] ? result : @{};
-    NSString *path = details[@"filePath"];
-    void (^finish)(NSError *) = ^(NSError *error) {
-      dispatch_async(dispatch_get_main_queue(), ^{
-        screen.view.userInteractionEnabled = YES;
-        if (error) {
-          UIAlertController *alert = [UIAlertController
-              alertControllerWithTitle:@"Loader installation failed"
-                               message:error.localizedDescription
-                        preferredStyle:UIAlertControllerStyleAlert];
-          [alert
-              addAction:[UIAlertAction actionWithTitle:@"OK"
-                                                 style:UIAlertActionStyleDefault
-                                               handler:nil]];
-          [screen presentViewController:alert animated:YES completion:nil];
-        } else {
-          [screen dismissViewControllerAnimated:YES completion:nil];
-        }
-      });
-    };
-    if ([details[@"selectedScheme"] integerValue] != 1 || !path.length ||
-        !versionID.length) {
-      finish(CofreAirError(@"Choose Air's direct installation method. Java "
-                           @"installer execution is not available here."));
-      return;
-    }
-    screen.view.userInteractionEnabled = NO;
-    BOOL neo = screen.isNeoForge;
-    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-      NSError *error = nil;
-      NSDictionary *instanceProfile = self.profiles.profiles[name];
-      NSString *instanceDir =
-          amePCLVersionGameDirAbsolute(instanceProfile, nil);
-      BOOL ok =
-          neo ? [NeoForgeDirectInstaller
-                    installNeoForgeFromInstaller:path
-                                       versionId:versionID
-                                   customGameDir:instanceDir
-                             skipRegisterVersion:YES
-                                        progress:nil
-                                           error:&error]
-              : [ForgeDirectInstaller installForgeFromInstaller:path
-                                                      versionId:versionID
-                                                  customGameDir:instanceDir
-                                            skipRegisterVersion:YES
-                                                       progress:nil
-                                                          error:&error];
-      dispatch_async(dispatch_get_main_queue(), ^{
-        if (ok) {
-          NSMutableDictionary *updated =
-              [self.profiles.profiles[name] mutableCopy];
-          if (!updated) {
-            finish(CofreAirError(
-                @"The instance was deleted during installation."));
-            return;
-          }
-          updated[@"lastVersionId"] = versionID;
-          NSMutableDictionary *profiles = [self.profiles.profiles mutableCopy];
-          profiles[name] = updated;
-          NSError *saveError = nil;
-          [self persistInstanceProfiles:profiles
-                               selected:name
-                                  error:&saveError];
-          finish(saveError);
-        } else
-          finish(error ?: CofreAirError(@"Air could not install this loader."));
-      });
+// Installs the Forge/NeoForge version picked in Cofre: downloads its official
+// installer and runs Air's direct installer (no Java, no second screen).
+- (void)installForgeLoader:(NSString *)loader
+                forProfile:(NSString *)name
+                   version:(NSString *)version
+                  progress:(void (^)(double, NSString *))progress
+                completion:(void (^)(NSError *_Nullable))completion {
+  void (^done)(NSError *) = ^(NSError *error) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+      completion(error);
     });
   };
-  return vc;
+  NSDictionary *profile = _profiles.profiles[name];
+  NSString *game = profile[@"cofreGameVersion"] ?: profile[@"lastVersionId"];
+  BOOL neo = [loader isEqualToString:@"neoforge"];
+  if (!profile || !game.length || !version.length) {
+    done(CofreAirError(@"The instance or loader version is invalid."));
+    return;
+  }
+  // Same Maven paths as Air's ForgeInstallViewController: Forge uses
+  // "<mc>-<forge>", NeoForge the bare version (1.20.1 builds under forge/).
+  NSString *full =
+      !neo && ![version hasPrefix:[game stringByAppendingString:@"-"]]
+          ? [NSString stringWithFormat:@"%@-%@", game, version]
+          : version;
+  NSString *vendor = neo ? @"NeoForge" : @"Forge";
+  NSString *versionID = [NSString stringWithFormat:@"%@-%@", vendor, full];
+  BOOL mirror = [getPrefObject(@"general.download_source") isEqual:@"bmclapi"];
+  NSString *host = mirror ? @"https://bmclapi2.bangbang93.com/maven"
+                   : neo  ? @"https://maven.neoforged.net/releases"
+                          : @"https://maven.minecraftforge.net";
+  NSString *artifact =
+      !neo ? @"net/minecraftforge/forge/%1$@/forge-%1$@-installer.jar"
+      : ([full hasPrefix:@"47."] || [full containsString:@"1.20.1"])
+          ? @"net/neoforged/forge/%1$@/forge-%1$@-installer.jar"
+          : @"net/neoforged/neoforge/%1$@/neoforge-%1$@-installer.jar";
+  NSURL *url = [NSURL
+      URLWithString:[NSString
+                        stringWithFormat:@"%@/%@", host,
+                                         [NSString
+                                             stringWithFormat:artifact, full]]];
+  NSString *jar = [NSTemporaryDirectory()
+      stringByAppendingPathComponent:
+          [NSString stringWithFormat:@"%@-installer-%@.jar", vendor,
+                                     NSUUID.UUID.UUIDString]];
+  if (progress)
+    progress(
+        0, [NSString stringWithFormat:@"Downloading the %@ installer", vendor]);
+  NSLog(@"[Cofre] loader download %@", url.absoluteString);
+  [[NSURLSession.sharedSession
+      downloadTaskWithURL:url
+        completionHandler:^(NSURL *location, NSURLResponse *response,
+                            NSError *error) {
+          NSInteger status = [(NSHTTPURLResponse *)response statusCode];
+          if (error || status != 200 ||
+              ![NSFileManager.defaultManager moveItemAtPath:location.path
+                                                     toPath:jar
+                                                      error:&error]) {
+            done(error && status == 200
+                     ? error
+                     : CofreAirError([NSString
+                           stringWithFormat:@"Couldn't download the %@ %@ "
+                                            @"installer (HTTP %ld).",
+                                            vendor, version, (long)status]));
+            return;
+          }
+          NSString *instanceDir = amePCLVersionGameDirAbsolute(profile, nil);
+          void (^step)(double, NSString *) = ^(double p, NSString *message) {
+            if (progress)
+              dispatch_async(dispatch_get_main_queue(), ^{
+                progress(p, message ?: @"");
+              });
+          };
+          NSError *installError = nil;
+          BOOL ok = neo ? [NeoForgeDirectInstaller
+                              installNeoForgeFromInstaller:jar
+                                                 versionId:versionID
+                                             customGameDir:instanceDir
+                                       skipRegisterVersion:YES
+                                                  progress:step
+                                                     error:&installError]
+                        : [ForgeDirectInstaller
+                              installForgeFromInstaller:jar
+                                              versionId:versionID
+                                          customGameDir:instanceDir
+                                    skipRegisterVersion:YES
+                                               progress:step
+                                                  error:&installError];
+          [NSFileManager.defaultManager removeItemAtPath:jar error:nil];
+          dispatch_async(dispatch_get_main_queue(), ^{
+            if (!ok) {
+              completion(
+                  installError
+                      ?: CofreAirError(@"Air could not install this loader."));
+              return;
+            }
+            NSMutableDictionary *updated =
+                [self.profiles.profiles[name] mutableCopy];
+            if (!updated) {
+              completion(CofreAirError(
+                  @"The instance was deleted during installation."));
+              return;
+            }
+            updated[@"lastVersionId"] = versionID;
+            updated[@"loader"] = loader;
+            updated[@"loaderVersion"] = version;
+            NSMutableDictionary *profiles =
+                [self.profiles.profiles mutableCopy];
+            profiles[name] = updated;
+            NSError *saveError = nil;
+            [self persistInstanceProfiles:profiles
+                                 selected:name
+                                    error:&saveError];
+            NSLog(@"[Cofre] loader installed %@ ok=%d", versionID,
+                  saveError == nil);
+            completion(saveError);
+          });
+        }] resume];
 }
 
 #pragma mark - End instances
@@ -837,15 +922,8 @@ static NSError *CofreAirError(NSString *message) {
   };
   return vc;
 }
-- (UIViewController *)forgeInstaller:(NSString *)instanceID {
-  return [self instanceForgeInstaller:instanceID];
-}
 @end
 
 UIViewController *CofreMakeControlsEditor(void) {
   return [[CofreAirBridgeAdapter new] controlsEditor];
-}
-UIViewController *CofreMakeForgeInstaller(const char *instanceID) {
-  return [[CofreAirBridgeAdapter new]
-      forgeInstaller:[NSString stringWithUTF8String:instanceID ?: ""]];
 }

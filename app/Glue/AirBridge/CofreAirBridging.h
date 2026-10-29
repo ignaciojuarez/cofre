@@ -24,6 +24,11 @@ NS_ASSUME_NONNULL_BEGIN
                    loader:(NSString *)loader
                   version:(NSString *)version
                     error:(NSError **)error;
+- (void)installForgeLoader:(NSString *)loader
+                forProfile:(NSString *)name
+                   version:(NSString *)version
+                  progress:(void (^)(double, NSString *))progress
+                completion:(void (^)(NSError *_Nullable))completion;
 - (void)installInstanceMod:(NSDictionary *)file
                 forProfile:(NSString *)profile
                 completion:(void (^)(NSError *_Nullable))completion;
@@ -80,6 +85,5 @@ NS_ASSUME_NONNULL_BEGIN
           progress:(void (^)(double, NSString *))progress
         completion:(void (^)(NSError *_Nullable))completion;
 - (UIViewController *)controlsEditor;
-- (UIViewController *)forgeInstaller:(NSString *)instanceID;
 @end
 NS_ASSUME_NONNULL_END

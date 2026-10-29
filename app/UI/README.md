@@ -57,7 +57,7 @@ public final class CofreRootViewController: UIViewController {
 
 - Link the `CofreUI` product from this local package (`app/UI`) into Air's app target. SwiftPM embeds `CofreUI_CofreUI.bundle` (fonts, icon).
 - Fonts register at runtime with `CTFontManagerRegisterFontsForURL(.process)`; Air's Info.plist is untouched.
-- `CofreUI.bootstrap()` (called by `makeRootViewController`) applies `CofreUIKitTheme` once. Present every Air view controller inside `CofreAirHostController` so the scoped UIAppearance applies (CofreUI already does this for `AirScreens`).
+- `CofreUI.bootstrap()` (called by `makeRootViewController`) applies `CofreUIKitTheme` once. Present every Air view controller inside `CofreAirHostController` so the scoped UIAppearance applies (the controls editor is the exception: it only works presented directly).
 - State restoration: save `nav.userActivity()` in `stateRestorationActivity`, restore with `nav.restore(from:)` and pass the `NavModel` to `makeRootViewController(services:nav:)`.
 
 ## What the adapter implements

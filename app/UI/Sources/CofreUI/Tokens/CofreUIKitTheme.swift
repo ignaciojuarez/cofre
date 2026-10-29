@@ -80,18 +80,4 @@
             window?.tintColor = .cofre.accent
         }
     }
-
-    /// Hosts an Air view controller inside `CofreAirHostController` from SwiftUI.
-    struct AirScreenHost: UIViewControllerRepresentable {
-        let make: () -> UIViewController
-        let onClose: () -> Void
-
-        func makeUIViewController(context: Context) -> CofreAirHostController {
-            let root = make()
-            root.navigationItem.leftBarButtonItem = UIBarButtonItem(
-                systemItem: .close, primaryAction: UIAction { _ in onClose() })
-            return CofreAirHostController(rootViewController: root)
-        }
-        func updateUIViewController(_ vc: CofreAirHostController, context: Context) {}
-    }
 #endif

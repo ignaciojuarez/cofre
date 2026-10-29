@@ -49,8 +49,6 @@
             case .neoforge: .neoforge
             }
         }
-        /// Forge and NeoForge install through Air's UIKit installer (`AirScreens.forgeInstaller`).
-        public var usesAirInstaller: Bool { self == .forge || self == .neoforge }
     }
 
     /// Instance icon: a pixel glyph plus an optional ore tint (hex), or a PNG from the pack.

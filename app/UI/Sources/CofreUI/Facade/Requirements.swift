@@ -82,12 +82,12 @@
         func setCurseForgeKey(_ key: String?) throws
     }
 
-    // MARK: GAP-10 · Air screens (X03, P04 Forge/NeoForge)
-    /// Goes in Glue (not CofreBackendAdapter) so CofreBackendAdapter stays UI-agnostic. CofreUI presents the returned
-    /// controllers inside `CofreAirHostController`, where `CofreUIKitTheme` applies.
+    // MARK: GAP-10 · Air screens (X03)
+    /// Goes in Glue (not CofreBackendAdapter) so CofreBackendAdapter stays UI-agnostic. CofreUI presents the controls
+    /// editor directly, as Air does: inside a navigation controller its exit menu acts on the wrong controller.
+    /// Forge and NeoForge install without a screen (`installLoader`).
     public protocol AirScreens: AnyObject {
         @MainActor func controlsEditor() -> UIViewController
-        @MainActor func forgeInstaller(instanceID: String) -> UIViewController
     }
 
     // MARK: GAP-11 · Air appearance (all Air VCs)

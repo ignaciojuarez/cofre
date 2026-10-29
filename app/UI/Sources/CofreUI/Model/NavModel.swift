@@ -135,11 +135,9 @@
 
     public enum AirScreenRoute: Identifiable, Hashable, Sendable {
         case controlsEditor
-        case forgeInstaller(String)
         public var id: String {
             switch self {
             case .controlsEditor: "controls"
-            case .forgeInstaller(let i): "forge-\(i)"
             }
         }
     }

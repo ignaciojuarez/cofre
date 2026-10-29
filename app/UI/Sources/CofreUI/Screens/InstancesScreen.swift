@@ -346,8 +346,8 @@
                             }
                             Row("Java", trailing: { Meta("Auto") })
                         }
-                        if loader.usesAirInstaller {
-                            Banner("\(loader.displayName) installs in the next step.", icon: .book, tone: .accent)
+                        if creating, loader != .vanilla, !loaderVersion.isEmpty {
+                            Row("Installing \(loader.displayName) \(loaderVersion)…", leading: { Spinner() })
                         }
                         BlockButton("Create", role: .primary, isLoading: creating) { create() }
                             .disabled(name.isEmpty || version.isEmpty)
@@ -401,9 +401,6 @@
                     dismiss()
                     nav.instance = made.id
                     nav.section = .instances
-                    if loader.usesAirInstaller, store.services.airScreens != nil {
-                        nav.showingAirScreen = .forgeInstaller(made.id)
-                    }
                 }
             }
         }

@@ -138,6 +138,17 @@
         }
 
         public func installLoader(instanceID: String, loader: Loader, version: String) async throws {
+            if loader == .forge || loader == .neoforge {
+                try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in
+                    air.installForgeLoader(
+                        loader.rawValue, forProfile: instanceID, version: version,
+                        progress: { p, message in NSLog("[Cofre] loader %.0f%% %@", p * 100, message) }
+                    ) { error in
+                        if let error { c.resume(throwing: error) } else { c.resume() }
+                    }
+                }
+                return
+            }
             guard loader == .fabric || loader == .quilt else {
                 throw CofreBackendError.unavailable("loader installation")
             }

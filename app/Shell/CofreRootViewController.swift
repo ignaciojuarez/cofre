@@ -21,5 +21,4 @@ public final class CofreRootViewController: UIViewController {
     let bridge: any CofreAirBridging
     init(bridge: any CofreAirBridging) { self.bridge = bridge }
     func controlsEditor() -> UIViewController { bridge.controlsEditor() }
-    func forgeInstaller(instanceID: String) -> UIViewController { bridge.forgeInstaller(instanceID) }
 }

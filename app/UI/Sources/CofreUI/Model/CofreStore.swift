@@ -323,7 +323,7 @@
                     ? try await self.backend.createInstance(
                         name: name, version: version, loader: loader, ownFolder: ownFolder, fabricAPI: fabricAPI)
                     : try await self.backend.createInstance(name: name, version: version, loader: loader)
-                if let v = loaderVersion, loader != .vanilla, !loader.usesAirInstaller {
+                if let v = loaderVersion, loader != .vanilla {
                     try await self.backend.installLoader(instanceID: i.id, loader: loader, version: v)
                 }
                 self.instances.append(i)
