@@ -11,8 +11,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     override func stopTunnel(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) { completionHandler() }
     override func handleAppMessage(_ messageData: Data, completionHandler: ((Data?) -> Void)? = nil) {
         let started = mach_task_basic_info_data_t(); var info = started; var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info_data_t>.stride / MemoryLayout<natural_t>.stride)
-        let peak = withUnsafeMutablePointer(to: &info) { $0.withMemoryRebound(to: task_info_t.self, capacity: 1) { task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &count) == KERN_SUCCESS ? Double(info.resident_size_max) / 1048576 : 0 }
-        }
+        let ok = withUnsafeMutablePointer(to: &info) { ptr in ptr.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &count) == KERN_SUCCESS } }
+        let peak = ok ? Double(info.resident_size_max) / 1048576 : 0
         guard let object = try? JSONSerialization.jsonObject(with: messageData) as? [String: Any], object["cmd"] as? String == "enableJIT", let pid = object["pid"] as? Int, pid > 0, let encoded = object["pairing"] as? String, let pairing = Data(base64Encoded: encoded), pairing.count < 262144 else { completionHandler?(Data("{\"state\":\"failed\",\"reason\":\"invalid message\"}".utf8)); return }
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("cofre-pairing-\(UUID().uuidString).plist")
         do { try pairing.write(to: url, options: .completeFileProtection); pairingURL = url } catch { completionHandler?(Data("{\"state\":\"failed\",\"reason\":\"pairing write failed\"}".utf8)); return }
