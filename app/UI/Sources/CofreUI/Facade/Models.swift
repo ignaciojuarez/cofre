@@ -182,7 +182,7 @@
     public struct GamePreferences: Equatable, Sendable {
         /// `autoRAM` is on by default: Cofre (the backend) picks a safe amount. `ramMB` applies only when it's off.
         public var ramMB = 4096, autoRAM = true, deviceRAMMB = 8192
-        public var renderer = "auto", resolution = 1.0, fsr = true, fsrMode = FSRMode.ultra
+        public var renderer = "auto", resolution = 1.0, fsr = true, fsrMode = FSRMode.ultra, graphicsApi = "auto"
         public var java = "auto", jvmArgs = ""
         public var fpsOverlay = true, vsync = false, fpsCap = 60, muteWithSwitch = true, microphone = false
         public var gyroAim = true, virtualMouse = false, hotbarSwipe = true, touchControllerMod = true,

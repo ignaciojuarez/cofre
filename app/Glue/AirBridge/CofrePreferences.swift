@@ -74,6 +74,7 @@ public struct CofrePreferenceStore {
         let fsr = integer(.fsrMode, instanceID, default: 0)
         p.fsrMode = [.off, .ultra, .quality, .performance][safe: fsr] ?? .off
         p.fsr = p.fsrMode != .off
+        p.graphicsApi = string(.graphicsAPI, instanceID, default: p.graphicsApi)
         p.java = string(.java, instanceID, default: p.java)
         p.jvmArgs = string(.javaArgs, instanceID, default: p.jvmArgs)
         p.fpsOverlay = bool(.fpsOverlay, instanceID, default: p.fpsOverlay)
@@ -106,6 +107,7 @@ public struct CofrePreferenceStore {
         put(.renderer, p.renderer, instanceID)
         put(.resolution, p.resolution * 100, instanceID)
         put(.fsrMode, ["off": 0, "ultra": 1, "quality": 2, "performance": 3][p.fsrMode.rawValue] ?? 0, instanceID)
+        put(.graphicsAPI, p.graphicsApi == "auto" ? "" : p.graphicsApi, instanceID)
         put(.java, p.java, instanceID)
         put(.javaArgs, p.jvmArgs, instanceID)
         put(.fpsOverlay, p.fpsOverlay, instanceID)

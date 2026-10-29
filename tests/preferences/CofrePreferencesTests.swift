@@ -25,12 +25,14 @@ final class CofrePreferencesTests: XCTestCase {
         let store = MemoryStore()
         var preferences = GamePreferences()
         preferences.renderer = "libmetallum.dylib"
+        preferences.graphicsApi = "vulkan"
         preferences.resolution = 0.75
         preferences.computeShaders = true
         preferences.envVariables = ["JAVA_TOOL_OPTIONS": "-Xmx2G"]
         store.owner.save(preferences, instanceID: "instance")
         let loaded = store.owner.load(instanceID: "instance")
         XCTAssertEqual(loaded.renderer, preferences.renderer)
+        XCTAssertEqual(loaded.graphicsApi, preferences.graphicsApi)
         XCTAssertEqual(loaded.resolution, preferences.resolution)
         XCTAssertEqual(loaded.computeShaders, preferences.computeShaders)
         XCTAssertEqual(loaded.envVariables, preferences.envVariables)
