@@ -15,7 +15,7 @@ struct StateScreen {
             case .getCofre: "How to get Cofre"
             case .tryAgain: "Try again"
             case .airDrop: "Send with AirDrop"
-            case .saveToDesktop: "Save to Desktop"
+            case .saveToDesktop: "Save a copy (delete it after sending)"
             }
         }
 
@@ -29,6 +29,13 @@ struct StateScreen {
         }
     }
 
+    /// Feedback after a button, shown in place of the help line. Same steps as the site's AirDrop fallback.
+    static let airDropSent = "Not listed? On the iPhone, set AirDrop to Everyone for 10 Minutes. Accept it there and type any "
+        + "AirDrop code here. Then: Files → Downloads → the file → Share → Cofre."
+    static let airDropMissing = "AirDrop isn't available here. Save a copy instead, and delete it after sending."
+    static let saved = "Saved to the Desktop. AirDrop it to your iPhone, then move it to the Trash."
+    static let saveFailed = "Couldn't save the file. Try AirDrop instead."
+
     /// The three checks from the site's "What you'll see".
     static let steps: [String] = ["iPhone connected", "Trusted", "Key sent to Cofre"]
 
@@ -39,6 +46,8 @@ struct StateScreen {
     var step: Int?
     /// Shown with a Spinner where the button would be, while the window moves on by itself.
     var waiting: String?
+    /// The pairing file exists on this Mac: show "Never share this file."
+    var keyOnMac = false
     var devices: [Device] = []
     var primary: Action?
     var secondary: Action?
@@ -46,10 +55,10 @@ struct StateScreen {
     init(_ state: LlaveState) {
         switch state {
         case .noDevice:
-            self.init(.plugIn, "Plug in your iPhone", "Use a cable that carries data, not just charging.", step: 0)
+            self.init(.plugIn, "Plug in your iPhone", "Use a cable that carries data, not just charging. If your Mac asks to allow the accessory, click Allow.", step: 0)
             waiting = "Looking for your iPhone\u{2026}"
         case .multipleDevices(let devices):
-            self.init(.pick(devices.count), "Pick your iPhone", "More than one iPhone is plugged in. Which one gets the key?")
+            self.init(.pick(devices.count), "Pick your iPhone or iPad", "More than one is plugged in. Which one gets the key?")
             self.devices = devices
         case .locked(let device):
             self.init(.unlock, "Unlock your iPhone", "Unlock \(device.name) and keep it on.", step: 1)
@@ -71,10 +80,12 @@ struct StateScreen {
         case .error(let error) where error.code == "COFRE_MISSING":
             self.init(.missing, "Install Cofre first", "Install Cofre on your iPhone, then try again.", primary: .getCofre, secondary: .tryAgain)
         case .placementFailed:
-            self.init(.airDrop, "Send it with AirDrop instead", "The key couldn't go in over the cable. AirDrop works too.",
+            self.init(.airDrop, "Send it with AirDrop instead", "The key couldn't go in over the cable. AirDrop works too: it lands in Files → Downloads.",
                       primary: .airDrop, secondary: .saveToDesktop)
+            keyOnMac = true
         case .ready:
-            self.init(.airDrop, "Your key is ready", "Send it to your iPhone with AirDrop.", primary: .airDrop, secondary: .saveToDesktop)
+            self.init(.airDrop, "Your key is ready", "Send it to your iPhone with AirDrop. It lands in Files → Downloads.", primary: .airDrop, secondary: .saveToDesktop)
+            keyOnMac = true
         case .error(let error):
             let (title, help) = Self.problem(error.code)
             self.init(.problem, title, help, primary: error.code == "CLI_NOT_FOUND" ? .close : .tryAgain)
@@ -88,7 +99,8 @@ struct StateScreen {
     /// Friendly copy per error code. Unknown codes get the generic line.
     private static func problem(_ code: String) -> (String, String) {
         switch code {
-        case "USER_DENIED": ("You tapped Don't Trust", "Unplug your iPhone, plug it back in, then tap Trust.")
+        case "USER_DENIED": ("You tapped Don't Trust", "Unplug your iPhone, unlock it and plug it back in. The alert comes back: tap Trust. "
+                             + "No alert? On the iPhone: Settings → General → Transfer or Reset iPhone → Reset → Reset Location & Privacy.")
         case "PASSWORD_PROTECTED": ("Unlock your iPhone", "Unlock it and keep it on, then try again.")
         case "NO_DEVICE": ("Can't find your iPhone", "Use a cable that carries data, then try again.")
         case "DEVICE_RESTRICTED": ("This iPhone can't connect", "It may be managed by a school or company.")

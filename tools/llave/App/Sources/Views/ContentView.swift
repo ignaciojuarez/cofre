@@ -8,12 +8,12 @@ public struct ContentView: View {
     @ObservedObject public var model: LlaveModel
     @Environment(\.openURL) private var openURL
     /// Feedback after AirDrop or Save, shown in place of the help line.
-    @State private var note: String?
+    @State private var note: String? = PreviewState.note
 
     /// Hidden title bar; the stage runs up under it so the window is 620 pt tall overall.
     private static let titleBar: CGFloat = 32
-    /// Step 1 of the setup (README). Keep in sync with `docs/app.js` LINKS.
-    private static let getCofre = URL(string: "https://github.com/ignaciojuarez/cofre#readme")!
+    /// Step 1 of the setup site (GitHub Pages from `docs/`). Keep in sync with `docs/app.js` LINKS.
+    private static let getCofre = URL(string: "https://ignaciojuarez.github.io/cofre/#step-1")!
 
     public init(model: LlaveModel) {
         self.model = model
@@ -41,11 +41,14 @@ public struct ContentView: View {
                         .accessibilityHidden(step >= StateScreen.steps.count)
                 }
                 if !screen.devices.isEmpty { devicePicker(screen.devices) }
+                if screen.keyOnMac {
+                    Banner("Never share this file. It's a key to your iPhone.", icon: .shield, tone: .warn)
+                }
                 Spacer(minLength: 0)
                 actions(screen)
                 footer
             }
-            .padding(.horizontal, 28).padding(.top, 20).padding(.bottom, 18)
+            .padding(.horizontal, 28).padding(.top, 12).padding(.bottom, 12)
             .animation(.linear(duration: CofreTheme.standard.motion.reducedCrossfade), value: screen.title)
         }
         .frame(width: 520, height: 620 - Self.titleBar)
@@ -54,7 +57,8 @@ public struct ContentView: View {
         .preferredColorScheme(CofreTheme.standard.colorScheme)
         .tint(Color.cofre.accent)
         .background {
-            Button("Close", action: close).keyboardShortcut(.cancelAction)
+            // Esc closes, except mid-transfer: the key is on its way into Cofre.
+            Button("Close") { if !isTransferring { close() } }.keyboardShortcut(.cancelAction)
                 .opacity(0).allowsHitTesting(false).accessibilityHidden(true)
         }
         .onChange(of: screen.title) { _, title in
@@ -84,18 +88,24 @@ public struct ContentView: View {
                 .keyboardShortcut(.defaultAction)
         }
         if let secondary = screen.secondary {
-            BlockButton(secondary.title, icon: secondary.icon) { run(secondary) }
+            if case .saveToDesktop = secondary {
+                // Last resort: a copy on the Desktop is a key to the iPhone, so it's small and says to delete it.
+                BlockButton(secondary.title, role: .ghost, size: .small) { run(secondary) }
+            } else {
+                BlockButton(secondary.title, icon: secondary.icon) { run(secondary) }
+            }
         }
     }
 
     private var footer: some View {
         HStack(spacing: 8) {
             PixelIcon(.shield, size: 14)
-            Text("Nothing is uploaded").cofreFont(.label).foregroundStyle(Color.cofre.muted)
-            Spacer()
-            KeyHint("esc", "Close")
+            Text("Nothing is uploaded. Nothing stays on this Mac unless you save it.").cofreFont(.label).foregroundStyle(Color.cofre.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 8)
+            if !isTransferring { KeyHint("esc", "Close") }
         }
-        .padding(.top, 6)
+        .padding(.top, 2)
     }
 
     private func run(_ action: StateScreen.Action) {
@@ -104,14 +114,14 @@ public struct ContentView: View {
         case .getCofre: openURL(Self.getCofre)
         case .tryAgain: model.reset()
         case .airDrop:
-            note = model.sendViaAirDrop()
-                ? "Pick your iPhone, then tap Accept on it. In Cofre, tap I have a file."
-                : "AirDrop isn't available here. Save to Desktop instead."
+            note = model.sendViaAirDrop() ? StateScreen.airDropSent : StateScreen.airDropMissing
         case .saveToDesktop:
-            note = model.saveToDesktop() != nil
-                ? "Saved to your Desktop. Send it to your iPhone with AirDrop."
-                : "Couldn't save the file. Try AirDrop instead."
+            note = model.saveToDesktop() != nil ? StateScreen.saved : StateScreen.saveFailed
         }
+    }
+
+    private var isTransferring: Bool {
+        switch state { case .pairing, .placing: true; default: false }
     }
 
     private func close() { NSApp.terminate(nil) }

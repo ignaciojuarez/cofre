@@ -4,6 +4,12 @@ import Foundation
 /// Names follow `LlaveState`; errors take an optional code, e.g. `error:USER_DENIED`. A preview run is simulated (see LlaveApp).
 enum PreviewState {
     static let current: LlaveState? = ProcessInfo.processInfo.environment["LLAVE_PREVIEW_STATE"].flatMap(state(named:))
+    /// `LLAVE_PREVIEW_NOTE=airDrop|saved` shows the line that follows that button.
+    static let note: String? = switch ProcessInfo.processInfo.environment["LLAVE_PREVIEW_NOTE"] {
+    case "airDrop": StateScreen.airDropSent
+    case "saved": StateScreen.saved
+    default: nil
+    }
 
     static func state(named name: String) -> LlaveState? {
         let phone = Device(udid: "00008150-PREVIEW", name: "Ana's iPhone", version: "26.1")
