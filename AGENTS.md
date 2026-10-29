@@ -4,8 +4,10 @@ Cofre is a Minecraft: Java Edition launcher for iPhone and iPad. It combines the
 
 ## Status (update when it changes)
 - `app/UI` (CofreUI) is complete against `MockBackend`.
-- **The Swift layer ships through `CofreCore.framework`.** `scripts/run.sh` builds and embeds the dynamic framework, while Air retains only the ObjC bridge and startup glue. Device verification still requires `strings` on the binary and `[Cofre] UI root installed` in the log.
-- Device-verified so far: install, launch, AirBridge counts, and the VPN request. JIT and pairing aren't device-verified yet.
+- **The Swift layer ships as `CofreCore.framework`.** It's built by the signing project, embedded by `scripts/run.sh`, and loaded at runtime with `dlopen` by `app/Glue/AirBridge/CofreStartup.m`. Air keeps only the ObjC bridge, which is compiled through patch 0001.
+  The build output is verified: the framework is embedded and signed, with CofreUI symbols present.
+  On the device, look for `[Cofre] UI root installed` or `[Cofre] UI fallback reason=…` in `Documents/latestlog.txt`.
+- Device-verified so far: install, launch, AirBridge counts, and the VPN request. CofreUI on device, JIT and pairing aren't device-verified yet.
 
 ## Where things live
 | Path | What | Language |
