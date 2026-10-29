@@ -15,10 +15,30 @@ public final class CofreBackendAdapter: NSObject, CofreBackend {
     private let air = CofreAirBridgeAdapter()
     private var launchTask: Task<Void, Never>?
     private var setup = SetupState()
+    private var setupContinuations: [AsyncStream<SetupState>.Continuation] = []
+    private func loadPersistedSetup() {
+        let d = UserDefaults.standard
+        if d.object(forKey: "cofre.setup.pairing") != nil { setup.pairing = d.bool(forKey: "cofre.setup.pairing") ? .ready : .blocked }
+        if d.object(forKey: "cofre.setup.vpn") != nil { setup.vpn = d.bool(forKey: "cofre.setup.vpn") ? .ready : .blocked }
+        if d.object(forKey: "cofre.setup.jit") != nil { setup.jit = d.bool(forKey: "cofre.setup.jit") ? .ready : .blocked }
+    }
+    public override init() { super.init(); loadPersistedSetup() }
 
     public func setupState() async -> SetupState { setup }
-    public func setupUpdates() -> AsyncStream<SetupState> { AsyncStream { _ in } }
-    public func recheckSetup() async { setup.pairing = hasPairing() ? .ready : .blocked; setup.vpn = isVPNRunning ? .ready : .unknown; setup.jit = isJITEnabled ? .ready : .blocked }
+    public func setupUpdates() -> AsyncStream<SetupState> {
+        AsyncStream { continuation in
+            setupContinuations.append(continuation)
+            continuation.yield(setup)
+            continuation.onTermination = { _ in }
+        }
+    }
+    public func recheckSetup() async {
+        setup.pairing = hasPairing() ? .ready : .blocked
+        setup.vpn = isVPNRunning ? .ready : .unknown
+        setup.jit = isJITEnabled ? .ready : .blocked
+        persistSetup()
+        setupContinuations.forEach { $0.yield(setup) }
+    }
     public func openDeveloperModeSettings() { UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!) }
     public func hasPairing() -> Bool { FileManager.default.fileExists(atPath: pairingURL.path) }
     public func importPairing(_ data: Data) throws { try data.write(to: pairingURL, options: [.atomic, .completeFileProtection]) }
@@ -75,6 +95,12 @@ public final class CofreBackendAdapter: NSObject, CofreBackend {
 
     private var pairingURL: URL { FileManager.default.urls(for:.documentDirectory,inDomains:.userDomainMask)[0].appendingPathComponent("StikJIT/pairingFile.plist") }
     private func logURL(_ kind: LogKind) -> URL { FileManager.default.urls(for:.documentDirectory,inDomains:.userDomainMask)[0].appendingPathComponent(kind == .latest ? "latestlog.txt" : "latestlog.txt") }
+    private func persistSetup() {
+        let d = UserDefaults.standard
+        d.set(setup.pairing.isReady, forKey: "cofre.setup.pairing")
+        d.set(setup.vpn.isReady, forKey: "cofre.setup.vpn")
+        d.set(setup.jit.isReady, forKey: "cofre.setup.jit")
+    }
     private func unavailable(_ name: String) -> CofreBackendError { .unavailable(name) }
     private func unavailableStream<T>(_ name: String) -> AsyncThrowingStream<T, Error> { AsyncThrowingStream { continuation in continuation.finish(throwing: unavailable(name)) } }
     private func callback(_ body: (@escaping (NSArray) -> Void) -> Void) async throws -> NSArray { await withCheckedContinuation { c in body { c.resume(returning:$0) } } }
