@@ -1,6 +1,7 @@
 // Cofre's debugger protocol implementation. No StikDebug source is incorporated.
 // Air requests: f00d/x16=0 detach, 1 region, 2 extension, 3 detach policy,
-// 4 patch; legacy 69 allocates x0 bytes. Keep attached until process exit.
+// 4 patch. brk #0x69 is Air's script probe until Air sends its extension (2), answered with 0x690000E0
+// like the universal script; after that it allocates x0 bytes. Keep attached until process exit.
 function le(hex) {
     if (!/^[0-9a-f]{16}$/i.test(hex)) throw Error('Invalid register');
     return BigInt('0x' + hex.match(/../g).reverse().join(''));
@@ -9,6 +10,7 @@ function hexLE(value) {
     return BigInt(value).toString(16).padStart(16, '0').match(/../g).reverse().join('');
 }
 const MAX_ADDRESS = 0xffffffffffffffffn;
+const PROBE_REPLY = 0x690000e0n;
 function checkedRange(address, size, cap) {
     if (typeof address !== 'bigint' || typeof size !== 'bigint' || address < 0n || address > MAX_ADDRESS ||
         size <= 0n || size > cap || address + size > MAX_ADDRESS + 1n)
@@ -44,6 +46,7 @@ function runCofre() {
     if (!/^T/.test(stop)) throw Error('Attach failed');
     log('COFRE_ATTACHED');
     stop = checked('c');
+    let extended = false;
     while (!/^[WX]/.test(stop)) {
         let pc = /(?:^|;)20:([0-9a-f]{16});/i.exec(stop);
         let request = pc ? parseStop(stop, checked('m' + checkedRange(le(pc[1]), 4n, 4n).address.toString(16) + ',4')) : null;
@@ -56,7 +59,10 @@ function runCofre() {
         }
         let address = request.legacy ? 0n : request.x0;
         let size = request.legacy ? request.x0 : request.x1;
-        if (request.op === 1n) {
+        if (request.legacy && !extended) {
+            // Anything but this value makes Air abort with "Support for legacy script has been removed".
+            writeRegister('0', PROBE_REPLY, request.tid);
+        } else if (request.op === 1n) {
             checkedRange(address, size, 1073741824n);
             if (address === 0n) {
                 let allocated = checked('_M' + size.toString(16) + ',rx');
@@ -82,7 +88,9 @@ function runCofre() {
                 if (bytes.length !== Number(count) * 2 || !/^[0-9a-f]+$/i.test(bytes)) throw Error('Invalid memory reply');
                 if (checked('M' + range + ':' + bytes) !== 'OK') throw Error('Patch write failed');
             }
-        } else if (![0n, 2n, 3n].includes(request.op)) {
+        } else if (request.op === 2n) {
+            extended = true;
+        } else if (![0n, 3n].includes(request.op)) {
             throw Error('Unsupported JIT request');
         }
         // Air's known extension operations are implemented above; never eval target memory.
@@ -93,4 +101,4 @@ function runCofre() {
     log('COFRE_EXITED');
 }
 if (typeof get_pid === 'function') runCofre();
-if (typeof module !== 'undefined') module.exports = {le, hexLE, parseStop, checkedRange};
+if (typeof module !== 'undefined') module.exports = {le, hexLE, parseStop, checkedRange, PROBE_REPLY};
