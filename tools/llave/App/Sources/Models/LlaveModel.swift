@@ -19,6 +19,7 @@ public final class LlaveModel: ObservableObject {
     private var watcherTask: Task<Void, Never>?
     private var pairingTask: Task<Void, Never>?
     private var temporaryFileURL: URL?
+    private var pairingDeviceUDID: String?
 
     public init(
         deviceWatcherFactory: @escaping (Bool) -> DeviceWatcherProtocol = { isSim in DeviceWatcher(isSimulating: isSim) },
@@ -51,23 +52,22 @@ public final class LlaveModel: ObservableObject {
     }
 
     public func handleDevicesUpdated(_ devices: [Device]) {
-        self.detectedDevices = devices
-
-        // If currently in an active pairing or ready state with a valid device, preserve unless disconnected
-        switch state {
-        case .locked(let current), .waitingForTrust(let current), .pairing(let current):
-            if !devices.contains(where: { $0.udid == current.udid }) {
-                pairingTask?.cancel()
-                cleanupTemporaryFile()
-                transitionToDefaultDeviceState(devices)
-            }
+        detectedDevices = devices
+        guard let selectedUDID = pairingDeviceUDID else {
+            // Only the initial waiting state may auto-start pairing.
+            if case .noDevice = state { transitionToDefaultDeviceState(devices) }
+            else if case .multipleDevices = state { transitionToDefaultDeviceState(devices) }
             return
-        case .ready:
-            // Device remains ready until user dismisses or device disconnects
-            return
-        default:
-            transitionToDefaultDeviceState(devices)
         }
+        guard devices.contains(where: { $0.udid == selectedUDID }) else {
+            pairingTask?.cancel()
+            pairingDeviceUDID = nil
+            cleanupTemporaryFile()
+            state = devices.isEmpty ? .noDevice : .multipleDevices(devices)
+            return
+        }
+        // DeviceWatcher ticks are intentionally ignored while pairing, placing,
+        // done, error, or export states are on screen.
     }
 
     private func transitionToDefaultDeviceState(_ devices: [Device]) {
@@ -85,6 +85,7 @@ public final class LlaveModel: ObservableObject {
         pairingTask?.cancel()
         cleanupTemporaryFile()
 
+        pairingDeviceUDID = device.udid
         state = .pairing(device)
 
         let outURL = makeTemporaryPairingURL(deviceName: device.name)
@@ -106,6 +107,7 @@ public final class LlaveModel: ObservableObject {
     }
 
     public func handlePairingEvent(_ event: LlaveEvent, device: Device, outURL: URL) {
+        temporaryFileURL = outURL
         switch event {
         case .waitingForUnlock:
             state = .locked(device)
@@ -124,20 +126,24 @@ public final class LlaveModel: ObservableObject {
         }
     }
 
+    private var exportFileURL: URL? {
+        if case .ready(let url) = state { return url }
+        if case .placementFailed = state { return temporaryFileURL }
+        return nil
+    }
+
     public func sendViaAirDrop() -> Bool {
-        guard case .ready(let fileURL) = state else {
-            return false
-        }
+        guard let fileURL = exportFileURL else { return false }
         let success = airDropService.sendViaAirDrop(fileURL: fileURL)
+        if success { cleanupTemporaryFile() }
         return success
     }
 
     public func saveToDesktop() -> URL? {
-        guard case .ready(let fileURL) = state else {
-            return nil
-        }
+        guard let fileURL = exportFileURL else { return nil }
         do {
             let saved = try airDropService.saveToDesktop(fileURL: fileURL)
+            cleanupTemporaryFile()
             return saved
         } catch {
             state = .error(LlaveError(code: "SAVE_FAILED", message: error.localizedDescription))
@@ -147,6 +153,7 @@ public final class LlaveModel: ObservableObject {
 
     public func reset() {
         pairingTask?.cancel()
+        pairingDeviceUDID = nil
         cleanupTemporaryFile()
         transitionToDefaultDeviceState(detectedDevices)
     }

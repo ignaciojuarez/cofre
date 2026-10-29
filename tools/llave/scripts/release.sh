@@ -12,6 +12,8 @@ p=Path(sys.argv[1]); s=p.read_text(); out,n=re.subn(r'RELEASE_SHA256="[0-9a-f]+"
 if n != 1: raise SystemExit(f'expected exactly one RELEASE_SHA256 replacement, got {n}')
 p.write_text(out)
 PY
+codesign --verify --deep --strict "$ROOT/build/Llave.app"
+spctl -a -t exec -vv "$ROOT/build/Llave.app" 2>&1 | tee "$ROOT/build/release-spctl.txt"
 EXPECTED=$(shasum -a 256 "$ROOT/build/Llave.app.zip" | awk '{print $1}')
 [ "$EXPECTED" = "$HASH" ] || { echo 'checksum self-verification failed' >&2; exit 4; }
 echo "Built signed zip: $ROOT/build/Llave.app.zip"; cat "$ROOT/SHA256SUMS"

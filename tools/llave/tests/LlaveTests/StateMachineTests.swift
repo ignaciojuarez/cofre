@@ -114,4 +114,29 @@ final class StateMachineTests: XCTestCase {
         model.handlePairingEvent(.error(code: "TEST_ERR", message: "Failed"), device: dev, outURL: tempURL)
         XCTAssertEqual(model.state, .error(LlaveError(code: "TEST_ERR", message: "Failed")))
     }
+    func testWatcherTicksDoNotResetPlacingDoneOrError() async {
+        let model = LlaveModel(deviceWatcherFactory: { _ in MockDeviceWatcher() }, pairingService: MockPairingService(), airDropService: MockAirDropService())
+        let dev = Device(udid: "STABLE", name: "iPhone", version: "18.0")
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("stable.mobiledevicepairing")
+        model.startPairing(device: dev)
+        model.handlePairingEvent(.validated, device: dev, outURL: file)
+        model.handleDevicesUpdated([dev]); XCTAssertEqual(model.state, .placing(dev))
+        model.handlePairingEvent(.placed, device: dev, outURL: file)
+        model.handleDevicesUpdated([dev]); XCTAssertEqual(model.state, .done(dev))
+        model.handlePairingEvent(.error(code: "X", message: "failed"), device: dev, outURL: file)
+        model.handleDevicesUpdated([dev]); XCTAssertEqual(model.state, .error(LlaveError(code: "X", message: "failed")))
+    }
+
+    func testPlacementFailureCanExportAndCleansTemporaryFile() async throws {
+        let air = MockAirDropService()
+        let model = LlaveModel(deviceWatcherFactory: { _ in MockDeviceWatcher() }, pairingService: MockPairingService(), airDropService: air)
+        let dev = Device(udid: "EXPORT", name: "iPhone", version: "18.0")
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("export.mobiledevicepairing")
+        try Data("pairing".utf8).write(to: file)
+        model.startPairing(device: dev)
+        model.handlePairingEvent(.error(code: "PAIRING_FAILED", message: "placement failed"), device: dev, outURL: file)
+        XCTAssertTrue(model.sendViaAirDrop())
+        XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
+    }
+
 }
