@@ -25,6 +25,9 @@ if (( BUILD )); then
   cp "$ROOT"/app/Glue/AirBridge/CofreRootFactory.m "$AIR/Natives/CofreGlue/"
   cp "$ROOT"/app/Shell/CofreRootViewController.swift "$AIR/Natives/CofreGlue/"
   cp "$ROOT"/app/Glue/AirBridge/CofreBackendAdapter.swift "$AIR/Natives/CofreGlue/"
+  cp "$ROOT"/app/Glue/AirBridge/ServerJoinAdapter.swift "$AIR/Natives/CofreGlue/"
+  mkdir -p "$AIR/Natives/CofreGlue/CofreServerJoin"
+  cp "$ROOT"/app/CofreKit/ServerJoin/Sources/CofreServerJoin/*.swift "$AIR/Natives/CofreGlue/CofreServerJoin/"
   cp "$ROOT"/app/Glue/AirBridge/CofrePairingImport.m "$AIR/Natives/CofreGlue/"
   python3 - <<PY2
 from pathlib import Path
@@ -43,6 +46,10 @@ PY2
   if [[ -n "$IPA" && -f "$IPA" ]]; then unzip -q -o "$IPA" -d "$ROOT/artifacts"; else BUILT_APP=$(find "$AIR/Natives/build" -maxdepth 1 -type d -name "*.app" -print -quit); [[ -n "$BUILT_APP" && -d "$BUILT_APP" ]] || bt_die "no IPA or app artifact"; cp -R "$BUILT_APP" "$ROOT/artifacts/Payload/AngelAuraAmethyst.app"; fi
   mv "$ROOT/artifacts/Payload/AngelAuraAmethyst.app" "$APP"
   INFO="$APP/Info.plist"
+  /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes array" "$INFO" 2>/dev/null || true
+  /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0 dict" "$INFO" 2>/dev/null || true
+  /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" "$INFO" 2>/dev/null || true
+  /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string cofre" "$INFO" 2>/dev/null || true
   /usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes array" "$INFO" 2>/dev/null || /usr/libexec/PlistBuddy -c "Print :CFBundleDocumentTypes" "$INFO" >/dev/null || bt_die "plist document types failed"
   /usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:0 dict" "$INFO" 2>/dev/null || true
   /usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:0:CFBundleTypeName string iPhone Pairing File" "$INFO" 2>/dev/null || true
