@@ -9,6 +9,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (BOOL)toggleMod:(id)mod error:(NSError **)error;
 - (NSArray<NSDictionary *> *)accounts;
 - (NSDictionary *)preferencesForProfile:(NSString *)profile;
+- (void)ensureAutomaticMemoryDefault;
 - (void)launchProfile:(NSString *)profile accountID:(nullable NSString *)accountID progress:(void (^)(NSString *stage))progress;
 @end
 NS_ASSUME_NONNULL_END

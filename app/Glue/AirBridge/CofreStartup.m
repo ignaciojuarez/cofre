@@ -5,6 +5,7 @@
 static void CofreStartAfterLaunch(void) {
     @autoreleasepool {
         CofreAirBridgeAdapter *bridge = [CofreAirBridgeAdapter new];
+        [bridge ensureAutomaticMemoryDefault];
         NSArray *instances = [bridge instances]; NSString *profile = bridge.profiles.selectedProfileName;
         NSLog(@"[Cofre] AirBridge connected instances=%lu profile=%@", (unsigned long)instances.count, profile ?: @"(none)");
         if (profile.length) [bridge worldsForProfile:profile completion:^(NSArray *worlds){ NSLog(@"[Cofre] worlds=%lu", (unsigned long)worlds.count); }];
