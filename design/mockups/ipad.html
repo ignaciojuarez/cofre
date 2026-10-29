@@ -511,27 +511,9 @@ document.getElementById('states').innerHTML=`<div class="st"><span></span>${['De
   <div class="inp">Keys ${kb('⌘')}${kb('⇧')}${kb('⌥')}${kb('↩')}${kb('esc')} · Controller ${gp('A')}${gp('B')}${gp('X')}${gp('Y')}${gp('LB')}${gp('RB')}</div>`;
 document.querySelectorAll('.px[data-i]').forEach(el=>el.innerHTML=iconSVG(el.dataset.i,+el.dataset.s||16,el.dataset.c||'#5ad1e8'));
 
-// Seeded pixel scenes: dithered dusk sky, blocky terraces, oak silhouettes.
+// Pixel scenes: PNGs rendered by CofreUI's PixelScene (waterfall canyon), one per seed and size, in scenes/.
 function rng(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
-const BAYER=[[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]];
-function scene(seed,W,H){
-  const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');const r=rng(seed);
-  const sky=['#0a0f2c','#121338','#1d1648','#2a1a58','#3d1f68','#5a2774','#7e3279','#a6437c','#cc5a78','#e8786a','#f2985c','#f6b85a'];
-  const hz=Math.round(H*.66);
-  for(let y=0;y<hz;y++){const t=Math.pow(y/hz,1.35)*(sky.length-1),i=Math.floor(t),f=t-i;
-    for(let xx=0;xx<W;xx++){x.fillStyle=(f*16>BAYER[y&3][xx&3])?sky[Math.min(i+1,sky.length-1)]:sky[i];x.fillRect(xx,y,1,1);}}
-  for(let s=0;s<W*H/90;s++){const sx=Math.floor(r()*W),sy=Math.floor(r()*hz*.45);x.fillStyle=r()>.7?'#ffffff':'#8c86c4';x.fillRect(sx,sy,1,1);}
-  const sunX=Math.round(W*(.55+r()*.25)),sunY=hz-Math.round(H*.05),sr=Math.round(H*.13);
-  for(let yy=-sr;yy<=sr;yy++)for(let xx=-sr;xx<=sr;xx++){const d=xx*xx+yy*yy;if(d<=sr*sr){x.fillStyle=d<(sr*.55)**2?'#fff2c4':'#ffd27a';x.fillRect(sunX+xx,sunY+yy,1,1);}}
-  for(let k=0;k<3;k++){const cw=8+Math.floor(r()*14),cx=Math.floor(r()*W),cy=4+Math.floor(r()*hz*.45);x.fillStyle='#4a3478';x.fillRect(cx,cy,cw,2);x.fillStyle='#6a4a98';x.fillRect(cx+2,cy-1,cw-5,1);}
-  const layer=(base,amp,step,col,top)=>{let h=base;const hs=[];for(let xx=0;xx<W;xx+=step){h+=Math.round((r()-.5)*amp);h=Math.max(base-amp*2,Math.min(base+amp,h));for(let k=0;k<step;k++)hs.push(h);}
-    for(let xx=0;xx<W;xx++){x.fillStyle=col;x.fillRect(xx,hs[xx],1,H-hs[xx]);x.fillStyle=top;x.fillRect(xx,hs[xx],1,1);}return hs;};
-  layer(hz-Math.round(H*.16),5,4,'#3a2470','#53359a');
-  layer(hz-Math.round(H*.04),3,3,'#241a4d','#33276a');
-  const g=layer(hz+Math.round(H*.1),2,5,'#130f2e','#2b6b3a');
-  for(let k=0;k<Math.round(W/14);k++){const tx=Math.floor(r()*(W-6))+3,ty=g[tx];x.fillStyle='#0d0a22';x.fillRect(tx,ty-3,1,3);x.fillRect(tx-2,ty-7,5,4);x.fillRect(tx-1,ty-8,3,1);}
-  return c.toDataURL();
-}
+function scene(seed,W,H){return `scenes/${seed}-${W}x${H}.png`;}
 document.querySelectorAll('[data-scene]').forEach(el=>{el.style.backgroundImage=`url(${scene(+el.dataset.scene,+el.dataset.sw||120,+el.dataset.sh||80)})`;});
 
 // Stone texture behind every screen, rebuilt per theme.

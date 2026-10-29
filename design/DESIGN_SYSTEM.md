@@ -166,7 +166,7 @@ Pixel scenes are static (no parallax). Haptics: `.selection` on segment and swit
 | 15 | **StepBar** | bars only (compact) · bars + names (regular) | done, current, pending | Reads "Step 3 of 6, Pairing file" |
 | 16 | **PixelIcon** | 8×8-grid glyphs (grass, stone, ore(tint), book, gear, play, bolt, cmd, key, shield, check, paper, chest, head) × any size | dimmed (55% in nav) | Decorative (`accessibilityHidden`) unless it's the only content. Then it gets a label. |
 | 17 | **AppIcon** | placeholder `cofre-design/icons/01-vanilla.png` | — | Decorative |
-| 18 | **PixelScene** | seeded dusk scene × pixel size | — | Decorative. Ignores Smart Invert. Rendered once per seed and size, then cached. |
+| 18 | **PixelScene** | seeded landscape × style (`falls` waterfall canyon by default, `geode`, `islands`, `lake`) × pixel size | — | Decorative. Ignores Smart Invert. Rendered once per style, seed and size, then cached. Keeps a dark top for white titles. |
 | 19 | **Stat** | value + label, tone | — | Combined: "142, mods" |
 | 20 | **Banner** | warn · ok · bad · info + optional action | — | Announced when it appears for errors (`AccessibilityNotification.Announcement`) |
 | 21 | **EmptyState** | no instances · no results · offline · needs CF key | — | Title is a header. The action is the first focus. |
@@ -381,7 +381,7 @@ public struct ListSection<Content: View>: View { public init(_ label: LocalizedS
 public struct Stat: View { public init(_ value: String, label: LocalizedStringKey, tone: Tone = .neutral) }
 public struct StepBar: View { public init(steps: [LocalizedStringKey], current: Int) }        // names when widthClass > .compact
 public struct PixelIcon: View { public init(_ glyph: PixelGlyph, size: CGFloat = 16, tint: Color? = nil) }
-public struct PixelScene: View { public init(seed: UInt32, pixels: CGSize = .init(width: 120, height: 80)) }
+public struct PixelScene: View { public init(seed: UInt32, pixels: CGSize = .init(width: 120, height: 80), style: Style? = nil) }
 public struct Banner<Action: View>: View { public init(_ title: LocalizedStringKey, icon: PixelGlyph, tone: Tone = .warn, @ViewBuilder action: () -> Action) }
 public struct EmptyState<Action: View>: View { public init(_ title: LocalizedStringKey, message: LocalizedStringKey, icon: PixelGlyph, @ViewBuilder action: () -> Action) }
 public struct DropZone: View { public init(_ title: LocalizedStringKey, types: [UTType], onDrop: @escaping ([URL]) -> Void, onChoose: @escaping () -> Void) }
