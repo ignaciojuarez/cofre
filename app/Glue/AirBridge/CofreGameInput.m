@@ -91,43 +91,14 @@ static UIResponder *CofreCurrentFirstResponder(void) {
 static void CofreAirInputHideKeyboard(void) {
     dispatch_async(dispatch_get_main_queue(), ^{
         UIResponder *responder = CofreCurrentFirstResponder();
-        [responder resignFirstResponder];
-        [SurfaceViewController.currentInstance.view.window endEditing:YES];
-        NSLog(@"[Cofre] keyboard hide responder=%@", NSStringFromClass(responder.class));
+        // Air's TrackedTextField refuses to resign while this guard is on; Air's own toggle lifts it the same way.
+        BOOL guarded = [responder respondsToSelector:NSSelectorFromString(@"setPreventUnexpectedResign:")];
+        if (guarded) [responder setValue:@NO forKey:@"preventUnexpectedResign"];
+        BOOL resigned = [responder resignFirstResponder];
+        if (guarded) [responder setValue:@YES forKey:@"preventUnexpectedResign"];
+        NSLog(@"[Cofre] keyboard hide responder=%@ resigned=%d", NSStringFromClass(responder.class), resigned);
     });
 }
-
-/// A ⌄ bar above the in-game keyboard: iPhone keyboards opened by a game field have no other way to close.
-@interface CofreKeyboardBar : NSObject
-@end
-
-@implementation CofreKeyboardBar
-+ (void)hide { CofreAirInputHideKeyboard(); }
-
-+ (void)attachOnShow {
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-        [NSNotificationCenter.defaultCenter addObserverForName:UIKeyboardWillShowNotification object:nil
-                                                         queue:NSOperationQueue.mainQueue
-                                                    usingBlock:^(NSNotification *note) {
-            UIResponder *responder = CofreCurrentFirstResponder();
-            if (![responder isKindOfClass:UITextField.class]) return;
-            UITextField *field = (UITextField *)responder;
-            if (field.inputAccessoryView) return;
-            UIToolbar *bar = [[UIToolbar alloc] initWithFrame:CGRectMake(0, 0, 320, 44)];
-            bar.barStyle = UIBarStyleBlack;
-            UIBarButtonItem *hide = [[UIBarButtonItem alloc]
-                initWithImage:[UIImage systemImageNamed:@"keyboard.chevron.compact.down"]
-                        style:UIBarButtonItemStylePlain target:self action:@selector(hide)];
-            hide.accessibilityLabel = @"Hide keyboard";
-            bar.items = @[[[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace
-                                                                         target:nil action:nil], hide];
-            field.inputAccessoryView = bar;
-            [field reloadInputViews];
-        }];
-    });
-}
-@end
 
 void CofreInputKey(const char *name, BOOL down) { CofreAirInputKey(name, down); }
 void CofreInputMouseButton(int button, BOOL down) { CofreAirInputMouseButton(button, down); }
@@ -234,7 +205,6 @@ static void CofreStartTouchDiagnostics(void) {
     dispatch_async(dispatch_get_main_queue(), ^{
         SurfaceViewController *game = (SurfaceViewController *)surface;
         CofreStartTouchDiagnostics();
-        [CofreKeyboardBar attachOnShow];
         UIView *container = game.view;
         if (!container) return;
         for (UIView *view in container.subviews) {
