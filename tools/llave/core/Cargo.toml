@@ -1,0 +1,22 @@
+[package]
+name = "llave-pair"
+version = "0.1.0"
+edition = "2024"
+authors = ["Ignacio Juarez"]
+description = "Fast, zero-leftover iPhone pairing generator for Cofre"
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+plist = "1.8"
+plist-macro = "0.1.6"
+idevice = { version = "0.1.68", features = ["usbmuxd", "remote_pairing", "house_arrest", "afc", "pair"] }
+uuid = { version = "1", features = ["v4"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

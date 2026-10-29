@@ -1,0 +1,33 @@
+name: Llave
+options:
+  deploymentTarget:
+    macOS: '14.0'
+  bundleIdPrefix: com.ignaciojuarez
+settings:
+  base:
+    SWIFT_VERSION: 5.9
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: Developer ID Application
+    DEVELOPMENT_TEAM: APPLE_TEAM_ID
+targets:
+  Llave:
+    type: application
+    platform: macOS
+    sources: [Sources]
+    resources: [Resources]
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.ignaciojuarez.llave
+      INFOPLIST_KEY_CFBundleDisplayName: Llave
+      INFOPLIST_KEY_LSMinimumSystemVersion: '14.0'
+      GENERATE_INFOPLIST_FILE: YES
+      MACOSX_DEPLOYMENT_TARGET: '14.0'
+
+  LlaveTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources: [../tests/LlaveTests]
+    dependencies:
+      - target: Llave
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.ignaciojuarez.llave.tests
+      GENERATE_INFOPLIST_FILE: YES

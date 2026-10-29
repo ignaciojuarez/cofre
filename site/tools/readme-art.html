@@ -1,0 +1,53 @@
+<!doctype html>
+<!-- Source for docs/assets/readme/*.png. Each element with data-shot becomes one image. Run tools/render-readme-images.cjs. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../docs/styles.css">
+<style>
+  body { background: none; padding: 8px; width: 900px; }
+  [data-shot] { margin-bottom: 24px; }
+  .art-banner { position: relative; width: 880px; height: 340px; overflow: hidden; border: 2px solid var(--outline); background: var(--page) url(../docs/assets/stone.png) 0 0 / 128px 128px; }
+  .art-banner .scene { position: absolute; left: 0; right: 0; bottom: 0; height: 96px; }
+  .art-banner .in { position: relative; display: flex; align-items: center; gap: 28px; padding: 32px 40px; }
+  .art-banner img.icon { width: 128px; height: 128px; border: 2px solid var(--outline); box-shadow: 0 4px 0 var(--lip); image-rendering: pixelated; }
+  .art-banner h1 { font-size: 72px; line-height: 1; margin: 2px 0 10px; }
+  .art-banner .pitch { margin: 0; max-width: 34ch; text-align: left; font-size: 20px; }
+  .inline { display: inline-flex; }
+  .art-step { width: 880px; display: flex; align-items: center; gap: 16px; padding: 18px 22px; }
+  .art-step .step-title { flex: 1; }
+  .art-step h3 { font-size: 28px; }
+  .art-banner-ok { width: 880px; margin: 0; }
+</style>
+</head>
+<body>
+<svg class="sprite" aria-hidden="true"><!--SPRITE--></svg>
+
+<div data-shot="banner" class="art-banner">
+  <img class="scene" src="../docs/assets/scene.png" alt="">
+  <div class="in">
+    <img class="icon" src="../docs/assets/cofre-icon.png" alt="">
+    <div>
+      <p class="label">iPhone &amp; iPad launcher · Free &amp; open source</p>
+      <h1>Cofre</h1>
+      <p class="pitch">Minecraft: Java Edition, mods and all, on your iPhone. JIT and VPN built in.</p>
+    </div>
+  </div>
+</div>
+
+<a data-shot="btn-invite" class="inline btn btn-primary btn-l"><svg class="ico"><use href="#i-mail"/></svg>Request an invite</a>
+<a data-shot="btn-guide" class="inline btn"><svg class="ico"><use href="#i-book"/></svg>What the command does</a>
+<a data-shot="btn-ipa" class="inline btn"><svg class="ico"><use href="#i-down"/></svg>Download IPA</a>
+<a data-shot="btn-source" class="inline btn"><svg class="ico"><use href="#i-book"/></svg>Source code</a>
+
+<div data-shot="step-1" class="block art-step"><span class="step-num">1</span><div class="step-title"><p class="label">Step 1 · On your iPhone</p><h3>Get Cofre</h3></div><span class="badge"><svg class="ico"><use href="#i-clock"/></svg>4 min</span></div>
+<div data-shot="step-2" class="block art-step"><span class="step-num">2</span><div class="step-title"><p class="label">Step 2 · On your iPhone</p><h3>Turn on Developer Mode</h3></div><span class="badge"><svg class="ico"><use href="#i-clock"/></svg>2 min</span></div>
+<div data-shot="step-3" class="block art-step"><span class="step-num">3</span><div class="step-title"><p class="label">Step 3 · On a Mac, once</p><h3>Connect to a Mac</h3></div><span class="badge"><svg class="ico"><use href="#i-clock"/></svg>2 min</span></div>
+<div data-shot="step-4" class="block art-step"><span class="step-num">4</span><div class="step-title"><p class="label">Step 4 · On your iPhone</p><h3>Open Cofre and play</h3></div><span class="badge"><svg class="ico"><use href="#i-clock"/></svg>3 min</span></div>
+
+<aside data-shot="shortcut" class="banner ok art-banner-ok">
+  <svg class="ico ico-l"><use href="#i-people"/></svg>
+  <div><p class="label">Shortcut · In person</p><p><b>No Mac? Use a friend's.</b> Plug into their Mac, paste the command, tap Trust. About 2 minutes, and nothing stays on their Mac.</p></div>
+</aside>
+</body>
+</html>

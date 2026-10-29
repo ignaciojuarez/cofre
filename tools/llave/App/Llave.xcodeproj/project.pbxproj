@@ -1,0 +1,468 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		01ABA3BDA305B217373B8252 /* DeviceWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A6CE21C4906E44A8A947670 /* DeviceWatcher.swift */; };
+		0FF61CD272471E488026ACA6 /* AirDropService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFF58445A19DDAF850DA6F91 /* AirDropService.swift */; };
+		146746DF990E668CD9C3A457 /* LlaveState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 895A51961B08D31882CDF4F0 /* LlaveState.swift */; };
+		1D4FAAE949A0335A339F661F /* SimulateFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97F0B5CBE3C7C07036A567CF /* SimulateFlowTests.swift */; };
+		29A3003DC219E654B9A655DD /* LlaveEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1A2247BFC4263EDE510C512 /* LlaveEvent.swift */; };
+		36912DAD1E1CD992A322236C /* LlaveApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF5E9969C08CA12F637249C8 /* LlaveApp.swift */; };
+		3A83505B474BA7F498CE44BC /* LlaveError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24D8A8B02D17C6FE7F4D1844 /* LlaveError.swift */; };
+		85B18C809D7A871F8C15FEAE /* PairingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FFD41CA2D32D0D2F6DDCD30 /* PairingService.swift */; };
+		89EBFE322A7D79F71CB4C808 /* Device.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0577A0019B49A30BB92FAA8 /* Device.swift */; };
+		8EF5862A4A18F8E62C8E563D /* StateMachineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D16B503EA0715E3A5EE5AA5 /* StateMachineTests.swift */; };
+		A7919A88A1CB9DE0F38A857F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AF03BF59257B3221D57FF15 /* ContentView.swift */; };
+		E74C1A8141F2C5D9830FE8D8 /* LlaveModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9315B0A24D5107EFC84DBFF3 /* LlaveModel.swift */; };
+		F49EE00FEA557440D830ED30 /* EventParsingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 030D06139229B856BAF3426E /* EventParsingTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		CA1230CF2DFB14B0CB690B5E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C82761B629467AA407A0AE98 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = EE2AA161BAECF66F18BD45F6;
+			remoteInfo = Llave;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		030D06139229B856BAF3426E /* EventParsingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventParsingTests.swift; sourceTree = "<group>"; };
+		24D8A8B02D17C6FE7F4D1844 /* LlaveError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LlaveError.swift; sourceTree = "<group>"; };
+		2695B746516762BD20C9A1CD /* LlaveTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LlaveTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		2D16B503EA0715E3A5EE5AA5 /* StateMachineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StateMachineTests.swift; sourceTree = "<group>"; };
+		3A6CE21C4906E44A8A947670 /* DeviceWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceWatcher.swift; sourceTree = "<group>"; };
+		895A51961B08D31882CDF4F0 /* LlaveState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LlaveState.swift; sourceTree = "<group>"; };
+		8FFD41CA2D32D0D2F6DDCD30 /* PairingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingService.swift; sourceTree = "<group>"; };
+		9315B0A24D5107EFC84DBFF3 /* LlaveModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LlaveModel.swift; sourceTree = "<group>"; };
+		97F0B5CBE3C7C07036A567CF /* SimulateFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimulateFlowTests.swift; sourceTree = "<group>"; };
+		9AF03BF59257B3221D57FF15 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		9F7151E70E11B0F933D1AEA9 /* Llave.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Llave.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A0577A0019B49A30BB92FAA8 /* Device.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Device.swift; sourceTree = "<group>"; };
+		CF5E9969C08CA12F637249C8 /* LlaveApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LlaveApp.swift; sourceTree = "<group>"; };
+		E1A2247BFC4263EDE510C512 /* LlaveEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LlaveEvent.swift; sourceTree = "<group>"; };
+		FFF58445A19DDAF850DA6F91 /* AirDropService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirDropService.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		0ABCC28264DEFEF60257EDA5 = {
+			isa = PBXGroup;
+			children = (
+				0F969CA3FDD4B0A55ED1A0C5 /* LlaveTests */,
+				5CD894B1E349B6269DEE6F7B /* Sources */,
+				B9E18C59DA2C230F16755B9F /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		0F969CA3FDD4B0A55ED1A0C5 /* LlaveTests */ = {
+			isa = PBXGroup;
+			children = (
+				030D06139229B856BAF3426E /* EventParsingTests.swift */,
+				97F0B5CBE3C7C07036A567CF /* SimulateFlowTests.swift */,
+				2D16B503EA0715E3A5EE5AA5 /* StateMachineTests.swift */,
+			);
+			name = LlaveTests;
+			path = ../tests/LlaveTests;
+			sourceTree = "<group>";
+		};
+		51B6AE016C0582AACB87D6EF /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				FFF58445A19DDAF850DA6F91 /* AirDropService.swift */,
+				3A6CE21C4906E44A8A947670 /* DeviceWatcher.swift */,
+				8FFD41CA2D32D0D2F6DDCD30 /* PairingService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		5CD894B1E349B6269DEE6F7B /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				CF5E9969C08CA12F637249C8 /* LlaveApp.swift */,
+				A9336CA7FBC4781367D767B5 /* Models */,
+				51B6AE016C0582AACB87D6EF /* Services */,
+				750A0C3D09A219B58B0A7AFE /* Views */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		750A0C3D09A219B58B0A7AFE /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				9AF03BF59257B3221D57FF15 /* ContentView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		A9336CA7FBC4781367D767B5 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				A0577A0019B49A30BB92FAA8 /* Device.swift */,
+				24D8A8B02D17C6FE7F4D1844 /* LlaveError.swift */,
+				E1A2247BFC4263EDE510C512 /* LlaveEvent.swift */,
+				9315B0A24D5107EFC84DBFF3 /* LlaveModel.swift */,
+				895A51961B08D31882CDF4F0 /* LlaveState.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		B9E18C59DA2C230F16755B9F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				9F7151E70E11B0F933D1AEA9 /* Llave.app */,
+				2695B746516762BD20C9A1CD /* LlaveTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		2BA9737F29EFD29DC0AD9046 /* LlaveTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DE0553C154464A93C4891453 /* Build configuration list for PBXNativeTarget "LlaveTests" */;
+			buildPhases = (
+				EA07F8894EFE3B59F5DE39E3 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				2EA28B5A6CC2AFFEB0BE404B /* PBXTargetDependency */,
+			);
+			name = LlaveTests;
+			packageProductDependencies = (
+			);
+			productName = LlaveTests;
+			productReference = 2695B746516762BD20C9A1CD /* LlaveTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		EE2AA161BAECF66F18BD45F6 /* Llave */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D2D39F893A9A40E2A89FF28B /* Build configuration list for PBXNativeTarget "Llave" */;
+			buildPhases = (
+				70028A15B0EB1DC134E88C81 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Llave;
+			packageProductDependencies = (
+			);
+			productName = Llave;
+			productReference = 9F7151E70E11B0F933D1AEA9 /* Llave.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		C82761B629467AA407A0AE98 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					2BA9737F29EFD29DC0AD9046 = {
+						DevelopmentTeam = APPLE_TEAM_ID;
+						ProvisioningStyle = Manual;
+					};
+					EE2AA161BAECF66F18BD45F6 = {
+						DevelopmentTeam = APPLE_TEAM_ID;
+						ProvisioningStyle = Manual;
+					};
+				};
+			};
+			buildConfigurationList = 26C70392E46C63A9762A7921 /* Build configuration list for PBXProject "Llave" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 0ABCC28264DEFEF60257EDA5;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = B9E18C59DA2C230F16755B9F /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				EE2AA161BAECF66F18BD45F6 /* Llave */,
+				2BA9737F29EFD29DC0AD9046 /* LlaveTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		70028A15B0EB1DC134E88C81 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0FF61CD272471E488026ACA6 /* AirDropService.swift in Sources */,
+				A7919A88A1CB9DE0F38A857F /* ContentView.swift in Sources */,
+				89EBFE322A7D79F71CB4C808 /* Device.swift in Sources */,
+				01ABA3BDA305B217373B8252 /* DeviceWatcher.swift in Sources */,
+				36912DAD1E1CD992A322236C /* LlaveApp.swift in Sources */,
+				3A83505B474BA7F498CE44BC /* LlaveError.swift in Sources */,
+				29A3003DC219E654B9A655DD /* LlaveEvent.swift in Sources */,
+				E74C1A8141F2C5D9830FE8D8 /* LlaveModel.swift in Sources */,
+				146746DF990E668CD9C3A457 /* LlaveState.swift in Sources */,
+				85B18C809D7A871F8C15FEAE /* PairingService.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EA07F8894EFE3B59F5DE39E3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F49EE00FEA557440D830ED30 /* EventParsingTests.swift in Sources */,
+				1D4FAAE949A0335A339F661F /* SimulateFlowTests.swift in Sources */,
+				8EF5862A4A18F8E62C8E563D /* StateMachineTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		2EA28B5A6CC2AFFEB0BE404B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EE2AA161BAECF66F18BD45F6 /* Llave */;
+			targetProxy = CA1230CF2DFB14B0CB690B5E /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		000F3F11A7BBC3DC790BBBB3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.ignaciojuarez.llave.tests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Llave.app/Contents/MacOS/Llave";
+			};
+			name = Debug;
+		};
+		561415DD3FD4FBD13E371FD0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.ignaciojuarez.llave.tests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Llave.app/Contents/MacOS/Llave";
+			};
+			name = Release;
+		};
+		576D386B05765A182DC124A3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Llave;
+				INFOPLIST_KEY_LSMinimumSystemVersion = 14.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ignaciojuarez.llave;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		6ECF2D6FBFF8621CB07C8500 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "Developer ID Application";
+				CODE_SIGN_STYLE = Manual;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = APPLE_TEAM_ID;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+		9A37C13E4BA5B1F48D75B731 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Llave;
+				INFOPLIST_KEY_LSMinimumSystemVersion = 14.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ignaciojuarez.llave;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		F24F7B45B66A0E43F24E9F27 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "Developer ID Application";
+				CODE_SIGN_STYLE = Manual;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = APPLE_TEAM_ID;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		26C70392E46C63A9762A7921 /* Build configuration list for PBXProject "Llave" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F24F7B45B66A0E43F24E9F27 /* Debug */,
+				6ECF2D6FBFF8621CB07C8500 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		D2D39F893A9A40E2A89FF28B /* Build configuration list for PBXNativeTarget "Llave" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				576D386B05765A182DC124A3 /* Debug */,
+				9A37C13E4BA5B1F48D75B731 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		DE0553C154464A93C4891453 /* Build configuration list for PBXNativeTarget "LlaveTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				000F3F11A7BBC3DC790BBBB3 /* Debug */,
+				561415DD3FD4FBD13E371FD0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = C82761B629467AA407A0AE98 /* Project object */;
+}

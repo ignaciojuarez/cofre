@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'self'; font-src 'self'; script-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>Cofre · Java Edition on your iPhone, in 4 steps</title>
+<meta name="description" content="Cofre is a free, open-source Minecraft: Java Edition launcher for iPhone and iPad with JIT and a VPN built in. Go from zero to playing in 4 simple steps.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0f0d17">
+<link rel="icon" type="image/png" href="assets/cofre-icon.png">
+<link rel="preload" href="fonts/PixelifySans-SemiBold.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/Geist-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="styles.css">
+<script src="app.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#steps">Skip to the steps</a>
+
+<svg class="sprite" aria-hidden="true" focusable="false">
+<symbol id="i-copy" viewBox="0 0 8 8"><path d="M0 0h5v1h-5zM0 1h1v1h-1zM4 1h1v1h-1zM0 2h1v1h-1zM3 2h5v1h-5zM0 3h1v1h-1zM3 3h1v1h-1zM7 3h1v1h-1zM0 4h4v1h-4zM7 4h1v1h-1zM3 5h1v1h-1zM7 5h1v1h-1zM3 6h5v1h-5z"/></symbol>
+<symbol id="i-check" viewBox="0 0 8 8"><path d="M6 1h2v1h-2zM5 2h2v1h-2zM0 3h2v1h-2zM4 3h2v1h-2zM1 4h4v1h-4zM2 5h2v1h-2z"/></symbol>
+<symbol id="i-cross" viewBox="0 0 8 8"><path d="M1 1h2v1h-2zM5 1h2v1h-2zM2 2h4v1h-4zM3 3h2v1h-2zM2 4h4v1h-4zM1 5h2v1h-2zM5 5h2v1h-2z"/></symbol>
+<symbol id="i-clock" viewBox="0 0 8 8"><path d="M2 0h4v1h-4zM1 1h1v1h-1zM6 1h1v1h-1zM0 2h1v1h-1zM4 2h1v1h-1zM7 2h1v1h-1zM0 3h1v1h-1zM4 3h1v1h-1zM7 3h1v1h-1zM0 4h1v1h-1zM4 4h2v1h-2zM7 4h1v1h-1zM0 5h1v1h-1zM7 5h1v1h-1zM1 6h1v1h-1zM6 6h1v1h-1zM2 7h4v1h-4z"/></symbol>
+<symbol id="i-key" viewBox="0 0 8 8"><path d="M0 2h3v1h-3zM0 3h1v1h-1zM2 3h6v1h-6zM0 4h3v1h-3zM5 4h1v1h-1zM7 4h1v1h-1z"/></symbol>
+<symbol id="i-shield" viewBox="0 0 8 8"><path d="M1 0h6v1h-6zM1 1h1v1h-1zM6 1h1v1h-1zM1 2h1v1h-1zM6 2h1v1h-1zM1 3h1v1h-1zM6 3h1v1h-1zM1 4h1v1h-1zM6 4h1v1h-1zM2 5h1v1h-1zM5 5h1v1h-1zM3 6h2v1h-2z"/></symbol>
+<symbol id="i-bolt" viewBox="0 0 8 8"><path d="M4 0h3v1h-3zM3 1h3v1h-3zM2 2h3v1h-3zM1 3h6v1h-6zM3 4h3v1h-3zM2 5h3v1h-3zM1 6h2v1h-2z"/></symbol>
+<symbol id="i-arrow" viewBox="0 0 8 8"><path d="M4 1h1v1h-1zM4 2h2v1h-2zM0 3h7v1h-7zM4 4h2v1h-2zM4 5h1v1h-1z"/></symbol>
+<symbol id="i-down" viewBox="0 0 8 8"><path d="M3 0h2v1h-2zM3 1h2v1h-2zM3 2h2v1h-2zM1 3h6v1h-6zM2 4h4v1h-4zM3 5h2v1h-2zM0 7h8v1h-8z"/></symbol>
+<symbol id="i-mail" viewBox="0 0 8 8"><path d="M0 1h8v1h-8zM0 2h2v1h-2zM6 2h2v1h-2zM0 3h1v1h-1zM2 3h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM0 4h1v1h-1zM3 4h2v1h-2zM7 4h1v1h-1zM0 5h1v1h-1zM7 5h1v1h-1zM0 6h8v1h-8z"/></symbol>
+<symbol id="i-phone" viewBox="0 0 8 8"><path d="M2 0h4v1h-4zM2 1h1v1h-1zM5 1h1v1h-1zM2 2h1v1h-1zM5 2h1v1h-1zM2 3h1v1h-1zM5 3h1v1h-1zM2 4h1v1h-1zM5 4h1v1h-1zM2 5h4v1h-4zM2 6h4v1h-4z"/></symbol>
+<symbol id="i-mac" viewBox="0 0 8 8"><path d="M0 0h8v1h-8zM0 1h1v1h-1zM7 1h1v1h-1zM0 2h1v1h-1zM7 2h1v1h-1zM0 3h1v1h-1zM7 3h1v1h-1zM0 4h8v1h-8zM3 5h2v1h-2zM2 6h4v1h-4z"/></symbol>
+<symbol id="i-people" viewBox="0 0 8 8"><path d="M1 1h2v1h-2zM5 1h2v1h-2zM1 2h2v1h-2zM5 2h2v1h-2zM0 4h3v1h-3zM5 4h3v1h-3zM0 5h3v1h-3zM5 5h3v1h-3z"/></symbol>
+<symbol id="i-book" viewBox="0 0 8 8"><path d="M1 0h6v1h-6zM1 1h1v1h-1zM7 1h1v1h-1zM1 2h1v1h-1zM3 2h3v1h-3zM7 2h1v1h-1zM1 3h1v1h-1zM7 3h1v1h-1zM1 4h1v1h-1zM3 4h3v1h-3zM7 4h1v1h-1zM1 5h1v1h-1zM7 5h1v1h-1zM1 6h6v1h-6z"/></symbol>
+<symbol id="i-wifi" viewBox="0 0 8 8"><path d="M2 0h4v1h-4zM1 1h1v1h-1zM6 1h1v1h-1zM0 2h1v1h-1zM3 2h2v1h-2zM7 2h1v1h-1zM2 3h1v1h-1zM5 3h1v1h-1zM3 5h2v1h-2zM3 6h2v1h-2z"/></symbol>
+<symbol id="i-storage" viewBox="0 0 8 8"><path d="M0 0h8v1h-8zM0 1h1v1h-1zM7 1h1v1h-1zM0 2h8v1h-8zM0 3h1v1h-1zM7 3h1v1h-1zM0 4h8v1h-8zM0 5h1v1h-1zM2 5h2v1h-2zM7 5h1v1h-1zM0 6h8v1h-8z"/></symbol>
+</svg>
+
+<header class="top">
+  <div class="wrap top-in">
+    <a class="brand" href="#top"><img src="assets/cofre-icon.png" width="28" height="28" alt=""> Cofre</a>
+    <nav aria-label="On this page">
+      <a href="#steps">Steps</a>
+      <a href="#help">Help</a>
+      <a data-link="source" href="#source">Source</a>
+    </nav>
+  </div>
+</header>
+
+<noscript><p class="noscript wrap">Download buttons need JavaScript. Turn it on, or use the links in the project's README.</p></noscript>
+
+<main id="top">
+
+<section class="hero wrap" aria-labelledby="hero-title">
+  <img class="hero-icon" src="assets/cofre-icon.png" width="128" height="128" alt="Cofre app icon: a purple chest with a gold lock">
+  <p class="label">iPhone &amp; iPad launcher · Free &amp; open source</p>
+  <h1 id="hero-title">Cofre</h1>
+  <p class="pitch">Minecraft: Java Edition, mods and all, on your iPhone. JIT and VPN built in.</p>
+  <div class="actions">
+    <a class="btn btn-primary btn-l" href="#step-1"><svg aria-hidden="true" class="ico"><use href="#i-arrow"/></svg>Get Cofre</a>
+    <a class="btn btn-l" href="#requirements">What you need</a>
+  </div>
+  <ul class="stats" aria-label="At a glance">
+    <li class="block"><b>4</b><span class="label">Steps</span></li>
+    <li class="block"><b>10</b><span class="label">Minutes</span></li>
+    <li class="block"><b>1×</b><span class="label">Mac visit</span></li>
+  </ul>
+</section>
+
+<img class="scene" src="assets/scene.png" width="240" height="60" alt="">
+
+<section id="steps" class="wrap section" aria-labelledby="steps-title">
+  <p class="label">Zero to playing</p>
+  <h2 id="steps-title">Four steps. One button each.</h2>
+
+  <ol class="steps">
+
+    <li class="step block" id="step-1">
+      <div class="step-main">
+        <div class="step-head">
+          <span class="step-num" aria-hidden="true">1</span>
+          <div class="step-title">
+            <p class="label">Step 1 · On your iPhone</p>
+            <h3>Get Cofre</h3>
+          </div>
+          <span class="badge"><svg aria-hidden="true" class="ico"><use href="#i-clock"/></svg>4 min</span>
+        </div>
+        <ol class="howto">
+          <li>Tap <b>Request an invite</b> and tell us who you are.</li>
+          <li>We send you a link that shares your iPhone's ID, so we can add it to Cofre.</li>
+          <li>When your install link arrives, open it on your iPhone and tap <b>Install</b>.</li>
+        </ol>
+        <div class="step-actions">
+          <a class="btn btn-primary btn-l" data-link="invite" href="#step-1"><svg aria-hidden="true" class="ico"><use href="#i-mail"/></svg>Request an invite</a>
+        </div>
+        <details class="more">
+          <summary>Advanced: sideload the IPA</summary>
+          <div class="more-body">
+            <p>Not on the invite list, or have your own developer account? Install the IPA with your own Apple ID (for example AltStore or SideStore).</p>
+            <div class="table-scroll">
+            <table>
+              <caption class="sr">What changes with your own Apple ID</caption>
+              <thead><tr><th scope="col"><span class="sr">Item</span></th><th scope="col">Free Apple ID</th><th scope="col">Paid account</th></tr></thead>
+              <tbody>
+                <tr><th scope="row">App lasts</th><td>7 days</td><td>1 year</td></tr>
+                <tr><th scope="row">Apps at once</th><td>3</td><td>No limit</td></tr>
+                <tr><th scope="row">Built-in VPN</th><td><span class="no">No</span>*</td><td><span class="yes">Yes</span></td></tr>
+                <tr><th scope="row">JIT</th><td><span class="yes">Yes</span></td><td><span class="yes">Yes</span></td></tr>
+              </tbody>
+            </table>
+            </div>
+            <p class="fine">* Free accounts need a separate VPN app. Paid account: $99 a year. Limits are Apple's: <a href="https://developer.apple.com/support/compare-memberships/">free vs paid accounts</a> · <a href="https://developer.apple.com/help/account/reference/supported-capabilities-ios">VPN needs a paid account</a>.</p>
+            <a class="btn" data-link="ipa" href="#step-1"><svg aria-hidden="true" class="ico"><use href="#i-down"/></svg>Download IPA</a>
+          </div>
+        </details>
+      </div>
+      <figure class="see">
+        <figcaption class="label">What you'll see</figcaption>
+        <div class="mock phone" role="img" aria-label="An iPhone alert asks to install Cofre, with Cancel and Install. Then the Cofre icon appears on the home screen.">
+          <div class="mock-alert">
+            <p><b>… would like to install “Cofre”</b></p>
+            <div class="mock-btns"><span>Cancel</span><span class="on">Install</span></div>
+          </div>
+          <div class="mock-home">
+            <span class="app"><i></i>Photos</span>
+            <span class="app"><i></i>Camera</span>
+            <span class="app new"><img src="assets/cofre-icon.png" width="32" height="32" alt="">Cofre</span>
+          </div>
+        </div>
+      </figure>
+    </li>
+
+    <li class="step block" id="step-2">
+      <div class="step-main">
+        <div class="step-head">
+          <span class="step-num" aria-hidden="true">2</span>
+          <div class="step-title">
+            <p class="label">Step 2 · On your iPhone</p>
+            <h3>Turn on Developer Mode</h3>
+          </div>
+          <span class="badge"><svg aria-hidden="true" class="ico"><use href="#i-clock"/></svg>2 min</span>
+        </div>
+        <ol class="howto">
+          <li>Open <b>Settings → Privacy &amp; Security</b>.</li>
+          <li>Scroll to <b>Security</b>, tap <b>Developer Mode</b>, turn it on.</li>
+          <li>Tap <b>Restart</b>. After it restarts, unlock, tap <b>Turn On</b> (or <b>Enable</b>) and enter your passcode.</li>
+        </ol>
+        <div class="step-actions">
+          <details class="more more-btn">
+            <summary class="btn btn-l"><svg aria-hidden="true" class="ico"><use href="#i-bolt"/></svg>Don't see it?</summary>
+            <div class="more-body">
+              <p>iOS hides Developer Mode until the iPhone has been paired with a Mac. Do <a href="#step-3">Step 3</a> first, then come back here.</p>
+              <p>Opening Cofre and seeing <b>“Developer Mode Required”</b>? Same fix: finish this step.</p>
+            </div>
+          </details>
+        </div>
+      </div>
+      <figure class="see">
+        <figcaption class="label">What you'll see</figcaption>
+        <div class="mock phone" role="img" aria-label="Settings, Privacy and Security: the Developer Mode switch is on, and an alert asks you to Restart.">
+          <p class="mock-crumb">Settings › Privacy &amp; Security</p>
+          <p class="mock-sec">Security</p>
+          <div class="mock-row dim">Lockdown Mode <span>Off</span></div>
+          <div class="mock-row hi">Developer Mode <span class="switch" aria-hidden="true"><i></i></span></div>
+          <div class="mock-alert">
+            <p><b>Developer Mode</b><br>Restart to turn on.</p>
+            <div class="mock-btns"><span>Cancel</span><span class="on">Restart</span></div>
+          </div>
+        </div>
+      </figure>
+    </li>
+
+    <li class="step block" id="step-3">
+      <div class="step-main">
+        <div class="step-head">
+          <span class="step-num" aria-hidden="true">3</span>
+          <div class="step-title">
+            <p class="label">Step 3 · On a Mac, once</p>
+            <h3>Connect to a Mac</h3>
+          </div>
+          <span class="badge"><svg aria-hidden="true" class="ico"><use href="#i-clock"/></svg>2 min</span>
+        </div>
+        <ol class="howto">
+          <li>Have Cofre installed on your iPhone (<a href="#step-1">Step 1</a>).</li>
+          <li>Plug your iPhone into the Mac with a cable.</li>
+          <li>Open <b>Terminal</b> (press <kbd>⌘</kbd> <kbd>Space</kbd>, type “Terminal”, press <kbd>Return</kbd>). Paste the command below and press <kbd>Return</kbd>.</li>
+          <li>A Cofre window opens and guides you: unlock your iPhone, tap <b>Trust</b>, then wait for <b>Done</b>.</li>
+          <li>Open Cofre on your iPhone. It's ready.</li>
+        </ol>
+        <div class="command">
+          <code data-command>Turn on JavaScript to see the command.</code>
+          <button class="btn btn-primary btn-l" type="button" data-copy="command"><svg aria-hidden="true" class="ico"><use href="#i-copy"/></svg><span>Copy</span></button>
+        </div>
+        <p class="fine copy-status" role="status" data-copy-status="command"></p>
+        <aside class="banner bad" aria-label="Warning">
+          <svg aria-hidden="true" class="ico ico-l"><use href="#i-shield"/></svg>
+          <div>
+            <p class="label">Never share your pairing key</p>
+            <p><b>Never paste or upload your pairing file to any chat, website or person.</b> Not even ChatGPT or Claude. It's a key to your phone.</p>
+          </div>
+        </aside>
+        <details class="more">
+          <summary>If the window shows “Send with AirDrop”</summary>
+          <div class="more-body">
+            <ol>
+              <li>Click <b>Send with AirDrop</b> and pick your iPhone. On the iPhone, tap <b>Accept</b>. It's saved in <b>Files → Downloads</b>.</li>
+              <li>Open Cofre, tap <b>I have a file</b> → <b>Downloads</b> → the file named after your iPhone.</li>
+            </ol>
+          </div>
+        </details>
+        <div class="step-actions">
+          <a class="btn" data-link="pairingGuide" href="#step-3"><svg aria-hidden="true" class="ico"><use href="#i-book"/></svg>What the command does</a>
+          <button class="btn btn-ghost" type="button" data-copy="help"><svg aria-hidden="true" class="ico"><use href="#i-bolt"/></svg><span>Stuck? Ask ChatGPT or Claude</span></button>
+        </div>
+        <p class="fine copy-status" role="status" data-copy-status="help"></p>
+        <aside class="banner ok" aria-label="Shortcut">
+          <svg aria-hidden="true" class="ico ico-l"><use href="#i-people"/></svg>
+          <div>
+            <p class="label">Shortcut · In person</p>
+            <p><b>No Mac? Use a friend's.</b> Plug into their Mac, paste the command, tap Trust. About 2 minutes, and nothing stays on their Mac.</p>
+          </div>
+        </aside>
+      </div>
+      <figure class="see">
+        <figcaption class="label">What you'll see</figcaption>
+        <div class="mock mac" role="img" aria-label="On the Mac: Terminal runs the command, and a Cofre window shows iPhone connected, trusted, key sent, Done.">
+          <div class="mac-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+          <p class="mock-term">$ curl -fsSL …/pair.sh | sh</p>
+          <div class="mac-body">
+            <img src="assets/key-icon.png" width="48" height="48" alt="">
+            <p class="mock-title">Cofre</p>
+            <ul class="mock-checks">
+              <li><svg class="ico"><use href="#i-check"/></svg>iPhone connected</li>
+              <li><svg class="ico"><use href="#i-check"/></svg>Trusted</li>
+              <li><svg class="ico"><use href="#i-check"/></svg>Key sent to Cofre</li>
+            </ul>
+            <span class="mock-btn">Done</span>
+          </div>
+        </div>
+        <div class="cable" aria-hidden="true"></div>
+        <div class="mock phone small" role="img" aria-label="The iPhone asks: Trust This Computer? Tap Trust.">
+          <div class="mock-alert">
+            <p><b>Trust This Computer?</b></p>
+            <div class="mock-btns"><span class="on">Trust</span><span>Don't Trust</span></div>
+          </div>
+        </div>
+      </figure>
+    </li>
+
+    <li class="step block" id="step-4">
+      <div class="step-main">
+        <div class="step-head">
+          <span class="step-num" aria-hidden="true">4</span>
+          <div class="step-title">
+            <p class="label">Step 4 · On your iPhone</p>
+            <h3>Open Cofre and play</h3>
+          </div>
+          <span class="badge"><svg aria-hidden="true" class="ico"><use href="#i-clock"/></svg>3 min</span>
+        </div>
+        <ol class="howto">
+          <li>Open Cofre. Your key is already inside, so setup moves on by itself.</li>
+          <li>When iOS asks to add a VPN, tap <b>Allow</b>. Cofre then tests JIT for you.</li>
+          <li>Tap <b>Sign in with Microsoft</b>, then <b>Play</b>.</li>
+        </ol>
+        <p class="fine">From then on, just tap Play. JIT and the VPN turn on by themselves.</p>
+        <div class="step-actions">
+          <a class="btn btn-l" href="#help"><svg aria-hidden="true" class="ico"><use href="#i-book"/></svg>Stuck? Get help</a>
+        </div>
+      </div>
+      <figure class="see">
+        <figcaption class="label">What you'll see</figcaption>
+        <img class="shot" src="assets/shot-play.png" width="560" height="368" alt="Cofre's Play screen: a big Play button, JIT OK, 6 GB memory, 70% resolution, 60 FPS cap">
+      </figure>
+    </li>
+  </ol>
+</section>
+
+<section id="requirements" class="wrap section" aria-labelledby="req-title">
+  <p class="label">Before you start</p>
+  <h2 id="req-title">What you need</h2>
+  <ul class="rows">
+    <li class="block row"><svg aria-hidden="true" class="ico ico-l"><use href="#i-phone"/></svg><div><h3>iPhone or iPad</h3><p><b>iOS 26.</b> Tested on iPhone 17 Pro with iOS 26. Other iPhones and iPads on iOS 26 should work but aren't tested yet. Wait for our OK before big iOS updates.</p></div></li>
+    <li class="block row"><svg aria-hidden="true" class="ico ico-l"><use href="#i-key"/></svg><div><h3>Minecraft: Java Edition</h3><p>A Microsoft account that owns Java Edition. Minecraft bought on a phone or console doesn't include it.</p></div></li>
+    <li class="block row"><svg aria-hidden="true" class="ico ico-l"><use href="#i-mac"/></svg><div><h3>A Mac, just once</h3><p>For Step 3: about 2 minutes, plus a cable for your iPhone. A friend's Mac works too. <span class="badge soon">Windows &amp; Linux: coming soon</span></p></div></li>
+    <li class="block row"><svg aria-hidden="true" class="ico ico-l"><use href="#i-storage"/></svg><div><h3>Free space and Wi-Fi</h3><p>Keep <b>about 8 GB</b> free. Cofre is about 760 MB. Each modpack takes 1–6 GB. Wi-Fi is needed to turn on JIT.</p></div></li>
+  </ul>
+</section>
+
+<section id="works" class="wrap section" aria-labelledby="works-title">
+  <p class="label">Straight answers</p>
+  <h2 id="works-title">What works, and the limits</h2>
+  <div class="split">
+    <div class="block card">
+      <h3 class="tone-ok"><svg aria-hidden="true" class="ico"><use href="#i-check"/></svg>Works</h3>
+      <ul class="ticks">
+        <li><b>Play with PC friends.</b> It's real Java Edition, so you join the same servers as PC players. Bedrock players (consoles, phones) can join only if the server runs Geyser.</li>
+        <li><b>Modded servers.</b> Fabric, Quilt, Forge and NeoForge. Install the server's modpack or the same mods from Modrinth or CurseForge.</li>
+        <li><b>Coming: one-tap Join.</b> Servers will be able to publish a card so Cofre installs the right mods and joins for you.</li>
+      </ul>
+    </div>
+    <div class="block card">
+      <h3 class="tone-warn"><svg aria-hidden="true" class="ico"><use href="#i-cross"/></svg>Limits</h3>
+      <ul class="ticks">
+        <li><b>Memory.</b> Phones have less RAM than PCs. Cofre picks a safe amount for you. On 6 GB iPhones keep packs to about 150 mods, and lower the resolution if it closes.</li>
+        <li><b>PC-only mods.</b> Mods with desktop native code don't work, such as Simple Voice Chat, Plasmo Voice and Sound Physics Remastered.</li>
+        <li><b>iOS updates</b> can break JIT. Turn off automatic updates and wait for our OK.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="help" class="wrap section" aria-labelledby="help-title">
+  <p class="label">FAQ &amp; troubleshooting</p>
+  <h2 id="help-title">Help</h2>
+  <div class="faq">
+    <details class="block">
+      <summary>JIT won't turn on</summary>
+      <div class="more-body">
+        <ol>
+          <li>Check <b>Developer Mode</b> is on (<a href="#step-2">Step 2</a>).</li>
+          <li>Use Wi-Fi, and turn off any other VPN (work, ad blocker). iOS runs one VPN at a time.</li>
+          <li>Right after a restart, JIT needs internet once to set up.</li>
+          <li>Close Cofre fully and open it again. Then try <b>Settings → JIT &amp; Java → Test JIT</b>.</li>
+          <li>Still failing? Your pairing key may be stale. See the next answer.</li>
+        </ol>
+      </div>
+    </details>
+    <details class="block">
+      <summary>It stopped working after an iOS update or a reset</summary>
+      <div class="more-body">
+        <p>An iOS update, erasing the iPhone, or <b>Reset Location &amp; Privacy</b> can make your pairing key stop working. Redo <a href="#step-3">Step 3</a>: plug in and run the command again (2 minutes).</p>
+        <p>To avoid it: <b>Settings → General → Software Update → Automatic Updates</b>, turn them off.</p>
+      </div>
+    </details>
+    <details class="block">
+      <summary>Why does Cofre ask to add a VPN?</summary>
+      <div class="more-body">
+        <p>JIT needs Cofre to talk to your own iPhone. The VPN is local: it only carries that one connection inside the phone. Your browsing doesn't go through it. Tap <b>Allow</b> and enter your passcode.</p>
+      </div>
+    </details>
+    <details class="block">
+      <summary>“Not enough storage”</summary>
+      <div class="more-body">
+        <p>Keep about 8 GB free. Delete instances you don't play in <b>Instances</b>, and check <b>Settings → General → iPhone Storage</b>.</p>
+      </div>
+    </details>
+    <details class="block">
+      <summary>Can I share my pairing file?</summary>
+      <div class="more-body">
+        <p><b>No. Never paste or upload it to any chat, website or person, not even ChatGPT or Claude.</b> It's a key to your iPhone: anyone who has it can control your phone like a trusted computer. It also only works for the iPhone it was made for. Everyone runs <a href="#step-3">Step 3</a> for their own phone.</p>
+      </div>
+    </details>
+    <details class="block">
+      <summary>Is the Terminal command safe?</summary>
+      <div class="more-body">
+        <p>It downloads a small helper signed by us into a temporary folder, opens it, puts the key inside Cofre over the cable, and deletes itself. Nothing is installed or uploaded, and it never asks for a password. <a data-link="pairingGuide" href="#step-3">Read exactly what it does</a>.</p>
+      </div>
+    </details>
+    <details class="block">
+      <summary>Does it work on cellular data?</summary>
+      <div class="more-body">
+        <p>Turning on JIT needs Wi-Fi. With no Wi-Fi around, you can still play single-player: start Cofre, then turn on Airplane Mode.</p>
+      </div>
+    </details>
+    <details class="block">
+      <summary>How long does Cofre last?</summary>
+      <div class="more-body">
+        <p>Invite installs last 1 year. Cofre warns you 30 days before. Installing the new link keeps your worlds. Sideloaded with a free Apple ID: 7 days, then refresh.</p>
+      </div>
+    </details>
+  </div>
+</section>
+
+<section id="privacy" class="wrap section" aria-labelledby="privacy-title">
+  <p class="label">Privacy &amp; safety</p>
+  <h2 id="privacy-title">Your key stays with you</h2>
+  <ul class="rows">
+    <li class="block row"><svg aria-hidden="true" class="ico ico-l"><use href="#i-key"/></svg><div><h3>Your pairing key never leaves your devices</h3><p>It goes from the Mac straight into Cofre over the cable. Cofre keeps it on the phone. It's never uploaded or logged.</p></div></li>
+    <li class="block row"><svg aria-hidden="true" class="ico ico-l"><use href="#i-shield"/></svg><div><h3>The helper deletes itself</h3><p>It runs from a temporary folder and is gone when it says Done. Nothing installed, no password, no account.</p></div></li>
+    <li class="block row"><svg aria-hidden="true" class="ico ico-l"><use href="#i-wifi"/></svg><div><h3>Local VPN, Microsoft sign-in</h3><p>The VPN never leaves your phone. You sign in on Microsoft's own page.</p></div></li>
+    <li class="block row"><svg aria-hidden="true" class="ico ico-l"><use href="#i-book"/></svg><div><h3>Open source</h3><p>Cofre is GPL-3.0. Read every line, or build it yourself.</p></div></li>
+  </ul>
+</section>
+
+</main>
+
+<footer class="foot" id="source">
+  <div class="wrap">
+    <div class="foot-top">
+      <a class="brand" href="#top"><img src="assets/cofre-icon.png" width="28" height="28" alt=""> Cofre</a>
+      <a class="btn" data-link="source" href="#source"><svg aria-hidden="true" class="ico"><use href="#i-book"/></svg>Source code</a>
+    </div>
+    <p class="legal"><b>Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft.</b> Minecraft is a trademark of Mojang AB.</p>
+    <p class="credits">Cofre is <b>GPL-3.0</b>, a fork of <a href="https://github.com/herbrine8403/Amethyst-iOS-MyRemastered">Air</a> and <a href="https://github.com/AngelAuraMC/Amethyst-iOS">Amethyst</a> (GPL-3.0). JIT by <a href="https://github.com/StikDebug/StikJIT">StikJIT</a> (MPL-2.0). Device pairing by <a href="https://github.com/jkcoxson/idevice">idevice</a> (MIT). Fonts: Pixelify Sans, Geist and Geist Mono (<a href="fonts/OFL.txt">SIL OFL 1.1</a>). Pixel art is original.</p>
+  </div>
+</footer>
+</body>
+</html>

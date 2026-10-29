@@ -1,0 +1,6 @@
+build/
+core/target/
+.DS_Store
+llave-pair-universal
+dist/
+App/Resources/llave-pair
