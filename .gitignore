@@ -9,3 +9,4 @@ app/Resources/AppIcon/.DS_Store
 scripts/__pycache__/
 scripts/run.local.config
 artifacts/Development.entitlements
+.build-tools/signing/build/
