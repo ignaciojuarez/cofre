@@ -55,6 +55,7 @@ extension CofreBackendAdapter {
         let url = request.card ?? Discovery.wellKnown(host: request.server.split(separator: ":").first.map(String.init) ?? request.server)
         let result = try CardDecoder.decodeEnvelope(try await URLSessionCardFetcher().fetch(url))
         let trust = await TrustVerifier.evaluate(card: result.card, envelope: result.envelope, store: Self.trustStore)
+        UserDefaults.standard.set(true, forKey: "cofre.server-card.\(result.card.server.addresses.first?.host ?? request.server)")
         let index = MrpackIndex(dependencies: [:], files: [])
         return JoinResolution(card: result.card, plan: InstallPlanner.plan(card: result.card, index: index), trust: trust)
     }
