@@ -14,6 +14,7 @@ if (( BUILD )); then
   find "$AIR" -name CMakeCache.txt -delete
   find "$AIR" -type d -name CMakeFiles -prune -exec rm -rf {} +
   mkdir -p "$AIR/Natives/Assets.xcassets"
+  if ! grep -q "CofreMakeRootViewController" "$AIR/Natives/SceneDelegate.m"; then git -C "$AIR" apply "$ROOT/patches/air/0002-install-cofre-root.patch" || bt_die "failed to apply Cofre root patch"; fi
   mkdir -p "$AIR/Natives/CofreGlue"
   cp "$ROOT"/app/Glue/AirBridge/AirBridgeAdapter.* "$AIR/Natives/CofreGlue/"
   cp "$ROOT"/app/Glue/AirBridge/CofreStartup.m "$AIR/Natives/CofreGlue/"
