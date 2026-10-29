@@ -52,6 +52,17 @@ targets:
       ARCHS: arm64
       SWIFT_OBJC_BRIDGING_HEADER: $(SRCROOT)/../../app/Glue/AirBridge/CofreAirBridging.h
       SWIFT_INCLUDE_PATHS: "$(SRCROOT)/../../app/UI/build/Debug-iphoneos $(SRCROOT)/../../app/ServerJoin/build/Debug-iphoneos"
+  CofreCoreTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: ../../tests/preferences/CofrePreferencesTests.swift
+    dependencies:
+      - target: CofreCore
+      - package: CofreUI
+        product: CofreUI
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.ignaciojuarez.cofre.core.tests
   PacketTunnel:
     type: app-extension
     platform: iOS

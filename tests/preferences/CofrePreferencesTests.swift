@@ -1,5 +1,6 @@
 import XCTest
-@testable import CofrePreferences
+import CofreCore
+import CofreUI
 
 final class CofrePreferencesTests: XCTestCase {
     func testDefaultsAndKeyMapping() {
