@@ -10,11 +10,14 @@ public struct PixelScene: View {
     }
 
     public var body: some View {
-        Group {
+        // Takes the offered size and fills it, cropped. A bare `.fill` image reports its overflowing size, which
+        // widened whole columns past the screen (the iPhone launch screen was clipped on both sides).
+        Color.clear.overlay {
             if let img = SceneRenderer.image(seed: seed, w: Int(pixels.width), h: Int(pixels.height)) {
                 Image(decorative: img, scale: 1).interpolation(.none).resizable().aspectRatio(contentMode: .fill)
             }
         }
+        .clipped()
         .accessibilityIgnoresInvertColors()
         .accessibilityHidden(true)
     }
