@@ -137,6 +137,22 @@ public enum Discovery {
         else { throw ServerJoinError.invalidDeepLink }
         return card
     }
+
+    /// Decodes a join link and binds its optional advertised server to the card's addresses.
+    public static func deepLink(_ url: URL, card: ServerCard) throws -> URL {
+        let cardURL = try deepLink(url)
+        guard let advertised = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: {
+            $0.name == "server"
+        })?.value else { return cardURL }
+        let parts = advertised.split(separator: ":", maxSplits: 1).map(String.init)
+        guard let host = URLPolicy.canonicalHost(parts[0]),
+            let port = parts.count == 2 ? Int(parts[1]) : 25565,
+            card.server.addresses.contains(where: {
+                URLPolicy.canonicalHost($0.host) == host && $0.port == port
+            })
+        else { throw ServerJoinError.invalidDeepLink }
+        return cardURL
+    }
     public static func wellKnown(host: String) -> URL {
         URL(string: "https://\(host)/.well-known/minecraft-server-card.json")!
     }

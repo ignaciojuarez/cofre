@@ -22,6 +22,17 @@ final class ServerJoinTests: XCTestCase {
             try Discovery.deepLink(URL(string: "cofre://join?card=https%3A%2F%2Fexample.test%2Fx")!).absoluteString,
             "https://example.test/x")
     }
+    func testDeepLinkServerMismatchRejected() throws {
+        let c = try CardDecoder.decodeCard(card("fabric-modrinth"))
+        let link = URL(string: "cofre://join?server=other.test:25565&card=https%3A%2F%2Fexample.test%2Fx")!
+        XCTAssertThrowsError(try Discovery.deepLink(link, card: c))
+    }
+    func testURLPolicyRejectsUserinfoPortsAndCanonicalizesIDN() throws {
+        XCTAssertThrowsError(try URLPolicy.validate(URL(string: "https://u:p@example.test/x")!, allowedHosts: ["example.test"]))
+        XCTAssertThrowsError(try URLPolicy.validate(URL(string: "https://example.test:444/x")!, allowedHosts: ["example.test"]))
+        let url = try URLPolicy.validate(URL(string: "https://bücher.example./x")!, allowedHosts: ["xn--bcher-kva.example"])
+        XCTAssertEqual(url.host, "xn--bcher-kva.example")
+    }
     func testWellKnown() {
         XCTAssertEqual(
             Discovery.wellKnown(host: "a.test").absoluteString, "https://a.test/.well-known/minecraft-server-card.json")
@@ -52,6 +63,20 @@ final class ServerJoinTests: XCTestCase {
         await TrustVerifier.confirm(card: c, envelope: e, store: s)
         let second = await TrustVerifier.evaluate(card: c, envelope: e, store: s)
         XCTAssertFalse(second.keyChanged)
+    }
+    func testTrustPersistsAcrossReinitAndKeyChangeBlocks() async throws {
+        let c = try CardDecoder.decodeCard(card("fabric-modrinth"))
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("trust-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let first = CardEnvelope(format: "cofre-card-envelope/1", payload: "", keyID: "k", publicKey: String(repeating: "A", count: 43), signature: String(repeating: "B", count: 86), previousKeySignature: nil)
+        let store = FileTrustStore(url: url)
+        await TrustVerifier.confirm(card: c, envelope: first, store: store)
+        let reloaded = FileTrustStore(url: url)
+        let same = await TrustVerifier.evaluate(card: c, envelope: first, store: reloaded)
+        XCTAssertFalse(same.firstVisit)
+        let changed = CardEnvelope(format: first.format, payload: "", keyID: "new", publicKey: String(repeating: "C", count: 43), signature: first.signature, previousKeySignature: nil)
+        let rotation = await TrustVerifier.evaluate(card: c, envelope: changed, store: reloaded)
+        XCTAssertTrue(rotation.keyChanged)
     }
     func testOriginBinding() async throws {
         let c = try CardDecoder.decodeCard(card("fabric-modrinth"))
@@ -147,4 +172,22 @@ final class ServerJoinTests: XCTestCase {
         XCTAssertEqual(try CardDecoder.decodeCard(card("fabric-modrinth")).pack.sha512.count, 128)
     }
     func testCachePathAPI() { XCTAssertNotNil(FileHashCache(root: URL(fileURLWithPath: "/tmp/cache"))) }
+    func testStreamingBudgetAndHashFailureLeaveNoImport() async throws {
+        var object = try JSONSerialization.jsonObject(with: card("fabric-modrinth")) as! [String: Any]
+        var pack = object["pack"] as! [String: Any]
+        pack["size_bytes"] = 4
+        pack["sha512"] = String(repeating: "0", count: 128)
+        object["pack"] = pack
+        let card = try CardDecoder.decodeCard(JSONSerialization.data(withJSONObject: object))
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("oversize-\(UUID().uuidString)")
+        try Data(repeating: 1, count: 5).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+        do { try await InstallEngine().verify(fileURL: file, card: card); XCTFail("expected rejection") }
+        catch let error as ServerJoinError { XCTAssertEqual(error, .sizeLimit) }
+        let short = FileManager.default.temporaryDirectory.appendingPathComponent("hash-\(UUID().uuidString)")
+        try Data(repeating: 0, count: 4).write(to: short)
+        defer { try? FileManager.default.removeItem(at: short) }
+        do { try await InstallEngine().verify(fileURL: short, card: card); XCTFail("expected rejection") }
+        catch let error as ServerJoinError { XCTAssertEqual(error, .hashMismatch) }
+    }
 }
