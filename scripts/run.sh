@@ -51,6 +51,12 @@ if (( BUILD )); then
   xcodebuild -project "$SIGNING/CofreSigning.xcodeproj" -scheme CofreSigning -configuration Debug -destination 'generic/platform=iOS' -derivedDataPath "$SIGNING/build" -allowProvisioningUpdates DEVELOPMENT_TEAM="$TEAM_ID" -quiet build || bt_die "CofreCore build failed"
   mkdir -p "$APP/Frameworks"
   cp -R "$SIGNING/build/Build/Products/Debug-iphoneos/CofreCore.framework" "$APP/Frameworks/"
+  # SwiftPM resources (CofreUI fonts) live in *_*.bundle; Bundle.module looks for them at the app root.
+  for bundle in "$SIGNING"/build/Build/Products/Debug-iphoneos/*_*.bundle; do
+    rm -rf "$APP/$(basename "$bundle")"
+    cp -R "$bundle" "$APP/"
+  done
+  [[ -d "$APP/CofreUI_CofreUI.bundle" ]] || bt_die "CofreUI resources missing from the app"
   bt_step "Build VPN extension"
   SIGNING="$ROOT/.build-tools/signing"
   (cd "$SIGNING" && xcodegen generate --spec project.yml --quiet) || bt_die "could not generate the signing project"
