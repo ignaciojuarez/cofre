@@ -213,18 +213,7 @@
                         try Task.checkCancellation()
                         if !self.isJITEnabled {
                             continuation.yield(LaunchProgress(stage: 1, of: 7, title: "JIT", detail: "Enabling JIT"))
-                            let result = await CofreJIT.enable(pid: getpid(), pairingURL: { self.pairingURL })
-                            NSLog("[Cofre] launch JIT status=%@", String(describing: result))
-                            try Task.checkCancellation()
-                            switch result {
-                            case .enabled: break
-                            case .needsPairing: throw CofreBackendError.jit("No pairing key yet")
-                            case .needsVPN: throw CofreBackendError.jit("The VPN isn't on")
-                            case .failed(let message, let step):
-                                throw CofreBackendError.jit(step.map { "JIT failed at \($0): \(message)" } ?? message)
-                            case .unavailable, .enabling: throw CofreBackendError.jit("JIT didn't turn on")
-                            }
-                            guard self.isJITEnabled else { throw CofreBackendError.jit("JIT didn't turn on") }
+                            try await self.ensureJIT()
                         }
                         try Task.checkCancellation()
                         NSLog("[Cofre] launch JIT ready; starting Air")
@@ -312,6 +301,23 @@
         public func importPack(_ url: URL, instanceID: String?) -> AsyncThrowingStream<InstallProgress, Error> {
             unavailableStream("pack import")
         }
+        /// Turns on JIT through the built-in VPN, as the game and the Forge/NeoForge installers need it.
+        func ensureJIT() async throws {
+            guard !isJITEnabled else { return }
+            let result = await CofreJIT.enable(pid: getpid(), pairingURL: { self.pairingURL })
+            NSLog("[Cofre] JIT status=%@", String(describing: result))
+            try Task.checkCancellation()
+            switch result {
+            case .enabled: break
+            case .needsPairing: throw CofreBackendError.jit("No pairing key yet. Pair this device in Settings first.")
+            case .needsVPN: throw CofreBackendError.jit("The VPN isn't on")
+            case .failed(let message, let step):
+                throw CofreBackendError.jit(step.map { "JIT failed at \($0): \(message)" } ?? message)
+            case .unavailable, .enabling: throw CofreBackendError.jit("JIT didn't turn on")
+            }
+            guard isJITEnabled else { throw CofreBackendError.jit("JIT didn't turn on") }
+        }
+
         public func testJIT() -> AsyncThrowingStream<JITStep, Error> {
             AsyncThrowingStream { continuation in
                 Task { @MainActor in

@@ -585,6 +585,12 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
       completion(error);
     });
   };
+  // The installers' processors run in a headless JVM, which can start only once per app session.
+  static BOOL headlessJVMUsed;
+  if (headlessJVMUsed) {
+    done(CofreAirError(@"Close Cofre completely and open it again to install another Forge or NeoForge loader."));
+    return;
+  }
   NSDictionary *profile = _profiles.profiles[name];
   NSString *game = profile[@"cofreGameVersion"] ?: profile[@"lastVersionId"];
   BOOL neo = [loader isEqualToString:@"neoforge"];
@@ -652,6 +658,10 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
           // The installers download libraries synchronously through the shared
           // session; running them on its serial callback queue deadlocks.
           dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+          // Air never clears this flag, so a run that stopped before the JVM started would
+          // make the next attempt skip the processors and miss their status file.
+          atomic_store(&g_ame_headlessJvmFinished, 0);
+          headlessJVMUsed = isJITEnabled(false);
           NSString *instanceDir = amePCLVersionGameDirAbsolute(profile, nil);
           void (^step)(double, NSString *) = ^(double p, NSString *message) {
             if (progress)

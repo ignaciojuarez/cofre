@@ -141,6 +141,8 @@
         public func installLoader(instanceID: String, loader: Loader, version: String) async throws {
             if loader == .forge || loader == .neoforge {
                 let name = loader == .neoforge ? "NeoForge" : "Forge"
+                // Their installer runs Java tools, which need JIT.
+                try await ensureJIT()
                 try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in
                     let watchdog = AirWatchdog(idle: 120) {
                         c.resume(throwing: NSError(
