@@ -292,7 +292,7 @@ Overlaps with `logic-review.md` are noted, not repeated.
   - "Cofre missing" exists twice: the `.cofreMissing` state and `.error(code: "COFRE_MISSING")` (`StateScreen.swift:77-81`). Keep the state and map the code to it once, in `LlaveModel`.
   - `LlaveState.ready(fileURL:)` is only produced by `PreviewState.swift:24` → delete it, or document it as the AirDrop-only path.
   - `--simulate` is declared 3 times: `cli.rs:6-7` (global) plus `:14-15` and `:24-25`, merged at `main.rs:14,18,40`. Keep only the global flag.
-  - `tools/llave/SHA256SUMS` contains an absolute path into another checkout (`<local-home>/.t3/scratch/…/llave/build/Llave.app.zip`). Fix `release.sh:6` to `(cd "$ROOT/build" && shasum -a 256 Llave.app.zip) > "$ROOT/SHA256SUMS"`.
+  - `tools/llave/SHA256SUMS` contains an absolute path into another checkout (a local absolute path). Fix `release.sh:6` to `(cd "$ROOT/build" && shasum -a 256 Llave.app.zip) > "$ROOT/SHA256SUMS"`.
 
 ### M15. The app↔appex JIT message has no shared definition
 - **Where:**
@@ -400,7 +400,7 @@ a loopback PacketTunnel VPN running StikJIT for JIT. Mac pairing helper: Llave. 
    `artifacts/`). If `build-air.pid` exists and that PID is alive, wait; never start a second build or edit
    `.work/air` meanwhile.
 6. Never install on any device except through `scripts/run.sh` (relay to the iPhone 17 Pro). Never the iPad.
-   Simulators: reuse the shared UDIDs in `<local-volume>/Developer/kiwios/docs/simulators.md`; never create or erase.
+   Simulators: reuse the shared simulators; never create or erase.
 7. User-facing text: never mention third-party pairing tools; point to our Terminal command. Never ask
    anyone to paste a pairing file anywhere.
 8. Links: site URLs live in `docs/app.js` `LINKS`; the app copy is `CofreLinks` (allowlist test). Change both.

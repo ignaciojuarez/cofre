@@ -16,8 +16,7 @@ live next to this file; this one links to them. Update the status here whenever 
 
 ## 🎯 Now: approved features (from the design draft)
 
-The screens were drafted by Z in `Screens/Draft/` ([design-draft](design-draft.md),
-`/tmp/cofre-shots/agentZ-*.png`). Each one is built on CofreKit, and the old path it replaces is deleted in the
+The screens were drafted by Z in `Screens/Draft/` ([design-draft](design-draft.md)). Each one is built on CofreKit, and the old path it replaces is deleted in the
 same step.
 
 | # | Area | What ships | Status |
@@ -162,7 +161,6 @@ Done already: the frame rate is the game's (`0e18921`), and ProMotion's 30–120
 - 🎯 Still to rerun one at a time (GPT rate limits) and apply:
   - bridge, backend and prefs (AC);
   - SwiftUI app, tests and scripts (AD).
-- Briefs are in `/tmp/cofre-audit/`.
 
 ## Release and distribution ([PUBLIC_RELEASE](PUBLIC_RELEASE.md))
 
@@ -176,7 +174,6 @@ Done already: the frame rate is the game's (`0e18921`), and ProMotion's 30–120
   - Windows build.
 - 💤 Invite flow and hosting on GitHub Releases. Never cofre.site; never mention iloader.
 - 💤 CurseForge key through `request_secret`. Until then CurseForge search shows "needs a key".
-- 💤 Ops: delete `/tmp/llave-test` on the relay Mac.
 
 ## Later (from [missing-features](missing-features.md))
 
@@ -209,5 +206,5 @@ Done already: the frame rate is the game's (`0e18921`), and ProMotion's 30–120
   - commit through a temporary index, then `git reset -- <files>`;
   - take the `.work/.build-lock` before building;
   - for device builds while others have work in progress, build from a clean worktree (`run.sh` uses `cd -P`).
-- Install only on the iPhone 17 Pro, through the relay. Local commits only; publishing needs approval.
+- Install only through `scripts/run.sh` (device set in the local config). Local commits only; publishing needs approval.
 - A weekly upstream report runs as a T3 scheduled task ([UPSTREAM_STRATEGY](UPSTREAM_STRATEGY.md)).

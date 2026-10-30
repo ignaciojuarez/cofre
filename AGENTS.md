@@ -34,7 +34,7 @@ Cofre is a Minecraft: Java Edition launcher for iPhone and iPad. It combines the
    1. Wait until `pgrep -f '.work/air|CofreSigning'` returns nothing.
    2. Create the lock with `mkdir .work/.build-lock`, retrying while it exists.
    3. Run `rmdir .work/.build-lock` when you're done, even after a failure.
-6. Install only through `scripts/run.sh`, which uses the relay to the iPhone 17 Pro `OLD_DEVICE_UDID`. **Never the iPad mini.** Simulators: reuse the shared UDIDs in `<local-volume>/Developer/kiwios/docs/simulators.md`; never create or erase them.
+6. Install only through `scripts/run.sh`. The target device, relay host and signing identity live in the uncommitted `scripts/run.local.config`; never commit device IDs, hostnames or local paths. Reuse existing simulators; never create or erase them.
 7. User-facing text: never mention third-party pairing tools; point to our Terminal command. Never ask anyone to paste or upload a pairing file anywhere.
 8. Links: site URLs live in `docs/app.js` `LINKS`, and the app's copy in CofreUI's links (an allowlist test enforces it). Change both. The domain is `ignaciojuarez.github.io/cofre`; never use `cofre.site`.
 9. Never log or print pairing-file contents or keys.

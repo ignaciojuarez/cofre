@@ -94,7 +94,7 @@ Scope: `cofre/` only, plus `launcher-plan/server-join/`. Read-only review on 202
 | `cargo test` in `tools/llave/core` | **PASS**; 1 test passed. |
 | `cargo clippy` in `tools/llave/core` | **PASS with 2 warnings** (`collapsible_if` at `src/pair.rs:111` and `:172`). |
 | `sh tools/llave/test-pair.sh` | **PASS**; simulation launched and completed. |
-| CofreUI `xcodebuild test` on shared simulator `SIMULATOR_UDID` | **PASS**; 11 tests, 0 failures. Xcode emitted repeated `invalidDigitCount(94232)` diagnostics but the test action succeeded. |
+| CofreUI `xcodebuild test` on a shared simulator | **PASS**; 11 tests, 0 failures. Xcode emitted repeated `invalidDigitCount(94232)` diagnostics but the test action succeeded. |
 | ShellCheck | `uvx` unavailable. `pipx run shellcheck-py` ran: project scripts produced warnings/info; the full tree also reported a vendored Air error (`glslang/Test/validate-shaders.sh:19`, `SC2145`). |
 | `launcher-plan/server-join/validate_examples.py` | **PASS**; valid examples pass and malicious/missing-required fixtures fail as expected. |
 

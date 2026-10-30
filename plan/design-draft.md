@@ -4,7 +4,7 @@ Draft for review. Mock data only; nothing is wired. It covers the approved items
 
 - Code: `app/UI/Sources/CofreUI/Screens/Draft/` (9 files, real components, draft-only data in `DraftData`).
 - Preview: `-screen draft -draft <area> -draftState <state>` (table at the end).
-- Contact sheets: `/tmp/cofre-shots/agentZ-1-play-worlds.png` through `agentZ-8-ipad.png`.
+- Contact sheets: rendered from PreviewHost (not committed).
 
 ## Separation of concerns
 

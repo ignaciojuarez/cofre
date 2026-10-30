@@ -6,7 +6,7 @@
 ## 1. Architecture
 
 ```
-┌──────────── Cobble.ipa  (Apple Development, team APPLE_TEAM_ID, get-task-allow) ────────────┐
+┌──────────── Cobble.ipa  (Apple Development, your team, get-task-allow) ────────────┐
 │                                                                                          │
 │  Host app  ── com.ignaciojuarez.cobble                                                   │
 │  ├─ New shell (SwiftUI): Setup wizard · Play · Instances · Mods · Settings               │
@@ -107,7 +107,7 @@ Ignacio ──private install link (Sqim, or GitHub Release + itms-services mani
 ## 6. Open questions (your call)
 
 1. **One app or two first?** Ship the proven 2-app version (Cobble + StikDebug) now, or wait for S1 to pass for the single app?
-2. **Apple team:** use the main team APPLE_TEAM_ID, or a separate $99 team so a ban can't touch your other apps?
+2. **Apple team:** use the main team, or a separate $99 team so a ban can't touch your other apps?
 3. **Microsoft login:** reuse Air's client ID now, or register our own Azure app (1–2 weeks of waiting)?
 4. **Accounts:** Microsoft only (needs owning the game), or keep offline accounts?
 5. **CurseForge:** each person's own key / Modrinth only / allow the mirror?

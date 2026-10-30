@@ -3,7 +3,7 @@ set -eu
 ROOT=$(cd -- "$(dirname "$0")/.." && pwd)
 "$ROOT/scripts/build.sh"
 (cd "$ROOT/build" && ditto -c -k --keepParent Llave.app Llave.app.zip)
-shasum -a 256 "$ROOT/build/Llave.app.zip" > "$ROOT/SHA256SUMS"
+(cd "$ROOT/build" && shasum -a 256 Llave.app.zip) > "$ROOT/SHA256SUMS"
 HASH=$(awk 'NR==1{print $1}' "$ROOT/SHA256SUMS")
 python3 - "$ROOT/pair.sh" "$HASH" <<'PY'
 from pathlib import Path

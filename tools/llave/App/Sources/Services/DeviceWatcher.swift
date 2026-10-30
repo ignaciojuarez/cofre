@@ -31,25 +31,11 @@ public final class DeviceWatcher: DeviceWatcherProtocol, @unchecked Sendable {
         stop()
     }
 
+    /// Only the helper signed inside the app bundle; never a path another user could plant.
     public static func resolveBinary() -> URL? {
-        if let res = Bundle.main.url(forResource: "llave-pair", withExtension: nil),
-            FileManager.default.isExecutableFile(atPath: res.path)
-        {
-            return res
-        }
-        let devPaths = [
-            "/tmp/bin/llave-pair",
-            "/usr/local/bin/llave-pair",
-            FileManager.default.currentDirectoryPath + "/core/target/release/llave-pair",
-            FileManager.default.currentDirectoryPath + "/llave/core/target/release/llave-pair",
-            FileManager.default.currentDirectoryPath + "/../core/target/release/llave-pair",
-        ]
-        for p in devPaths {
-            if FileManager.default.isExecutableFile(atPath: p) {
-                return URL(fileURLWithPath: p)
-            }
-        }
-        return nil
+        guard let url = Bundle.main.url(forResource: "llave-pair", withExtension: nil),
+              FileManager.default.isExecutableFile(atPath: url.path) else { return nil }
+        return url
     }
 
     public func start() {

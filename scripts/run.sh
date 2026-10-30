@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd -P "$(dirname "$0")/.." && pwd)"
-BUILD_TOOLS="${BUILD_TOOLS:-<local-volume>/Developer/kiwios/tools/build-runners}"
-source "$BUILD_TOOLS/lib/common.sh"
-source "$BUILD_TOOLS/lib/device.sh"
-source "$BUILD_TOOLS/lib/relay.sh"
 source "$ROOT/scripts/run.config"
 if [[ -f "$ROOT/scripts/run.local.config" ]]; then
   source "$ROOT/scripts/run.local.config"
 fi
+[[ -n "$BUILD_TOOLS" ]] || { echo "Set BUILD_TOOLS in scripts/run.local.config" >&2; exit 1; }
+source "$BUILD_TOOLS/lib/common.sh"
+source "$BUILD_TOOLS/lib/device.sh"
+source "$BUILD_TOOLS/lib/relay.sh"
 BUILD=0
 SQIM=0
 export RELAY_HOST RELAY_DEVICE_ID SIGNING_IDENTITY TEAM_ID BOOTJDK MAKE_ARGS

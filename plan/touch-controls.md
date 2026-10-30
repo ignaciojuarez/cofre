@@ -89,7 +89,7 @@ All three use the stand-in game frame with the Java HUD at auto GUI scale, sit i
 - B stays available as a "Minimal" layout for players who want it. A stays as "Classic Bedrock".
 
 Mockups (simulator renders, nothing from a device):
-- `/tmp/cofre-shots/agentS-sheet.png`: all variations, iPad, menu mode and the settings pane.
+- A PreviewHost contact sheet (not committed): all variations, iPad, menu mode and the settings pane.
 - `agentS-a.png`, `agentS-b.png`, `agentS-c.png`: each at rest and in context.
 - `agentS-ipad.png`, `agentS-settings.png`.
 

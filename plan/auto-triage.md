@@ -9,7 +9,7 @@ iPhone: crash screen or Settings › Report a problem
   └─ builds report.zip (report.json + trimmed logs), shows a preview, the user taps Send
        ├─ A: email (default; no account needed) → reports@ mailbox
        └─ B: prefilled GitHub issue (people with GitHub accounts)
-Mac mini (kiwi-hub): a T3 scheduled task every 15 min
+A home Mac: a T3 scheduled task every 15 min
   ├─ reads new mail (hostinger-mail) and opens/updates a GitHub issue with `gh` (Ignacio's own auth)
   ├─ deduplicates by crash signature: a repeat becomes a comment, "+1 (3 devices)"
   └─ starts one agent per new signature, in its own worktree

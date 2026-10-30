@@ -68,5 +68,5 @@ Order: Instances → Accounts → Logs → Worlds → Content (+ Modrinth) → D
 
 Engine seam first slice (BM): `GameEngine` now names the remaining Air work (launch, sign-in/refresh,
 JIT, input, loader installation, renderer/preferences keys and CurseForge). `PreviewEngine` is Air-free
-and emits no sample launcher data. The bridge inventory is recorded in `/tmp/cofre-audit/engine-seam.md`;
+and emits no sample launcher data. The bridge inventory was recorded in an engine-seam audit;
 the uncalled `modsForProfile` bridge method and the superseded Draft/Servers comparison previews are removed.

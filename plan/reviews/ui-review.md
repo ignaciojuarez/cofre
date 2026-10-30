@@ -11,7 +11,7 @@ Read-only review, 2026-10-29. Scope: `cofre/app/UI`, `cofre/tools/llave/App/Sour
 |---|---|
 | `xcodebuild test -scheme CofreUI` on the shared iPhone 18 Pro sim `4EC427DF…` (derived data in `/tmp`) | ✅ 11/11 passed. There are no view or snapshot tests, and contrast is only tested for the purple accent. |
 | `swift test` (macOS, scratch path in `/tmp`) | ✅ 2/2 passed |
-| Headless Chromium screenshots of `docs/index.html` at 360, 768 and 1280 px | ✅ No overflow at 360. Layout matches the tokens. Screenshots are in `/tmp/cofre-review/`. |
+| Headless Chromium screenshots of `docs/index.html` at 360, 768 and 1280 px | ✅ No overflow at 360. Layout matches the tokens. |
 | Contrast of the site and app token pairs (WCAG 2.x) | Everything passes AA **except the Emerald accent's button text, at 4.38:1** (#12). |
 | `whois -h whois.nic.site cofre.site` | **"Domain cofre.site is available for registration"** (#1) |
 | HTTP status of every external link | The upstream, Apple and idevice links return 200. All `github.com/ignaciojuarez/cofre/...` links return 404 because they're still placeholders. |

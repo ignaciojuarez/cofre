@@ -2,7 +2,7 @@
 
 > Status: UI and facade done against `MockBackend` (agent W). Real engine: agent V in `app/Glue`
 > (`CofreServerEngine.swift`: servers.dat codec, server list ping, launch args). Screenshots:
-> `/tmp/cofre-shots/agentW-servers-sheet.png`. PreviewHost: `-screen servers -servers <state>`.
+> PreviewHost: `-screen servers -servers <state>`.
 
 ## Why
 The old Worlds pane listed Modrinth's top 50 public servers under "Servers", as if they were the player's. The

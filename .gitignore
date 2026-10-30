@@ -14,3 +14,15 @@ artifacts/Development.entitlements
 app/*/build/
 app/CofreKit/*/build/
 artifacts/upstream-report.md
+artifacts/
+**/build/
+**/DerivedData/
+*.xcodeproj/
+*.ipa
+*.mobiledevicepairing
+*.mobileprovision
+*.provisionprofile
+*.p12
+*.pfx
+*.cer
+.DS_Store
