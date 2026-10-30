@@ -10,6 +10,8 @@ public final class CofreRootViewController: UIViewController {
         DownloadQueue.shared.handleBackgroundEvents(completion: completionHandler)
     }
     private let bridge: any CofreAirBridging
+    private let nav = NavModel()
+    private var urlObservers: [NSObjectProtocol] = []
     public init(bridge: any CofreAirBridging) { self.bridge = bridge; super.init(nibName: nil, bundle: nil) }
     @available(*, unavailable) required init?(coder: NSCoder) { fatalError("CofreRootViewController requires bridge") }
     public override func viewDidLoad() {
@@ -24,8 +26,18 @@ public final class CofreRootViewController: UIViewController {
         instances?.didWriteProfiles = { bridge.reloadProfiles() }
         backend.instances = instances
         let services = CofreServices(backend: backend, instances: instances)
-        let root = CofreUI.makeRootViewController(services: services)
+        let root = CofreUI.makeRootViewController(services: services, nav: nav)
         addChild(root); root.view.frame = view.bounds; root.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         view.addSubview(root.view); root.didMove(toParent: self)
+        let center = NotificationCenter.default
+        urlObservers.append(center.addObserver(forName: Notification.Name("UISceneOpenURLContextsNotification"), object: nil, queue: .main) { [weak self] note in
+            for context in note.userInfo?["UISceneOpenURLContextsKey"] as? Set<UIOpenURLContext> ?? [] { _ = self?.nav.open(context.url) }
+        })
+        urlObservers.append(center.addObserver(forName: UIScene.willConnectNotification, object: nil, queue: .main) { [weak self] note in
+            let options = note.userInfo?["UISceneConnectionOptionsKey"] as? UIScene.ConnectionOptions
+            for context in options?.urlContexts ?? [] { _ = self?.nav.open(context.url) }
+        })
     }
+
+    deinit { urlObservers.forEach(NotificationCenter.default.removeObserver) }
 }
