@@ -29,3 +29,16 @@ index 179bb64..6a582c3 100644
 +
 +# Cofre: the glue above talks to Air and starts the VPN; scripts/run.sh copies it into CofreGlue/.
 +target_link_libraries(AngelAuraAmethyst PUBLIC "-framework NetworkExtension")
+diff --git a/Natives/shaderc_shim.c b/Natives/shaderc_shim.c
+--- a/Natives/shaderc_shim.c
++++ b/Natives/shaderc_shim.c
+@@ -459,6 +459,9 @@ static void ame_cache_dump_source(uint64_t key, int sb_entry, int kind,
+                                   const char *source, size_t source_len,
+                                   const char *input_file, const char *entry_point,
+                                   const ame_sb_opt_fields_t *opt) {
++    // Cofre: diagnostic source dumps are opt-in; keep the compiled shader cache.
++    const char *dump = getenv("COFRE_SHADER_DUMPS");
++    if (dump == NULL || strcmp(dump, "1") != 0) return;
+     if (ame_cache_state != 1) return; // 缓存初始化失败则不转储
+     if (ame_dump_dir[0] == '\0') {
+         const char *home = getenv("POJAV_HOME");
