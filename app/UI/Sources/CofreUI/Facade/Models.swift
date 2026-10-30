@@ -289,16 +289,18 @@
         static func key(_ s: String) -> String { s.lowercased().filter { $0.isLetter || $0.isNumber } }
     }
 
+    public enum AccountState: String, Sendable { case ready, expired, demo }
     public struct Account: Identifiable, Hashable, Sendable {
         public let id: String
         public var name: String
         public var kind: String
         public var isActive: Bool
-        public init(id: String, name: String, kind: String = "Microsoft", isActive: Bool = false) {
-            self.id = id
-            self.name = name
-            self.kind = kind
-            self.isActive = isActive
+        public var state: AccountState
+        public var expiry: Date?
+        public init(id: String, name: String, kind: String = "Microsoft", isActive: Bool = false,
+                    state: AccountState = .ready, expiry: Date? = nil) {
+            self.id = id; self.name = name; self.kind = kind; self.isActive = isActive
+            self.state = state; self.expiry = expiry
         }
     }
 

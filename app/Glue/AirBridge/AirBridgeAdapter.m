@@ -764,33 +764,13 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
   NSLog(@"[Cofre] mod toggle=%d", ok);
   return ok;
 }
-- (NSArray<NSDictionary *> *)accounts {
-  NSString *dir =
-      [NSString stringWithFormat:@"%s/accounts", getenv("POJAV_HOME") ?: ""];
-  NSArray *files =
-      [[NSFileManager defaultManager] contentsOfDirectoryAtPath:dir error:nil];
-  NSString *selected = getPrefObject(@"internal.selected_account");
-  NSMutableArray *out = [NSMutableArray array];
-  for (NSString *f in files) {
-    if (![f.pathExtension isEqualToString:@"json"])
-      continue;
-    NSString *accountID = f.stringByDeletingPathExtension;
-    NSData *data =
-        [NSData dataWithContentsOfFile:[dir stringByAppendingPathComponent:f]];
-    id json = data ? [NSJSONSerialization JSONObjectWithData:data
-                                                     options:0
-                                                       error:nil]
-                   : nil;
-    NSString *name =
-        [json isKindOfClass:NSDictionary.class] ? json[@"username"] : nil;
-    [out addObject:@{
-      @"id" : accountID,
-      @"name" : [name isKindOfClass:NSString.class] ? name : accountID,
-      @"active" : @([accountID isEqualToString:selected])
-    }];
-  }
-  NSLog(@"[Cofre] accounts=%lu", (unsigned long)out.count);
-  return out;
+/* accounts are read by CofreKit; Air only owns token cleanup. */
+- (void)removeAccountToken:(NSString *)accountID {
+  if (accountID.length == 0) return;
+  NSDictionary *query = @{(__bridge id)kSecClass: (__bridge id)kSecClassGenericPassword,
+                          (__bridge id)kSecAttrService: @"AccountToken",
+                          (__bridge id)kSecAttrAccount: accountID};
+  SecItemDelete((__bridge CFDictionaryRef)query);
 }
 - (void)signInMicrosoftWithProgress:(void (^)(NSString *))progress
                          completion:(void (^)(NSDictionary *_Nullable,

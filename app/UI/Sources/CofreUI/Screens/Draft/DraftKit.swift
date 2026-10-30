@@ -58,7 +58,7 @@
             case "worlds": WorldsDraft(state: state)
             case "beforePlay": BeforePlayDraft(state: state)
             case "versions": VersionsDraft(state: state)
-            case "accounts": AccountsDraft(state: state)
+            case "accounts": Text("Accounts & data")
             default: PlayHomeDraft(state: state)
             }
         }

@@ -69,7 +69,7 @@ typedef NS_ENUM(NSInteger, CofreLaunchEvent) {
        completion:(void (^)(NSError *_Nullable))completion;
 - (void)modsForProfile:(NSString *)profile
             completion:(void (^)(NSArray *))completion;
-- (NSArray<NSDictionary *> *)accounts;
+- (void)removeAccountToken:(NSString *)accountID;
 - (void)signInMicrosoftWithProgress:(void (^)(NSString *))progress
                          completion:
                              (void (^)(NSDictionary *_Nullable account,

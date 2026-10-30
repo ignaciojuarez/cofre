@@ -271,14 +271,17 @@
             ListSection(spacing: 4) {
                 ForEach(store.accounts) { a in
                     Row(
-                        a.name, subtitle: a.isActive ? "\(a.kind) · active" : a.kind,
+                        a.name, subtitle: accountSubtitle(a),
                         leading: { PixelIcon(.head, size: 26) },
                         trailing: {
-                            BlockButton("Remove", role: .ghostDestructive, size: .small) {
-                                store.pendingConfirmation = .removeAccount(a)
+                            HStack(spacing: 6) {
+                                if a.state == .expired { BlockButton("Sign in again", role: .primary, size: .small) { Task { await store.signIn() } } }
+                                Badge(a.state == .demo ? "Demo" : (a.isActive ? "Active" : a.state == .expired ? "Expired" : "Ready"), tone: a.state == .expired ? .danger : a.state == .demo ? .warn : .success)
+                                BlockButton("Remove", role: .ghostDestructive, size: .small) { store.pendingConfirmation = .removeAccount(a) }
                             }
                         })
                 }
+                if store.accounts.contains(where: { $0.state == .demo }) { Banner("This account doesn't own Java Edition · demo only", icon: .head, tone: .warn) }
                 BlockButton("Add account", icon: .head) { Task { await store.signIn() } }
             }
             ListSection("Downloads", spacing: 4) {
@@ -317,6 +320,12 @@
                     }
                 }
             }
+        }
+
+        private func accountSubtitle(_ a: Account) -> String {
+            if a.state == .expired { return "Signed out · sign in again" }
+            if a.state == .demo { return "Doesn't own Java Edition · demo only" }
+            return a.isActive ? "\(a.kind) · active" : a.kind
         }
 
         private func legend(_ t: LocalizedStringKey, _ tone: Tone) -> some View {

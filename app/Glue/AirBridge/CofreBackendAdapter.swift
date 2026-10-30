@@ -29,6 +29,11 @@
         }
         let air: any CofreAirBridging
         let modCatalog = CofreModCatalog()
+        private lazy var accountStore: AccountStore = {
+            AccountStore(directory: FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0],
+                         readSelected: { [weak self] in self?.air.preferenceObject("internal.selected_account", profile: nil) as? String },
+                         writeSelected: { [weak self] id in self?.air.setPreferenceObject("internal.selected_account", value: id ?? "", profile: nil) })
+        }()
         public init(bridge: any CofreAirBridging) {
             self.air = bridge
             super.init()
@@ -70,7 +75,7 @@
             setup.pairing = hasPairing() ? .ready : (setup.pairing.isReady ? .unknown : setup.pairing)
             if await CofreVPN.isAllowed() { setup.vpn = .ready } else if setup.vpn.isReady { setup.vpn = .unknown }
             if isJITEnabled { setup.jit = .ready }
-            let accountReady = (try? await accounts().isEmpty == false) ?? false
+            let accountReady = accountStore.list().contains { $0.state == .ready }
             if accountReady { setup.account = .ready } else if setup.account.isReady { setup.account = .unknown }
             publishSetup()
         }
@@ -189,10 +194,7 @@
         // Installed content (list, on/off, delete, updates) lives in CofreBackendAdapter+Mods.swift.
 
         public func accounts() async throws -> [Account] {
-            air.accounts().compactMap { d in
-                guard let id = d["id"] as? String else { return nil }
-                return Account(id: id, name: d["name"] as? String ?? id, isActive: d["active"] as? Bool ?? false)
-            }
+            accountStore.list().map { a in Account(id: a.id, name: a.name, kind: a.kind, isActive: a.isActive, state: AccountState(rawValue: a.state.rawValue) ?? .ready, expiry: a.expiry) }
         }
         public func signInMicrosoft() async throws -> Account {
             let d: [AnyHashable: Any] = try await withCheckedThrowingContinuation { c in
@@ -213,7 +215,7 @@
             publishSetup()
             return account
         }
-        public func removeAccount(id: String) async throws { throw unavailable("account removal") }
+        public func removeAccount(id: String) async throws { _ = try accountStore.remove(id: id); air.removeAccountToken(id) }
 
         public func launch(instanceID: String, accountID: String?) -> AsyncThrowingStream<LaunchProgress, Error> {
             UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "cofre.launch.started.\(instanceID)")

@@ -69,7 +69,7 @@ NS_ASSUME_NONNULL_BEGIN
 /// Toggles a mod's enabled state.
 - (BOOL)toggleMod:(id)mod error:(NSError **)error;
 /// Returns configured accounts: id, name, active.
-- (NSArray<NSDictionary *> *)accounts;
+- (void)removeAccountToken:(NSString *)accountID;
 /// Signs in with Microsoft through Air's login (web page, then Xbox and
 /// Minecraft tokens). The account comes back as id, name, demo (true when it
 /// doesn't own Java Edition). Air saves and selects it.
