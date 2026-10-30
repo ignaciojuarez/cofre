@@ -649,6 +649,9 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
                                             vendor, version, (long)status]));
             return;
           }
+          // The installers download libraries synchronously through the shared
+          // session; running them on its serial callback queue deadlocks.
+          dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
           NSString *instanceDir = amePCLVersionGameDirAbsolute(profile, nil);
           void (^step)(double, NSString *) = ^(double p, NSString *message) {
             if (progress)
@@ -699,6 +702,7 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
             NSLog(@"[Cofre] loader installed %@ ok=%d", versionID,
                   saveError == nil);
             completion(saveError);
+          });
           });
         }] resume];
 }

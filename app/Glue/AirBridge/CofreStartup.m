@@ -83,6 +83,8 @@ static void CofreEnsureStarted(void) {
     // The game owns VSync and its frame limit in options.txt. With this Air setting on, Air's Java launcher
     // overwrites both (VSync off, 260 FPS) at every launch, undoing what the player picked in game.
     setPrefBool(@"video.disable_game_vsync", NO);
+    // Air defaults every download to the BMCLAPI mirror in China; use Mojang and the loaders' own servers first.
+    setPrefObject(@"general.download_source", @"official");
   });
 }
 
