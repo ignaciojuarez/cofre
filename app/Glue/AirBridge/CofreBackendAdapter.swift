@@ -376,9 +376,11 @@
                 airVersion: info["CFBundleShortVersionString"] as? String ?? "", sourceURL: CofreLinks.source)
         }
         public func renderers() async -> [RendererOption] {
+            let manifestURL = Bundle.main.url(forResource: "RendererManifest", withExtension: "json")
+            let metalDetail = (manifestURL.flatMap { try? RendererManifest.load(from: $0) }).map { "Manifest: \($0.gameVersions.sorted().joined(separator: ", "))" } ?? "Ship-derived renderer manifest"
             let candidates: [(String, String, String, String?)] = [
                 ("auto", "Auto", "Picks per version", nil),
-                ("libmetallum.dylib", "Metal", "Minecraft 26.x", "libmetallum.dylib"),
+                ("libmetallum.dylib", "Metal", metalDetail, "libmetallum.dylib"),
                 ("libmobileglues.dylib", "MobileGlues", "OpenGL 4 · modern packs", "libmobileglues.dylib"),
                 ("libtinygl4angle.dylib", "ANGLE", "OpenGL ES on Metal", "libtinygl4angle.dylib"),
                 ("libOSMesa.8.dylib", "Zink", "OpenGL on Vulkan", "libOSMesa.8.dylib"),
