@@ -25,7 +25,7 @@
     @MainActor
     public final class CofreBackendAdapter: NSObject, CofreBackend {
         public var capabilities: BackendCapabilities {
-            [.deleteWorld, .addServer, .envVariables, .rendererTuning, .serverJoin, .instanceIcon]
+            [.addServer, .envVariables, .rendererTuning, .serverJoin, .instanceIcon]
         }
         let air: any CofreAirBridging
         let modCatalog = CofreModCatalog()
@@ -145,15 +145,6 @@
             if let url = URL(string: s), url.isFileURL { return try? Data(contentsOf: url) }
             return nil
         }
-        public func worlds(instanceID: String) async throws -> [WorldSummary] {
-            try await callback { done in self.air.worlds(forProfile: instanceID) { done($0 as? [Any] ?? []) } }.map { d in
-                let x = d as? [String: Any] ?? [:]
-                let n = x["name"] as? String ?? "World"
-                return WorldSummary(
-                    id: x["id"] as? String ?? n, name: n, mode: x["mode"] as? String ?? "", playTime: nil,
-                    lastPlayed: nil)
-            }
-        }
         public func servers(instanceID: String) async throws -> [ServerSummary] {
             guard let dir = air.gameDirectory(forProfile: instanceID) else { return [] }
             let url = dir.appendingPathComponent("servers.dat")
@@ -169,16 +160,6 @@
                 let x = d as? [String: Any] ?? [:]; guard let id = x["id"] as? String, !id.isEmpty else { return nil }
                 return ServerSummary(id: id, name: x["title"] as? String ?? id, address: x["address"] as? String ?? "", detail: x["description"] as? String)
             }
-        }
-        public func deleteWorld(instanceID: String, worldID: String) async throws {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                air.deleteWorld(worldID, forProfile: instanceID) { error in
-                    if let error { continuation.resume(throwing: error) } else { continuation.resume() }
-                }
-            }
-        }
-        public func backUpWorld(instanceID: String, worldID: String) async throws -> URL {
-            throw unavailable("world backup")
         }
         public func addServer(instanceID: String, name: String, address: String) async throws -> ServerSummary {
             guard let dir = air.gameDirectory(forProfile: instanceID) else { throw CofreBackendError.unavailable("game directory") }
@@ -293,6 +274,11 @@
         }
         public func rejoin(instanceID: String, kind: RejoinIntent.Kind, target: String, accountID: String?) -> AsyncThrowingStream<LaunchProgress, Error> {
             if kind == .server { air.setServerIp(target, forProfile: instanceID) }
+            if kind == .world {
+                let version = air.instances().first(where: { ($0["id"] as? String) == instanceID })?["version"] as? String ?? ""
+                NSLog("[Cofre] world quick play instance=%@ folder=%@ args=%@", instanceID, target,
+                      MinecraftLaunchArguments.singleplayer(folder: target, gameVersion: version).joined(separator: " "))
+            }
             CofreBreadcrumb.log("play", details: "instance=\(instanceID) rejoin=\(kind.rawValue)")
             return launch(instanceID: instanceID, accountID: accountID)
         }

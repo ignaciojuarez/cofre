@@ -610,16 +610,6 @@
         public func setCurseForgeKey(_ key: String?) throws { cfKey = key }
 
         // MARK: GAP-13 OptionalActions
-        public func deleteWorld(instanceID: String, worldID: String) async throws {
-            var list = try await worlds(instanceID: instanceID)
-            list.removeAll { $0.id == worldID }
-            worldList[instanceID] = list
-        }
-        public func backUpWorld(instanceID: String, worldID: String) async throws -> URL {
-            let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(worldID).zip")
-            try Data().write(to: url)
-            return url
-        }
         public func addServer(instanceID: String, name: String, address: String) async throws -> ServerSummary {
             let s = ServerSummary(
                 id: UUID().uuidString, name: name, address: address,

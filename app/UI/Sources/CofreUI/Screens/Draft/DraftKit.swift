@@ -55,7 +55,7 @@
             case "import": ImportDraft(state: state)
             case "files": FilesDraft(state: state)
             case "content": ContentDraft(state: state)
-            case "worlds": WorldsDraft(state: state)
+            case "worlds": EmptyState("Worlds moved to Play", message: "", icon: .grass)
             case "beforePlay": BeforePlayDraft(state: state)
             case "versions": VersionsDraft(state: state)
             case "accounts": Text("Accounts & data")

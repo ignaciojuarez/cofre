@@ -66,40 +66,6 @@
         if store.pendingModCompatibility == nil { nav.showingLaunch = true }
     }
 
-    /// World rows (Worlds pane, instance detail).
-    struct WorldRows: View {
-        let worlds: [WorldSummary]
-        var playFirst = true
-        @Environment(CofreStore.self) private var store
-        @Environment(NavModel.self) private var nav
-
-        var body: some View {
-            ForEach(Array(worlds.enumerated()), id: \.element.id) { i, w in
-                Row(w.name, subtitle: [w.mode, w.playTime].compactMap { $0 }.joined(separator: " · ")) {
-                    InstanceGlyph(icon: w.icon, size: 28)
-                } trailing: {
-                    if i == 0 && playFirst {
-                        BlockButton("Play", icon: .play, role: .primary, size: .small) { startLaunch(store, nav) }
-                    } else if let ago = Fmt.ago(w.lastPlayed) {
-                        Meta(ago)
-                    }
-                }
-                .contextMenu {
-                    Button("Play") { startLaunch(store, nav) }
-                    // Only what the backend can do (GAP-13). Delete always asks first.
-                    if store.can(.backUpWorld) {
-                        Button("Back up") {
-                            Task { if let url = await store.backUpWorld(w) { presentShareSheet(url) } }
-                        }
-                    }
-                    if store.can(.deleteWorld) {
-                        Button("Delete", role: .destructive) { store.pendingConfirmation = .deleteWorld(w) }
-                    }
-                }
-            }
-        }
-    }
-
     /// Installed content rows with a switch (M04, instance detail).
     struct InstalledRows: View {
         let items: [InstalledItem]
@@ -170,7 +136,6 @@
         var title: Text {
             switch self {
             case .deleteInstance(let i): Text("Delete \(i.name)?")
-            case .deleteWorld(let w): Text("Delete \(w.name)?")
             case .removeAccount(let a): Text("Remove \(a.name)?")
             case .removeServer(let s): Text("Delete \(s.name)?")
             }
@@ -178,7 +143,6 @@
         var message: Text {
             switch self {
             case .deleteInstance: Text("Worlds and mods in its folder are removed too.")
-            case .deleteWorld: Text("It's removed from this device. This can't be undone.")
             case .removeAccount: Text("You can sign in again any time.")
             case .removeServer: Text("It's gone from this instance's list in game too. Other instances keep theirs.")
             }
@@ -186,7 +150,6 @@
         var actionTitle: LocalizedStringKey {
             switch self {
             case .deleteInstance: "Delete instance"
-            case .deleteWorld: "Delete world"
             case .removeAccount: "Remove"
             case .removeServer: "Delete"
             }

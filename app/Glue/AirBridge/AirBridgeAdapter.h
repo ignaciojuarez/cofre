@@ -51,13 +51,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// Returns the selected Air profile name.
 - (NSString *)selectedProfileName;
-/// Scans worlds for a profile.
-- (void)worldsForProfile:(NSString *)profile
-              completion:(void (^)(NSArray *))completion;
-/// Deletes a world and reports an optional error.
-- (void)deleteWorld:(NSString *)worldID
-         forProfile:(NSString *)profile
-         completion:(void (^)(NSError *_Nullable))completion;
 /// Adds a server to a profile and reports an optional error.
 - (void)addServer:(NSString *)address
              name:(NSString *)name

@@ -1,5 +1,7 @@
 #if canImport(UIKit)
     import SwiftUI
+    import UniformTypeIdentifiers
+    import CofreKit
 
     // P01 Play home + Worlds | Servers. AdaptiveSplit: side by side on regular, one Play · Worlds · Servers picker on
     // compact.
@@ -60,22 +62,7 @@
                                 label: "Memory")
                             Stat("\(Int(store.preferences.resolution * 100))%", label: "Resolution")
                         }
-                        let recent = store.instances.filter { $0.id != inst.id }.prefix(3)
-                        if !recent.isEmpty {
-                            ListSection("Recent") {
-                                ForEach(Array(recent)) { i in
-                                    Row(
-                                        i.name,
-                                        subtitle: [i.loaderLabel, Fmt.agoLong(i.lastPlayed)].compactMap { $0 }.joined(
-                                            separator: " · ")
-                                    ) {
-                                        InstanceGlyph(icon: i.icon, size: 24)
-                                    } trailing: {
-                                        BlockButton("Play", size: .small) { startLaunch(store, nav, instanceID: i.id) }
-                                    }
-                                }
-                            }
-                        }
+                        JumpBackIn(store: store, nav: nav)
                         if store.can(.controllerNavigation) { HintStrip() }
                     } else {
                         EmptyState("No instances yet", message: "Make one, or import a modpack.", icon: .grass) {
@@ -152,18 +139,94 @@
     /// Worlds. New worlds are made in game, so there's no "+ New" here. Servers have their own pane.
     public struct WorldsPane: View {
         @Environment(CofreStore.self) private var store
+        @Environment(NavModel.self) private var nav
+        @State private var model = WorldsModel()
+        @State private var showingImport = false
         public init() {}
         public var body: some View {
             VStack(spacing: 0) {
-                ColumnHeader("Worlds")
+                ColumnHeader("Worlds") {
+                    Button { showingImport = true } label: { PixelIcon(.paper, size: 16) }
+                        .buttonStyle(.plain).accessibilityLabel("Import world")
+                }
                 PaneScroll(spacing: 5) {
-                    if store.worlds.isEmpty {
+                    if let error = model.error { Banner(error, icon: .cross, tone: .danger) }
+                    if let undo = model.undoLabel {
+                        Banner(undo, icon: .check, tone: .success) { BlockButton("Undo", size: .small) { model.undoDelete() } }
+                    }
+                    if model.worlds.isEmpty {
                         EmptyState("No worlds yet", message: "Play once and your worlds show up here.", icon: .grass)
                     } else {
-                        WorldRows(worlds: store.worlds)
+                        ForEach(model.worlds) { world in
+                            WorldFileRow(world: world, model: model, store: store, nav: nav)
+                        }
                     }
                 }
             }
+            .task(id: store.activeInstance?.id) { model.load(instanceID: store.activeInstance?.id, from: store.instanceStore) }
+            .refreshable { model.refresh() }
+            .fileImporter(isPresented: $showingImport, allowedContentTypes: [.zip]) { result in
+                if case .success(let url) = result { _ = url.startAccessingSecurityScopedResource(); model.import(url); url.stopAccessingSecurityScopedResource() }
+            }
+        }
+    }
+
+    private struct JumpBackIn: View {
+        let store: CofreStore
+        let nav: NavModel
+        @State private var model = WorldsModel()
+        var body: some View {
+            Group {
+                if !model.worlds.isEmpty {
+                    ListSection("Jump back in") {
+                    ForEach(model.worlds.prefix(3)) { world in
+                        Row(world.displayName, subtitle: [world.gameMode, Fmt.ago(world.lastPlayed), Fmt.bytes(world.sizeBytes)].compactMap { $0 }.joined(separator: " · ")) {
+                            WorldGlyph(data: world.iconPNG)
+                        } trailing: {
+                            BlockButton("Play", icon: .play, size: .small) {
+                                guard let instance = model.instance else { return }
+                                startLaunch(store, nav, instanceID: instance.id, rejoin: RejoinIntent(instanceID: instance.id, kind: .world, target: world.folder, displayName: world.displayName))
+                            }
+                        }
+                    }
+                    }
+                }
+            }
+            .task(id: store.activeInstance?.id) { model.load(instanceID: store.activeInstance?.id, from: store.instanceStore) }
+        }
+    }
+
+    private struct WorldFileRow: View {
+        let world: World
+        let model: WorldsModel
+        let store: CofreStore
+        let nav: NavModel
+        var body: some View {
+            Row(world.displayName, subtitle: [world.gameMode, Fmt.ago(world.lastPlayed), Fmt.bytes(world.sizeBytes)].compactMap { $0 }.joined(separator: " · ")) {
+                WorldGlyph(data: world.iconPNG)
+            } trailing: {
+                BlockButton("Play", icon: .play, role: .primary, size: .small) {
+                    guard let instance = model.instance else { return }
+                    startLaunch(store, nav, instanceID: instance.id, rejoin: RejoinIntent(instanceID: instance.id, kind: .world, target: world.folder, displayName: world.displayName))
+                }
+            }
+            .contextMenu {
+                Button("Play") { guard let instance = model.instance else { return }; startLaunch(store, nav, instanceID: instance.id, rejoin: RejoinIntent(instanceID: instance.id, kind: .world, target: world.folder, displayName: world.displayName)) }
+                Button("Back up") { if let url = model.backUp(world) { presentShareSheet(url) } }
+                Button("Export") { if let url = model.export(world) { presentShareSheet(url) } }
+                if let target = store.instanceStore.flatMap({ try? $0.list().first(where: { $0.id != model.instance?.id }) }) {
+                    Button("Copy to instance") { model.copy(world, to: target) }
+                }
+                Button("Delete", role: .destructive) { model.delete(world) }
+            }
+        }
+    }
+
+    private struct WorldGlyph: View {
+        let data: Data?
+        var body: some View {
+            if let data, let image = UIImage(data: data) { Image(uiImage: image).resizable().interpolation(.none).scaledToFit().frame(width: 28, height: 28) }
+            else { InstanceGlyph(icon: .init(glyph: .grass), size: 28) }
         }
     }
 #endif

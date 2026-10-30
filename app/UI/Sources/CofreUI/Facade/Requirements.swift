@@ -236,10 +236,6 @@ import Foundation
     public struct BackendCapabilities: OptionSet, Sendable {
         public let rawValue: Int
         public init(rawValue: Int) { self.rawValue = rawValue }
-        /// World context menu: Delete (with confirmation) → `deleteWorld`.
-        public static let deleteWorld = BackendCapabilities(rawValue: 1 << 0)
-        /// World context menu: Back up → `backUpWorld`, then the share sheet.
-        public static let backUpWorld = BackendCapabilities(rawValue: 1 << 1)
         /// Servers: Recommended "Add", "Paste" and links write to servers.dat → `addServer`.
         public static let addServer = BackendCapabilities(rawValue: 1 << 2)
         /// X04 "Env variables" row, from `GamePreferences.envVariables`.
@@ -266,9 +262,6 @@ import Foundation
 
     public protocol OptionalActions: AnyObject {
         var capabilities: BackendCapabilities { get }
-        func deleteWorld(instanceID: String, worldID: String) async throws
-        /// A file URL (zip) for the share sheet.
-        func backUpWorld(instanceID: String, worldID: String) async throws -> URL
         func addServer(instanceID: String, name: String, address: String) async throws -> ServerSummary
         func createInstance(name: String, version: String, loader: Loader, ownFolder: Bool, fabricAPI: Bool)
             async throws -> InstanceSummary
@@ -283,12 +276,6 @@ import Foundation
 
     extension OptionalActions {
         public var capabilities: BackendCapabilities { [] }
-        public func deleteWorld(instanceID: String, worldID: String) async throws {
-            throw UnsupportedAction(name: "Deleting worlds")
-        }
-        public func backUpWorld(instanceID: String, worldID: String) async throws -> URL {
-            throw UnsupportedAction(name: "World backups")
-        }
         public func addServer(instanceID: String, name: String, address: String) async throws -> ServerSummary {
             throw UnsupportedAction(name: "Adding servers")
         }

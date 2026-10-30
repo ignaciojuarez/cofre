@@ -183,9 +183,7 @@
             guard let id = activeInstance?.id else { return }
             let mods = modsInstance?.id
             await run {
-                async let w = self.backend.worlds(instanceID: id)
                 async let s = self.backend.servers(instanceID: id)
-                self.worlds = try await w
                 self.servers = try await s
                 self.serversInstanceID = id
                 self.pingServers()
@@ -251,23 +249,6 @@
                 accounts.insert(a, at: 0)
                 setup.account = .ready
             } catch { setup.account = .failed(error.localizedDescription) }
-        }
-
-        // MARK: Worlds and servers (GAP-13)
-
-        public func deleteWorld(_ w: WorldSummary) async {
-            guard let inst = activeInstance?.id else { return }
-            await run {
-                try await self.backend.deleteWorld(instanceID: inst, worldID: w.id)
-                self.worlds.removeAll { $0.id == w.id }
-            }
-        }
-
-        public func backUpWorld(_ w: WorldSummary) async -> URL? {
-            guard let inst = activeInstance?.id else { return nil }
-            var url: URL?
-            await run { url = try await self.backend.backUpWorld(instanceID: inst, worldID: w.id) }
-            return url
         }
 
         // MARK: Server join (GAP-14)
@@ -760,7 +741,6 @@
         public func confirm(_ c: Confirmation) async {
             switch c {
             case .deleteInstance(let i): await delete(i.id)
-            case .deleteWorld(let w): await deleteWorld(w)
             case .removeAccount(let a): await removeAccount(a)
             case .removeServer(let s): await removeServer(s)
             }
@@ -808,13 +788,11 @@
     /// Destructive actions confirmed by the root view's alert, whichever menu, swipe or button started them.
     public enum Confirmation: Identifiable, Equatable {
         case deleteInstance(InstanceSummary)
-        case deleteWorld(WorldSummary)
         case removeAccount(Account)
         case removeServer(ServerSummary)
         public var id: String {
             switch self {
             case .deleteInstance(let i): "instance-\(i.id)"
-            case .deleteWorld(let w): "world-\(w.id)"
             case .removeAccount(let a): "account-\(a.id)"
             case .removeServer(let s): "server-\(s.id)"
             }

@@ -17,7 +17,7 @@
                         AnyView(Segmented("Pane", selection: .constant(1), options: [(0, "Play"), (1, "Worlds")])))
                 PaneScroll(spacing: 5) {
                     SectionLabel("Worlds")
-                    WorldRows(worlds: Array(store.worlds.prefix(3)))
+                    Row("Worlds are file-backed in Play")
                     SectionLabel(Text(verbatim: "My servers · \(store.activeInstance?.name ?? "")")).padding(.top, 14)
                     ForEach(store.servers.prefix(3)) { ServerRow(server: $0) }
                     SectionLabel("Recommended").padding(.top, 14)

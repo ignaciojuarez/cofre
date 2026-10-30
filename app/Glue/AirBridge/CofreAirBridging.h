@@ -58,11 +58,6 @@ typedef NS_ENUM(NSInteger, CofreLaunchEvent) {
                (void (^)(NSURL *_Nullable, NSError *_Nullable))completion;
 
 - (NSString *)selectedProfileName;
-- (void)worldsForProfile:(NSString *)profile
-              completion:(void (^)(NSArray *))completion;
-- (void)deleteWorld:(NSString *)worldID
-         forProfile:(NSString *)profile
-         completion:(void (^)(NSError *_Nullable))completion;
 - (void)addServer:(NSString *)address
              name:(NSString *)name
        forProfile:(NSString *)profile

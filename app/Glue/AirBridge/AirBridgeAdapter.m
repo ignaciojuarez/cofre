@@ -691,46 +691,6 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
 
 #pragma mark - End instances
 
-- (void)worldsForProfile:(NSString *)profile
-              completion:(void (^)(NSArray *))completion {
-  [[WorldService sharedService]
-      scanWorldsForProfile:profile
-                completion:^(NSArray *items) {
-                  NSLog(@"[Cofre] worlds profile=%@ count=%lu", profile,
-                        (unsigned long)items.count);
-                  if (completion)
-                    completion(items);
-                }];
-}
-- (void)deleteWorld:(NSString *)worldID
-         forProfile:(NSString *)profile
-         completion:(void (^)(NSError *_Nullable))completion {
-  [[WorldService sharedService]
-      scanWorldsForProfile:profile
-                completion:^(NSArray *items) {
-                  WorldItem *found = nil;
-                  for (WorldItem *item in items)
-                    if ([item.worldName isEqualToString:worldID] ||
-                        [item.displayName isEqualToString:worldID]) {
-                      found = item;
-                      break;
-                    }
-                  if (!found) {
-                    if (completion)
-                      completion([NSError errorWithDomain:@"CofreAir"
-                                                     code:404
-                                                 userInfo:@{
-                                                   NSLocalizedDescriptionKey :
-                                                       @"World not found"
-                                                 }]);
-                    return;
-                  }
-                  NSError *error = nil;
-                  [[WorldService sharedService] deleteWorld:found error:&error];
-                  if (completion)
-                    completion(error);
-                }];
-}
 - (void)addServer:(NSString *)address
              name:(NSString *)name
        forProfile:(NSString *)profile

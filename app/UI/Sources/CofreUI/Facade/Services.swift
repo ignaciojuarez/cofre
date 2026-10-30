@@ -34,7 +34,6 @@
         func instances() async throws -> [InstanceSummary]
         func createInstance(name: String, version: String, loader: Loader) async throws -> InstanceSummary
         func installLoader(instanceID: String, loader: Loader, version: String) async throws
-        func worlds(instanceID: String) async throws -> [WorldSummary]
         func servers(instanceID: String) async throws -> [ServerSummary]
         /// `nil` means the global defaults (Settings), an ID means per-instance overrides.
         func preferences(instanceID: String?) async throws -> GamePreferences
