@@ -280,3 +280,27 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 - 26.3’s preflight warning correctly identified incompatible Iris/Sodium and provided a safe “Turn off and play” path; no Cofre fix needed.
 - 1.21.11’s failure is reproducible and needs an Air-side renderer-selection fix. I did not edit upstream or consume the exhausted patch budget.
 - Player flow requires a full Cofre relaunch after each game process; relaunch returned to Play reliably.
+
+### Physical scenario attempt (2026-10-30 · HEAD 656c9e1)
+
+- Build: `./scripts/run.sh --build --no-install` exited 0; build lock released. Shared checkout included concurrent uncommitted Metal-warning edits; this was not an isolated HEAD build.
+- Install: cable `devicectl device install app` succeeded for `com.ignaciojuarez.cofre`.
+- Device-control blocker: `device_open` returned `No device COFRE_DEVICE_UDID on 'This machine' (hostId local). Call device_list for current ids.` Refreshed inventory still contains only simulators. Current tool instructions require device_open and prohibit direct CLI fallback, so no scenario launches or screenshots were attempted.
+
+| Scenario | Result | Log reason |
+|---|---|---|
+| fabric-1.21.1-sodium | BLOCKED / not run | Physical iPad absent from required device-control interface |
+| fabric-26.2-sodium-iris | BLOCKED / not run | Physical iPad absent from required device-control interface |
+| forge-1.20.1-deps | BLOCKED / not run | Physical iPad absent from required device-control interface |
+| neoforge-1.21.1 | BLOCKED / not run | Physical iPad absent from required device-control interface |
+| pack-fabulously-optimized | BLOCKED / not run | Physical iPad absent from required device-control interface |
+| pack-small-neoforge | BLOCKED / not run | Physical iPad absent from required device-control interface |
+| quilt-1.21.1-qsl | BLOCKED / not run | Physical iPad absent from required device-control interface |
+| vanilla-1.16.5 | BLOCKED / not run | Physical iPad absent from required device-control interface |
+| vanilla-1.20.1 | BLOCKED / not run | Physical iPad absent from required device-control interface |
+| vanilla-1.21.1 | BLOCKED / not run | Physical iPad absent from required device-control interface |
+| vanilla-1.21.11 | BLOCKED / not run | Physical iPad absent from required device-control interface |
+| vanilla-26.3 | BLOCKED / not run | Physical iPad absent from required device-control interface |
+
+- 1.21.11 investigation: shipped RendererManifest.json lists 1.21.11 with 102 mapped classes. Patch 0003 gates the agent on manifest support and Java >= 21; it no longer uses the old MC >= 26 condition. The comment in pickRendererForProfile claiming the old gate is stale. Existing historical black-screen evidence does not establish the failure on this build. No speculative fallback or compatibility list added; title screen remains unverified.
+- No launch fixes committed. Scenario runner remains unverified; its inGame verdict alone does not prove a rendered title screen. Final rebuild/device verification remains outstanding.
