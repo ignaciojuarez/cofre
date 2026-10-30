@@ -42,6 +42,7 @@ Cofre is a Minecraft: Java Edition launcher for iPhone and iPad. It combines the
 11. "Done" means verified: tests pass, and for device features, the device log shows the marker. Stubs and "should work" don't count.
 
 ## Where to make a change
+- **Start from `plan/ROADMAP.md` and follow `plan/architecture.md`:** the game's files are the truth; one small CofreKit object per domain (Foundation only, Mac-tested on fixture folders); no protocol with one implementation, no forwarding adapters; delete what a new piece replaces in the same change.
 - **Anything Air does that holds us back** (bugs, UI we have to hide, ObjC boilerplate): prefer replacing it with a small Cofre-owned Swift 6 file (async/await, no bridging) and delete the bridge method or patch it replaced. Keep Air for the JVM, rendering, input and the game surface until replacing them is clearly cheaper. Track candidates in `plan/own-air.md`.
 - **New screen or UI behavior:** `app/UI`, plus `MockBackend` sample data and a test.
 - **New backend capability:** add it to a protocol in `app/UI/Sources/CofreUI/Facade/` with a default, then implement it in `CofreBackendAdapter.swift`. Turn on its `BackendCapabilities` flag only once it really works.
