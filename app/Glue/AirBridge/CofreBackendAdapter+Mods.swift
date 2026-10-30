@@ -58,6 +58,7 @@ struct CofreModVersion {
 
     @MainActor
     final class CofreModCatalog {
+        let modrinth = Modrinth()
         // The facade passes IDs, so retain the catalog and download metadata across calls.
         var projects: [String: [String: Any]] = [:]
         var versions: [String: CofreModVersion] = [:]
@@ -109,9 +110,18 @@ struct CofreModVersion {
                     filters["loader"] = loader
                 }
             }
-            let rows = try await modRows { done in
-                air.searchProjects(filters, source: source, completion: done)
+            if source == 1 {
+                let facets = [["project_type:\(projectType)"]] + (filters["mcVersion"].flatMap { [["versions:\($0)"]] } ?? []) + (filters["loader"].flatMap { [["categories:\($0)"]] } ?? [])
+                let hits = try await modCatalog.modrinth.search(query: query.text, facets: facets)
+                return hits.compactMap { hit in
+                    guard hit.projectType == projectType else { return nil }
+                    let id = hit.projectID
+                    modCatalog.projects[id] = ["id": id, "title": hit.title, "description": hit.description, "imageUrl": hit.iconURL?.absoluteString ?? "", "url": hit.pageURL?.absoluteString ?? "", "downloads": hit.downloads, "projectType": projectType, "apiSource": 1]
+                    let loaders = hit.categories.compactMap { Loader(rawValue: $0.lowercased()) }
+                    return ProjectSummary(id: id, title: hit.title, author: "", summary: hit.description, iconURL: hit.iconURL, downloads: hit.downloads, loaders: loaders, fits: true, source: query.source, pageURL: hit.pageURL)
+                }
             }
+            let rows = try await modRows { done in air.searchProjects(filters, source: source, completion: done) }
             return rows.compactMap { row in
                 guard let id = row["id"] as? String, !id.isEmpty else { return nil }
                 // Modrinth mirrors can answer with other project types (a resource pack on the Packs tab would
@@ -133,7 +143,10 @@ struct CofreModVersion {
         public func versions(projectID: String, instanceID: String) async throws -> [ProjectVersion] {
             let target = modTarget(instanceID)
             let kind = Self.kind(modCatalog.projects[projectID]?["projectType"] as? String)
-            return try await loadModVersions(projectID: projectID, source: source(of: projectID)).map { version in
+            let source = source(of: projectID)
+            let versions = try await loadModVersions(projectID: projectID, source: source, loaders: source == 1 ? [target.loader.rawValue] : [], gameVersions: source == 1 ? [target.game] : [])
+            if source == 1 { Task { _ = try? await self.loadModVersions(projectID: projectID, source: source) } }
+            return versions.map { version in
                 let number = version.data["version"] as? String ?? version.name
                 // CurseForge's "number" is a file ID; its name is the file name, which cleans up better.
                 let raw = version.source == 2 ? version.name : number
@@ -360,15 +373,10 @@ struct CofreModVersion {
                 if let sha = try? await cachedSHA1(path) { hashOf[item.id] = sha }
             }
             let unknown = Set(hashOf.values).filter { modCatalog.identities[$0] == nil }
-            if online, !unknown.isEmpty,
-                let found = try? await modrinthJSON(
-                    "version_files", body: ["hashes": Array(unknown), "algorithm": "sha1"]) as? [String: Any]
-            {
+            if online, !unknown.isEmpty, let found = try? await modCatalog.modrinth.versionFiles(hashes: Array(unknown)) {
                 for sha in unknown {
-                    let v = found[sha] as? [String: Any]
-                    modCatalog.identities[sha] = v.map {
-                        "\($0["project_id"] as? String ?? "")|\($0["id"] as? String ?? "")|\($0["version_type"] as? String ?? "release")"
-                    } ?? ""
+                    let v = found[sha]
+                    modCatalog.identities[sha] = v.map { "\($0.projectID)|\($0.id)|\($0.versionType)" } ?? ""
                 }
                 UserDefaults.standard.set(
                     modCatalog.identities.filter { !$0.value.isEmpty }, forKey: "cofre.mods.identities")
@@ -535,7 +543,7 @@ struct CofreModVersion {
                     }
                 }
             } else {
-                title = (try? await modrinthJSON("project/\(id)", body: nil) as? [String: Any])?["title"] as? String
+                title = try? await modCatalog.modrinth.project(id: id).title
             }
             if let title { modCatalog.titles[id] = title }
             return title ?? id
@@ -628,15 +636,17 @@ struct CofreModVersion {
             ContentKind.allCases.first { self.projectType($0) == projectType } ?? .mods
         }
 
-        private func loadModVersions(projectID: String, source: Int) async throws -> [CofreModVersion] {
-            let rows = try await modRows { done in
-                air.projectVersions(projectID, source: source, completion: done)
+        private func loadModVersions(projectID: String, source: Int, loaders: [String] = [], gameVersions: [String] = []) async throws -> [CofreModVersion] {
+            if source == 1 {
+                return try await modCatalog.modrinth.versions(projectID: projectID, loaders: loaders, gameVersions: gameVersions).map { v in
+                    let file = v.files.first(where: { $0.primary }) ?? v.files.first
+                    let version = CofreModVersion(data: ["id": v.id, "projectID": v.projectID, "apiSource": 1, "name": v.name, "version": v.versionNumber, "gameVersions": v.gameVersions, "loaders": v.loaders, "channel": v.versionType, "dependencies": v.dependencies.map { ["project_id": $0.projectID as Any, "version_id": $0.versionID as Any, "dependency_type": $0.dependencyType] }, "file": ["url": file?.url?.absoluteString as Any, "size": file?.size as Any, "hashes": file?.hashes as Any]])
+                    modCatalog.versions[version.id] = version
+                    return version
+                }
             }
-            return rows.map { row in
-                let version = CofreModVersion(data: row)
-                modCatalog.versions[version.id] = version
-                return version
-            }
+            let rows = try await modRows { done in air.projectVersions(projectID, source: source, completion: done) }
+            return rows.map { row in let version = CofreModVersion(data: row); modCatalog.versions[version.id] = version; return version }
         }
 
         private func modRows(_ body: (@escaping ([Any], Error?) -> Void) -> Void) async throws -> [[String: Any]] {
