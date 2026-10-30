@@ -49,6 +49,8 @@ public struct CofrePreferenceStore {
 
     /// MobileGlues' FSR presets 1–4 (Ultra quality, Quality, Balanced, Performance): screen size ÷ factor is drawn.
     static let fsrFactors = [1.3, 1.5, 1.7, 2.0]
+    /// The picked size (0–1) and Smooth upscale, owned by Cofre; read at launch by the Air bridge.
+    static let scaleKey = "cofre.render.scale", smoothKey = "cofre.render.smooth"
 
     public typealias Read = (_ key: String, _ profile: String?) -> Any?
     public typealias Write = (_ key: String, _ value: Any, _ profile: String?) -> Void
@@ -70,12 +72,14 @@ public struct CofrePreferenceStore {
             : integer(.ramAllocation, instanceID, default: p.ramMB)
         p.deviceRAMMB = Int(ProcessInfo.processInfo.physicalMemory / 1_048_576)
         p.renderer = string(.renderer, instanceID, default: p.renderer)
-        // With FSR the screen stays full size and MobileGlues draws smaller inside it, so the size the player picked
-        // is the screen size divided by the FSR preset's factor.
+        // Cofre keeps the picked size and Smooth upscale itself; the launch turns them into Air's keys for the renderer
+        // that actually runs (AirBridgeAdapter applySmoothUpscale). Before that, read Air's: a smooth launch leaves a
+        // full-size screen plus an FSR preset, which is the picked size divided by the preset's factor.
         let stored = double(.resolution, instanceID, default: p.resolution * 100) / 100
         let preset = integer(.fsr, instanceID, default: 0)
-        p.fsr = Self.fsrFactors.indices.contains(preset - 1)
-        p.resolution = p.fsr ? stored / Self.fsrFactors[preset - 1] : stored
+        let fromAir = Self.fsrFactors.indices.contains(preset - 1) ? stored / Self.fsrFactors[preset - 1] : stored
+        p.resolution = UserDefaults.standard.object(forKey: Self.scaleKey) as? Double ?? fromAir
+        p.fsr = UserDefaults.standard.object(forKey: Self.smoothKey) as? Bool ?? (preset > 0)
         p.graphicsApi = string(.graphicsAPI, instanceID, default: p.graphicsApi)
         p.java = string(.java, instanceID, default: p.java)
         p.jvmArgs = string(.javaArgs, instanceID, default: p.jvmArgs)
@@ -103,17 +107,10 @@ public struct CofrePreferenceStore {
         put(.autoRAM, p.autoRAM, instanceID)
         if !p.autoRAM { put(.ramAllocation, p.ramMB, instanceID) }
         put(.renderer, p.renderer, instanceID)
-        // Smooth upscale: full-size screen plus the MobileGlues FSR preset nearest the picked size (½ at most), so
-        // the picture is scaled once. Otherwise the screen itself is the picked size and FSR is off.
-        if p.fsr, p.renderer.contains("mobileglues"), p.resolution < 0.99 {
-            let factor = 1 / max(p.resolution, 0.5)
-            let preset = Self.fsrFactors.indices.min { abs(Self.fsrFactors[$0] - factor) < abs(Self.fsrFactors[$1] - factor) }!
-            put(.resolution, 100.0, instanceID)
-            put(.fsr, preset + 1, instanceID)
-        } else {
-            put(.resolution, p.resolution * 100, instanceID)
-            put(.fsr, 0, instanceID)
-        }
+        UserDefaults.standard.set(p.resolution, forKey: Self.scaleKey)
+        UserDefaults.standard.set(p.fsr, forKey: Self.smoothKey)
+        put(.resolution, p.resolution * 100, instanceID)
+        put(.fsr, 0, instanceID)
         put(.graphicsAPI, p.graphicsApi == "auto" ? "" : p.graphicsApi, instanceID)
         put(.java, p.java, instanceID)
         put(.javaArgs, p.jvmArgs, instanceID)

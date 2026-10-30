@@ -75,7 +75,8 @@
                     }
                     if let smooth {
                         ToggleRow(
-                            "Smooth upscale (FSR)", subtitle: "Softer edges instead of sharp pixels. Down to ½.",
+                            "Smooth upscale (FSR)",
+                            subtitle: "Softer edges instead of sharp pixels, down to ½. Works with MobileGlues; Auto uses it for Forge and NeoForge before 1.21.11.",
                             isOn: Binding(
                                 get: { smooth.wrappedValue },
                                 set: {

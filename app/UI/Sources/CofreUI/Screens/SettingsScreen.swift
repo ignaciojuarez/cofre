@@ -116,10 +116,12 @@
                         "Renderer", value: store.renderers.first { $0.id == p.renderer }?.name ?? p.renderer,
                         accent: true)
                 }.buttonStyle(RowButtonStyle())
-                // FSR is a MobileGlues setting, so Smooth upscale shows only when MobileGlues is the renderer.
+                // Smooth upscale is MobileGlues' FSR: offered when MobileGlues may run (chosen, or Auto, which picks it
+                // for Forge/NeoForge before 1.21.11); the launch applies it only when MobileGlues actually runs.
                 ResolutionRow(
                     scale: prefBinding(store, instanceID, \.resolution),
-                    smooth: p.renderer.contains("mobileglues") ? prefBinding(store, instanceID, \.fsr) : nil)
+                    smooth: p.renderer.contains("mobileglues") || p.renderer == "auto"
+                        ? prefBinding(store, instanceID, \.fsr) : nil)
                 ToggleRow("FPS overlay", isOn: prefBinding(store, instanceID, \.fpsOverlay))
                 Text("VSync and Max Framerate are in the game: Options › Video Settings.")
                     .cofreFont(.caption).foregroundStyle(Color.cofre.muted).padding(.horizontal, 2)
