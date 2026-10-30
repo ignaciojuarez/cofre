@@ -86,7 +86,12 @@
             setup.trust = .ready
             setup.pairing = hasPairing() ? .ready : (setup.pairing.isReady ? .unknown : setup.pairing)
             if await CofreVPN.isAllowed() { setup.vpn = .ready } else if setup.vpn.isReady { setup.vpn = .unknown }
-            if isJITEnabled { setup.jit = .ready }
+            if isJITEnabled {
+                setup.jit = .ready
+            } else if !hasPairing(), setup.jit.isReady {
+                // A remembered JIT test means nothing once the pairing key is gone: launches would fail.
+                UserDefaults.standard.removeObject(forKey: "cofre.setup.jit"); setup.jit = .unknown
+            }
             let accountReady = accountStore.list().contains { $0.state == .ready }
             if accountReady { setup.account = .ready } else if setup.account.isReady { setup.account = .unknown }
             publishSetup()

@@ -937,8 +937,8 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
   dispatch_once(&once, ^{
     NSData *data = [NSData dataWithContentsOfURL:[NSBundle.mainBundle URLForResource:@"RendererManifest" withExtension:@"json"]];
     NSArray<NSString *> *listed = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil][@"gameVersions"] : @[];
-    // Air loads the Metallum agent only for Minecraft 26+ (JavaLauncher: "MC major < 26" skips it), so a listed
-    // older version such as 1.21.11 would get Metal's surface without its renderer: a black screen.
+    // Air loads the Metallum agent for exactly these versions when the session runs Java 21+ (patch 0003), so
+    // this list and the agent gate agree; a Java 8/17 session would get Metal's surface without its renderer.
     metalVersions = listed;
   });
   NSString *pick = global.length && ![global isEqualToString:@"auto"] ? global
