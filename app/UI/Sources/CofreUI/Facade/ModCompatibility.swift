@@ -4,10 +4,11 @@ import CofreKit
 /// Compatibility is computed by CofreKit. This small value keeps existing UI call sites source-compatible.
 public struct ModCompatibility: Hashable, Sendable {
     /// The renderer an instance runs, decided like the launch does (AirBridgeAdapter pickRendererForProfile): Auto is
-    /// Metal where the bundled Metallum supports the version, MobileGlues for Forge/NeoForge elsewhere, else Air's GL.
-    public static func renderer(setting: String, gameVersion: String, loader: String) -> String {
-        guard setting.lowercased() == "auto" else { return setting }
-        if metalVersions.contains(gameVersion) { return "metallum" }
+    /// Metal where the bundled Metallum supports the version and Java 21+, MobileGlues for Forge/NeoForge elsewhere, else Air's GL.
+    public static func renderer(instanceSetting: String? = nil, globalSetting: String, gameVersion: String, loader: String, javaVersion: Int = 21) -> String {
+        let setting = instanceSetting.flatMap { $0.isEmpty || $0 == "auto" ? nil : $0 } ?? globalSetting
+        guard setting.isEmpty || setting == "auto" else { return setting }
+        if (javaVersion <= 0 || javaVersion >= 21) && metalVersions.contains(gameVersion) { return "metallum" }
         return loader == "forge" || loader == "neoforge" ? "mobileglues" : "air"
     }
     /// Versions supported by the exact shipped Metallum manifest. No version family is inferred here.

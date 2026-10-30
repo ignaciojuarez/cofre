@@ -20,6 +20,7 @@ public struct Instance: Identifiable, Codable, Hashable, Sendable {
     public var favorite: Bool
     public var icon: String?
     /// Air's real `lastVersionId` (e.g. `fabric-loader-0.16.9-1.21.1`, `1.20.1-forge-47.2.0`, `neoforge-21.1.77`).
+    public var renderer: String?
     public var versionID: String?
 
     public init(id: String, name: String, gameDirectory: URL, gameVersion: String,
@@ -224,7 +225,7 @@ public final class InstanceStore: @unchecked Sendable {
         try d.write(to: profilesURL, options: .atomic)
         didWriteProfiles?()
     }
-    private func makeInstance(id: String, profile p: [String: Any]) -> Instance? { guard let name = p["name"] as? String, let version = p["lastVersionId"] as? String else { return nil }; let dir = resolveGameDirectory?(id, p) ?? (p["gameDir"] as? String).map(resolveGameDir) ?? root; let parsed = parseVersion(version); let meta = try? readMeta(at: dir); var instance = Instance(id: id, name: name, gameDirectory: dir, gameVersion: meta?.gameVersion ?? parsed.version, loader: meta?.loader ?? parsed.loader, loaderVersion: (p["loaderVersion"] as? String) ?? meta?.loaderVersion, javaPath: p["javaPath"] as? String, javaVersion: p["javaVersion"] as? Int, memoryMB: p["memory"] as? Int, autoMemory: (p["autoMemory"] as? Bool) ?? true, jvmArguments: p["javaArgs"] as? String, lastGoodJVMArguments: p["lastGoodJavaArgs"] as? String, notes: meta?.notes ?? "", group: meta?.group, favorite: meta?.favorite ?? false, icon: meta?.icon); instance.versionID = version; return instance }
+    private func makeInstance(id: String, profile p: [String: Any]) -> Instance? { guard let name = p["name"] as? String, let version = p["lastVersionId"] as? String else { return nil }; let dir = resolveGameDirectory?(id, p) ?? (p["gameDir"] as? String).map(resolveGameDir) ?? root; let parsed = parseVersion(version); let meta = try? readMeta(at: dir); var instance = Instance(id: id, name: name, gameDirectory: dir, gameVersion: meta?.gameVersion ?? parsed.version, loader: meta?.loader ?? parsed.loader, loaderVersion: (p["loaderVersion"] as? String) ?? meta?.loaderVersion, javaPath: p["javaPath"] as? String, javaVersion: p["javaVersion"] as? Int, memoryMB: p["memory"] as? Int, autoMemory: (p["autoMemory"] as? Bool) ?? true, jvmArguments: p["javaArgs"] as? String, lastGoodJVMArguments: p["lastGoodJavaArgs"] as? String, notes: meta?.notes ?? "", group: meta?.group, favorite: meta?.favorite ?? false, icon: meta?.icon); instance.versionID = version; instance.renderer = (p["cofreRendererPicked"] as? Bool) == true ? "auto" : p["renderer"] as? String; return instance }
     private func refresh(_ id: String) throws -> Instance { try loadProfiles(); guard let i = makeInstance(id: id, profile: profiles[id] ?? [:]) else { throw StoreError.missingProfile }; return i }
     private func saveMeta(_ i: Instance) throws { try JSONEncoder().encode(i).write(to: i.gameDirectory.appendingPathComponent("cofre.json"), options: .atomic) }
     private func readMeta(at dir: URL) throws -> Instance { try JSONDecoder().decode(Instance.self, from: Data(contentsOf: dir.appendingPathComponent("cofre.json"))) }

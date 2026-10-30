@@ -298,7 +298,7 @@
             guard let id = instanceID ?? activeInstance?.id else { return }
             activeInstanceID = id
             if rejoin == nil, server == nil, let instance = instances.first(where: { $0.id == id }) {
-                    let renderer = ModCompatibility.renderer(setting: preferences.renderer, gameVersion: instance.gameVersion, loader: instance.loader.rawValue)
+                let renderer = ModCompatibility.renderer(instanceSetting: instancePreferences[instance.id]?.renderer ?? instance.renderer, globalSetting: preferences.renderer, gameVersion: instance.gameVersion, loader: instance.loader.rawValue, javaVersion: instance.javaVersion.flatMap(Int.init) ?? 21)
                 if case .warn(let issues) = ModCompatibilityChecker.decision(items: installed[.mods] ?? [], gameVersion: instance.gameVersion, renderer: renderer) {
                     pendingModCompatibility = issues
                     return
@@ -463,10 +463,12 @@
             let loader = Loader(rawValue: i.loader.rawValue) ?? .vanilla
             // Air's "latest-release" alias resolves to the newest release at launch.
             let game = ["latest-release": "Latest release", "latest-snapshot": "Latest snapshot"][i.gameVersion] ?? i.gameVersion
-            return InstanceSummary(id: i.id, name: i.name, loader: loader, gameVersion: game,
+            var summary = InstanceSummary(id: i.id, name: i.name, loader: loader, gameVersion: game,
                                    loaderVersion: i.loaderVersion, javaVersion: i.javaVersion.map(String.init),
                                    icon: InstanceIcon.resolve(png: nil, picked: i.icon, id: i.id, loader: loader),
                                    favorite: i.favorite, group: i.group, notes: i.notes)
+            summary.renderer = i.renderer
+            return summary
         }
 
         public func preferences(for id: String) -> GamePreferences { instancePreferences[id] ?? preferences }
@@ -548,7 +550,7 @@
                         fail(projectID, reason, retry: false)
                     } else if plan.needsConfirmation || (ModCompatibility.entry(for: plan.target.id, name: plan.target.name)?.issue(
                         gameVersion: self.modsInstance?.gameVersion ?? plan.target.version,
-                        renderer: self.modsInstance.map { ModCompatibility.renderer(setting: self.preferences.renderer, gameVersion: $0.gameVersion, loader: $0.loader.rawValue) } ?? self.preferences.renderer
+                        renderer: self.modsInstance.map { ModCompatibility.renderer(instanceSetting: self.instancePreferences[$0.id]?.renderer ?? $0.renderer, globalSetting: self.preferences.renderer, gameVersion: $0.gameVersion, loader: $0.loader.rawValue, javaVersion: $0.javaVersion.flatMap(Int.init) ?? 21) } ?? "air"
                     ) != nil) {
                         modInstalls[projectID]?.phase = .confirm
                         modInstallSheet = projectID
@@ -658,7 +660,7 @@
 
         public func compatibilityIssue(for item: InstalledItem, instance: InstanceSummary? = nil) -> ModCompatibilityIssue? {
             guard let i = instance ?? modsInstance else { return nil }
-            let renderer = ModCompatibility.renderer(setting: preferences.renderer, gameVersion: i.gameVersion, loader: i.loader.rawValue)
+            let renderer = ModCompatibility.renderer(instanceSetting: instancePreferences[i.id]?.renderer ?? i.renderer, globalSetting: preferences.renderer, gameVersion: i.gameVersion, loader: i.loader.rawValue, javaVersion: i.javaVersion.flatMap(Int.init) ?? 21)
             return ModCompatibility.entry(for: item.projectID ?? item.id, name: item.name)?.issue(gameVersion: i.gameVersion, renderer: renderer)
         }
 

@@ -105,6 +105,7 @@
         public var sizeBytes: Int64?
         public var lastPlayed: Date?
         public var updatesAvailable: Int
+        public var renderer: String? = nil
         public var javaVersion: String?
         public var ownFolder: Bool
         public var icon: InstanceIcon

@@ -112,7 +112,7 @@
                                     ProjectIcon(project: p, size: 28)
                                 } trailing: {
                                     HStack(spacing: 5) {
-                                        if let inst = store.modsInstance, ModCompatibility.entry(for: p.id, name: p.title)?.issue(gameVersion: inst.gameVersion, renderer: ModCompatibility.renderer(setting: store.preferences.renderer, gameVersion: inst.gameVersion, loader: inst.loader.rawValue)) != nil { Badge("Won't run", tone: .warn) }
+                                        if let inst = store.modsInstance, ModCompatibility.entry(for: p.id, name: p.title)?.issue(gameVersion: inst.gameVersion, renderer: ModCompatibility.renderer(instanceSetting: store.instancePreferences[inst.id]?.renderer ?? inst.renderer, globalSetting: store.preferences.renderer, gameVersion: inst.gameVersion, loader: inst.loader.rawValue, javaVersion: inst.javaVersion.flatMap(Int.init) ?? 21)) != nil { Badge("Won't run", tone: .warn) }
                                         GetButton(project: p) { endEditing() }
                                     }
                                 }
@@ -179,7 +179,7 @@
                                 // Its own line: next to three loader badges it pushed the page past the screen edge.
                                 if ModCompatibility.entry(for: p.id, name: p.title)?.issue(
                                     gameVersion: store.modsInstance?.gameVersion ?? "",
-                                    renderer: store.modsInstance.map { ModCompatibility.renderer(setting: store.preferences.renderer, gameVersion: $0.gameVersion, loader: $0.loader.rawValue) } ?? store.preferences.renderer)
+                                    renderer: store.modsInstance.map { ModCompatibility.renderer(instanceSetting: store.instancePreferences[$0.id]?.renderer ?? $0.renderer, globalSetting: store.preferences.renderer, gameVersion: $0.gameVersion, loader: $0.loader.rawValue, javaVersion: $0.javaVersion.flatMap(Int.init) ?? 21) } ?? "air")
                                     != nil
                                 {
                                     Badge("Won't run", tone: .warn)
@@ -257,7 +257,7 @@
                                 .keyboardShortcut(.return, modifiers: .command)
                             }
                         }
-                        if let issue = ModCompatibility.entry(for: p.id, name: p.title)?.issue(gameVersion: store.modsInstance?.gameVersion ?? "", renderer: store.preferences.renderer == "auto" ? "metallum" : store.preferences.renderer) { Banner(issue.title, icon: .cross, tone: .warn) }
+                        if let issue = ModCompatibility.entry(for: p.id, name: p.title)?.issue(gameVersion: store.modsInstance?.gameVersion ?? "", renderer: store.modsInstance.map { ModCompatibility.renderer(instanceSetting: store.instancePreferences[$0.id]?.renderer ?? $0.renderer, globalSetting: store.preferences.renderer, gameVersion: $0.gameVersion, loader: $0.loader.rawValue, javaVersion: $0.javaVersion.flatMap(Int.init) ?? 21) } ?? "air") { Banner(issue.title, icon: .cross, tone: .warn) }
                         if let picked {
                             ListSection("Details", spacing: 4) {
                                 Row("Version", trailing: { Self.detail(picked.number) })

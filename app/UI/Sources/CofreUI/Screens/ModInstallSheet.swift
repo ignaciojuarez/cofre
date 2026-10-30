@@ -65,7 +65,7 @@
                 ModCompatibility.entry(for: plan.target.id, name: plan.target.name)?.issue(
                     gameVersion: $0.gameVersion,
                     renderer: ModCompatibility.renderer(
-                        setting: store.preferences.renderer, gameVersion: $0.gameVersion, loader: $0.loader.rawValue))
+                        instanceSetting: store.instancePreferences[$0.id]?.renderer ?? $0.renderer, globalSetting: store.preferences.renderer, gameVersion: $0.gameVersion, loader: $0.loader.rawValue, javaVersion: $0.javaVersion.flatMap(Int.init) ?? 21))
             }
             // The warning leads, in one line.
             if let issue {
