@@ -105,3 +105,24 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 - Actual: Cofre shows “Copy a server address first.” and remains on the empty Servers view.
 - Evidence: `/tmp/cofre-test/shots/round3-deeplink.png`
 - Severity: S2 · Status: handoff · Commit: —
+
+## Round 4a overnight test cases (2026-10-30 · HEAD 192a226 · iPad simulator)
+
+| Area | Test case | Result | Evidence |
+|---|---|---|---|
+| Build | Disposable `scripts/sim.sh` builds current CofreCore, retags every nested Mach-O to `IOSSIMULATOR`, removes PacketTunnel, ad-hoc signs inside-out, validates platforms, installs | PASS (install); launch exits immediately | `/tmp/cofre-sim-head.log`, build sha `192a226` |
+| Settings | Settings › Game Resolution row has no FSR control | BLOCKED: app launch exits before UI session; no screenshot | — |
+| Instances | B-004 edit/rename after fix `96c0aa0` | BLOCKED: app launch exits | — |
+| Mods | B-005 incompatible install confirmation after fix `4f0b3cb` | BLOCKED: app launch exits | — |
+| Content | B-006 world-owned data empty state after fix `7496a18` | BLOCKED: app launch exits | — |
+| Settings | B-007 FSR removal (`a5a2159`) | BLOCKED: app launch exits; source and Swift tests pass | — |
+| Servers | B-008 deep-link forwarding after fix `192a226` | BLOCKED: app launch exits | — |
+| Modpacks | Valid and corrupt `.mrpack` through Files | BLOCKED: no running app session | — |
+| Lifecycle | Kill mid-download and mid-install | BLOCKED: no running app session | — |
+| System | Rotate, Split View/Stage Manager, UX pass | BLOCKED: no running app session | — |
+
+### Round 4a build notes
+- `scripts/sim.sh` prints `CofreBuild 192a226`, uses `/tmp/cofre-sim-head`, and does not write `.work/air`, `artifacts/Payload`, or `.build-tools/signing/build`.
+- Air `PLATFORM=7` was attempted in a disposable copy but CMake linked device-only `libEGL.framework`; the script uses the documented disposable retag/ad-hoc workaround and validates all nested Mach-O files, including Java runtimes, Frameworks, and the app executable.
+- Install succeeded on `SIMULATOR_UDID`; `simctl launch` returned `NSPOSIXErrorDomain code=3` with no process, so the required Settings screenshot and interactive cases remain blocked.
+- `cd app/UI && swift test`: 48 tests, 0 failures. Whole-app compile check failed in pre-existing/unrelated `app/Shell/CofreRootViewController.swift` (`UISceneOpenURLContextsNotification` and renamed `UISceneWillConnectNotification`).
