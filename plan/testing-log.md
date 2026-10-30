@@ -125,4 +125,4 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 - `scripts/sim.sh` prints `CofreBuild 192a226`, uses `/tmp/cofre-sim-head`, and does not write `.work/air`, `artifacts/Payload`, or `.build-tools/signing/build`.
 - Air `PLATFORM=7` was attempted in a disposable copy but CMake linked device-only `libEGL.framework`; the script uses the documented disposable retag/ad-hoc workaround and validates all nested Mach-O files, including Java runtimes, Frameworks, and the app executable.
 - Install succeeded on `SIMULATOR_UDID`; `simctl launch` returned `NSPOSIXErrorDomain code=3` with no process, so the required Settings screenshot and interactive cases remain blocked.
-- `cd app/UI && swift test`: 48 tests, 0 failures. Whole-app compile check failed in pre-existing/unrelated `app/Shell/CofreRootViewController.swift` (`UISceneOpenURLContextsNotification` and renamed `UISceneWillConnectNotification`).
+- `cd app/UI && swift test`: 48 tests, 0 failures. Whole-app compile check passed with an own derived data path (`/tmp/cofre-round4-core2`).

@@ -37,7 +37,9 @@ retag() {
   mv "$tmp" "$file"
 }
 while IFS= read -r -d '' f; do retag "$f"; done < <(find "$APP" -type f -print0)
-while IFS= read -r -d '' f; do codesign --force --sign - "$f" >/dev/null; done < <(find "$APP/Frameworks" -type f \( -name '*.dylib' -o -name '*.framework' \) -print0)
+while IFS= read -r -d '' f; do
+  file "$f" | grep -q 'Mach-O' && codesign --force --sign - "$f" >/dev/null
+done < <(find "$APP/Frameworks" -type f -print0)
 codesign --force --sign - "$APP"
 while IFS= read -r -d '' f; do
   xcrun vtool -show-build "$f" 2>/dev/null | grep -q 'platform IOSSIMULATOR' || { echo "platform validation failed: $f" >&2; exit 1; }
