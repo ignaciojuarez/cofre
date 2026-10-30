@@ -1,3 +1,4 @@
+import CofreKit
 import Foundation
 
 /// Air's normalized version payload; kept independent of UIKit for regression checks.
@@ -337,35 +338,9 @@ struct CofreModVersion {
         func scan(_ kind: ContentKind, instanceID: String, online: Bool, identify: Bool = true) async throws
             -> [InstalledItem]
         {
-            guard let directory = air.gameDirectory(forProfile: instanceID),
-                let fileKind = ContentStore.Kind(rawValue: kind == .resourcePacks ? "resourcePacks" : kind == .shaders ? "shaderpacks" : kind.rawValue)
-            else { return [] }
-            var items: [InstalledItem]
-            if let files = try? ContentStore(gameDirectory: URL(fileURLWithPath: directory)).list(fileKind) {
-                items = files.map { file in
-                    InstalledItem(id: file.id, name: file.name, version: file.version, enabled: file.enabled, kind: kind, issue: nil, projectID: nil, versionID: nil, updateVersionID: nil).withContentState(inUse: file.inUse, world: file.world)
-                }
-            } else {
-                let rows: [Any] = await withCheckedContinuation { c in
-                    air.mods(forProfile: instanceID) { c.resume(returning: $0) }
-                }
-                items = rows.compactMap { row in
-                    let x = row as? [String: Any] ?? [:]
-                    let file = Self.enabledName(x["file"] as? String ?? "")
-                    guard let id = file.isEmpty ? x["id"] as? String : file else { return nil }
-                    return InstalledItem(
-                        id: id, name: x["name"] as? String ?? id, version: x["version"] as? String ?? "",
-                        enabled: x["enabled"] as? Bool ?? true, kind: kind)
-                }
-            } else {
-                let folder = try contentFolder(kind, instanceID: instanceID, create: false)
-                let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
-                items = names.filter { !$0.hasPrefix(".") }.sorted().map { name in
-                    let id = Self.enabledName(name)
-                    return InstalledItem(
-                        id: id, name: (id as NSString).deletingPathExtension, version: "", enabled: id == name,
-                        kind: kind)
-                }
+            guard let fileKind = Self.storeKind(kind), let directory = air.gameDirectory(forProfile: instanceID) else { return [] }
+            var items = try ContentStore(gameDirectory: directory).list(fileKind).map { file in
+                InstalledItem(id: file.id, name: file.name, version: file.version, enabled: file.enabled, kind: kind)
             }
             if identify { try? await self.identify(&items, kind: kind, instanceID: instanceID, online: online) }
             return items
@@ -488,16 +463,31 @@ struct CofreModVersion {
             ])
         }
 
+        static func storeKind(_ kind: ContentKind) -> ContentStore.Kind? {
+            switch kind {
+            case .mods: .mods
+            case .resourcePacks: .resourcePacks
+            case .shaders: .shaderpacks
+            case .dataPacks: .datapacks
+            case .modpacks: nil
+            }
+        }
+
+        /// The instance's content folder and the file behind `item`.
+        private func contentFile(_ item: InstalledItem, instanceID: String) throws -> (ContentStore, ContentStore.Item)? {
+            guard let kind = Self.storeKind(item.kind), let directory = air.gameDirectory(forProfile: instanceID) else { return nil }
+            let store = ContentStore(gameDirectory: directory)
+            return try store.list(kind).first { $0.id == item.id }.map { (store, $0) }
+        }
+
         public func setEnabled(_ enabled: Bool, item: InstalledItem, instanceID: String) async throws {
-            guard let directory = air.gameDirectory(forProfile: instanceID), let kind = ContentStore.Kind(rawValue: item.kind == .resourcePacks ? "resourcePacks" : item.kind == .shaders ? "shaderpacks" : item.kind.rawValue),
-                let file = try ContentStore(gameDirectory: URL(fileURLWithPath: directory)).list(kind).first(where: { $0.id == item.id }) else { return }
-            try ContentStore(gameDirectory: URL(fileURLWithPath: directory)).setEnabled(enabled, file)
+            guard let (store, file) = try contentFile(item, instanceID: instanceID) else { return }
+            try store.setEnabled(enabled, file)
         }
 
         public func delete(_ item: InstalledItem, instanceID: String) async throws {
-            guard let directory = air.gameDirectory(forProfile: instanceID), let kind = ContentStore.Kind(rawValue: item.kind == .resourcePacks ? "resourcePacks" : item.kind == .shaders ? "shaderpacks" : item.kind.rawValue),
-                let file = try ContentStore(gameDirectory: URL(fileURLWithPath: directory)).list(kind).first(where: { $0.id == item.id }) else { return }
-            _ = try ContentStore(gameDirectory: URL(fileURLWithPath: directory)).trash(file)
+            guard let (store, file) = try contentFile(item, instanceID: instanceID) else { return }
+            _ = try store.trash(file)
             var index = modIndex(instanceID)
             index[item.id] = nil
             UserDefaults.standard.set(index, forKey: Self.indexKey(instanceID))
