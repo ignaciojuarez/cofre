@@ -27,6 +27,8 @@ import UIKit
 //                       to Documents/<snapshot>.png, e.g. an iPad 13" window on an 11" simulator.
 //   -snapshot name      File name for -canvas output
 //   -touch a|b|c|ipad|settings|sheet   Touch-controls design mock (-screen touch)
+//   -draft play|instances|import|files|content|worlds|beforePlay|logs|crash|versions|accounts   Design draft
+//   -draftState <state>  That area's state (plan/design-draft.md), e.g. -draft worlds -draftState undo
 
 @main
 final class AppDelegate: UIResponder, UIApplicationDelegate {}
@@ -156,7 +158,11 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         }
         let setupStep = args.object(forKey: "setupStep") != nil ? args.integer(forKey: "setupStep") : nil
         let root: UIViewController =
-            screen == "touch"
+            screen == "draft"
+            ? UIHostingController(
+                rootView: DraftPage(
+                    args.string(forKey: "draft") ?? "play", state: args.string(forKey: "draftState") ?? ""))
+            : screen == "touch"
             ? UIHostingController(rootView: TouchControlsMockPage(args.string(forKey: "touch") ?? "sheet"))
             : screen == "serversMock"
             ? UIHostingController(rootView: ServersVariationsMock())
