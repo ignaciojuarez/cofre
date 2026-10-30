@@ -249,10 +249,9 @@ struct CofreModVersion {
                         }
                         if plan.makesInstance {
                             guard let pack = staged.first?.file else { throw modError("The pack didn't download.") }
-                            guard let gameDirectory = air.gameDirectory(forProfile: instanceID) else {
-                                throw modError("The instance folder is unavailable.")
-                            }
-                            try await importDownloadedPack(pack, in: gameDirectory) { fraction in
+                            guard let packs = Self.modpackDirectory else { throw modError("The game folder is unavailable.") }
+                            try FileManager.default.createDirectory(at: packs, withIntermediateDirectories: true)
+                            try await importDownloadedPack(pack, in: packs) { fraction in
                                 continuation.yield(
                                     InstallProgress(title: plan.target.name, fraction: fraction, stages: stages))
                             }
@@ -342,7 +341,8 @@ struct CofreModVersion {
                     url, profile: nil,
                     progress: { fraction, _ in Task { @MainActor in progress(min(max(fraction, 0), 0.99)) } },
                     completion: { error in
-                        ModpackImport.markImportFinished(in: gameDirectory)
+                        // A failed import is rolled back now; a crash is rolled back at the next launch.
+                        if error != nil { ModpackImport.cleanupAbandonedImport(in: gameDirectory) } else { ModpackImport.markImportFinished(in: gameDirectory) }
                         if let error { done.resume(throwing: error) } else { done.resume() }
                     })
             }

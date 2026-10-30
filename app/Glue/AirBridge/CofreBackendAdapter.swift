@@ -42,13 +42,17 @@
             self.air = bridge
             super.init()
             CofreGameInput.shared.bridge = bridge
-            for profile in bridge.instances() {
-                guard let id = profile["id"] as? String, let directory = bridge.gameDirectory(forProfile: id) else { continue }
-                ModpackImport.cleanupAbandonedImport(in: directory)
-            }
+            if let packs = Self.modpackDirectory { ModpackImport.cleanupAbandonedImport(in: packs) }
             loadPersistedSetup()
         }
         private var launchTask: Task<Void, Never>?
+        /// Where Air's importer builds each modpack instance (`<POJAV_GAME_DIR>/custom_gamedir/<id>`), so an interrupted
+        /// import is rolled back there and nowhere else.
+        static var modpackDirectory: URL? {
+            ProcessInfo.processInfo.environment["POJAV_GAME_DIR"].map {
+                URL(fileURLWithPath: $0).appendingPathComponent("custom_gamedir", isDirectory: true)
+            }
+        }
         private var setup = SetupState()
         private var setupContinuations: [UUID: AsyncStream<SetupState>.Continuation] = [:]
         private var preferenceStore: CofrePreferenceStore {
