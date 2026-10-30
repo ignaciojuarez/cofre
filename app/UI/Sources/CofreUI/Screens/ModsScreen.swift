@@ -115,7 +115,7 @@
                                     ProjectIcon(project: p, size: 28)
                                 } trailing: {
                                     HStack(spacing: 5) {
-                                        if let inst = store.modsInstance, let issue = ModCompatibility.entry(for: p.id, name: p.title)?.issue(gameVersion: inst.gameVersion, renderer: ModCompatibility.renderer(setting: store.preferences.renderer, instance: inst)) { Badge(issue.badge, tone: .warn) }
+                                        if let inst = store.modsInstance, let issue = ModCompatibility.entry(for: p.id, name: p.title)?.issue(gameVersion: inst.gameVersion, renderer: ModCompatibility.renderer(setting: store.preferences.renderer, gameVersion: inst.gameVersion, loader: inst.loader.rawValue)) { Badge(issue.badge, tone: .warn) }
                                         GetButton(project: p) { endEditing() }
                                     }
                                 }
@@ -182,7 +182,7 @@
                                 // Its own line: next to three loader badges it pushed the page past the screen edge.
                                 if let issue = ModCompatibility.entry(for: p.id, name: p.title)?.issue(
                                     gameVersion: store.modsInstance?.gameVersion ?? "",
-                                    renderer: store.modsInstance.map { ModCompatibility.renderer(setting: store.preferences.renderer, instance: $0) } ?? store.preferences.renderer)
+                                    renderer: store.modsInstance.map { ModCompatibility.renderer(setting: store.preferences.renderer, gameVersion: $0.gameVersion, loader: $0.loader.rawValue) } ?? store.preferences.renderer)
                                 {
                                     Badge(issue.badge, tone: .warn)
                                 }

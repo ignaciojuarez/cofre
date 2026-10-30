@@ -298,7 +298,7 @@
             guard let id = instanceID ?? activeInstance?.id else { return }
             activeInstanceID = id
             if rejoin == nil, server == nil, let instance = instances.first(where: { $0.id == id }) {
-                    let renderer = ModCompatibility.renderer(setting: preferences.renderer, instance: instance)
+                    let renderer = ModCompatibility.renderer(setting: preferences.renderer, gameVersion: instance.gameVersion, loader: instance.loader.rawValue)
                 if case .warn(let issues) = ModCompatibilityChecker.decision(items: installed[.mods] ?? [], gameVersion: instance.gameVersion, renderer: renderer) {
                     pendingModCompatibility = issues
                     return
@@ -548,7 +548,7 @@
                         fail(projectID, reason, retry: false)
                     } else if plan.needsConfirmation || (ModCompatibility.entry(for: plan.target.id, name: plan.target.name)?.issue(
                         gameVersion: self.modsInstance?.gameVersion ?? plan.target.version,
-                        renderer: self.modsInstance.map { ModCompatibility.renderer(setting: self.preferences.renderer, instance: $0) } ?? self.preferences.renderer
+                        renderer: self.modsInstance.map { ModCompatibility.renderer(setting: self.preferences.renderer, gameVersion: $0.gameVersion, loader: $0.loader.rawValue) } ?? self.preferences.renderer
                     ) != nil) {
                         modInstalls[projectID]?.phase = .confirm
                         modInstallSheet = projectID
@@ -658,7 +658,7 @@
 
         public func compatibilityIssue(for item: InstalledItem, instance: InstanceSummary? = nil) -> ModCompatibilityIssue? {
             guard let i = instance ?? modsInstance else { return nil }
-            let renderer = ModCompatibility.renderer(setting: preferences.renderer, instance: i)
+            let renderer = ModCompatibility.renderer(setting: preferences.renderer, gameVersion: i.gameVersion, loader: i.loader.rawValue)
             return ModCompatibility.entry(for: item.projectID ?? item.id, name: item.name)?.issue(gameVersion: i.gameVersion, renderer: renderer)
         }
 

@@ -119,12 +119,12 @@
                 Text("Already has \(ListFormatter.localizedString(byJoining: plan.present)).")
                     .cofreFont(.secondary).foregroundStyle(Color.cofre.muted)
             }
-            if let target, let issue = ModCompatibility.entry(for: plan.target.id, name: plan.target.name)?.issue(gameVersion: target.gameVersion, renderer: ModCompatibility.renderer(setting: store.preferences.renderer, instance: target)) {
+            if let target, let issue = ModCompatibility.entry(for: plan.target.id, name: plan.target.name)?.issue(gameVersion: target.gameVersion, renderer: ModCompatibility.renderer(setting: store.preferences.renderer, gameVersion: target.gameVersion, loader: target.loader.rawValue)) {
                 Banner(issue.title, icon: .cross, tone: .warn)
                 Text(issue.reason).cofreFont(.secondary).foregroundStyle(Color.cofre.muted)
             }
             BlockButton(
-                target.flatMap { ModCompatibility.entry(for: plan.target.id, name: plan.target.name)?.issue(gameVersion: $0.gameVersion, renderer: ModCompatibility.renderer(setting: store.preferences.renderer, instance: $0)) } == nil ? installTitle(job, plan) : "Get anyway",
+                target.flatMap { ModCompatibility.entry(for: plan.target.id, name: plan.target.name)?.issue(gameVersion: $0.gameVersion, renderer: ModCompatibility.renderer(setting: store.preferences.renderer, gameVersion: $0.gameVersion, loader: $0.loader.rawValue)) } == nil ? installTitle(job, plan) : "Get anyway",
                 role: .primary) { store.confirmInstall(id) }
                 .keyboardShortcut(.return, modifiers: .command)
         }

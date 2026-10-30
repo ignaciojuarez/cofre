@@ -3,10 +3,10 @@ import CofreKit
 
 /// Compatibility is computed by CofreKit. This small value keeps existing UI call sites source-compatible.
 public struct ModCompatibility: Hashable, Sendable {
-    public static func renderer(setting: String, instance: InstanceSummary) -> String {
+    public static func renderer(setting: String, gameVersion: String, loader: String) -> String {
         guard setting.lowercased() == "auto" else { return setting }
-        if instance.loader == .forge || instance.loader == .neoforge { return "mobileglues" }
-        return instance.gameVersion == "1.21.11" || instance.gameVersion.hasPrefix("26.") ? "metallum" : "air"
+        if loader == "forge" || loader == "neoforge" { return "mobileglues" }
+        return gameVersion == "1.21.11" || gameVersion.hasPrefix("26.") ? "metallum" : "air"
     }
     public let id: String, name: String
     private let supportedMetalVersions: Set<String>?
