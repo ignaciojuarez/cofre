@@ -1,6 +1,7 @@
 #if canImport(UIKit)
     import SwiftUI
     import UIKit
+    import UserNotifications
 
     // G01 Game stopped: Cofre's screen when Minecraft exits mid-game, in place of Air's crash screen. A card over the
     // lake: what happened, one next step, Close Cofre. Share log, Copy details and the raw log come after. Side by
@@ -18,17 +19,19 @@
 
     /// The whole screen for a hosting controller: measures its window like `CofreRootView`.
     public struct GameExitView: View {
-        let report: GameExitReport, close: () -> Void, showDetails: Bool
+        let report: GameExitReport, intent: RejoinIntent?, close: () -> Void, retry: () -> Void, showDetails: Bool
         /// `showDetails` opens Details right away (preview host).
-        public init(report: GameExitReport, showDetails: Bool = false, close: @escaping () -> Void) {
+        public init(report: GameExitReport, intent: RejoinIntent? = nil, showDetails: Bool = false, close: @escaping () -> Void, retry: (() -> Void)? = nil) {
             self.report = report
+            self.intent = intent
             self.close = close
+            self.retry = retry ?? close
             self.showDetails = showDetails
         }
 
         public var body: some View {
             GeometryReader { g in
-                GameExitScreen(report: report, size: g.size, close: close, showDetails: showDetails).sizeClasses(
+                GameExitScreen(report: report, intent: intent, size: g.size, close: close, retry: retry, showDetails: showDetails).sizeClasses(
                     SizeClasses(g.size))
             }
             .environment(\.cofreTheme, CofreTheme.current)
@@ -38,7 +41,7 @@
     }
 
     struct GameExitScreen: View {
-        let report: GameExitReport, size: CGSize, close: () -> Void
+        let report: GameExitReport, intent: RejoinIntent?, size: CGSize, close: () -> Void, retry: () -> Void
         @State var showDetails = false
         @State private var copied = false
 
@@ -107,7 +110,18 @@
         }
 
         @ViewBuilder private var actions: some View {
-            BlockButton("Close Cofre", role: .primary, size: .large, action: close)
+            if let intent {
+                BlockButton("Play again · \(intent.displayName)", role: .primary, size: .large) {
+                    let content = UNMutableNotificationContent()
+                    content.body = "Tap to jump back into \(intent.displayName)"
+                    UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+                    UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "cofre.rejoin", content: content, trigger: nil))
+                    retry()
+                }
+                BlockButton("Close Cofre", role: .ghost, size: .large, action: close)
+            } else {
+                BlockButton("Close Cofre", role: .primary, size: .large, action: close)
+            }
             // Honest about restarts: Java can't start twice in one app run.
             Text("Minecraft can only start once each time Cofre opens. Open Cofre again from the Home Screen to play.")
                 .cofreFont(.caption).foregroundStyle(Color.cofre.muted)

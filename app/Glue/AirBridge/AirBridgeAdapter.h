@@ -86,6 +86,7 @@ NS_ASSUME_NONNULL_BEGIN
 /// Applies Cofre's automatic memory default when needed.
 - (void)ensureAutomaticMemoryDefault;
 /// Starts a profile launch and reports progress labels.
+- (void)setServerIp:(NSString *)address forProfile:(NSString *)profile;
 - (void)launchProfile:(NSString *)profile
             accountID:(nullable NSString *)accountID
              progress:(void (^)(NSString *stage))progress;

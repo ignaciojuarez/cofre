@@ -207,6 +207,7 @@ extension MrpackIndex {
                       MinecraftLaunchArguments.server(address, gameVersion: version).joined(separator: " "))
             }
             Task { try? await addServer(instanceID: request.id, name: request.server, address: request.server) }
+            air.setServerIp(request.server, forProfile: request.id)
             _ = launch(instanceID: request.id, accountID: nil)
         }
     }

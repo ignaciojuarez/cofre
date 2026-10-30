@@ -955,6 +955,9 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
   }
   setPrefObject(key, value);
 }
+- (void)setServerIp:(NSString *)address forProfile:(NSString *)profile {
+  [self.profiles setServerIp:address forProfile:profile];
+}
 // Air's Play flow (LauncherNavigationController launchMinecraft:): download the
 // version's files, then hand the window to SurfaceViewController, which starts
 // the JVM on a background queue. Cofre has already turned on JIT. Progress is

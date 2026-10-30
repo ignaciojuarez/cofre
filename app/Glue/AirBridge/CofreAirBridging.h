@@ -70,6 +70,7 @@ NS_ASSUME_NONNULL_BEGIN
                       value:(id)value
                     profile:(nullable NSString *)profile;
 - (void)ensureAutomaticMemoryDefault;
+- (void)setServerIp:(NSString *)address forProfile:(NSString *)profile;
 - (void)launchProfile:(NSString *)profile
             accountID:(nullable NSString *)accountID
              progress:(void (^)(NSString *))progress;

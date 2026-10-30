@@ -23,6 +23,12 @@ public struct MinecraftServerAddress: Equatable, Sendable {
 }
 
 public enum MinecraftLaunchArguments {
+    public static func singleplayer(folder: String, gameVersion: String) -> [String] {
+        let numbers = gameVersion.split(separator: ".").compactMap { Int($0) }
+        let modern = numbers.count >= 2 && (numbers[0] > 1 || (numbers[0] == 1 && numbers[1] >= 20))
+        return modern ? ["--quickPlaySingleplayer", folder] : []
+    }
+
     public static func server(_ address: MinecraftServerAddress, gameVersion: String) -> [String] {
         let numbers = gameVersion.split(separator: ".").compactMap { Int($0) }
         let modern = numbers.count >= 2 && (numbers[0] > 1 || (numbers[0] == 1 && numbers[1] >= 20))

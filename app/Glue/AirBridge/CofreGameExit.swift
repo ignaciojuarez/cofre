@@ -18,8 +18,10 @@ import UIKit
             let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first
         else { return }
         let report = CofreLogStore().gameExitReport(code: code, instance: bridge.flatMap(instanceLabel))
+        let intent = bridge.flatMap { makeRejoinIntent($0) }
+        if let intent { RejoinIntentStore.save(intent) }
         NSLog("[Cofre] game exit screen reason=%@ crashReport=%d", report.reason.rawValue, report.files.count > 1)
-        let host = UIHostingController(rootView: GameExitView(report: report, close: AppExit.close))
+        let host = UIHostingController(rootView: GameExitView(report: report, intent: intent, close: AppExit.close, retry: { AppExit.close() }))
         host.view.backgroundColor = .cofre.page
         host.overrideUserInterfaceStyle = CofreTheme.current.interfaceStyle
         let w = UIWindow(windowScene: scene)
@@ -29,6 +31,19 @@ import UIKit
         w.makeKeyAndVisible()
         UIView.animate(withDuration: 0.25) { w.alpha = 1 }
         window = w
+    }
+
+    private static func makeRejoinIntent(_ bridge: any CofreAirBridging) -> RejoinIntent? {
+        let id = bridge.selectedProfileName()
+        guard !id.isEmpty, let dir = bridge.gameDirectory(forProfile: id) else { return nil }
+        let defaults = UserDefaults.standard
+        let since = Date(timeIntervalSince1970: defaults.double(forKey: "cofre.launch.started.\(id)"))
+        let logURL = dir.appendingPathComponent("logs/latest.log")
+        if let log = try? String(contentsOf: logURL), let server = RejoinDetector.server(in: log) {
+            return RejoinIntent(instanceID: id, kind: .server, target: server, displayName: server)
+        }
+        guard since.timeIntervalSince1970 > 0, let world = RejoinDetector.world(in: dir, since: since) else { return nil }
+        return RejoinIntent(instanceID: id, kind: .world, target: world.lastPathComponent, displayName: world.lastPathComponent)
     }
 
     /// "Survival+ · Fabric 1.21.1".

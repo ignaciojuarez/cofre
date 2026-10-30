@@ -102,3 +102,17 @@ final class GameExitTests: XCTestCase {
         }
     }
 }
+
+extension GameExitTests {
+    func testRejoinDetectsLastServerAndExpires() {
+        let log = "Connecting to old.example, 25565\nConnecting to play.example, 25566\n"
+        XCTAssertEqual(RejoinDetector.server(in: log), "play.example:25566")
+        let defaults = UserDefaults(suiteName: "rejoin-test")!
+        defaults.removePersistentDomain(forName: "rejoin-test")
+        RejoinIntentStore.save(RejoinIntent(instanceID: "i", kind: .server, target: "play.example:25566", displayName: "Play"), defaults: defaults)
+        XCTAssertNotNil(RejoinIntentStore.load(defaults: defaults))
+        let expired = RejoinIntent(instanceID: "i", kind: .world, target: "world", displayName: "World", createdAt: .now.addingTimeInterval(-601))
+        RejoinIntentStore.save(expired, defaults: defaults)
+        XCTAssertNil(RejoinIntentStore.load(defaults: defaults))
+    }
+}

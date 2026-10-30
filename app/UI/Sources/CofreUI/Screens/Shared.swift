@@ -61,8 +61,8 @@
     }
 
     /// Starts a launch and shows the takeover.
-    @MainActor func startLaunch(_ store: CofreStore, _ nav: NavModel, instanceID: String? = nil) {
-        store.play(instanceID)
+    @MainActor func startLaunch(_ store: CofreStore, _ nav: NavModel, instanceID: String? = nil, rejoin: RejoinIntent? = nil) {
+        store.play(instanceID, rejoin: rejoin)
         nav.showingLaunch = true
     }
 

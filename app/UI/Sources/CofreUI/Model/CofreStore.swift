@@ -300,7 +300,7 @@
         // MARK: Launch
 
         /// With `server`, launches straight into it (`joinServer`, plan/servers.md).
-        public func play(_ instanceID: String? = nil, server: ServerSummary? = nil) {
+        public func play(_ instanceID: String? = nil, server: ServerSummary? = nil, rejoin: RejoinIntent? = nil) {
             guard let id = instanceID ?? activeInstance?.id else { return }
             activeInstanceID = id
             joiningServer = server
@@ -316,7 +316,9 @@
             Task {
                 do {
                     let stream =
-                        server.map {
+                        rejoin.map {
+                            backend.rejoin(instanceID: id, kind: $0.kind, target: $0.target, accountID: activeAccount?.id)
+                        } ?? server.map {
                             backend.joinServer(instanceID: id, address: $0.address, accountID: activeAccount?.id)
                         } ?? backend.launch(instanceID: id, accountID: activeAccount?.id)
                     for try await p in stream {

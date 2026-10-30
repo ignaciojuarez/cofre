@@ -63,12 +63,14 @@ public enum CofreLinks {
     public struct CofreRootView: View {
         @State private var store: CofreStore
         @State private var nav: NavModel
+        @State private var rejoin: RejoinIntent?
         private let setupStart: Int?
 
         /// `setupStart` forces the wizard at that step (preview host); `nil` resumes where the user left off.
         @MainActor public init(store: CofreStore, nav: NavModel? = nil, setupStart: Int? = nil) {
             _store = State(initialValue: store)
             _nav = State(initialValue: nav ?? NavModel())
+            _rejoin = State(initialValue: RejoinIntentStore.load())
             self.setupStart = setupStart
         }
 
@@ -159,7 +161,15 @@ public enum CofreLinks {
             .environment(\.cofreTheme, store.theme)
             .preferredColorScheme(store.theme.colorScheme)
             .tint(Color.cofre.accent)
-            .task { await store.start() }
+            .task {
+                await store.start()
+                if let intent = rejoin, store.setupCompleted {
+                    rejoin = nil
+                    RejoinIntentStore.clear()
+                    try? await Task.sleep(for: .milliseconds(300))
+                    startLaunch(store, nav, instanceID: intent.instanceID, rejoin: intent)
+                }
+            }
             .sizeClasses(classes)
         }
 

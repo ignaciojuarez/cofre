@@ -131,7 +131,13 @@ import Foundation
     /// Finish with `finished == true`; throw to fail (the message is shown with the failing stage).
     public protocol LaunchControl: AnyObject {
         func launch(instanceID: String, accountID: String?) -> AsyncThrowingStream<LaunchProgress, Error>
+        func rejoin(instanceID: String, kind: RejoinIntent.Kind, target: String, accountID: String?) -> AsyncThrowingStream<LaunchProgress, Error>
+
         func cancelLaunch() async
+    }
+
+    public extension LaunchControl {
+        func rejoin(instanceID: String, kind: RejoinIntent.Kind, target: String, accountID: String?) -> AsyncThrowingStream<LaunchProgress, Error> { launch(instanceID: instanceID, accountID: accountID) }
     }
 
     // MARK: GAP-02 · Logs (P02, X06)

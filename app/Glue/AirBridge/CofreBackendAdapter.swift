@@ -215,6 +215,7 @@
         public func removeAccount(id: String) async throws { throw unavailable("account removal") }
 
         public func launch(instanceID: String, accountID: String?) -> AsyncThrowingStream<LaunchProgress, Error> {
+            UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "cofre.launch.started.\(instanceID)")
             AsyncThrowingStream { continuation in
                 launchTask?.cancel()
                 let task = Task { @MainActor in
@@ -284,6 +285,11 @@
                 launchTask = task
                 continuation.onTermination = { _ in task.cancel() }
             }
+        }
+        public func rejoin(instanceID: String, kind: RejoinIntent.Kind, target: String, accountID: String?) -> AsyncThrowingStream<LaunchProgress, Error> {
+            if kind == .server { air.setServerIp(target, forProfile: instanceID) }
+            NSLog("[Cofre] rejoin launch instance=%@ kind=%@ target=%@", instanceID, kind.rawValue, target)
+            return launch(instanceID: instanceID, accountID: accountID)
         }
         public func cancelLaunch() async {
             launchTask?.cancel()
