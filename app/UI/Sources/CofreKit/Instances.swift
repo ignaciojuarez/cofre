@@ -43,11 +43,14 @@ public final class InstanceStore: @unchecked Sendable {
     public let root: URL
     public let profilesURL: URL
     private let fm: FileManager
+    /// The engine's own rule for where a profile's game folder is (Air: gameDir or per-version isolation).
+    private let resolveGameDirectory: ((String, [String: Any]) -> URL?)?
     private var profiles: [String: [String: Any]] = [:]
     private var document: [String: Any] = [:]
 
-    public init(root: URL, fileManager: FileManager = .default) throws {
+    public init(root: URL, fileManager: FileManager = .default, gameDirectory: ((String, [String: Any]) -> URL?)? = nil) throws {
         self.root = root; self.fm = fileManager; self.profilesURL = root.appendingPathComponent("launcher_profiles.json")
+        self.resolveGameDirectory = gameDirectory
         try fm.createDirectory(at: root, withIntermediateDirectories: true)
         try loadProfiles()
     }
@@ -137,7 +140,7 @@ public final class InstanceStore: @unchecked Sendable {
 
     private func loadProfiles() throws { guard fm.fileExists(atPath: profilesURL.path) else { profiles = [:]; document = [:]; return }; let d = try Data(contentsOf: profilesURL); let obj = try JSONSerialization.jsonObject(with: d) as? [String: Any] ?? [:]; document = obj; profiles = (obj["profiles"] as? [String: [String: Any]]) ?? [:] }
     private func saveProfiles() throws { document["profiles"] = profiles; let d = try JSONSerialization.data(withJSONObject: document, options: [.prettyPrinted, .sortedKeys]); try d.write(to: profilesURL, options: .atomic) }
-    private func makeInstance(id: String, profile p: [String: Any]) -> Instance? { guard let name = p["name"] as? String, let version = p["lastVersionId"] as? String else { return nil }; let dir = URL(fileURLWithPath: (p["gameDir"] as? String) ?? root.appendingPathComponent(id).path); let parsed = parseVersion(version); let meta = try? readMeta(at: dir); return Instance(id: id, name: name, gameDirectory: dir, gameVersion: meta?.gameVersion ?? parsed.version, loader: meta?.loader ?? parsed.loader, loaderVersion: (p["loaderVersion"] as? String) ?? meta?.loaderVersion, javaPath: p["javaPath"] as? String, javaVersion: p["javaVersion"] as? Int, memoryMB: p["memory"] as? Int, autoMemory: (p["autoMemory"] as? Bool) ?? true, jvmArguments: p["javaArgs"] as? String, lastGoodJVMArguments: p["lastGoodJavaArgs"] as? String, notes: meta?.notes ?? "", group: meta?.group, favorite: meta?.favorite ?? false, icon: meta?.icon) }
+    private func makeInstance(id: String, profile p: [String: Any]) -> Instance? { guard let name = p["name"] as? String, let version = p["lastVersionId"] as? String else { return nil }; let dir = resolveGameDirectory?(id, p) ?? URL(fileURLWithPath: (p["gameDir"] as? String) ?? root.appendingPathComponent(id).path); let parsed = parseVersion(version); let meta = try? readMeta(at: dir); return Instance(id: id, name: name, gameDirectory: dir, gameVersion: meta?.gameVersion ?? parsed.version, loader: meta?.loader ?? parsed.loader, loaderVersion: (p["loaderVersion"] as? String) ?? meta?.loaderVersion, javaPath: p["javaPath"] as? String, javaVersion: p["javaVersion"] as? Int, memoryMB: p["memory"] as? Int, autoMemory: (p["autoMemory"] as? Bool) ?? true, jvmArguments: p["javaArgs"] as? String, lastGoodJVMArguments: p["lastGoodJavaArgs"] as? String, notes: meta?.notes ?? "", group: meta?.group, favorite: meta?.favorite ?? false, icon: meta?.icon) }
     private func refresh(_ id: String) throws -> Instance { try loadProfiles(); guard let i = makeInstance(id: id, profile: profiles[id] ?? [:]) else { throw StoreError.missingProfile }; return i }
     private func saveMeta(_ i: Instance) throws { try JSONEncoder().encode(i).write(to: i.gameDirectory.appendingPathComponent("cofre.json"), options: .atomic) }
     private func readMeta(at dir: URL) throws -> Instance { try JSONDecoder().decode(Instance.self, from: Data(contentsOf: dir.appendingPathComponent("cofre.json"))) }

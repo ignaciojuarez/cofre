@@ -106,7 +106,7 @@
         /// `defaults` holds the setup progress; tests and the preview host pass their own suite.
         public init(services: CofreServices, defaults: UserDefaults = .standard) {
             self.services = services
-            self.instanceStore = services.instancesRoot.flatMap { try? InstanceStore(root: $0) }
+            self.instanceStore = services.instances
             self.defaults = defaults
             setupCompleted = defaults.bool(forKey: Keys.completed)
             setupStep = defaults.object(forKey: Keys.step) as? Int

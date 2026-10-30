@@ -1,4 +1,5 @@
 #if canImport(UIKit)
+    import CofreKit
     import Foundation
 
     // The boundary between CofreUI and the logic layer. Screens never see these directly: they read the
@@ -111,11 +112,11 @@
         public var backend: any CofreBackend
         /// The directory containing Air's launcher_profiles.json. Production derives this from Air's profiles;
         /// previews and tests may provide a fixture folder.
-        public var instancesRoot: URL?
+        public var instances: InstanceStore?
 
-        public init(backend: any CofreBackend, instancesRoot: URL? = nil) {
+        public init(backend: any CofreBackend, instances: InstanceStore? = nil) {
             self.backend = backend
-            self.instancesRoot = instancesRoot
+            self.instances = instances
         }
 
         /// Sample data from the mockups, for previews, tests and the preview host.
