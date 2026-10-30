@@ -3,11 +3,10 @@ import SwiftUI
 import UIKit
 
 // Launch arguments (all optional):
-//   -screen play|worlds|servers|serversMock|instances|mods|modpage|settings|jit|about|controls|setup|launch|join|gameExit
+//   -screen play|worlds|servers|instances|mods|modpage|settings|jit|about|controls|setup|launch|join|gameExit
 //                       (default play)
 //   -servers mine|loading|pinging|offline|empty|version|newInstance|joining
 //                       Servers pane state (-screen servers, plan/servers.md)
-//   (-screen serversMock) Layout B for comparison: worlds and servers as two sections of one list
 //   -exitReason memory|renderer|missingLibrary|mods|java|unknown|quit   Why the game stopped (-screen gameExit)
 //   -exitDetails YES    Open its Details sheet
 //   -joinState firstVisit|needsAttention|keyChanged|installing|update|error|ready|resolving|live   Join server sheet state
@@ -26,8 +25,6 @@ import UIKit
 //                       to Documents/<snapshot>.png, e.g. an iPad 13" window on an 11" simulator.
 //   -snapshot name      File name for -canvas output
 //   -touch a|b|c|ipad|settings|sheet   Touch-controls design mock (-screen touch)
-//   -draft play|instances|import|files|content|worlds|beforePlay|logs|crash|versions|accounts   Design draft
-//   -draftState <state>  That area's state (plan/design-draft.md), e.g. -draft worlds -draftState undo
 
 @main
 final class AppDelegate: UIResponder, UIApplicationDelegate {}
@@ -155,14 +152,8 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         }
         let setupStep = args.object(forKey: "setupStep") != nil ? args.integer(forKey: "setupStep") : nil
         let root: UIViewController =
-            screen == "draft"
-            ? UIHostingController(
-                rootView: DraftPage(
-                    args.string(forKey: "draft") ?? "play", state: args.string(forKey: "draftState") ?? ""))
-            : screen == "touch"
+            screen == "touch"
             ? UIHostingController(rootView: TouchControlsMockPage(args.string(forKey: "touch") ?? "sheet"))
-            : screen == "serversMock"
-            ? UIHostingController(rootView: ServersVariationsMock())
             : screen == "gameExit"
             ? UIHostingController(
                 rootView: GameExitView(
