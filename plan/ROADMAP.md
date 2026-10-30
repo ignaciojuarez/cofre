@@ -27,6 +27,7 @@ same step.
 | 3 | **Logs and crash reports** | Live log with search and filter, a redacted share bundle (Settings › Logs › Share report, and the crash screen's Share). This is also step 1–2 of [auto-triage](auto-triage.md) | ✅ `d52e309` `d81b536` `577d44b` |
 | 4 | **Worlds** | "Jump back in" on Play (recent worlds, quick play straight in), back up / restore, export / import `.zip`, copy to another instance, delete with undo plus Recently deleted, world cards | ✅ `8615a1e` `7c060fc` |
 | 5 | **Content parity** | Resource packs, shaders and data packs get the mods treatment: installed list, on/off, update, delete. "In use" is read-only from the game | 🚧 BG |
+| 6a | **Over-the-air updates** | Play banner checks GitHub Releases once per launch and installs signed IPA via manifest | ✅ |
 | 6 | **Downloads and versions** | A downloads strip on Play, resume/retry, background downloads, disk-space preflight, a version picker (releases/snapshots) and loader version list | 🎯 |
 | 7 | **Modpack import + Files** | Import `.mrpack`/`.zip` from a file or link with staged rollback, "Open in Cofre" from Files and the share sheet | 🎯 |
 | 8 | ~~iOS niceties~~ | ❌ Not in the launcher (Ignacio): no heat/Low Power banner or power-saving switches. Big-download Wi-Fi gating stays in Downloads | — |

@@ -24,12 +24,17 @@
         @Environment(CofreStore.self) private var store
         @Environment(NavModel.self) private var nav
         @Environment(\.widthClass) private var width
+        @State private var availableUpdate: Update?
+        @AppStorage("cofre.dismissedUpdate") private var dismissedUpdate = ""
         public init() {}
 
         public var body: some View {
             VStack(spacing: 0) {
                 ColumnHeader("Play") { AccountChip() }
                 PaneScroll {
+                    if let update = availableUpdate, update.version != dismissedUpdate {
+                        UpdateBanner(update: update, dismiss: { dismissedUpdate = update.version })
+                    }
                     if store.libraryLoaded { CofreDownloadsStrip().environment(nav) }
                     if store.libraryLoaded && !store.accounts.contains(where: { $0.state == .ready }) { Banner("Sign in to play Java Edition", icon: .head, tone: .warn) { BlockButton("Accounts", size: .small) { nav.section = .settings; nav.settingsPane = .accounts } } }
                     if store.setupCompleted, store.setup.pairing.isFailed {
@@ -71,6 +76,14 @@
                         }
                     }
                 }
+            }
+            .task {
+                let number = Int(Bundle.main.object(forInfoDictionaryKey: "CofreBuildNumber") as? String ?? "0")
+                availableUpdate = await UpdateChecker(installedBuildNumber: number).check()
+            }
+            .task {
+                let number = Int(Bundle.main.object(forInfoDictionaryKey: "CofreBuildNumber") as? String ?? "0") ?? 0
+                availableUpdate = await UpdateChecker(installedBuildNumber: number).check()
             }
         }
 
@@ -135,6 +148,21 @@
                 }
             }
         }
+    }
+
+    private struct UpdateBanner: View {
+        let update: CofreKit.Update
+        let dismiss: () -> Void
+        var body: some View {
+            HStack(spacing: 10) {
+                PixelIcon(.bolt, size: 18)
+                Text("Update available · \(update.version) · What's new")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button("Update") { UIApplication.shared.open(update.installURL) }
+                Button("Dismiss") { dismiss() }
+            }
+        }
+
     }
 
     /// Worlds. New worlds are made in game, so there's no "+ New" here. Servers have their own pane.

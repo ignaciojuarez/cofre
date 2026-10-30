@@ -63,3 +63,7 @@ Machine-local settings (JDK, signing identity, relay) live in the gitignored `sc
 ## Update upstream
 Follow `UPDATING.md`. Stop and ask a human if a LICENSE changes, a patch would exceed the budget, or a conflict touches the JIT protocol, entitlements or sign-in.
 - Weekly upstream check: run `scripts/upstream-report.sh` and review `artifacts/upstream-report.md`.
+
+## Releasing
+
+Run `scripts/release.sh` locally to build (or reuse `artifacts/Payload/Cofre.app`), create `Cofre.ipa` and `manifest.plist`, and print the exact GitHub CLI command. It never publishes unless passed `--publish`. Use `scripts/release.sh --check` to verify the signature and print only the embedded provisioning profile's device count.

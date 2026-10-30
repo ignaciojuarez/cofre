@@ -26,6 +26,9 @@ info["UTImportedTypeDeclarations"] = [{
 }]
 # Cofre's own version for Settings → About. CFBundleShortVersionString stays Air's: Air's update checks read it.
 info["CofreVersion"] = "0.1"
+info["CofreBuildNumber"] = int(subprocess.run(
+    ["git", "-C", str(Path(__file__).parent), "rev-list", "--count", "HEAD"], capture_output=True, text=True
+).stdout.strip() or "0")
 info["CofreBuild"] = subprocess.run(
     ["git", "-C", str(Path(__file__).parent), "rev-parse", "--short", "HEAD"], capture_output=True, text=True
 ).stdout.strip()
