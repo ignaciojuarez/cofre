@@ -26,7 +26,9 @@
                 .environment(\.widthClass, .compact)
             } else {
                 ZStack {
-                    PixelScene(seed: scene, pixels: .init(width: 240, height: 160)).ignoresSafeArea()
+                    PixelScene(seed: scene, pixels: .init(width: 240, height: 160))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .ignoresSafeArea()
                     LinearGradient(
                         colors: [Color.black.opacity(0.15), Color.black.opacity(0.7)], startPoint: .top,
                         endPoint: .bottom
