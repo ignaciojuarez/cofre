@@ -22,11 +22,11 @@ same step.
 
 | # | Area | What ships | Status |
 |---|---|---|---|
-| 1 | **Instances** | Duplicate (with or without worlds, APFS clone), export/import `.zip`, delete with undo, groups (★ Favorites first), notes, per-instance Java, RAM (auto/manual), JVM args with safe rollback, loader version. The instance detail gains a "Before you play" tab (engine settings only; presets wait for a decision) | 🎯 |
-| 2 | **Accounts** | Remove with confirm, "Signed out, sign in again" row state, "Demo / doesn't own Java" warning, banners on Play | 🎯 |
-| 3 | **Logs and crash reports** | Live log with search and filter, a redacted share bundle (Settings › Logs › Share report, and the crash screen's Share). This is also step 1–2 of [auto-triage](auto-triage.md) | 🎯 |
-| 4 | **Worlds** | "Jump back in" on Play (recent worlds, quick play straight in), back up / restore, export / import `.zip`, copy to another instance, delete with undo plus Recently deleted, world cards | 🎯 |
-| 5 | **Content parity** | Resource packs, shaders and data packs get the mods treatment: installed list, on/off, update, delete. "In use" is read-only from the game | 🎯 |
+| 1 | **Instances** | Duplicate (with or without worlds, APFS clone), export/import `.zip`, delete with undo, groups (★ Favorites first), notes, per-instance Java, RAM (auto/manual), JVM args with safe rollback, loader version. The instance detail gains a "Before you play" tab (engine settings only; presets wait for a decision) | ✅ `a11a782` `5e60ee0` `9fab9ef` `2ed24ee` |
+| 2 | **Accounts** | Remove with confirm, "Signed out, sign in again" row state, "Demo / doesn't own Java" warning, banners on Play | ✅ `263ff9b` `1c4e1b3` |
+| 3 | **Logs and crash reports** | Live log with search and filter, a redacted share bundle (Settings › Logs › Share report, and the crash screen's Share). This is also step 1–2 of [auto-triage](auto-triage.md) | ✅ `d52e309` `d81b536` `577d44b` |
+| 4 | **Worlds** | "Jump back in" on Play (recent worlds, quick play straight in), back up / restore, export / import `.zip`, copy to another instance, delete with undo plus Recently deleted, world cards | ✅ `8615a1e` `7c060fc` |
+| 5 | **Content parity** | Resource packs, shaders and data packs get the mods treatment: installed list, on/off, update, delete. "In use" is read-only from the game | 🚧 BG |
 | 6 | **Downloads and versions** | A downloads strip on Play, resume/retry, background downloads, disk-space preflight, a version picker (releases/snapshots) and loader version list | 🎯 |
 | 7 | **Modpack import + Files** | Import `.mrpack`/`.zip` from a file or link with staged rollback, "Open in Cofre" from Files and the share sheet | 🎯 |
 | 8 | **iOS niceties** | Heat and Low Power Mode banner, autosave-before-suspend note, Wi-Fi-only for big downloads | 🎯 |
@@ -61,6 +61,13 @@ Z's variations, recommended picks taken (Ignacio: "I like it all"):
 | ✕ in menus | Change the icon to "← Back"? |
 | Companion state mod | An optional tiny Fabric mod that reports exact game state (flying, swimming, which screen is open). Low priority |
 | Public release | Our own Azure app for Microsoft sign-in; Metallum license and provenance; GitHub publishing (needs approval) ([PUBLIC_RELEASE](PUBLIC_RELEASE.md)) |
+
+## Done since the roadmap was written
+
+- One dark look; the Look section is gone (`05c873c`).
+- A shared CofreKit `Zip` built on Apple's Compression framework (`65f2e01`).
+- Computed mod compatibility (`24fb0af`): the hand-written table is gone.
+- A 15-second whole-app compile check for agents, which catches glue build breaks.
 
 ## Known issues
 
