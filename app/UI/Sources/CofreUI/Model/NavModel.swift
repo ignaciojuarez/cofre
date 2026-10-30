@@ -5,7 +5,7 @@
     // so resizing between compact and regular keeps the selection (W1 → I1).
 
     public enum SettingsPane: String, CaseIterable, Codable, Hashable, Sendable, Identifiable {
-        case game, renderer, touch, controller, controlsEditor, jitJava, accounts, logs, look, about
+        case game, renderer, touch, controller, jitJava, accounts, logs, look, about
         public var id: String { rawValue }
 
         var title: LocalizedStringKey {
@@ -14,7 +14,6 @@
             case .renderer: "Renderer"
             case .touch: "Controls"
             case .controller: "Controller"
-            case .controlsEditor: "Controls editor"
             case .jitJava: "JIT & Java"
             case .accounts: "Accounts & data"
             case .logs: "Logs"
@@ -26,7 +25,7 @@
             switch self {
             case .game: .grass
             case .renderer: .ore
-            case .touch, .controller, .controlsEditor: .cmd
+            case .touch, .controller: .cmd
             case .jitJava: .bolt
             case .accounts: .head
             case .logs: .paper
@@ -35,7 +34,7 @@
             }
         }
         static let groups: [(LocalizedStringKey, [SettingsPane])] = [
-            ("Game", [.game, .renderer]), ("Controls", [.touch, .controller, .controlsEditor]),
+            ("Game", [.game, .renderer]), ("Controls", [.touch, .controller]),
             ("System", [.jitJava, .accounts, .logs, .look, .about]),
         ]
     }
@@ -92,7 +91,6 @@
         /// ⌃⌘S: regular width shows the rail even when the sidebar would fit.
         public var preferRail = false
         public var showingLaunch = false
-        public var showingAirScreen: AirScreenRoute?
         /// The Join server sheet (GAP-14). Shown only when the backend reports `.serverJoin`, and after setup.
         public var serverJoin: ServerJoinRequest?
         /// Join on a server the instance can't join: pick one that fits, or make one (plan/servers.md).
@@ -137,12 +135,4 @@
         }
     }
 
-    public enum AirScreenRoute: Identifiable, Hashable, Sendable {
-        case controlsEditor
-        public var id: String {
-            switch self {
-            case .controlsEditor: "controls"
-            }
-        }
-    }
 #endif

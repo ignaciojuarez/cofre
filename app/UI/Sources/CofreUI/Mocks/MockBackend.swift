@@ -689,23 +689,4 @@
         }
     }
 
-    /// Stand-ins for Air's UIKit screens (GAP-10).
-    public final class MockAirScreens: AirScreens {
-        public init() {}
-        @MainActor public func controlsEditor() -> UIViewController {
-            Self.placeholder("Controls editor", detail: "Air · CustomControlsViewController")
-        }
-
-        @MainActor static func placeholder(_ title: String, detail: String) -> UIViewController {
-            let vc = UITableViewController(style: .insetGrouped)
-            vc.title = title
-            let label = UILabel()
-            label.text = detail
-            label.font = .cofre(.label)
-            label.textAlignment = .center
-            vc.tableView.tableHeaderView = label
-            label.frame.size.height = 60
-            return vc
-        }
-    }
 #endif

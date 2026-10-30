@@ -130,15 +130,6 @@ public enum CofreLinks {
             .blockSheet(item: $nav.serverVersion, hugsContent: true, onDismiss: afterServerSheet) { choice in
                 ServerVersionSheet(choice: choice).environment(store).environment(nav)
             }
-            // Air's controls editor is a self-contained full-screen editor with its own exit menu; it only works
-            // presented directly by UIKit.
-            .onChange(of: nav.showingAirScreen) { _, route in
-                guard route == .controlsEditor else { return }
-                nav.showingAirScreen = nil
-                if let editor = store.services.airScreens?.controlsEditor() {
-                    UIViewController.cofreTopmost?.present(editor, animated: true)
-                }
-            }
             // Join server (GAP-14): a bottom sheet on compact, a centered card overlay on regular.
             .sheet(item: serverJoinRequest(card: false, regular: regular), onDismiss: startPendingJoinLaunch) {
                 request in
@@ -226,17 +217,6 @@ public enum CofreLinks {
                 }.keyboardShortcut("l", modifiers: .command)
             }
             .opacity(0).allowsHitTesting(false).accessibilityHidden(true)
-        }
-    }
-
-    extension UIViewController {
-        /// The controller on top of the key window, for presenting Air's UIKit screens.
-        static var cofreTopmost: UIViewController? {
-            let window = UIApplication.shared.connectedScenes.lazy.compactMap { ($0 as? UIWindowScene)?.keyWindow }
-                .first
-            var top = window?.rootViewController
-            while let next = top?.presentedViewController { top = next }
-            return top
         }
     }
 

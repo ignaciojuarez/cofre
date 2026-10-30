@@ -62,7 +62,6 @@
                     case .renderer: RendererContent()
                     case .touch: ControlsPane()
                     case .controller: ControllerContent()
-                    case .controlsEditor: ControlsEditorContent()
                     case .jitJava: JITJavaContent()
                     case .accounts: AccountsDataContent()
                     case .logs: LogsContent()
@@ -203,33 +202,6 @@
                 }.padding(.horizontal, 11).frame(minHeight: 44).block(.panel)
                 ToggleRow("Gyro aim", isOn: prefBinding(store, nil, \.gyroAim))
                 if store.can(.controllerNavigation) { HintStrip() }
-            }
-            BlockButton("Open controls editor", icon: .cmd) { nav.showingAirScreen = .controlsEditor }
-                .keyboardShortcut("k", modifiers: [.command, .shift])
-                .disabled(store.services.airScreens == nil)
-        }
-    }
-
-    struct ControlsEditorContent: View {
-        @Environment(CofreStore.self) private var store
-        @Environment(NavModel.self) private var nav
-        @Environment(\.widthClass) private var width
-        var body: some View {
-            Text("Drag and resize buttons. Opens full screen.").cofreFont(.body).foregroundStyle(Color.cofre.inkSoft)
-            if store.services.airScreens == nil {
-                Banner("The controls editor isn't available yet.", icon: .cmd, tone: .warn)
-            }
-            BlockButton("Open controls editor", icon: .cmd, role: .primary) { nav.showingAirScreen = .controlsEditor }
-                .keyboardShortcut("k", modifiers: [.command, .shift])
-                .disabled(store.services.airScreens == nil)
-            if width > .compact {
-                ListSection("Keys") {
-                    KeyHint("⌘Z", "Undo")
-                    KeyHint("⌫", "Delete")
-                    KeyHint("← →", "Nudge 1 pt · with ⇧, 10 pt")
-                    KeyHint("⌘D", "Duplicate")
-                    KeyHint("tab", "Next button")
-                }
             }
         }
     }

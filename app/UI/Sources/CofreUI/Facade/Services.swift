@@ -109,17 +109,14 @@
     /// What the shell hands to `CofreUI.makeRootViewController(services:)`.
     public struct CofreServices {
         public var backend: any CofreBackend
-        /// Air's leftover UIKit screens (GAP-10). Lives in Glue; `nil` hides the entry points.
-        public var airScreens: (any AirScreens)?
 
-        public init(backend: any CofreBackend, airScreens: (any AirScreens)? = nil) {
+        public init(backend: any CofreBackend) {
             self.backend = backend
-            self.airScreens = airScreens
         }
 
         /// Sample data from the mockups, for previews, tests and the preview host.
         public static func mock(setupComplete: Bool = true) -> CofreServices {
-            CofreServices(backend: MockBackend(setupComplete: setupComplete), airScreens: MockAirScreens())
+            CofreServices(backend: MockBackend(setupComplete: setupComplete))
         }
     }
 #endif
