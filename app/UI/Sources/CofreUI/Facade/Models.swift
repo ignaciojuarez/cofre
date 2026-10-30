@@ -108,12 +108,15 @@
         public var javaVersion: String?
         public var ownFolder: Bool
         public var icon: InstanceIcon
+        public var favorite: Bool
+        public var group: String?
+        public var notes: String
 
         public init(
             id: String, name: String, loader: Loader, gameVersion: String, loaderVersion: String? = nil,
             modCount: Int? = nil,
             sizeBytes: Int64? = nil, lastPlayed: Date? = nil, updatesAvailable: Int = 0, javaVersion: String? = nil,
-            ownFolder: Bool = true, icon: InstanceIcon? = nil
+            ownFolder: Bool = true, icon: InstanceIcon? = nil, favorite: Bool = false, group: String? = nil, notes: String = ""
         ) {
             self.id = id
             self.name = name
@@ -127,6 +130,7 @@
             self.javaVersion = javaVersion
             self.ownFolder = ownFolder
             self.icon = icon ?? .automatic(id: id, loader: loader)
+            self.favorite = favorite; self.group = group; self.notes = notes
         }
 
         public var loaderLabel: String {

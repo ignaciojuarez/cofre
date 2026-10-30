@@ -59,7 +59,16 @@
                     } else if shown.isEmpty {
                         EmptyState("No matches", message: "Try another name.", icon: .book)
                     } else {
-                        list(shown)
+                        let favorites = shown.filter { $0.favorite }
+                        let grouped = Dictionary(grouping: shown.filter { !$0.favorite }) { $0.group ?? "Other" }
+                        BlockList {
+                            if !favorites.isEmpty {
+                                ListSection("★ Favorites", spacing: 4) { ForEach(favorites) { instanceRow($0) } }
+                            }
+                            ForEach(grouped.keys.sorted(), id: \.self) { key in
+                                ListSection(key, spacing: 4) { ForEach(grouped[key] ?? []) { instanceRow($0) } }
+                            }
+                        }
                     }
                 }
                 .frame(maxHeight: .infinity, alignment: .top)
@@ -95,8 +104,11 @@
         }
 
         private func list(_ shown: [InstanceSummary]) -> some View {
-            BlockList {
-                ForEach(shown) { inst in
+            BlockList { ForEach(shown) { instanceRow($0) } }
+        }
+
+        @ViewBuilder private func instanceRow(_ inst: InstanceSummary) -> some View {
+                Group {
                     let selected = width != .compact && (nav.instance ?? store.instances.first?.id) == inst.id
                     Button {
                         nav.instance = inst.id
@@ -123,7 +135,6 @@
                     }
                     .blockListRow(horizontal: width == .compact ? 16 : 20)
                 }
-            }
         }
     }
 
@@ -196,16 +207,9 @@
                         FlowBadges(inst: inst)
                         Segmented(
                             "Instance", selection: $tab,
-                            options: [
-                                (0, "Overview"), (1, "Mods · \(modCount(inst))"),
-                                (2, "Worlds · \(store.worlds.count)"), (3, "Options"),
-                            ])
+                            options: [(0, "Overview"), (1, "Before you play")])
                         switch tab {
-                        case 1: InstalledRows(items: store.installed[.mods] ?? [])
-                        case 2: WorldRows(worlds: store.worlds, playFirst: false)
-                        case 3:
-                            if store.can(.instanceIcon), inst.icon.png == nil { InstanceIconGrid(inst: inst) }
-                            GameSettingsContent(instanceID: inst.id)
+                        case 1: beforeYouPlay(inst)
                         default: overview(inst)
                         }
                     }
@@ -224,6 +228,15 @@
             store.modsInstance?.id == inst.id ? store.installed[.mods]?.count ?? inst.modCount ?? 0 : inst.modCount ?? 0
         }
 
+        @ViewBuilder private func beforeYouPlay(_ inst: InstanceSummary) -> some View {
+            ListSection("Engine", spacing: 4) {
+                ValueRow("Memory", value: store.preferences(for: inst.id).autoRAM ? "Auto" : Fmt.mb(store.preferences(for: inst.id).ramMB))
+                ValueRow("Java", value: inst.javaVersion.map { "Java \($0)" } ?? "Auto")
+                if inst.loader != .vanilla { ValueRow("Loader", value: inst.loaderVersion ?? inst.loader.displayName) }
+                ValueRow("JVM arguments", value: store.preferences(for: inst.id).jvmArgs.isEmpty ? "Default" : "Custom")
+            }
+        }
+
         @ViewBuilder private func overview(_ inst: InstanceSummary) -> some View {
             let prefs = store.preferences(for: inst.id)
             AdaptiveGrid(minItem: 110) {
@@ -232,6 +245,12 @@
                 Stat("\(inst.updatesAvailable)", label: "Updates", tone: inst.updatesAvailable > 0 ? .warn : .neutral)
                 Stat(Fmt.ago(inst.lastPlayed) ?? "—", label: "Played")
             }
+            ListSection("In this instance", spacing: 4) {
+                ValueRow("Worlds", value: "Open in Play")
+                ValueRow("Content", value: "Open in Mods")
+                ValueRow("Servers", value: "Open in Play")
+            }
+            GameOwnsNote("Worlds, content and servers each have one home in Cofre.")
             ListSection("Instance", spacing: 4) {
                 if inst.loader != .vanilla {
                     Row("Loader version", trailing: { Meta(inst.loaderVersion ?? "—") })
