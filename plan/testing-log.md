@@ -131,3 +131,25 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 - Final script run tested HEAD `83533df` on iPad `SIMULATOR_UDID`; install and launch succeeded.
 - Settings › Game with Renderer Auto shows Resolution `Full · 2420 × 1668` and no FSR control. Evidence: `/tmp/cofre-test/shots/round4a-settings-no-fsr.png`.
 - B-007 retest: fixed ✅. B-004/B-005/B-006/B-008 remain unverified interactively because this pass stopped after the required Settings proof; their fixes are present at `96c0aa0`, `4f0b3cb`, `7496a18`, and `192a226`.
+
+## Round 5 overnight test cases (2026-10-30 · HEAD 95bf202 · iPad simulator attempt)
+
+| Area | Test case | Result | Evidence |
+|---|---|---|---|
+| Build | `scripts/sim.sh` HEAD build and install | PASS; `CofreBuild 95bf202`, installed on C51 | `/tmp/cofre-round5-build.log` |
+| Instances | B-004 ⋯ → Edit → rename emoji/60-char/duplicate | BLOCKED: C51 was held by session `t3-6333a8e35e03854c7b9c2a19`; fallback EF held by `t3-f28e9bedc5ff0ebd7a8f7615` | — |
+| Mods | B-005 Fabric 1.21.1 Sodium/Iris renderer badge and Get anyway/Cancel | BLOCKED: both permitted iPads in use | — |
+| Content | B-006 Mods → Data world-owned explanation | BLOCKED: both permitted iPads in use | — |
+| Servers | B-008 valid and empty `cofre://join` links | BLOCKED: both permitted iPads in use | — |
+| Modpacks | real Modrinth `.mrpack`, corrupt `.mrpack`, wrong-loader `.zip` via Files | BLOCKED: no owned simulator session | — |
+| Lifecycle | kill mid-download and mid-install; relaunch consistency | BLOCKED: no owned simulator session | — |
+| System | rotation, narrow width/Split View/Stage Manager | BLOCKED: no owned simulator session | — |
+| Accounts | Microsoft sign-in with supplied runtime secret | BLOCKED: no owned simulator session; secret was not read | — |
+| UX | first-time pass: Play, Instances, Mods, Settings, Accounts, Logs, Downloads | BLOCKED: no owned simulator session | — |
+| Tests | `cd app/UI && swift test` | PASS: 48 tests, 0 failures | terminal output 2026-10-30 02:31 |
+| Compile | whole-app signing target with `/tmp/cofre-round5-core` | PASS: `** BUILD SUCCEEDED **` | terminal output |
+
+### Round 5 notes
+- `device_list` showed all iPads booted; `device_open` confirmed C51 and EF were already owned by other active sessions. I did not close or reuse those sessions and did not drive another thread's UI.
+- No interactive screenshots or UX findings were produced because the shared-device ownership constraint prevented a valid session. No bug status was changed; B-004/B-005/B-006/B-008 remain handoff pending interactive retest.
+- No physical device was used, no credentials were read, and no files were changed outside this log.
