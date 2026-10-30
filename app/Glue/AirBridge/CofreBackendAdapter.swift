@@ -42,6 +42,10 @@
             self.air = bridge
             super.init()
             CofreGameInput.shared.bridge = bridge
+            for profile in bridge.instances() {
+                guard let id = profile["id"] as? String, let directory = bridge.gameDirectory(forProfile: id) else { continue }
+                ModpackImport.cleanupAbandonedImport(in: directory)
+            }
             loadPersistedSetup()
         }
         private var launchTask: Task<Void, Never>?

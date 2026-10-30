@@ -7,6 +7,47 @@ import FoundationNetworking
 /// Archives are unpacked and downloaded into a staging directory first; the profile is
 /// created only after every file has passed its hash check.
 public final class ModpackImport: @unchecked Sendable {
+    private static let markerName = ".cofre-import-in-progress"
+
+    /// Records the files already in a game directory so an interrupted Air import can be rolled back safely.
+    public static func markImportStarted(in gameDirectory: URL, fileManager fm: FileManager = .default) throws {
+        let baseline = (fm.enumerator(at: gameDirectory, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey])?.compactMap { item -> String? in
+            guard let url = item as? URL else { return nil }
+            return String(url.path.dropFirst(gameDirectory.path.count + 1))
+        } ?? [])
+        let data = try JSONSerialization.data(withJSONObject: ["baseline": baseline], options: [])
+        try data.write(to: gameDirectory.appendingPathComponent(markerName), options: .atomic)
+    }
+
+    public static func markImportFinished(in gameDirectory: URL, fileManager fm: FileManager = .default) {
+        try? fm.removeItem(at: gameDirectory.appendingPathComponent(markerName))
+    }
+
+    /// Removes only files and folders created after a marker was written. Symlinks are removed as links and never traversed.
+    public static func cleanupAbandonedImport(in gameDirectory: URL, fileManager fm: FileManager = .default) {
+        let marker = gameDirectory.appendingPathComponent(markerName)
+        guard let data = try? Data(contentsOf: marker),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let baseline = object["baseline"] as? [String] else { return }
+        let keep = Set(baseline)
+        let urls = (fm.enumerator(at: gameDirectory, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey])?.compactMap { $0 as? URL } ?? [])
+            .filter { $0.path != marker.path }
+            .sorted { $0.path.count > $1.path.count }
+        for url in urls where !keep.contains(String(url.path.dropFirst(gameDirectory.path.count + 1))) {
+            try? fm.removeItem(at: url)
+        }
+        try? fm.removeItem(at: marker)
+    }
+
+    public static func cleanupAbandonedStaging(in directory: URL, fileManager fm: FileManager = .default) {
+        let folders = (try? fm.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey])) ?? []
+        for folder in folders where folder.lastPathComponent.hasPrefix(".cofre-import-") {
+            guard (try? folder.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]).isDirectory) == true,
+                  (try? folder.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) != true else { continue }
+            try? fm.removeItem(at: folder)
+        }
+    }
+
     public struct Result: Sendable {
         public let instance: Instance
         public let addedFiles: [String]
@@ -51,7 +92,8 @@ public final class ModpackImport: @unchecked Sendable {
     }
 
     public func importPack(_ archive: URL, name: String? = nil) async throws -> Result {
-        let staging = fm.temporaryDirectory.appendingPathComponent("cofre-import-\(UUID().uuidString)", isDirectory: true)
+        Self.cleanupAbandonedStaging(in: fm.temporaryDirectory, fileManager: fm)
+        let staging = fm.temporaryDirectory.appendingPathComponent(".cofre-import-\(UUID().uuidString)", isDirectory: true)
         try fm.createDirectory(at: staging, withIntermediateDirectories: true)
         defer { try? fm.removeItem(at: staging) }
         try Zip.extract(archive, to: staging)
