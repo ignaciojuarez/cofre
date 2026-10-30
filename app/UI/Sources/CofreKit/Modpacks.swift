@@ -111,6 +111,7 @@ public final class ModpackImport: @unchecked Sendable {
             guard let http = response as? HTTPURLResponse, (200..<400).contains(http.statusCode), let url = http.url else { throw Failure.curseForgeDownloadUnavailable(file.projectID, file.fileID, page) }
             // The API normally redirects to the CDN. Use the queue so the staged file gets the same lifecycle.
             let destination = root.appendingPathComponent("mods/\(file.projectID)-\(file.fileID).jar")
+            try fm.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
             try data.write(to: destination)
             _ = url; added.append("mods/\(file.projectID)-\(file.fileID).jar")
         }
