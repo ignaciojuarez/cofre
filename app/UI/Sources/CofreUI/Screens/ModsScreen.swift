@@ -87,6 +87,8 @@
                             nav.settingsPane = .accounts
                         }
                     }
+                } else if store.query.kind == .dataPacks {
+                    EmptyState("Data packs belong to a world", message: "Open a world to add data packs there.", icon: .grass)
                 } else if let err = store.searchError, store.results.isEmpty, !store.searching {
                     EmptyState(
                         "Can't reach \(store.query.source.displayName)",
@@ -546,7 +548,9 @@
                     }
                 }
                 .padding(.horizontal, width == .compact ? 16 : 20).padding(.bottom, 4)
-                if all.isEmpty {
+                if kind == .dataPacks {
+                    EmptyState("Data packs belong to a world", message: "Open a world to add data packs there.", icon: .grass)
+                } else if all.isEmpty {
                     EmptyState(
                         kind == .mods ? "No mods yet" : "Nothing here yet", message: "Get them in Get mods.",
                         icon: .chest
