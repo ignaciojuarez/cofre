@@ -107,7 +107,7 @@ struct VersionPickerSheet: View {
                         Button { selection = version.id; dismiss() } label: { Row(version.id, isSelected: selection == version.id, leading: { Radio(isOn: selection == version.id) }, trailing: { Meta(version.id == selection ? "Selected" : "") }) }.buttonStyle(RowButtonStyle())
                     }
                 }
-                PreflightLine(downloadBytes: 412 * 1024 * 1024, freeBytes: 18_400 * 1024 * 1024)
+                PreflightLine()
             }.padding(16) }
         }
         .task(id: "\(kind.rawValue)-\(loader?.rawValue ?? "game")") {
@@ -121,13 +121,19 @@ struct VersionPickerSheet: View {
     }
 }
 
+/// Free space on this device. The real download size is checked again before anything downloads (DownloadQueue).
 struct PreflightLine: View {
-    let downloadBytes: Int64, freeBytes: Int64
+    private var freeBytes: Int64? {
+        try? URL(fileURLWithPath: NSHomeDirectory())
+            .resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]).volumeAvailableCapacityForImportantUsage
+    }
     var body: some View {
-        HStack(spacing: 10) { PixelIcon(.check, size: 14); VStack(alignment: .leading, spacing: 1) {
-            Text("Downloads \(Fmt.bytes(downloadBytes) ?? "—") · needs 1.1 GB").cofreFont(.rowTitle).foregroundStyle(Color.cofre.ink)
-            Text("\(Fmt.bytes(freeBytes) ?? "—") free · Java 25 already here · Wi‑Fi").cofreFont(.caption).foregroundStyle(Color.cofre.muted)
-        }; Spacer(minLength: 0) }.padding(.horizontal, 11).padding(.vertical, 8).block(.panel)
+        HStack(spacing: 10) {
+            PixelIcon(.check, size: 14)
+            Text("\(Fmt.bytes(freeBytes) ?? "—") free on this device").cofreFont(.caption).foregroundStyle(Color.cofre.muted)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 11).padding(.vertical, 8).block(.panel)
     }
 }
 #endif

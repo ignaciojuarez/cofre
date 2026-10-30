@@ -396,7 +396,7 @@
                 }
             }
             GameOwnsNote("Reads the game's latest.log as it writes. Nothing leaves this iPhone unless you share it.")
-                .sheet(item: Binding(get: { reportURL.map { ReportSheetItem(url: $0, preview: reportPreview) } }, set: { _ in reportURL = nil })) { item in
+                .blockSheet(item: Binding(get: { reportURL.map { ReportSheetItem(url: $0, preview: reportPreview) } }, set: { _ in reportURL = nil })) { item in
                     if let preview = item.preview { ReportPreviewSheet(preview: preview, url: item.url) }
                 }
         }

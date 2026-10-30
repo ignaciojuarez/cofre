@@ -193,7 +193,9 @@
                             Stat(Fmt.ago(p.updated) ?? "—", label: "Updated")
                         }
                         Text(verbatim: p.summary).cofreFont(.body).foregroundStyle(Color.cofre.inkSoft)
-                        versionList(versions, chosen: chosen, installed: installed)
+                        versionList(
+                            versions, chosen: chosen, installed: installed,
+                            loading: store.versions[id] == nil && store.versionsError[id] == nil)
                         let state = store.installState(p)
                         ForEach(chosen.flatMap { store.dependencies[$0] } ?? []) { d in
                             Row(
@@ -323,13 +325,21 @@
         }
 
         /// M02 versions: filtered to the target by default, with a one-tap way to see the rest.
-        @ViewBuilder fileprivate func versionList(_ versions: [ProjectVersion], chosen: String?, installed: String?)
-            -> some View
-        {
+        @ViewBuilder fileprivate func versionList(
+            _ versions: [ProjectVersion], chosen: String?, installed: String?, loading: Bool = false
+        ) -> some View {
             let f = filter ?? .defaults(for: store.modsInstance)
             let shown = f.visible(versions, installed: installed, all: showAll)
             let hidden = versions.count - shown.count
             ListSection("Versions", spacing: 4) {
+                // Big projects list hundreds of versions, which can take a few seconds.
+                if loading {
+                    Row("Loading versions…", subtitle: "Big mods have hundreds; this can take a few seconds", leading: { Spinner() })
+                    ForEach(0..<3, id: \.self) { _ in
+                        Row("0.0.0", subtitle: "26.3 · Fabric", leading: { Radio(isOn: false) })
+                            .redacted(reason: .placeholder).opacity(0.5)
+                    }
+                }
                 if !versions.isEmpty {
                     VersionFilterBar(versions: versions, filter: Binding(get: { f }, set: { filter = $0 }))
                         .disabled(showAll)

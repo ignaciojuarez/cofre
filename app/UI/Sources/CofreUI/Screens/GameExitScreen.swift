@@ -74,7 +74,7 @@
             }
             .environment(\.widthClass, sideBySide || size.width >= 700 ? .medium : .compact)
             .blockSheet(isPresented: $showDetails) { details }
-            .sheet(isPresented: $showReportShare) { if let reportURL, let reportPreview { ReportPreviewSheet(preview: reportPreview, url: reportURL) } }
+            .blockSheet(isPresented: $showReportShare) { if let reportURL, let reportPreview { ReportPreviewSheet(preview: reportPreview, url: reportURL) } }
         }
 
         @ViewBuilder private var card: some View {

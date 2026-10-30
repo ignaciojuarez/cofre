@@ -219,7 +219,7 @@
                     if store.activeInstanceID != id { await store.selectInstance(id) }
                     await store.loadPreferences(for: id)
                 }
-                .sheet(isPresented: $showingLoaderPicker) {
+                .blockSheet(isPresented: $showingLoaderPicker) {
                     if let loader = store.instances.first(where: { $0.id == id })?.loader {
                         VersionPickerSheet(loader: loader, selection: .constant(store.instances.first(where: { $0.id == id })?.loaderVersion ?? "")).environment(store)
                     }
@@ -449,7 +449,7 @@
                             }
                             Row("Java", trailing: { Meta("Auto") })
                         }
-                        PreflightLine(downloadBytes: 412 * 1024 * 1024, freeBytes: 18_400 * 1024 * 1024)
+                        PreflightLine()
                         if creating, loader != .vanilla, !loaderVersion.isEmpty {
                             Row("Installing \(loader.displayName) \(loaderVersion)…", leading: { Spinner() })
                         }
@@ -475,7 +475,7 @@
                 loaderVersions = (try? await store.backend.loaderVersions(loader: loader, game: version)) ?? []
                 loaderVersion = loaderVersions.first ?? ""
             }
-            .sheet(isPresented: $showingVersionPicker) {
+            .blockSheet(isPresented: $showingVersionPicker) {
                 VersionPickerSheet(loader: nil, selection: $version).environment(store)
             }
         }
