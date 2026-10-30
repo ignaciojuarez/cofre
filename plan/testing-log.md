@@ -95,7 +95,7 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 - Steps: Open Settings → Game with renderer Auto.
 - Expected: FSR row is hidden unless MobileGlues is selected.
 - Actual: Resolution slider and “FSR 1.0 upscale” segmented controls are visible under Auto.
-- Evidence: `/tmp/cofre-test/shots/round3-controls.png` (settings state captured during session)
+- Evidence: `/tmp/cofre-test/shots/round3-settings.png`
 - Severity: S3 · Status: handoff · Commit: —
 
 ### B-008 · Servers · `cofre://join` falls back to clipboard warning
