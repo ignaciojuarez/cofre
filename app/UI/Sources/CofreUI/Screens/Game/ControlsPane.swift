@@ -55,6 +55,9 @@
                 BlockSlider("Opacity", value: $settings.opacity, in: 0.2...1, step: 0.05) {
                     "\(Int(($0 * 100).rounded())) %"
                 }
+                BlockSlider("Stick area", value: $settings.stickArea, in: 0.2...0.6, step: 0.05) {
+                    "\(Int(($0 * 100).rounded())) % of the screen"
+                }
                 ToggleRow("Fade when idle", subtitle: "Dims to 35% after 3 s", isOn: $settings.fadeWhenIdle)
                 ToggleRow("Left-handed", subtitle: "Mirror stick and buttons", isOn: $settings.leftHanded)
                 ToggleRow("Haptics", isOn: $settings.haptics)

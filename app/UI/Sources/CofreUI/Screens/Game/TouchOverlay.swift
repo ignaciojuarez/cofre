@@ -263,7 +263,10 @@ public final class TouchOverlayModel {
 
     func stickBegan(at p: CGPoint, rest: CGRect) {
         touched()
-        stickCenter = settings.style == .classic ? CGPoint(x: rest.midX, y: rest.midY) : p
+        trayOpen = false
+        // Classic keeps its fixed stick when the thumb lands on it; anywhere else in the strip it follows the thumb.
+        let onRest = settings.style == .classic && TouchLayout.hitRect(rest).contains(p)
+        stickCenter = onRest ? CGPoint(x: rest.midX, y: rest.midY) : p
         stickMoved(to: p, radius: rest.width / 2)
     }
 
@@ -406,18 +409,25 @@ public struct TouchOverlayView: View {
 
     @ViewBuilder private func stick(rest: CGRect, size: CGSize) -> some View {
         let style = model.settings.style
-        let zone = style == .classic ? TouchLayout.hitRect(rest) : TouchLayout.stickZone(size: size, leftHanded: model.settings.leftHanded)
+        let zone = TouchLayout.stickZone(size: size, leftHanded: model.settings.leftHanded, fraction: model.settings.stickArea)
         Color.clear.frame(width: zone.width, height: zone.height).contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { v in
-                        if model.stickCenter == nil {
-                            model.stickBegan(at: CGPoint(x: zone.minX + v.startLocation.x, y: zone.minY + v.startLocation.y), rest: rest)
+                        let start = CGPoint(x: zone.minX + v.startLocation.x, y: zone.minY + v.startLocation.y)
+                        // The hotbar reaches into the strip: a touch there picks a slot, as everywhere else.
+                        if model.stickCenter == nil, !model.touchOnHotbar {
+                            if TouchLayout.hotbarSlot(at: start, in: model.hotbar(in: size)) != nil {
+                                model.worldBegan(at: start, size: size)
+                                return
+                            }
+                            model.stickBegan(at: start, rest: rest)
                         }
+                        guard !model.touchOnHotbar else { return }
                         model.stickMoved(
                             to: CGPoint(x: zone.minX + v.location.x, y: zone.minY + v.location.y), radius: rest.width / 2)
                     }
-                    .onEnded { _ in model.stickEnded() }
+                    .onEnded { _ in model.touchOnHotbar ? model.worldEnded() : model.stickEnded() }
             )
             .accessibilityLabel(Text("Move"))
             .position(x: zone.midX, y: zone.midY)

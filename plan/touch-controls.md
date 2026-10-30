@@ -58,7 +58,8 @@ All three use the stand-in game frame with the Java HUD at auto GUI scale, sit i
 |---|---|---|---|
 | Idea | Bedrock's default layout, recreated | Almost nothing on screen; gestures do the rest | Bedrock positions with Ghost's quiet behavior. System buttons sit on the hotbar line. |
 | Visible by default | 6: stick, jump, sneak, chat, pause, ••• | 2: jump, ≡ (the stick appears only under the thumb) | 4 clusters / 6 targets: stick · jump+sneak · pause · hotbar dock (chat ⟦hotbar⟧ •••) |
-| Stick | Fixed square, bottom-left | Floating: appears where the left thumb lands (left 40% of the screen) | Rests bottom-left at 35%. Touching anywhere in the left 40% re-centers it under the thumb. |
+| Stick | Fixed square, bottom-left; a touch elsewhere in the stick area floats it under the thumb | Floating: appears where the left thumb lands | Rests bottom-left at 35%; a touch anywhere in the stick area re-centers it under the thumb |
+| Stick area | All layouts: a full-height strip, 40% of the width by default (20–60% in Controls). Every touch that starts there moves, never looks; buttons and the hotbar on top still win. | | |
 | Sprint | Push the stick to its top edge (the edge lights up and SPRINT shows) | Same | Same |
 | Jump | Bottom-right, 60 pt. Double-tap = fly (vanilla). | Same, plus **swipe down on jump = sneak toggle** | Same as A |
 | Sneak | Left of jump, 52 pt. Double-tap locks it (accent fill). | A gesture on jump (the hint "▼ sneak" shows under it) | Up and left of jump, 46 pt, so the thumb rolls between them. Double-tap locks it. |

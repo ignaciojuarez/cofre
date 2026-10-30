@@ -147,6 +147,24 @@ final class TouchControlsTests: XCTestCase {
         XCTAssertEqual(TouchLayout.stickZone(size: phone, leftHanded: true).maxX, phone.width)
     }
 
+    // The stick's strip is full height and as wide as the setting says, so a thumb there never turns the camera.
+    func testStickAreaIsAFullHeightStripOfTheChosenWidth() {
+        let zone = TouchLayout.stickZone(size: phone, leftHanded: false)
+        XCTAssertEqual(zone, CGRect(x: 0, y: 0, width: phone.width * 0.4, height: phone.height))
+        XCTAssertEqual(TouchLayout.stickZone(size: phone, leftHanded: false, fraction: 0.5).width, phone.width / 2)
+        XCTAssertEqual(TouchLayout.stickZone(size: phone, leftHanded: false, fraction: 0.9).width, phone.width * 0.6)
+    }
+
+    // Settings saved before a setting existed keep their values; the new one takes its default.
+    func testOlderSavedSettingsKeepTheirValues() throws {
+        let old = #"{"style":"minimal","buttonScale":1.2,"opacity":0.5,"fadeWhenIdle":false,"leftHanded":true,"haptics":false,"lookSensitivity":2,"invertY":true}"#
+        let s = try JSONDecoder().decode(TouchControlSettings.self, from: Data(old.utf8))
+        XCTAssertEqual(s.style, .minimal)
+        XCTAssertEqual(s.lookSensitivity, 2)
+        XCTAssertTrue(s.leftHanded)
+        XCTAssertEqual(s.stickArea, 0.4)
+    }
+
     func testHitTargetsAreAtLeast44Points() {
         let small = TouchLayout.hitRect(CGRect(x: 100, y: 100, width: 36, height: 36))
         XCTAssertEqual(small.size, CGSize(width: 44, height: 44))

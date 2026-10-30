@@ -33,8 +33,25 @@ public struct TouchControlSettings: Codable, Equatable, Sendable {
     /// 0.25–3.
     public var lookSensitivity = 1.0
     public var invertY = false
+    /// 0.2–0.6 of the screen's width, from the stick's edge: every touch that starts there moves, never looks.
+    public var stickArea = 0.4
 
     public init() {}
+
+    /// Missing keys keep their defaults, so a setting added later doesn't reset the saved ones.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = Self()
+        style = try c.decodeIfPresent(TouchLayoutStyle.self, forKey: .style) ?? d.style
+        buttonScale = try c.decodeIfPresent(Double.self, forKey: .buttonScale) ?? d.buttonScale
+        opacity = try c.decodeIfPresent(Double.self, forKey: .opacity) ?? d.opacity
+        fadeWhenIdle = try c.decodeIfPresent(Bool.self, forKey: .fadeWhenIdle) ?? d.fadeWhenIdle
+        leftHanded = try c.decodeIfPresent(Bool.self, forKey: .leftHanded) ?? d.leftHanded
+        haptics = try c.decodeIfPresent(Bool.self, forKey: .haptics) ?? d.haptics
+        lookSensitivity = try c.decodeIfPresent(Double.self, forKey: .lookSensitivity) ?? d.lookSensitivity
+        invertY = try c.decodeIfPresent(Bool.self, forKey: .invertY) ?? d.invertY
+        stickArea = try c.decodeIfPresent(Double.self, forKey: .stickArea) ?? d.stickArea
+    }
 
     public static let idleOpacity = 0.35
     public static let idleDelay: TimeInterval = 3
@@ -175,10 +192,11 @@ public enum TouchLayout {
         return f
     }
 
-    /// Where a touch starts the floating stick: the lower part of the stick's half (rule U2 keeps the middle free).
-    public static func stickZone(size: CGSize, leftHanded: Bool) -> CGRect {
-        let w = size.width * 0.4, top = size.height * 0.35
-        return CGRect(x: leftHanded ? size.width - w : 0, y: top, width: w, height: size.height - top)
+    /// The stick's strip of the screen, full height: a touch that starts there always moves (the stick appears
+    /// under the thumb), so it can never turn the camera first. Buttons and the hotbar on top still win.
+    public static func stickZone(size: CGSize, leftHanded: Bool, fraction: Double = 0.4) -> CGRect {
+        let w = size.width * min(max(fraction, 0.2), 0.6)
+        return CGRect(x: leftHanded ? size.width - w : 0, y: 0, width: w, height: size.height)
     }
 
     /// Rule U5: every target gets at least 44×44 pt.
