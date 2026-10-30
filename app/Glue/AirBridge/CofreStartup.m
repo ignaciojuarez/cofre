@@ -50,6 +50,21 @@ static void CofreConfigureAirJIT(void) {
   NSLog(@"[Cofre] JIT mode=attached dyld_bypass=on");
 }
 
+/// Background/resume breadcrumbs: whether the JIT debugger is still attached when the app comes back is the main
+/// suspect for a game that freezes after the Home Screen.
+static void CofreWatchLifecycle(void) {
+  NSNotificationCenter *center = NSNotificationCenter.defaultCenter;
+  [center addObserverForName:UIApplicationDidEnterBackgroundNotification object:nil queue:nil usingBlock:^(NSNotification *n) {
+    NSLog(@"[Cofre] app background jit=%d debugger=%d", isJITEnabled(false), JIT26IsLikelyDebuggerKeepAttached());
+  }];
+  [center addObserverForName:UIApplicationWillEnterForegroundNotification object:nil queue:nil usingBlock:^(NSNotification *n) {
+    NSLog(@"[Cofre] app foreground jit=%d debugger=%d", isJITEnabled(false), JIT26IsLikelyDebuggerKeepAttached());
+  }];
+  [center addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:nil usingBlock:^(NSNotification *n) {
+    NSLog(@"[Cofre] app active jit=%d debugger=%d", isJITEnabled(false), JIT26IsLikelyDebuggerKeepAttached());
+  }];
+}
+
 /// Starts CofreCore with the Air bridge exactly once. Safe to call from any
 /// launch path.
 static void CofreEnsureStarted(void) {
@@ -64,6 +79,7 @@ static void CofreEnsureStarted(void) {
                                           bridge);
     [bridge ensureAutomaticMemoryDefault];
     CofreConfigureAirJIT();
+    CofreWatchLifecycle();
     // The game owns VSync and its frame limit in options.txt. With this Air setting on, Air's Java launcher
     // overwrites both (VSync off, 260 FPS) at every launch, undoing what the player picked in game.
     setPrefBool(@"video.disable_game_vsync", NO);
