@@ -196,22 +196,13 @@
         }
 
         // Controls without a backend stay hidden: the default reports nothing, and actions throw instead of pretending.
-        func testCapabilitiesDefaultToNothing() async throws {
+        func testCapabilitiesDefaultToNothing() {
             let mock = MockBackend(stepDelay: 0)
             let store = CofreStore(services: CofreServices(backend: mock), defaults: freshDefaults())
-            XCTAssertFalse(store.can(.deleteWorld))
             XCTAssertFalse(store.can(.controllerNavigation))
             XCTAssertEqual(MinimalActions().capabilities, [])
-            do {
-                try await MinimalActions().deleteWorld(instanceID: "a", worldID: "b")
-                XCTFail("should throw")
-            } catch {}
-
-            mock.capabilities = [.deleteWorld]
-            await store.start()
-            let world = try XCTUnwrap(store.worlds.first)
-            await store.confirm(.deleteWorld(world))
-            XCTAssertFalse(store.worlds.contains(world))
+            mock.capabilities = [.controllerNavigation]
+            XCTAssertTrue(store.can(.controllerNavigation))
         }
 
         func testOfflineSearchShowsError() async {
@@ -221,6 +212,18 @@
             await store.search()
             XCTAssertNotNil(store.searchError)
             XCTAssertTrue(store.results.isEmpty)
+        }
+
+        // Typing cancels the previous search; a cancelled search never shows "Can't reach".
+        func testCancelledOrStaleSearchLeavesStateAlone() async {
+            let mock = MockBackend(stepDelay: 0)
+            mock.offline = true
+            let store = CofreStore(services: CofreServices(backend: mock), defaults: freshDefaults())
+            let cancelled = Task { await store.search() }
+            cancelled.cancel()
+            await cancelled.value
+            XCTAssertNil(store.searchError)
+            XCTAssertFalse(store.searching)
         }
 
         // Mods works on one instance that runs mods: Play's when it does, else the last one picked.

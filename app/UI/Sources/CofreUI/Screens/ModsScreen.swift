@@ -128,7 +128,8 @@
             .scrollDismissesKeyboard(.immediately)
             .background { Color.clear.contentShape(Rectangle()).onTapGesture { endEditing() } }
             .task(id: store.query) {
-                try? await Task.sleep(for: .milliseconds(250))
+                // Debounce: a keystroke cancels the wait, and the old text is never searched.
+                do { try await Task.sleep(for: .milliseconds(250)) } catch { return }
                 await store.search()
             }
         }

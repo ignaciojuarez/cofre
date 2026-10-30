@@ -475,21 +475,28 @@
 
         // MARK: Mods
 
+        /// Searches the current query. Only the search for the latest query may change results, the error or
+        /// the spinner: an older one that finishes late, or that a keystroke cancelled, leaves them alone.
         public func search() async {
+            let q = query
             searching = true
-            defer { searching = false }
+            defer { if q == query { searching = false } }
             do {
                 // The target's own list too, so rows show ✓ for what it already has (after a switch, too).
-                let q = query
                 async let found = backend.search(q)
                 if let inst = q.instanceID, q.kind != .modpacks,
                     let have = try? await backend.installed(q.kind, instanceID: inst), q == query
                 {
                     installed[q.kind] = have
                 }
-                results = try await found
+                let hits = try await found
+                guard q == query, !Task.isCancelled else { return }
+                results = hits
                 searchError = nil
-            } catch is CancellationError {} catch {
+            } catch {
+                // Cancelling also surfaces as URLError.cancelled from URLSession; neither is a failure.
+                let cancelled = error is CancellationError || (error as? URLError)?.code == .cancelled
+                guard q == query, !Task.isCancelled, !cancelled else { return }
                 NSLog("[Cofre] search failed: %@", String(describing: error))
                 results = []
                 searchError = error.localizedDescription
