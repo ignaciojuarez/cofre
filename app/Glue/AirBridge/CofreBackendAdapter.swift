@@ -3,6 +3,7 @@
     import UIKit
     import NetworkExtension
     import CofreUI
+    import CofreKit
 
     public enum CofreBackendError: LocalizedError {
         case unavailable(String)

@@ -3,6 +3,7 @@
     import UIKit
     import Observation
     import CofreUI
+    import CofreKit
     import CofreServerJoin
 
 extension MrpackIndex {

@@ -30,7 +30,6 @@ targets:
       - path: ../../app/Glue/CofreConstants.swift
       - path: ../../app/Glue/PairingFileValidator.swift
       - path: ../../app/Glue/AirBridge/CofreBackendAdapter.swift
-      - path: ../../app/Glue/AirBridge/CofreServerEngine.swift
       - path: ../../app/Glue/AirBridge/CofrePreferences.swift
       - path: ../../app/Glue/AirBridge/CofreBackendAdapter+Instances.swift
       - path: ../../app/Glue/AirBridge/CofreBackendAdapter+Mods.swift
@@ -46,6 +45,8 @@ targets:
     dependencies:
       - package: CofreUI
         product: CofreUI
+      - package: CofreUI
+        product: CofreKit
       - package: CofreServerJoin
         product: CofreServerJoin
     settings:
@@ -62,11 +63,12 @@ targets:
     sources:
       - path: ../../tests/preferences/CofrePreferencesTests.swift
       - path: ../../tests/logs/CofreLogStoreTests.swift
-      - path: ../../tests/servers/CofreServerEngineTests.swift
     dependencies:
       - target: CofreCore
       - package: CofreUI
         product: CofreUI
+      - package: CofreUI
+        product: CofreKit
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.ignaciojuarez.cofre.core.tests
   PacketTunnel:

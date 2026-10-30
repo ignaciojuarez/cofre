@@ -1,5 +1,5 @@
 import XCTest
-@testable import CofreCore
+@testable import CofreKit
 
 final class CofreServerEngineTests: XCTestCase {
     func testServersRoundTripPreservesFieldsAndUnknownTags() throws {
