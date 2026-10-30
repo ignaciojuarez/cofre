@@ -403,8 +403,27 @@
             }
         }
         public func javaRuntimes() async -> [JavaRuntime] { [] }
-        public func storage() async -> StorageUsage { StorageUsage(gameBytes: 0, javaBytes: 0, cacheBytes: 0) }
-        public func clearCache() async throws { throw unavailable("cache management") }
+        private var storageCleanup: StorageCleanup {
+            let env = ProcessInfo.processInfo.environment
+            let home = env["POJAV_HOME"].map { URL(fileURLWithPath: $0) }
+                ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            var directories = air.instances().compactMap { ($0["id"] as? String).flatMap { air.gameDirectory(forProfile: $0) } }
+            if let game = env["POJAV_GAME_DIR"] { directories.append(URL(fileURLWithPath: game)) }
+            return StorageCleanup(home: home, gameDirectories: directories)
+        }
+        public func storage() async -> StorageUsage {
+            let cleanup = storageCleanup
+            return await Task.detached {
+                let total = StorageCleanup.bytes(cleanup.home)
+                let cache = cleanup.reclaimableBytes
+                let java = StorageCleanup.bytes(Bundle.main.bundleURL.appendingPathComponent("java_runtimes"))
+                return StorageUsage(gameBytes: max(0, total - cache), javaBytes: java, cacheBytes: cache)
+            }.value
+        }
+        public func clearCache() async throws {
+            let cleanup = storageCleanup
+            try await Task.detached { _ = try cleanup.clear() }.value
+        }
         public func curseForgeKey() -> String? { nil }
         public func setCurseForgeKey(_ key: String?) throws { throw unavailable("CurseForge key storage") }
 

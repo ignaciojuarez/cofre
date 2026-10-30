@@ -256,6 +256,7 @@
     struct AccountsDataContent: View {
         @Environment(CofreStore.self) private var store
         @State private var key = ""
+        @State private var clearingSpace = false
         var body: some View {
             ListSection(spacing: 4) {
                 ForEach(store.accounts) { a in
@@ -300,12 +301,18 @@
             if let s = store.storage {
                 ListSection("Storage · \(Fmt.bytes(s.total) ?? "")", spacing: 8) {
                     StorageBar(usage: s)
+                    Row("Reclaimable", trailing: { Meta(Fmt.bytes(s.cacheBytes) ?? "0 B") })
+                    Text("Clears logs, crash reports, shader dumps and temporary files older than a day. Current logs and your game files stay.")
+                        .cofreFont(.caption).foregroundStyle(Color.cofre.muted)
                     HStack(spacing: 12) {
                         legend("Game", .accent)
                         legend("Java", .warn)
                         legend("Cache", .success)
                         Spacer()
-                        BlockButton("Clear cache", size: .small) { Task { await store.clearCache() } }
+                        BlockButton("Free up space", size: .small, isLoading: clearingSpace) {
+                            clearingSpace = true
+                            Task { await store.clearCache(); clearingSpace = false }
+                        }.disabled(clearingSpace || s.cacheBytes == 0)
                     }
                 }
             }
