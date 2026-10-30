@@ -19,11 +19,13 @@
 
     /// The whole screen for a hosting controller: measures its window like `CofreRootView`.
     public struct GameExitView: View {
-        let report: GameExitReport, intent: RejoinIntent?, close: () -> Void, retry: () -> Void, showDetails: Bool
+        let report: GameExitReport, intent: RejoinIntent?, reportURL: URL?, reportPreview: ReportPreviewData?, close: () -> Void, retry: () -> Void, showDetails: Bool
         /// `showDetails` opens Details right away (preview host).
-        public init(report: GameExitReport, intent: RejoinIntent? = nil, showDetails: Bool = false, close: @escaping () -> Void, retry: (() -> Void)? = nil) {
+        public init(report: GameExitReport, intent: RejoinIntent? = nil, reportURL: URL? = nil, reportPreview: ReportPreviewData? = nil, showDetails: Bool = false, close: @escaping () -> Void, retry: (() -> Void)? = nil) {
             self.report = report
             self.intent = intent
+            self.reportURL = reportURL
+            self.reportPreview = reportPreview
             self.close = close
             self.retry = retry ?? close
             self.showDetails = showDetails
@@ -31,7 +33,7 @@
 
         public var body: some View {
             GeometryReader { g in
-                GameExitScreen(report: report, intent: intent, size: g.size, close: close, retry: retry, showDetails: showDetails).sizeClasses(
+                GameExitScreen(report: report, intent: intent, reportURL: reportURL, reportPreview: reportPreview, size: g.size, close: close, retry: retry, showDetails: showDetails).sizeClasses(
                     SizeClasses(g.size))
             }
             .environment(\.cofreTheme, CofreTheme.current)
@@ -41,9 +43,10 @@
     }
 
     struct GameExitScreen: View {
-        let report: GameExitReport, intent: RejoinIntent?, size: CGSize, close: () -> Void, retry: () -> Void
+        let report: GameExitReport, intent: RejoinIntent?, reportURL: URL?, reportPreview: ReportPreviewData?, size: CGSize, close: () -> Void, retry: () -> Void
         @State var showDetails = false
         @State private var copied = false
+        @State private var showReportShare = false
 
         /// iPhone landscape: short and wide, so text and actions sit side by side.
         private var sideBySide: Bool { size.width >= 600 && size.height < 500 }
@@ -68,6 +71,7 @@
             }
             .environment(\.widthClass, sideBySide || size.width >= 700 ? .medium : .compact)
             .blockSheet(isPresented: $showDetails) { details }
+            .sheet(isPresented: $showReportShare) { if let reportURL, let reportPreview { ReportPreviewSheet(preview: reportPreview, url: reportURL) } }
         }
 
         @ViewBuilder private var card: some View {
@@ -129,8 +133,11 @@
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.bottom, 4)
             HStack(spacing: 8) {
-                ShareLink(items: report.files) { Text("Share log") }.buttonStyle(.block())
-                    .disabled(report.files.isEmpty)
+                if reportURL != nil {
+                    BlockButton("Share report", icon: .paper) { showReportShare = true }
+                } else {
+                    ShareLink(items: report.files) { Text("Share log") }.buttonStyle(.block()).disabled(report.files.isEmpty)
+                }
                 BlockButton(copied ? "Copied" : "Copy details") {
                     UIPasteboard.general.string = report.detailsText
                     copied = true

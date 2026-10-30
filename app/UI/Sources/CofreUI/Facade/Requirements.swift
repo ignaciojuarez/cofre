@@ -127,6 +127,8 @@ import Foundation
         func logLines(_ kind: LogKind) -> AsyncStream<LogLine>
         /// A file URL suitable for the share sheet.
         func exportLog(_ kind: LogKind) async throws -> URL
+        func exportReport() async throws -> URL
+        func reportPreview() async -> ReportPreviewData
     }
 
     // MARK: GAP-03 · Instance metadata and actions (P03, I02)

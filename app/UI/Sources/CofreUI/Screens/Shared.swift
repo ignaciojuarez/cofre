@@ -363,3 +363,33 @@
         }
     }
 #endif
+
+#if canImport(UIKit)
+struct ReportPreviewSheet: View {
+    let preview: ReportPreviewData
+    let url: URL
+    @Environment(\.dismiss) private var dismiss
+    var body: some View {
+        VStack(spacing: 0) {
+            SheetHeader("Share report")
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    SectionLabel("Hidden before it leaves")
+                    Text("Personal names, account IDs, tokens, server addresses and file paths are redacted.")
+                        .cofreFont(.secondary).foregroundStyle(Color.cofre.inkSoft)
+                    ListSection("Report fields", spacing: 4) {
+                        ForEach(preview.fields, id: \.self) { Text(verbatim: $0).cofreFont(.code).foregroundStyle(Color.cofre.inkSoft).padding(.horizontal, 10).padding(.vertical, 7) }
+                    }
+                    ListSection("Files in report.zip", spacing: 4) {
+                        ForEach(preview.files, id: \.self) { Text(verbatim: $0).cofreFont(.code).foregroundStyle(Color.cofre.inkSoft).padding(.horizontal, 10).padding(.vertical, 7) }
+                    }
+                }.padding(16)
+            }
+            HStack(spacing: 8) {
+                BlockButton("Cancel") { dismiss() }
+                BlockButton("Share report", icon: .paper, role: .primary) { dismiss(); presentShareSheet(url) }
+            }.padding(16)
+        }
+    }
+}
+#endif

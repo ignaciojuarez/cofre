@@ -24,6 +24,7 @@ public final class LogStore: @unchecked Sendable {
         guard let url, let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }
         return text.split(whereSeparator: \.isNewline).enumerated().compactMap { i, line in makeEntry(i, String(line), source: source) }
     }
+    public func tail(_ source: LogSource, limit: Int = 200) -> [LogEntry] { Array(read(source).suffix(limit)) }
     public func search(_ query: String = "", levels: Set<LogLevel> = Set(LogLevel.allCases), sources: Set<LogSource> = Set(LogSource.allCases)) -> [LogEntry] {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return LogSource.allCases.filter(sources.contains).flatMap(read).filter { levels.contains($0.level) && (q.isEmpty || $0.text.lowercased().contains(q)) }
@@ -55,6 +56,16 @@ public struct ReportBundle: Sendable {
     public struct Context: Sendable { public var appVersion: String?; public var build: String?; public var device: String?; public var iOS: String?; public var instance: ReportInstance?; public var exitReason: String?; public var clue: String?; public init(appVersion: String? = nil, build: String? = nil, device: String? = nil, iOS: String? = nil, instance: ReportInstance? = nil, exitReason: String? = nil, clue: String? = nil) { self.appVersion = appVersion; self.build = build; self.device = device; self.iOS = iOS; self.instance = instance; self.exitReason = exitReason; self.clue = clue } }
     public let store: LogStore; public let context: Context
     public init(store: LogStore, context: Context = Context()) { self.store = store; self.context = context }
+    public struct PreviewField: Sendable { public let name: String; public let value: String; public init(name: String, value: String) { self.name = name; self.value = value } }
+    public struct Preview: Sendable { public let fields: [PreviewField]; public let files: [String]; public init(fields: [PreviewField], files: [String]) { self.fields = fields; self.files = files } }
+    public func preview() -> Preview {
+        var fields = [PreviewField(name: "App version", value: context.appVersion.map(Self.redact) ?? "<redacted>"), PreviewField(name: "Build", value: context.build.map(Self.redact) ?? "<redacted>"), PreviewField(name: "Device", value: context.device.map(Self.redact) ?? "<redacted>"), PreviewField(name: "iOS", value: context.iOS.map(Self.redact) ?? "<redacted>"), PreviewField(name: "Exit reason", value: context.exitReason.map(Self.redact) ?? "<redacted>"), PreviewField(name: "Crash signature", value: "<redacted>")]
+        if let instance = context.instance { fields.append(PreviewField(name: "Instance", value: Self.redact(instance.minecraftVersion ?? "<redacted>"))) }
+        var files = ["report.json", "logs.txt"]
+        if let crash = store.instance?.appendingPathComponent("crash-reports"), let names = try? FileManager.default.contentsOfDirectory(atPath: crash.path) { files += names.filter { $0.hasSuffix(".txt") }.map { "crash-reports/\($0)" }.sorted() }
+        return Preview(fields: fields, files: files)
+    }
+
     public func make(at url: URL) throws -> URL {
         var files: [(String, Data)] = []
         let logs = LogSource.allCases.flatMap(store.read).map(\.text).joined(separator: "\n")
@@ -66,7 +77,8 @@ public struct ReportBundle: Sendable {
         files.append(("logs.txt", Data(Self.redact(logs).utf8)))
         let fm = FileManager.default
         if let crash = store.instance?.appendingPathComponent("crash-reports"), let names = try? fm.contentsOfDirectory(atPath: crash.path) { for n in names where n.hasSuffix(".txt") { if let d = fm.contents(atPath: crash.appendingPathComponent(n).path) { files.append(("crash-reports/" + n, Data(Self.redact(String(decoding: d, as: UTF8.self)).utf8))) } } }
-        return try Zip.write(files, to: url)
+        try Zip.write(files.map { item in (path: item.0, data: { item.1 } as () throws -> Data) }, to: url)
+        return url
     }
     public static func redact(_ value: String) -> String {
         var s = value.replacingOccurrences(of: "(?i)(token|access_token|refresh_token)\\s*[=:]\\s*[^\\s,;]+", with: "$1=<redacted>", options: .regularExpression)
@@ -80,6 +92,3 @@ public struct ReportBundle: Sendable {
 }
 
 private enum SHA256 { static func hex(_ data: Data) -> String { var h = [UInt32](repeating: 0, count: 8); let seed: [UInt32] = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19]; h = seed; for (i,b) in data.enumerated() { h[i % 8] = (h[i % 8] &* 33) ^ UInt32(b) }; return h.map { String(format: "%08x", $0) }.joined() } }
-private enum Zip { static func write(_ files: [(String,Data)], to url: URL) throws -> URL { var out = Data(); var central = Data(); for (name,data) in files { let off = UInt32(out.count), n = Data(name.utf8), crc = crc32(data); out.appendLE(0x04034b50); out.appendLE(UInt16(20)); out.appendLE(UInt16(0)); out.appendLE(UInt16(0)); out.appendLE(UInt16(0)); out.appendLE(UInt16(0)); out.appendLE(crc); out.appendLE(UInt32(data.count)); out.appendLE(UInt32(data.count)); out.appendLE(UInt16(n.count)); out.appendLE(UInt16(0)); out.append(n); out.append(data); central.appendLE(0x02014b50); central.appendLE(UInt16(20)); central.appendLE(UInt16(20)); central.appendLE(UInt16(0)); central.appendLE(UInt16(0)); central.appendLE(UInt16(0)); central.appendLE(UInt16(0)); central.appendLE(crc); central.appendLE(UInt32(data.count)); central.appendLE(UInt32(data.count)); central.appendLE(UInt16(n.count)); central.appendLE(UInt16(0)); central.appendLE(UInt16(0)); central.appendLE(UInt16(0)); central.appendLE(UInt16(0)); central.appendLE(UInt16(0)); central.appendLE(off); central.append(n) }; out.append(central); out.appendLE(0x06054b50); out.appendLE(UInt16(0)); out.appendLE(UInt16(0)); out.appendLE(UInt16(files.count)); out.appendLE(UInt16(files.count)); out.appendLE(UInt32(central.count)); out.appendLE(UInt32(out.count - central.count)); out.appendLE(UInt16(0)); try out.write(to: url); return url } }
-private extension Data { mutating func appendLE<T: FixedWidthInteger>(_ value: T) { var v = value.littleEndian; Swift.withUnsafeBytes(of: &v) { append(contentsOf: $0) } } }
-private func crc32(_ data: Data) -> UInt32 { var c: UInt32 = 0xffffffff; for b in data { c ^= UInt32(b); for _ in 0..<8 { c = c & 1 == 1 ? (c >> 1) ^ 0xedb88320 : c >> 1 } }; return ~c }

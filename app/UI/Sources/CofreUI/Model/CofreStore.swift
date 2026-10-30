@@ -1,5 +1,6 @@
 #if canImport(UIKit)
     import SwiftUI
+    import CofreKit
 
     /// UI state for every screen. Screens read this; it calls the `CofreBackend` protocols.
     /// Errors surface as a banner (`lastError`) instead of crashing a pane.
@@ -302,6 +303,8 @@
 
         /// With `server`, launches straight into it (`joinServer`, plan/servers.md).
         public func play(_ instanceID: String? = nil, server: ServerSummary? = nil, rejoin: RejoinIntent? = nil) {
+            CofreBreadcrumb.log("play", details: instanceID.map { "instance=\($0)" } ?? "")
+
             guard let id = instanceID ?? activeInstance?.id else { return }
             activeInstanceID = id
             if rejoin == nil, server == nil, let instance = instances.first(where: { $0.id == id }) {
@@ -631,6 +634,8 @@
         }
 
         public func importPack(_ url: URL, intoInstance: Bool = false) {
+            CofreBreadcrumb.log("import", details: url.lastPathComponent)
+
             importProgress = InstallProgress(title: url.deletingPathExtension().lastPathComponent, fraction: 0)
             Task {
                 do {
@@ -648,6 +653,8 @@
         }
 
         public func setEnabled(_ on: Bool, item: InstalledItem) {
+            CofreBreadcrumb.log("toggle", details: "\(item.id)=\(on ? "on" : "off")")
+
             guard let inst = modsInstance?.id, var list = installed[item.kind], let i = list.firstIndex(of: item)
             else { return }
             list[i].enabled = on
@@ -656,6 +663,8 @@
         }
 
         public func deleteItem(_ item: InstalledItem) {
+            CofreBreadcrumb.log("delete", details: item.id)
+
             guard let inst = modsInstance?.id else { return }
             installed[item.kind]?.removeAll { $0.id == item.id }
             Task { await run { try await self.backend.delete(item, instanceID: inst) } }
@@ -684,6 +693,14 @@
             await run { url = try await self.backend.exportLog(kind) }
             return url
         }
+
+        public func exportReport() async -> URL? {
+            var url: URL?
+            await run { url = try await self.backend.exportReport() }
+            return url
+        }
+
+        public func reportPreview() async -> ReportPreviewData { await backend.reportPreview() }
 
         public func clearCache() async {
             await run { try await self.backend.clearCache() }

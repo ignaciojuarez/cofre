@@ -217,6 +217,10 @@
 
         public func launch(instanceID: String, accountID: String?) -> AsyncThrowingStream<LaunchProgress, Error> {
             UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "cofre.launch.started.\(instanceID)")
+            if let dir = air.gameDirectory(forProfile: instanceID), let options = try? String(contentsOf: dir.appendingPathComponent("options.txt"), encoding: .utf8) {
+                UserDefaults.standard.set(options, forKey: "cofre.options.before.\(instanceID)")
+            }
+            CofreBreadcrumb.log("play", details: "instance=\(instanceID)")
             return AsyncThrowingStream { continuation in
                 launchTask?.cancel()
                 let task = Task { @MainActor in
@@ -285,7 +289,7 @@
         }
         public func rejoin(instanceID: String, kind: RejoinIntent.Kind, target: String, accountID: String?) -> AsyncThrowingStream<LaunchProgress, Error> {
             if kind == .server { air.setServerIp(target, forProfile: instanceID) }
-            NSLog("[Cofre] rejoin launch instance=%@ kind=%@ target=%@", instanceID, kind.rawValue, target)
+            CofreBreadcrumb.log("play", details: "instance=\(instanceID) rejoin=\(kind.rawValue)")
             return launch(instanceID: instanceID, accountID: accountID)
         }
         public func cancelLaunch() async {
@@ -293,8 +297,42 @@
             launchTask = nil
             air.hideCofreLaunchOverlay()
         }
-        public func logLines(_ kind: LogKind) -> AsyncStream<LogLine> { CofreLogStore().lines(kind) }
-        public func exportLog(_ kind: LogKind) async throws -> URL { try CofreLogStore().export(kind) }
+        private func logStore() -> LogStore {
+            let id = air.selectedProfileName()
+            return LogStore(instance: id.isEmpty ? nil : air.gameDirectory(forProfile: id))
+        }
+        private func kitSource(_ kind: LogKind) -> CofreKit.LogSource {
+            switch kind { case .latest: .game; case .launcher: .launcher; case .crash: .crash }
+        }
+        public func logLines(_ kind: LogKind) -> AsyncStream<LogLine> {
+            let store = logStore(), source = kitSource(kind)
+            return AsyncStream { continuation in
+                let task = Task.detached {
+                    var seen = Set<String>(), nextID = 0
+                    while !Task.isCancelled {
+                        for entry in store.read(source) {
+                            let key = entry.text + "\u{0}" + String(entry.id)
+                            guard seen.insert(key).inserted else { continue }
+                            let level: LogLine.Level = switch entry.level { case .error: .error; case .warning: .warning; case .success: .success; case .info: .info }
+                            continuation.yield(LogLine(id: nextID, time: "", tag: entry.source.rawValue.capitalized, text: entry.text, level: level)); nextID += 1
+                        }
+                        if kind == .crash { break }
+                        try? await Task.sleep(for: .milliseconds(500))
+                    }
+                    continuation.finish()
+                }
+                continuation.onTermination = { _ in task.cancel() }
+            }
+        }
+        public func exportLog(_ kind: LogKind) async throws -> URL { try logStore().export(kitSource(kind)) }
+        public func exportReport() async throws -> URL {
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("report-\(UUID().uuidString).zip")
+            return try ReportBundle(store: logStore(), context: .init()).make(at: url)
+        }
+        public func reportPreview() async -> ReportPreviewData {
+            let p = ReportBundle(store: logStore(), context: .init()).preview()
+            return ReportPreviewData(fields: p.fields.map { "\($0.name): \($0.value)" }, files: p.files)
+        }
         public func importPack(_ url: URL, instanceID: String?) -> AsyncThrowingStream<InstallProgress, Error> {
             unavailableStream("pack import")
         }

@@ -359,29 +359,41 @@
     struct LogsContent: View {
         @Environment(CofreStore.self) private var store
         @State private var kind = LogKind.latest
+        @State private var search = ""
+        @State private var level = "all"
+        @State private var reportURL: URL?
+        @State private var reportPreview: ReportPreviewData?
         @State private var sharing = false
-        var body: some View {
-            Segmented(
-                "Log", selection: $kind, options: [(.latest, "Latest"), (.crash, "Crash"), (.launcher, "Launcher")])
-            LogView(lines: store.logs[kind] ?? []).frame(height: 300)
-                .task(id: kind) { await store.streamLog(kind) }
-            // Exports on tap: a live log stream never ends, so nothing can wait for it.
-            BlockButton("Share log", role: .primary, isLoading: sharing) {
-                Task {
-                    sharing = true
-                    if let url = await store.exportLog(kind) { presentShareSheet(url) }
-                    sharing = false
-                }
-            }
-            HStack(spacing: 8) {
-                BlockButton("Copy") {
-                    UIPasteboard.general.string = (store.logs[kind] ?? []).map { "\($0.time) [\($0.tag)] \($0.text)" }
-                        .joined(separator: "\n")
-                }
-                BlockButton("Crash report") { kind = .crash }
+        private var shown: [LogLine] {
+            (store.logs[kind] ?? []).filter { line in
+                let levelOK = level == "all" || (level == "problems" && (line.level == .warning || line.level == .error)) || (level == "errors" && line.level == .error)
+                return levelOK && (search.isEmpty || line.text.localizedCaseInsensitiveContains(search))
             }
         }
+        var body: some View {
+            Segmented("Log", selection: $kind, options: [(.latest, "Game"), (.crash, "Crash"), (.launcher, "Cofre")])
+            Field("Search log", text: $search, kind: .search, trailingNote: search.isEmpty ? nil : "\(shown.count) found")
+            ChipGroup("Show", selection: $level, options: [("all", "All"), ("problems", "Warnings"), ("errors", "Errors")])
+            LogView(lines: shown, follow: true).frame(minHeight: 260)
+                .task(id: kind) { await store.streamLog(kind) }
+            HStack(spacing: 8) {
+                BlockButton("Pause") {}
+                BlockButton("Share report…", icon: .paper, role: .primary, isLoading: sharing) {
+                    Task {
+                        sharing = true
+                        async let url = store.exportReport()
+                        async let preview = store.reportPreview()
+                        reportURL = await url; reportPreview = await preview; sharing = false
+                    }
+                }
+            }
+            GameOwnsNote("Reads the game's latest.log as it writes. Nothing leaves this iPhone unless you share it.")
+                .sheet(item: Binding(get: { reportURL.map { ReportSheetItem(url: $0, preview: reportPreview) } }, set: { _ in reportURL = nil })) { item in
+                    if let preview = item.preview { ReportPreviewSheet(preview: preview, url: item.url) }
+                }
+        }
     }
+    private struct ReportSheetItem: Identifiable { let id = UUID(); let url: URL; let preview: ReportPreviewData? }
 
     // MARK: X07 Look & more
 

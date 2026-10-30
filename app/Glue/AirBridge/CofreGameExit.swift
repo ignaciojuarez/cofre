@@ -1,4 +1,5 @@
 import CofreUI
+import CofreKit
 import SwiftUI
 import UIKit
 
@@ -18,11 +19,23 @@ import UIKit
         guard window == nil,
             let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first
         else { return }
-        let report = CofreLogStore().gameExitReport(code: code, instance: bridge.flatMap(instanceLabel))
+        let instanceURL = bridge.flatMap { bridge in
+            let id = bridge.selectedProfileName()
+            return id.isEmpty ? nil : bridge.gameDirectory(forProfile: id)
+        }
+        let logs = LogStore(instance: instanceURL)
+        let crashURL = logs.newestCrashReport(since: .distantPast)
+        let logText = logs.tail(.game, limit: 512).map(\.text).joined(separator: "\n")
+        let crashText = crashURL.flatMap { try? String(contentsOf: $0, encoding: .utf8) }
+        let report = GameExitReport(code: code, crashReport: crashText, log: logText, instance: bridge.flatMap(instanceLabel), files: [logs.gameLog].compactMap { $0 } + (crashURL.map { [$0] } ?? []))
+        if let bridge { let id = bridge.selectedProfileName(); let before = UserDefaults.standard.string(forKey: "cofre.options.before.\(id)") ?? ""; if let dir = bridge.gameDirectory(forProfile: id), let after = try? String(contentsOf: dir.appendingPathComponent("options.txt"), encoding: .utf8) { for change in OptionsDiff.changes(before: before, after: after) { NSLog("%@", change) } } }
+        let bundleURL = FileManager.default.temporaryDirectory.appendingPathComponent("report-\(UUID().uuidString).zip")
+        let reportBundle = try? ReportBundle(store: logs, context: .init(exitReason: report.reason.rawValue, clue: report.clue)).make(at: bundleURL)
+        let preview = ReportBundle(store: logs, context: .init(exitReason: report.reason.rawValue, clue: report.clue)).preview()
         let intent = bridge.flatMap { makeRejoinIntent($0) }
         if let intent { RejoinIntentStore.save(intent) }
         NSLog("[Cofre] game exit screen reason=%@ crashReport=%d", report.reason.rawValue, report.files.count > 1)
-        let host = UIHostingController(rootView: GameExitView(report: report, intent: intent, close: AppExit.close, retry: { AppExit.close() }))
+        let host = UIHostingController(rootView: GameExitView(report: report, intent: intent, reportURL: reportBundle, reportPreview: ReportPreviewData(fields: preview.fields.map { "\($0.name): \($0.value)" }, files: preview.files), close: AppExit.close, retry: { AppExit.close() }))
         host.view.backgroundColor = .cofre.page
         host.overrideUserInterfaceStyle = CofreTheme.current.interfaceStyle
         let w = UIWindow(windowScene: scene)

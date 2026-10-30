@@ -20,14 +20,10 @@
             GeometryReader { geo in
                 let wide = geo.size.width >= 700
                 Group {
-                    if area == "crash" {
-                        CrashShareDraft()
-                    } else {
-                        ShellLayout(compact: !wide) {
-                            DraftScreen(area: area, state: state, wide: wide)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                            NavChrome(style: wide ? .rail : .tabBar, nav: nav)
-                        }
+                    ShellLayout(compact: !wide) {
+                        DraftScreen(area: area, state: state, wide: wide)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                        NavChrome(style: wide ? .rail : .tabBar, nav: nav)
                     }
                 }
                 .environment(\.widthClass, wide ? .medium : .compact)
@@ -61,7 +57,6 @@
             case "content": ContentDraft(state: state)
             case "worlds": WorldsDraft(state: state)
             case "beforePlay": BeforePlayDraft(state: state)
-            case "logs": LogsDraft(state: state)
             case "versions": VersionsDraft(state: state)
             case "accounts": AccountsDraft(state: state)
             default: PlayHomeDraft(state: state)

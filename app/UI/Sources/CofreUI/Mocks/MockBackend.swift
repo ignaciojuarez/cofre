@@ -253,6 +253,9 @@
                 to: url, atomically: true, encoding: .utf8)
             return url
         }
+        public func exportReport() async throws -> URL { FileManager.default.temporaryDirectory.appendingPathComponent("report.zip") }
+        public func reportPreview() async -> ReportPreviewData { ReportPreviewData(fields: ["App version: <redacted>", "Build: <redacted>", "Device: <redacted>", "iOS: <redacted>", "Exit reason: <redacted>", "Crash signature: <redacted>"], files: ["report.json", "logs.txt"]) }
+
 
         // MARK: GAP-03 InstanceActions
         public func duplicate(instanceID: String) async throws -> InstanceSummary {

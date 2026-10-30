@@ -346,6 +346,8 @@
 
     public enum LogKind: String, CaseIterable, Sendable { case latest, crash, launcher }
 
+    public struct ReportPreviewData: Sendable { public let fields: [String]; public let files: [String]; public init(fields: [String], files: [String]) { self.fields = fields; self.files = files } }
+
     public struct LogLine: Identifiable, Hashable, Sendable {
         public enum Level: Sendable { case info, success, warning, error }
         public let id: Int
