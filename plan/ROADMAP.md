@@ -75,6 +75,9 @@ Z's variations, recommended picks taken (Ignacio: "I like it all"):
 - A shared CofreKit `Zip` built on Apple's Compression framework (`65f2e01`).
 - Computed mod compatibility (`24fb0af`): the hand-written table is gone.
 - A 15-second whole-app compile check for agents, which catches glue build breaks.
+- NeoForge 1.21.1 runs on the iPad (2026-10-30): installs no longer deadlock and turn on JIT first (`bc3fbcc`, `8dba0f9`), the early window is off (`0470adf`), LWJGL is visible to its modules (`fcdef38`), and Auto picks MobileGlues for Forge/NeoForge before 1.21.11 (`fb248bd`).
+- Cofre's crash screen shows for every game exit, including before the first frame (`0470adf`, `1ccd23a`).
+- One bounds-checked NBT reader for servers.dat and level.dat (`3441443`); a saved world can't crash Cofre at launch.
 
 ## Known issues
 
