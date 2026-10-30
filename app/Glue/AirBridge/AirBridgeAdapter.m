@@ -269,12 +269,6 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
   return out;
 }
 
-- (NSURL *)gameDirectoryForProfile:(NSString *)profile {
-  NSDictionary *p = self.profiles.profiles[profile];
-  NSString *path = p ? amePCLVersionGameDirAbsolute(p, nil) : nil;
-  return path.length ? [NSURL fileURLWithPath:path isDirectory:YES] : nil;
-}
-
 - (NSArray<NSURL *> *)instanceMetadataURLs:(NSURL *)url
                                   resource:(NSInteger)resource {
   return [PLMirrorCenter
@@ -436,13 +430,6 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
                              expectedSHA1:file[@"hashes"][@"sha1"]
                                  progress:nil
                                completion:completion];
-}
-
-- (NSString *)modsFolderForProfile:(NSString *)profile {
-  if (!_profiles.profiles[profile])
-    return nil;
-  return [[ModService sharedService] ensureModsFolderForProfile:profile
-                                                           error:nil];
 }
 
 - (void)duplicateProfile:(NSString *)name
@@ -696,23 +683,6 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
 #pragma mark - End instances
 
 
-- (void)modsForProfile:(NSString *)profile
-            completion:(void (^)(NSArray *))completion {
-  [[ModService sharedService]
-      scanModsForProfile:profile
-              completion:^(NSArray *mods) {
-                NSLog(@"[Cofre] mods profile=%@ count=%lu", profile,
-                      (unsigned long)mods.count);
-                NSMutableArray *rows = [NSMutableArray array];
-                for (ModItem *mod in mods) {
-                  [rows addObject:@{@"id": mod.onlineID ?: mod.fileName ?: @"", @"name": mod.displayName ?: mod.fileName ?: @"",
-                                    @"version": mod.version ?: @"", @"enabled": @(!mod.disabled),
-                                    @"file": mod.fileName ?: @""}];
-                }
-                if (completion)
-                  completion(rows);
-              }];
-}
 - (BOOL)toggleMod:(ModItem *)mod error:(NSError **)error {
   BOOL ok = [[ModService sharedService] toggleEnableForMod:mod error:error];
   NSLog(@"[Cofre] mod toggle=%d", ok);
@@ -983,10 +953,6 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
   id api = source == 2 ? [CurseForgeAPI sharedInstance]
                        : [ModrinthAPI sharedInstance];
   [api searchModWithFilters:filters completion:completion];
-}
-- (NSDictionary *)modContextForProfile:(NSString *)profile {
-  NSDictionary *data = _profiles.profiles[profile];
-  return [ModpackExportService parseVersionId:data[@"lastVersionId"] ?: @""];
 }
 - (void)projectVersions:(NSString *)projectID
                  source:(NSInteger)source

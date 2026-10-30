@@ -7,7 +7,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property(nonatomic, readonly) PLProfiles *profiles;
 /// Returns the profiles currently known to Air.
 - (NSArray<NSDictionary *> *)instances;
-- (nullable NSURL *)gameDirectoryForProfile:(NSString *)profile;
 // Instance catalogs and profile operations. Air owns paths, mirrors and
 // persistence.
 - (NSArray<NSURL *> *)instanceMetadataURLs:(NSURL *)url
@@ -54,8 +53,6 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)reloadProfiles;
 /// Adds a server to a profile and reports an optional error.
 /// Scans installed mods for a profile.
-- (void)modsForProfile:(NSString *)profile
-            completion:(void (^)(NSArray *))completion;
 /// Toggles a mod's enabled state.
 - (BOOL)toggleMod:(id)mod error:(NSError **)error;
 /// Returns configured accounts: id, name, active.
@@ -90,7 +87,6 @@ NS_ASSUME_NONNULL_BEGIN
                  source:(NSInteger)source
              completion:(void (^)(NSArray *, NSError *_Nullable))completion;
 /// Minecraft version and loader for mod compatibility.
-- (NSDictionary *)modContextForProfile:(NSString *)profile;
 /// Searches multiplayer servers.
 /// Imports a modpack into a profile.
 - (void)importPack:(NSURL *)url

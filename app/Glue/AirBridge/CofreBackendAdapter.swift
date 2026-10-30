@@ -403,3 +403,11 @@
         }
     }
 #endif
+
+#if canImport(UIKit)
+import CofreUI
+
+extension CofreBackendAdapter: GameEngine {
+    public var input: any GameInputService { CofreGameInput.shared }
+}
+#endif
