@@ -82,6 +82,10 @@ public struct GameExitReport: Hashable, Sendable {
         let report = (crashReport ?? "").split(whereSeparator: \.isNewline).map(String.init)
             .prefix { !$0.hasPrefix("-- System Details --") }.map { $0 }
         let errors = logLines.filter(isError)
+        // A crash inside Apple's GPU driver names AGXMetal in the fatal trace but has no error word on that line.
+        if logLines.contains(where: { $0.contains("AGXMetal") }) {
+            return (.renderer, logLines.contains { $0.contains("Reloading ResourceManager") } ? metalReload : "Metal crashed in the GPU driver.")
+        }
         for source in [report, errors] {
             for (reason, keys) in signs {
                 // The last match: the root cause in a stack trace, the newest line in a log.
@@ -98,6 +102,9 @@ public struct GameExitReport: Hashable, Sendable {
         if !report.isEmpty { return (.java, nil) }
         return (code == 0 ? .quit : .unknown, errors.last.map(clean))
     }
+
+    /// Changing Graphics or resource packs in game reloads every texture and shader; Metallum can crash there.
+    static let metalReload = "Metal crashed while reloading graphics (Graphics or resource packs changed in game)."
 
     private static func clean(_ line: String) -> String {
         // Drop log prefixes like "[12:00:01] [Render thread/ERROR]: " and keep it to one readable line.
@@ -128,6 +135,8 @@ public struct GameExitReport: Hashable, Sendable {
     public var nextStep: String {
         switch reason {
         case .memory: "Lower Memory in Settings › Game, or remove a few mods, then play again."
+        case .renderer where clue == Self.metalReload:
+            "Play again, and for now don't change Graphics or resource packs while in a world."
         case .renderer: "Turn off shader packs, or pick another renderer in Settings › Renderer."
         case .missingLibrary: "Play again so the game files are checked. Some versions don't run on iOS yet."
         case .mods: "Open Details to see which mod, then update or remove it, or add the mod it needs."

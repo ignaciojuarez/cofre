@@ -25,6 +25,15 @@ final class GameExitTests: XCTestCase {
     }
 
     // The shader pack in System Details and an INFO log line must not turn a Java error into a renderer one.
+    func testMetalDriverCrashIsTheRenderer() {
+        let fatal = "#  SIGSEGV (0xb)\n  #19 0x262d24730  /System/Library/Extensions/AGXMetalG18P.bundle/AGXMetalG18P"
+        let midGame = diagnose(134, log: "[17:03:20] [Render thread/INFO]: Reloading ResourceManager: vanilla\n" + fatal)
+        XCTAssertEqual(midGame.reason, .renderer)
+        XCTAssertEqual(midGame.clue, GameExitReport.metalReload)
+        XCTAssertTrue(midGame.nextStep.contains("Graphics"))
+        XCTAssertEqual(diagnose(134, log: fatal).clue, "Metal crashed in the GPU driver.")
+    }
+
     func testSystemDetailsAndInfoLinesDontCount() {
         let report = """
             Description: Ticking entity
