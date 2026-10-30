@@ -140,28 +140,21 @@
 
         public func installLoader(instanceID: String, loader: Loader, version: String) async throws {
             if loader == .forge || loader == .neoforge {
+                let name = loader == .neoforge ? "NeoForge" : "Forge"
                 try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in
-                    let lock = NSLock()
-                    var finished = false
-                    let timeout = DispatchWorkItem {
-                        lock.lock()
-                        guard !finished else { lock.unlock(); return }
-                        finished = true
-                        lock.unlock()
+                    let watchdog = AirWatchdog(idle: 120) {
                         c.resume(throwing: NSError(
                             domain: "CofreLoader", code: NSURLErrorTimedOut,
-                            userInfo: [NSLocalizedDescriptionKey: "Timed out installing \(loader == .neoforge ? "NeoForge" : "Forge"). Check your connection and try again."]))
+                            userInfo: [NSLocalizedDescriptionKey: "Installing \(name) stopped responding. Check your connection and try again."]))
                     }
-                    DispatchQueue.global().asyncAfter(deadline: .now() + 120, execute: timeout)
                     air.installForgeLoader(
                         loader.rawValue, forProfile: instanceID, version: version,
-                        progress: { p, message in NSLog("[Cofre] loader %.0f%% %@", p * 100, message) }
+                        progress: { p, message in
+                            watchdog.poke()
+                            NSLog("[Cofre] loader %.0f%% %@", p * 100, message)
+                        }
                     ) { error in
-                        lock.lock()
-                        guard !finished else { lock.unlock(); return }
-                        finished = true
-                        timeout.cancel()
-                        lock.unlock()
+                        guard watchdog.finish() else { return }
                         if let error { c.resume(throwing: error) } else { c.resume() }
                     }
                 }
@@ -192,23 +185,9 @@
                     let file = files.first(where: { ($0["primary"] as? Bool) == true }) ?? files.first
                 {
                     await withCheckedContinuation { continuation in
-                        let lock = NSLock()
-                        var finished = false
-                        let timeout = DispatchWorkItem {
-                            lock.lock()
-                            guard !finished else { lock.unlock(); return }
-                            finished = true
-                            lock.unlock()
-                            continuation.resume()
-                        }
-                        DispatchQueue.global().asyncAfter(deadline: .now() + 120, execute: timeout)
+                        let watchdog = AirWatchdog(idle: 120) { continuation.resume() }
                         air.installInstanceMod(file, forProfile: instanceID) { _ in
-                            lock.lock()
-                            guard !finished else { lock.unlock(); return }
-                            finished = true
-                            timeout.cancel()
-                            lock.unlock()
-                            continuation.resume()
+                            if watchdog.finish() { continuation.resume() }
                         }
                     }
                 }
@@ -243,6 +222,41 @@
                     }
                 }
             }
+        }
+    }
+
+    /// Fires `onTimeout` once if an Air callback goes `idle` seconds without progress.
+    /// `finish()` returns true only for whichever of completion or timeout comes first.
+    private final class AirWatchdog: @unchecked Sendable {
+        private let lock = NSLock()
+        private let idle: TimeInterval
+        private let onTimeout: () -> Void
+        private var finished = false
+        private var timer: DispatchWorkItem?
+
+        init(idle: TimeInterval, onTimeout: @escaping () -> Void) {
+            self.idle = idle
+            self.onTimeout = onTimeout
+            poke()
+        }
+
+        func poke() {
+            lock.lock(); defer { lock.unlock() }
+            guard !finished else { return }
+            timer?.cancel()
+            // Strong on purpose: the timer must fire even if Air drops its callbacks.
+            let item = DispatchWorkItem { if self.finish() { self.onTimeout() } }
+            timer = item
+            DispatchQueue.global().asyncAfter(deadline: .now() + idle, execute: item)
+        }
+
+        func finish() -> Bool {
+            lock.lock(); defer { lock.unlock() }
+            guard !finished else { return false }
+            finished = true
+            timer?.cancel()
+            timer = nil
+            return true
         }
     }
 #endif
