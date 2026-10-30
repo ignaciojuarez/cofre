@@ -80,8 +80,8 @@
                             try? FileManager.default.removeItem(at: copy)
                             try? FileManager.default.copyItem(at: url, to: copy)
                             Task { @MainActor in
-                                store.importPack(copy)
-                                nav.sheet = .importPack
+                                if store.instanceStore != nil { await store.importInstance(copy) }
+                                else { store.importPack(copy); nav.sheet = .importPack }
                             }
                         }
                     }
@@ -97,8 +97,8 @@
             }
             .fileImporter(isPresented: $pickingPack, allowedContentTypes: [.mrpack, .zip]) { r in
                 if case .success(let url) = r {
-                    store.importPack(url)
-                    nav.sheet = .importPack
+                    if store.instanceStore != nil { Task { await store.importInstance(url) } }
+                    else { store.importPack(url); nav.sheet = .importPack }
                 }
             }
         }
@@ -229,11 +229,12 @@
         }
 
         @ViewBuilder private func beforeYouPlay(_ inst: InstanceSummary) -> some View {
+            let kit = store.instanceStore.flatMap { try? $0.list().first { $0.id == inst.id } }
             ListSection("Engine", spacing: 4) {
-                ValueRow("Memory", value: store.preferences(for: inst.id).autoRAM ? "Auto" : Fmt.mb(store.preferences(for: inst.id).ramMB))
-                ValueRow("Java", value: inst.javaVersion.map { "Java \($0)" } ?? "Auto")
+                ValueRow("Memory", value: kit?.autoMemory != false ? "Auto" : Fmt.mb(kit?.memoryMB ?? 0))
+                ValueRow("Java", value: kit?.javaVersion.map { "Java \($0)" } ?? "Auto")
                 if inst.loader != .vanilla { ValueRow("Loader", value: inst.loaderVersion ?? inst.loader.displayName) }
-                ValueRow("JVM arguments", value: store.preferences(for: inst.id).jvmArgs.isEmpty ? "Default" : "Custom")
+                ValueRow("JVM arguments", value: kit?.jvmArguments?.isEmpty == false ? "Custom" : "Default")
             }
         }
 
@@ -252,6 +253,9 @@
             }
             GameOwnsNote("Worlds, content and servers each have one home in Cofre.")
             ListSection("Instance", spacing: 4) {
+                Button(inst.favorite ? "★ Favorite" : "☆ Favorite") {
+                    Task { await store.setInstanceMeta(inst.id, favorite: !inst.favorite) }
+                }.buttonStyle(RowButtonStyle())
                 if inst.loader != .vanilla {
                     Row("Loader version", trailing: { Meta(inst.loaderVersion ?? "—") })
                 }

@@ -10,7 +10,12 @@ public final class CofreRootViewController: UIViewController {
         super.viewDidLoad()
         CofreUIKitTheme.apply()
         let backend = CofreBackendAdapter(bridge: bridge)
-        let services = CofreServices(backend: backend)
+        let instancesRoot = bridge.instances().compactMap { profile in
+            guard let id = profile["id"] as? String,
+                  let directory = bridge.gameDirectory(forProfile: id) else { return nil }
+            return directory.deletingLastPathComponent()
+        }.first
+        let services = CofreServices(backend: backend, instancesRoot: instancesRoot)
         let root = CofreUI.makeRootViewController(services: services)
         addChild(root); root.view.frame = view.bounds; root.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         view.addSubview(root.view); root.didMove(toParent: self)

@@ -8,6 +8,8 @@
     public final class CofreStore {
         public let services: CofreServices
         var backend: any CofreBackend { services.backend }
+        /// Cofre-owned instance files. The launcher profile remains Air-compatible on disk.
+        public let instanceStore: InstanceStore?
 
         // Setup
         public var setup = SetupState()
@@ -95,6 +97,7 @@
         public var pendingConfirmation: Confirmation?
         /// Set by the hosting controller so window-level UIKit state follows X07.
         @ObservationIgnored public var onThemeChange: ((CofreTheme) -> Void)?
+        private var lastTrash: InstanceStore.TrashToken?
         @ObservationIgnored private let defaults: UserDefaults
 
         private enum Keys {
@@ -106,6 +109,7 @@
         /// `defaults` holds the setup progress; tests and the preview host pass their own suite.
         public init(services: CofreServices, defaults: UserDefaults = .standard) {
             self.services = services
+            self.instanceStore = services.instancesRoot.flatMap { try? InstanceStore(root: $0) }
             self.defaults = defaults
             setupCompleted = defaults.bool(forKey: Keys.completed)
             setupStep = defaults.object(forKey: Keys.step) as? Int
@@ -159,7 +163,11 @@
 
         public func refreshLibrary() async {
             await run {
-                self.instances = try await self.backend.instances()
+                if let instanceStore = self.instanceStore {
+                    self.instances = try instanceStore.list().map(Self.summary)
+                } else {
+                    self.instances = try await self.backend.instances()
+                }
                 self.accounts = try await self.backend.accounts()
                 self.preferences = try await self.backend.preferences(instanceID: nil)
             }
@@ -372,13 +380,15 @@
         ) async -> InstanceSummary? {
             var made: InstanceSummary?
             await run {
-                let i =
-                    self.can(.createOptions)
-                    ? try await self.backend.createInstance(
-                        name: name, version: version, loader: loader, ownFolder: ownFolder, fabricAPI: fabricAPI)
-                    : try await self.backend.createInstance(name: name, version: version, loader: loader)
-                if let v = loaderVersion, loader != .vanilla {
-                    try await self.backend.installLoader(instanceID: i.id, loader: loader, version: v)
+                let i: InstanceSummary
+                if let instanceStore = self.instanceStore {
+                    let k = Instance.Loader(rawValue: loader.rawValue) ?? .unknown
+                    i = Self.summary(try instanceStore.create(name: name, version: version, loader: k, loaderVersion: loaderVersion))
+                } else {
+                    i = self.can(.createOptions)
+                        ? try await self.backend.createInstance(name: name, version: version, loader: loader, ownFolder: ownFolder, fabricAPI: fabricAPI)
+                        : try await self.backend.createInstance(name: name, version: version, loader: loader)
+                    if let v = loaderVersion, loader != .vanilla { try await self.backend.installLoader(instanceID: i.id, loader: loader, version: v) }
                 }
                 self.instances.append(i)
                 made = i
@@ -388,7 +398,9 @@
 
         public func duplicate(_ id: String) async {
             await run {
-                let copy = try await self.backend.duplicate(instanceID: id)
+                let copy: InstanceSummary
+                if let instanceStore = self.instanceStore { copy = Self.summary(try instanceStore.duplicate(id)) }
+                else { copy = try await self.backend.duplicate(instanceID: id) }
                 self.instances.append(copy)
             }
         }
@@ -405,16 +417,49 @@
 
         public func delete(_ id: String) async {
             await run {
-                try await self.backend.delete(instanceID: id)
+                if let instanceStore = self.instanceStore { self.lastTrash = try instanceStore.trash(id) }
+                else { try await self.backend.delete(instanceID: id) }
                 self.instances.removeAll { $0.id == id }
             }
             if activeInstanceID == id { activeInstanceID = instances.first?.id }
         }
 
+        public func undoDelete() async {
+            guard let token = lastTrash, let instanceStore else { return }
+            await run {
+                self.instances.append(Self.summary(try instanceStore.restore(token)))
+                self.lastTrash = nil
+            }
+        }
+
+        public func importInstance(_ url: URL, name: String? = nil) async {
+            guard let instanceStore else { return }
+            await run { self.instances.append(Self.summary(try instanceStore.import(url, name: name))) }
+        }
+
         public func export(_ id: String) async -> URL? {
             var url: URL?
-            await run { url = try await self.backend.export(instanceID: id, format: .mrpack) }
+            await run {
+                if let instanceStore = self.instanceStore { url = try instanceStore.export(id) }
+                else { url = try await self.backend.export(instanceID: id, format: .mrpack) }
+            }
             return url
+        }
+
+        public func setInstanceMeta(_ id: String, notes: String? = nil, group: String?? = nil, favorite: Bool? = nil) async {
+            guard let instanceStore else { return }
+            await run {
+                let i = try instanceStore.setMetadata(id, notes: notes, group: group, favorite: favorite)
+                if let n = self.instances.firstIndex(where: { $0.id == id }) { self.instances[n] = Self.summary(i) }
+            }
+        }
+
+        private static func summary(_ i: Instance) -> InstanceSummary {
+            let loader = Loader(rawValue: i.loader.rawValue) ?? .vanilla
+            return InstanceSummary(id: i.id, name: i.name, loader: loader, gameVersion: i.gameVersion,
+                                   loaderVersion: i.loaderVersion, javaVersion: i.javaVersion.map(String.init),
+                                   icon: InstanceIcon.resolve(png: nil, picked: i.icon, id: i.id, loader: loader),
+                                   favorite: i.favorite, group: i.group, notes: i.notes)
         }
 
         public func preferences(for id: String) -> GamePreferences { instancePreferences[id] ?? preferences }

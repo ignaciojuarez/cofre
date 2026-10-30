@@ -109,9 +109,13 @@
     /// What the shell hands to `CofreUI.makeRootViewController(services:)`.
     public struct CofreServices {
         public var backend: any CofreBackend
+        /// The directory containing Air's launcher_profiles.json. Production derives this from Air's profiles;
+        /// previews and tests may provide a fixture folder.
+        public var instancesRoot: URL?
 
-        public init(backend: any CofreBackend) {
+        public init(backend: any CofreBackend, instancesRoot: URL? = nil) {
             self.backend = backend
+            self.instancesRoot = instancesRoot
         }
 
         /// Sample data from the mockups, for previews, tests and the preview host.
