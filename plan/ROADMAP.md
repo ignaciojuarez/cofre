@@ -29,7 +29,7 @@ same step.
 | 5 | **Content parity** | Resource packs, shaders and data packs get the mods treatment: installed list, on/off, update, delete. "In use" is read-only from the game | 🚧 BG |
 | 6 | **Downloads and versions** | A downloads strip on Play, resume/retry, background downloads, disk-space preflight, a version picker (releases/snapshots) and loader version list | 🎯 |
 | 7 | **Modpack import + Files** | Import `.mrpack`/`.zip` from a file or link with staged rollback, "Open in Cofre" from Files and the share sheet | 🎯 |
-| 8 | **iOS niceties** | Heat and Low Power Mode banner, autosave-before-suspend note, Wi-Fi-only for big downloads | 🎯 |
+| 8 | ~~iOS niceties~~ | ❌ Not in the launcher (Ignacio): no heat/Low Power banner or power-saving switches. Big-download Wi-Fi gating stays in Downloads | — |
 | 9a | **Own Modrinth client** | Mod pages load slowly because Air fetches every version (hundreds for Sodium). A CofreKit Modrinth client asks for the instance's versions first and the rest in the background | 🎯 |
 | 9 | **Engine seam** | Dissolve `CofreBackendAdapter`, the facade protocols and `MockBackend` into CofreKit + `GameEngine` | 🎯 |
 
@@ -56,12 +56,18 @@ Z's variations, recommended picks taken (Ignacio: "I like it all"):
 
 | Topic | Question |
 |---|---|
-| **Performance presets** | ⏸ Ignacio: not yet. Quality / Balanced / Battery tiles, heat-aware lowering, Performance pack ([performance](performance.md), design-draft §6) |
+| **Performance presets** | 💤 Maybe later, not in the launcher for now (Ignacio): the game's own Video Settings own quality and frame rate, and a second set of switches adds room for bugs. Was: Quality / Balanced / Battery tiles, heat-aware lowering, Performance pack ([performance](performance.md), design-draft §6) |
 | Design draft open questions (1–8) | Settings › Game and Renderer as "defaults for new instances"? Undo toast instead of confirm for world delete? ~~Shader-crash "Turn shaders off"~~ ✅ yes, built in `5824a14`. Heat-aware on by default? Performance pack on 26.x? Notes and groups in `cofre.json`? Wait for Wi-Fi above 200 MB? `.mcworld` error only? |
 | Auto-triage | ⏸ Ignacio: not yet. Report bundle + Share stay; sending, triage and agent PRs wait |
 | ✕ in menus | Change the icon to "← Back"? |
 | Companion state mod | An optional tiny Fabric mod that reports exact game state (flying, swimming, which screen is open). Low priority |
 | Public release | Our own Azure app for Microsoft sign-in; Metallum license and provenance; GitHub publishing (needs approval) ([PUBLIC_RELEASE](PUBLIC_RELEASE.md)) |
+
+## Decided against (for now)
+
+- Performance presets (Quality/Balanced/Battery), heat-aware lowering, the Performance pack, and heat/Low Power banners.
+  They duplicate the game's Video Settings and add room for bugs. The existing engine settings (renderer, memory,
+  resolution) stay. The ideas remain in [performance](performance.md) and [design-draft](design-draft.md) §6.
 
 ## Done since the roadmap was written
 
