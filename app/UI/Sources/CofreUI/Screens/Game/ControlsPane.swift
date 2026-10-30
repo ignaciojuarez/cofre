@@ -58,6 +58,9 @@
                 BlockSlider("Stick area", value: $settings.stickArea, in: 0.2...0.6, step: 0.05) {
                     "\(Int(($0 * 100).rounded())) % of the screen"
                 }
+                BlockSlider("Hold to break", value: $settings.holdToBreak, in: 0.1...0.5, step: 0.05) {
+                    "\(Int(($0 * 1000).rounded())) ms"
+                }
                 ToggleRow("Fade when idle", subtitle: "Dims to 35% after 3 s", isOn: $settings.fadeWhenIdle)
                 ToggleRow("Left-handed", subtitle: "Mirror stick and buttons", isOn: $settings.leftHanded)
                 ToggleRow("Haptics", isOn: $settings.haptics)

@@ -35,6 +35,8 @@ public struct TouchControlSettings: Codable, Equatable, Sendable {
     public var invertY = false
     /// 0.2–0.6 of the screen's width, from the stick's edge: every touch that starts there moves, never looks.
     public var stickArea = 0.4
+    /// Seconds a finger rests on the world before it breaks (0.1–0.5). Shorter touches place or use.
+    public var holdToBreak = WorldTouch.defaultHold
 
     public init() {}
 
@@ -51,6 +53,7 @@ public struct TouchControlSettings: Codable, Equatable, Sendable {
         lookSensitivity = try c.decodeIfPresent(Double.self, forKey: .lookSensitivity) ?? d.lookSensitivity
         invertY = try c.decodeIfPresent(Bool.self, forKey: .invertY) ?? d.invertY
         stickArea = try c.decodeIfPresent(Double.self, forKey: .stickArea) ?? d.stickArea
+        holdToBreak = try c.decodeIfPresent(Double.self, forKey: .holdToBreak) ?? d.holdToBreak
     }
 
     public static let idleOpacity = 0.35
@@ -248,16 +251,19 @@ public enum StickKeys {
 public struct WorldTouch: Equatable, Sendable {
     public enum Action: Equatable, Sendable { case look(dx: CGFloat, dy: CGFloat), use, attackDown, attackUp }
 
-    public static let tapMax: TimeInterval = 0.2, holdAfter: TimeInterval = 0.25, slop: CGFloat = 10
+    public static let defaultHold: TimeInterval = 0.2, slop: CGFloat = 10
 
     let start: CGPoint, startTime: TimeInterval
+    /// How long the finger rests before the hold breaks; a shorter touch is a tap (use).
+    let holdAfter: TimeInterval
     var last: CGPoint
     public private(set) var looking = false, attacking = false
 
-    public init(at p: CGPoint, time: TimeInterval) {
+    public init(at p: CGPoint, time: TimeInterval, holdAfter: TimeInterval = defaultHold) {
         start = p
         last = p
         startTime = time
+        self.holdAfter = holdAfter
     }
 
     public mutating func move(to p: CGPoint, time: TimeInterval) -> [Action] {
@@ -272,14 +278,14 @@ public struct WorldTouch: Equatable, Sendable {
 
     /// Call while the finger rests; starts the hold once it has stayed put long enough.
     public mutating func tick(time: TimeInterval) -> [Action] {
-        guard !looking, !attacking, time - startTime >= Self.holdAfter else { return [] }
+        guard !looking, !attacking, time - startTime >= holdAfter else { return [] }
         attacking = true
         return [.attackDown]
     }
 
     public mutating func end(time: TimeInterval) -> [Action] {
         if attacking { return [.attackUp] }
-        if !looking, time - startTime <= Self.holdAfter { return [.use] }
+        if !looking, time - startTime <= holdAfter { return [.use] }
         return []
     }
 }

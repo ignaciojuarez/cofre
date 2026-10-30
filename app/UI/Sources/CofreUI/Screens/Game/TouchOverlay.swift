@@ -310,10 +310,11 @@ public final class TouchOverlayModel {
             tabHeld = false
             release(.tab)
         }
-        world = WorldTouch(at: p, time: ProcessInfo.processInfo.systemUptime)
+        let hold = min(max(settings.holdToBreak, 0.1), 0.5)
+        world = WorldTouch(at: p, time: ProcessInfo.processInfo.systemUptime, holdAfter: hold)
         holdTask?.cancel()
         holdTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(WorldTouch.holdAfter))
+            try? await Task.sleep(for: .seconds(hold))
             guard !Task.isCancelled, let self, var w = self.world else { return }
             let actions = w.tick(time: ProcessInfo.processInfo.systemUptime)
             self.world = w

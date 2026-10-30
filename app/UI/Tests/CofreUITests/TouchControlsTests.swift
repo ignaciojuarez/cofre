@@ -194,6 +194,12 @@ final class TouchControlsTests: XCTestCase {
         XCTAssertEqual(hold.move(to: CGPoint(x: 20, y: 0), time: 0.5), [.look(dx: 20, dy: 0)], "keeps breaking while looking")
         XCTAssertEqual(hold.end(time: 0.8), [.attackUp])
 
+        // Hold to break is a setting: a shorter hold breaks sooner, and a touch under it still places.
+        var quick = WorldTouch(at: .zero, time: 0, holdAfter: 0.15)
+        XCTAssertEqual(quick.tick(time: 0.16), [.attackDown])
+        var quickTap = WorldTouch(at: .zero, time: 0, holdAfter: 0.15)
+        XCTAssertEqual(quickTap.end(time: 0.1), [.use])
+
         var drag = WorldTouch(at: .zero, time: 0)
         XCTAssertEqual(drag.move(to: CGPoint(x: 4, y: 0), time: 0.05), [], "under the slop")
         XCTAssertEqual(drag.move(to: CGPoint(x: 12, y: 0), time: 0.1), [.look(dx: 12, dy: 0)])
