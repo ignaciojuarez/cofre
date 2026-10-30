@@ -266,3 +266,17 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 - The NeoForge title-screen launch produced `[Cofre] first-frame source=metal`, `[Cofre] first-frame source=gl/air`, `launch overlay dismissed after first frame`, and MobileGlues renderer markers.
 - The game log contains mod/Iris warnings and a `MetallumAgent` `NoSuchMethodException` flow snapshot, but no fatal launch error; this is not a Cofre fix candidate.
 - Cofre was relaunched and left on Play. Manual settings remain selected in the instance preferences.
+
+### Physical matrix continuation (2026-10-30 · HEAD 98bd015)
+
+| Instance | Version / loader | Renderer | Result | Evidence |
+|---|---|---|---|---|
+| Vanilla263 | Minecraft 26.3 / Vanilla | Metal preflight; incompatible Iris/Sodium warning offered Turn off and play | PASS: Cofre explained the 26.3 Metal incompatibility, Turn off and play proceeded, Minecraft 26.3 title screen rendered | `/tmp/cofre-ipad-v263-title.png`, agent-device warning snapshot `s417692` |
+| Vanilla12111 | Minecraft 1.21.11 / Vanilla | Auto → Metallum selection, Air resolved EGL to ANGLE | FAIL: black screen; GUI shaders failed to compile and framebuffers were zero-sized. Root cause is Air’s Metal-to-auto handoff resolving to ANGLE on Java 8 | `/tmp/cofre-ipad-v12111-title.png`, `/tmp/cofre-ipad-logs4/latestlog.txt` |
+| Vanilla263 / Vanilla12111 | world entry and game-menu quit | — | BLOCKED: game surface exposes only Keyboard/Close to agent-device; touch taps did not activate Singleplayer, so no world-entry claim is made. Game process was terminated and Cofre relaunched between cases | screenshots above; process/relaunch logs |
+| Remaining requested cases | 1.21.1, 1.20.1, 1.16.5, Fabric, Quilt, Forge, packs, FPS comparison | — | BLOCKED pending remaining device time; no results claimed | — |
+
+### Matrix notes
+- 26.3’s preflight warning correctly identified incompatible Iris/Sodium and provided a safe “Turn off and play” path; no Cofre fix needed.
+- 1.21.11’s failure is reproducible and needs an Air-side renderer-selection fix. I did not edit upstream or consume the exhausted patch budget.
+- Player flow requires a full Cofre relaunch after each game process; relaunch returned to Play reliably.
