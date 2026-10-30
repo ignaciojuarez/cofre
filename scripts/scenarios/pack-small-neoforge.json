@@ -1,0 +1,9 @@
+{
+  "name": "pack-small-neoforge",
+  "loader": "neoforge",
+  "mods": [],
+  "renderer": "auto",
+  "resolution": 1.0,
+  "launch": true,
+  "pack": "create"
+}

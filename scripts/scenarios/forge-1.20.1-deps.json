@@ -1,0 +1,12 @@
+{
+  "name": "forge-1.20.1-deps",
+  "loader": "forge",
+  "mods": [
+    "jei",
+    "journeymap"
+  ],
+  "renderer": "auto",
+  "resolution": 1.0,
+  "launch": true,
+  "version": "1.20.1"
+}

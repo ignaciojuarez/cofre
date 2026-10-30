@@ -1,5 +1,16 @@
 # Overnight test plan
 
+## Debug scenario runner (iPad mini)
+
+Debug device builds can run a JSON scenario without UI taps. Copy a scenario into the app container, launch Cofre with `-cofreScenario`, and poll the redacted log:
+
+```sh
+scripts/scenario.sh scripts/scenarios/vanilla-26.3.json
+scripts/scenario.sh scripts/scenarios/fabric-1.21.1-sodium.json --timeout 1200
+```
+
+The default device is the cable-connected iPad mini (`COFRE_DEVICE_UDID`). Use `--device` only for another authorized device. Scenarios live in `scripts/scenarios`; `name` is idempotent, `fresh` recreates it, and `pack` installs a Modrinth pack as its own instance. The script writes redacted evidence under `/tmp/cofre-scenarios/` and prints `PASS in-game` or the failing step.
+
 One agent drives Cofre on two shared simulators all night, through computer use:
 **explore → find a bug → log it → fix it (or hand it off) → retest → explore more.**
 Results go in [`testing-log.md`](testing-log.md). The code wins over this file when they disagree.

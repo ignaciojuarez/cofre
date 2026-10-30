@@ -1,0 +1,9 @@
+{
+  "name": "vanilla-1.21.1",
+  "loader": "vanilla",
+  "mods": [],
+  "renderer": "auto",
+  "resolution": 1.0,
+  "launch": true,
+  "version": "1.21.1"
+}

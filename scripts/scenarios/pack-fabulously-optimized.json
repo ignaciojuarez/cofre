@@ -1,0 +1,9 @@
+{
+  "name": "pack-fabulously-optimized",
+  "loader": "fabric",
+  "mods": [],
+  "renderer": "auto",
+  "resolution": 1.0,
+  "launch": true,
+  "pack": "fabulously-optimized"
+}

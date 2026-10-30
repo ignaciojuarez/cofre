@@ -1,0 +1,11 @@
+{
+  "name": "quilt-1.21.1-qsl",
+  "loader": "quilt",
+  "mods": [
+    "qsl"
+  ],
+  "renderer": "auto",
+  "resolution": 1.0,
+  "launch": true,
+  "version": "1.21.1"
+}

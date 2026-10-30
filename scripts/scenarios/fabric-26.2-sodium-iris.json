@@ -1,0 +1,12 @@
+{
+  "name": "fabric-26.2-sodium-iris",
+  "loader": "fabric",
+  "mods": [
+    "sodium",
+    "iris"
+  ],
+  "renderer": "auto",
+  "resolution": 1.0,
+  "launch": true,
+  "version": "26.2"
+}

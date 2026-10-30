@@ -1,0 +1,9 @@
+{
+  "name": "vanilla-26.3",
+  "loader": "vanilla",
+  "mods": [],
+  "renderer": "auto",
+  "resolution": 1.0,
+  "launch": true,
+  "version": "26.3"
+}
