@@ -613,7 +613,7 @@ struct CofreModVersion {
 
         /// The instance's Minecraft version and loader, read by CofreKit from launcher_profiles.json.
         private func modTarget(_ instanceID: String) -> (game: String, loader: Loader) {
-            guard let instance = try? serverInstance(instanceID) else { return ("", .vanilla) }
+            guard let instance = try? storedInstance(instanceID) else { return ("", .vanilla) }
             return (instance.gameVersion, Loader(rawValue: instance.loader.rawValue) ?? .vanilla)
         }
 

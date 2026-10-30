@@ -21,6 +21,15 @@ index 1283697..f74b8d0 100644
  @interface PLLogOutputView()<UITableViewDataSource, UITableViewDelegate>
  @property(nonatomic) UITableView* logTableView;
  @property(nonatomic) UINavigationBar* navigationBar;
+@@ -186,6 +190,8 @@ + (void)appendToLog:(NSString *)string {
+ }
+ 
+ + (void)handleExitCode:(int)code {
++    CofreLaunchGameExited(code);
++    if (CofreHandleGameExit(code)) return;
+     if (!current) return;
+     
+     // 如果有错误，显示新的崩溃界面
 diff --git a/Natives/SurfaceViewController.m b/Natives/SurfaceViewController.m
 index 98c31ee..bcc750d 100644
 --- a/Natives/SurfaceViewController.m

@@ -216,6 +216,11 @@
                             try await self.ensureJIT()
                         }
                         try Task.checkCancellation()
+                        if let instance = try? self.storedInstance(instanceID), instance.loader == .forge || instance.loader == .neoforge {
+                            do { try FMLConfig.disableEarlyWindow(in: instance.gameDirectory) } catch {
+                                NSLog("[Cofre] fml.toml not updated: %@", error.localizedDescription)
+                            }
+                        }
                         NSLog("[Cofre] launch JIT ready; starting Air")
                         self.air.launchProfile(instanceID, accountID: accountID, gameArguments: gameArguments) { event, fraction, message in
                             switch event {
@@ -253,7 +258,7 @@
         }
         public func rejoin(instanceID: String, kind: RejoinIntent.Kind, target: String, accountID: String?) -> AsyncThrowingStream<LaunchProgress, Error> {
             if kind == .server { return joinServer(instanceID: instanceID, address: target, accountID: accountID) }
-            let version = (try? serverInstance(instanceID).gameVersion) ?? ""
+            let version = (try? storedInstance(instanceID).gameVersion) ?? ""
             return launch(instanceID: instanceID, accountID: accountID,
                           gameArguments: MinecraftLaunchArguments.singleplayer(folder: target, gameVersion: version))
         }
