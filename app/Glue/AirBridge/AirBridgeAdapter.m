@@ -936,7 +936,12 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
   static dispatch_once_t once;
   dispatch_once(&once, ^{
     NSData *data = [NSData dataWithContentsOfURL:[NSBundle.mainBundle URLForResource:@"RendererManifest" withExtension:@"json"]];
-    metalVersions = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil][@"gameVersions"] : @[];
+    NSArray<NSString *> *listed = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil][@"gameVersions"] : @[];
+    // Air loads the Metallum agent only for Minecraft 26+ (JavaLauncher: "MC major < 26" skips it), so a listed
+    // older version such as 1.21.11 would get Metal's surface without its renderer: a black screen.
+    metalVersions = [listed filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(NSString *v, id _) {
+      return v.integerValue >= 26;
+    }]];
   });
   NSString *pick = global.length && ![global isEqualToString:@"auto"] ? global
                  : [metalVersions containsObject:game] ? @RENDERER_NAME_METAL

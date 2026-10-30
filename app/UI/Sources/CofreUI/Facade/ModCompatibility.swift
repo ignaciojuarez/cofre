@@ -11,9 +11,10 @@ public struct ModCompatibility: Hashable, Sendable {
         return loader == "forge" || loader == "neoforge" ? "mobileglues" : "air"
     }
     /// Minecraft versions the bundled Metallum runs, from the app's RendererManifest.json (empty in tests/previews).
+    /// Air loads Metallum only for Minecraft 26+, so older listed versions (1.21.11) don't count.
     nonisolated(unsafe) public static var metalVersions: Set<String> =
-        (Bundle.main.url(forResource: "RendererManifest", withExtension: "json")
-            .flatMap { try? RendererManifest.load(from: $0) })?.gameVersions ?? []
+        ((Bundle.main.url(forResource: "RendererManifest", withExtension: "json")
+            .flatMap { try? RendererManifest.load(from: $0) })?.gameVersions ?? []).filter { (Int($0.prefix { $0.isNumber }) ?? 0) >= 26 }
     public let id: String, name: String
     private let supportedMetalVersions: Set<String>?
     private let reason: String

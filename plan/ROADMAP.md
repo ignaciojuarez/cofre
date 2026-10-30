@@ -87,6 +87,7 @@ Z's variations, recommended picks taken (Ignacio: "I like it all"):
 | On MC 26.3, Metal runs no Iris or Sodium (Metallum supports Iris only on 26.2, Sodium on 1.21.11 and 26.2); Distant Horizons needs GL | Crash naming (`e2fa287`) + AH's warnings |
 | Metallum writes a log line per draw call (7 MB in 3 minutes), which likely costs FPS | Find a log-level switch or filter (performance #4) |
 | Touch overlay checks for "menu open" 10 times a second | An Air hook folded into an existing patch |
+| Metal on 1.21.11 is a black screen: the bundled Metallum lists 1.21.11, but Air loads its agent only for Minecraft 26+ | Auto uses Metal only on 26+ (`[Cofre] renderer auto`); enabling 1.21.11 needs Air's gate changed (fold into an existing patch) — owner decision |
 | MobileGlues FSR turns the screen black: its upscale shader is desktop GLSL 4.50, which ANGLE on iOS rejects | Cofre keeps FSR off (`mobileglues.fsr1_setting = 0` at launch); report upstream to Air/MobileGlues |
 | Settings changed in game used to be overwritten at launch | ✅ `0e18921`: the game owns VSync, FPS and language |
 | Game untouchable for 45 s after launch | ✅ `aace89e` + the launch state machine `ff659d2` |

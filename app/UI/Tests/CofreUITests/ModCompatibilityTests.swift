@@ -8,10 +8,11 @@ final class ModCompatibilityTests: XCTestCase {
         XCTAssertEqual(ModCompatibility.renderer(setting: "auto", gameVersion: "1.21.1", loader: "fabric"), "air")
         XCTAssertEqual(ModCompatibility.renderer(setting: "auto", gameVersion: "1.21.1", loader: "forge"), "mobileglues")
         // Versions the bundled Metallum supports run Metal on Auto, Forge and NeoForge too (as the launch decides).
-        ModCompatibility.metalVersions = ["1.21.11", "26.2"]
+        ModCompatibility.metalVersions = ["26.2"]
         defer { ModCompatibility.metalVersions = [] }
         XCTAssertEqual(ModCompatibility.renderer(setting: "auto", gameVersion: "26.2", loader: "neoforge"), "metallum")
-        XCTAssertEqual(ModCompatibility.renderer(setting: "auto", gameVersion: "1.21.11", loader: "fabric"), "metallum")
+        // Air loads Metallum only for 26+, so 1.21.11 stays on the GL path.
+        XCTAssertEqual(ModCompatibility.renderer(setting: "auto", gameVersion: "1.21.11", loader: "fabric"), "air")
     }
     func testVerifiedIrisAndSodiumOnlyWorkOnMetal261211And262() {
         XCTAssertNil(ModCompatibility.entry(for: "iris")?.issue(gameVersion: "26.2", renderer: "metallum"))
