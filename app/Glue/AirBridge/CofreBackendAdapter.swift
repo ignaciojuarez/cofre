@@ -30,7 +30,9 @@
         let air: any CofreAirBridging
         let modCatalog = CofreModCatalog()
         private lazy var accountStore: AccountStore = {
-            AccountStore(directory: FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0],
+            // Air keeps accounts in $POJAV_HOME/accounts (Documents, or Caches when Documents isn't writable).
+            AccountStore(directory: ProcessInfo.processInfo.environment["POJAV_HOME"].map { URL(fileURLWithPath: $0) }
+                             ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0],
                          readSelected: { [weak self] in self?.air.preferenceObject("internal.selected_account", profile: nil) as? String },
                          writeSelected: { [weak self] id in self?.air.setPreferenceObject("internal.selected_account", value: id ?? "", profile: nil) })
         }()
