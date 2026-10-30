@@ -132,7 +132,7 @@ diff --git a/Natives/DownloadViewController.m b/Natives/DownloadViewController.m
                                                                    message:localize(@"launcher.wait_jit.message", nil)
 --- a/Natives/JavaLauncher.m
 +++ b/Natives/JavaLauncher.m
-@@ -2115,7 +2115,12 @@
+@@ -2115,7 +2115,13 @@
              metallumMcVersionId = (NSString *)launchTarget;
          }
          NSInteger metallumMcMajor = ame98_mcMajorFromVersionId(metallumMcVersionId);
@@ -141,12 +141,13 @@ diff --git a/Natives/DownloadViewController.m b/Natives/DownloadViewController.m
 +        NSDictionary *manifest = manifestData ? [NSJSONSerialization JSONObjectWithData:manifestData options:0 error:nil] : nil;
 +        NSArray *supportedVersions = [manifest isKindOfClass:NSDictionary.class] ? manifest[@"gameVersions"] : nil;
 +        BOOL manifestSupportsVersion = [supportedVersions containsObject:metallumMcVersionId];
-+        NSInteger sessionJava = preferredJavaVersion > 0 ? preferredJavaVersion : 21;
++        NSInteger sessionJava = [PLProfiles resolveKeyForCurrentProfile:@"javaVersion"].intValue;
++        if (sessionJava <= 0) sessionJava = 21;
 +        if (manifestSupportsVersion && sessionJava >= 21) {
              PUSH_MARGV_FORMAT(@"-javaagent:%@/metallum_agent.jar=", librariesPath);
              // 把实例的 MC 版本 id 传给 agent（按版本选 metallum 类映射）
              if (metallumMcVersionId.length > 0) {
-@@ -2124,8 +2129,7 @@
+@@ -2124,8 +2130,7 @@
              NSLog(@"[JavaLauncher] Metallum agent enabled: -javaagent:metallum_agent.jar (mcVersion=%@)",
                    metallumMcVersionId);
          } else {
