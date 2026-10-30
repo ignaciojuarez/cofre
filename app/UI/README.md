@@ -190,7 +190,7 @@ xcrun simctl launch <UDID> app.cofre.ui.previewhost -screen join -joinURL 'cofre
 xcrun simctl launch <UDID> app.cofre.ui.previewhost -screen servers -servers version   # mine|loading|pinging|offline|empty|version|newInstance|joining
 ```
 
-Use the shared simulators from `<local-volume>/Developer/kiwios/docs/simulators.md`. Never install on devices.
+Reuse an existing simulator. Never install on devices from here.
 Screenshots: `cofre-design/system/screens/`; Join server sheet: `cofre-design/server-join/screens/`.
 
 ## Known gaps
