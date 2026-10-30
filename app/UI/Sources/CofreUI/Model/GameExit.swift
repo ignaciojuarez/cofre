@@ -86,6 +86,14 @@ public struct GameExitReport: Hashable, Sendable {
         if logLines.contains(where: { $0.contains("AGXMetal") }) {
             return (.renderer, logLines.contains { $0.contains("Reloading ResourceManager") } ? metalReload : "Metal crashed in the GPU driver.")
         }
+        // OpenGL-only mods find no GL context on the Metal renderer; name the one at the top of the stack.
+        if (report + logLines).contains(where: { $0.contains("No GLCapabilities instance set") }),
+            let name = (report + logLines).lazy.compactMap({ line in
+                glOnlyMods.first { line.contains($0.package) }?.name
+            }).first
+        {
+            return (.mods, "\(name) \(needsGL)")
+        }
         for source in [report, errors] {
             for (reason, keys) in signs {
                 // The last match: the root cause in a stack trace, the newest line in a log.
@@ -102,6 +110,14 @@ public struct GameExitReport: Hashable, Sendable {
         if !report.isEmpty { return (.java, nil) }
         return (code == 0 ? .quit : .unknown, errors.last.map(clean))
     }
+
+    /// Mods that draw with OpenGL directly, by package. The Metal renderer only runs Iris and Sodium where Metallum
+    /// ships support for them (Iris on 26.2; Sodium on 1.21.11 and 26.2).
+    static let glOnlyMods: [(package: String, name: String)] = [
+        ("net.irisshaders", "Iris"), ("net.coderbot.iris", "Iris"), ("com.seibel.distanthorizons", "Distant Horizons"),
+        ("net.caffeinemc", "Sodium"), ("me.jellysquid.mods.sodium", "Sodium"),
+    ]
+    static let needsGL = "needs OpenGL, which the Metal renderer doesn't have on this Minecraft version."
 
     /// Changing Graphics or resource packs in game reloads every texture and shader; Metallum can crash there.
     static let metalReload = "Metal crashed while reloading graphics (Graphics or resource packs changed in game)."
@@ -139,6 +155,8 @@ public struct GameExitReport: Hashable, Sendable {
             "Play again, and for now don't change Graphics or resource packs while in a world."
         case .renderer: "Turn off shader packs, or pick another renderer in Settings › Renderer."
         case .missingLibrary: "Play again so the game files are checked. Some versions don't run on iOS yet."
+        case .mods where clue?.hasSuffix(Self.needsGL) == true:
+            "Turn that mod off in Mods › Installed, then play again. Shaders work on Minecraft 26.2 for now."
         case .mods: "Open Details to see which mod, then update or remove it, or add the mod it needs."
         case .java: "If you just changed mods, undo that. Otherwise share the log so someone can look."
         case .unknown: "Play again. If it keeps happening, share the log."

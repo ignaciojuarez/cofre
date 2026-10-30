@@ -34,6 +34,21 @@ final class GameExitTests: XCTestCase {
         XCTAssertEqual(diagnose(134, log: fatal).clue, "Metal crashed in the GPU driver.")
     }
 
+    func testGLOnlyModOnMetalNamesTheMod() {
+        let report = """
+            Description: Initializing game
+
+            java.lang.ExceptionInInitializerError
+            	at knot//net.irisshaders.iris.Iris.setDebug(Iris.java:432)
+            Caused by: java.lang.IllegalStateException: No GLCapabilities instance set for the current thread.
+            	at knot//org.lwjgl.opengl.GL.checkCapabilities(GL.java:288)
+            """
+        let r = diagnose(1, report: report)
+        XCTAssertEqual(r.reason, .mods)
+        XCTAssertEqual(r.clue, "Iris " + GameExitReport.needsGL)
+        XCTAssertTrue(r.nextStep.hasPrefix("Turn that mod off"))
+    }
+
     func testSystemDetailsAndInfoLinesDontCount() {
         let report = """
             Description: Ticking entity
