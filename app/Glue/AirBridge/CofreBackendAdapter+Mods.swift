@@ -346,9 +346,15 @@ struct CofreModVersion {
         func scan(_ kind: ContentKind, instanceID: String, online: Bool, identify: Bool = true) async throws
             -> [InstalledItem]
         {
-            guard [.mods, .shaders, .resourcePacks].contains(kind) else { return [] }
+            guard let directory = air.gameDirectory(forProfile: instanceID),
+                let fileKind = ContentStore.Kind(rawValue: kind == .resourcePacks ? "resourcePacks" : kind == .shaders ? "shaderpacks" : kind.rawValue)
+            else { return [] }
             var items: [InstalledItem]
-            if kind == .mods {
+            if let files = try? ContentStore(gameDirectory: URL(fileURLWithPath: directory)).list(fileKind) {
+                items = files.map { file in
+                    InstalledItem(id: file.id, name: file.name, version: file.version, enabled: file.enabled, kind: kind)
+                }
+            } else {
                 let rows: [Any] = await withCheckedContinuation { c in
                     air.mods(forProfile: instanceID) { c.resume(returning: $0) }
                 }
@@ -492,22 +498,15 @@ struct CofreModVersion {
         }
 
         public func setEnabled(_ enabled: Bool, item: InstalledItem, instanceID: String) async throws {
-            let folder = try contentFolder(item.kind, instanceID: instanceID, create: false)
-            let on = folder.appendingPathComponent(item.id)
-            let off = folder.appendingPathComponent(item.id + ".disabled")
-            if enabled, FileManager.default.fileExists(atPath: off.path) {
-                try FileManager.default.moveItem(at: off, to: on)
-            } else if !enabled, FileManager.default.fileExists(atPath: on.path) {
-                try FileManager.default.moveItem(at: on, to: off)
-            }
+            guard let directory = air.gameDirectory(forProfile: instanceID), let kind = ContentStore.Kind(rawValue: item.kind == .resourcePacks ? "resourcePacks" : item.kind == .shaders ? "shaderpacks" : item.kind.rawValue),
+                let file = try ContentStore(gameDirectory: URL(fileURLWithPath: directory)).list(kind).first(where: { $0.id == item.id }) else { return }
+            try ContentStore(gameDirectory: URL(fileURLWithPath: directory)).setEnabled(enabled, file)
         }
 
         public func delete(_ item: InstalledItem, instanceID: String) async throws {
-            let folder = try contentFolder(item.kind, instanceID: instanceID, create: false)
-            for name in [item.id, item.id + ".disabled"] {
-                let url = folder.appendingPathComponent(name)
-                if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
-            }
+            guard let directory = air.gameDirectory(forProfile: instanceID), let kind = ContentStore.Kind(rawValue: item.kind == .resourcePacks ? "resourcePacks" : item.kind == .shaders ? "shaderpacks" : item.kind.rawValue),
+                let file = try ContentStore(gameDirectory: URL(fileURLWithPath: directory)).list(kind).first(where: { $0.id == item.id }) else { return }
+            _ = try ContentStore(gameDirectory: URL(fileURLWithPath: directory)).trash(file)
             var index = modIndex(instanceID)
             index[item.id] = nil
             UserDefaults.standard.set(index, forKey: Self.indexKey(instanceID))
