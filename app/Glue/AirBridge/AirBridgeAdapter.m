@@ -1,6 +1,5 @@
 #import "AirBridgeAdapter.h"
 #import "CofreGameInput.h"
-#import "CustomControlsViewController.h"
 #import "DownloadTaskManager.h"
 #import "JavaLauncher.h"
 #import "LauncherPreferences.h"
@@ -1133,20 +1132,6 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
     completion(ok ? nil : error);
   }
 }
-// Configured like Air's own launcher. Present it directly: inside a navigation
-// controller its exit menu and Done button act on the wrong controller.
-- (UIViewController *)controlsEditor {
-  CustomControlsViewController *vc = [CustomControlsViewController new];
-  vc.modalPresentationStyle = UIModalPresentationOverFullScreen;
-  vc.modalInPresentation = YES;
-  vc.setDefaultCtrl = ^(NSString *name) {
-    setPrefObject(@"control.default_ctrl", name);
-  };
-  vc.getDefaultCtrl = ^{
-    return getPrefObject(@"control.default_ctrl");
-  };
-  return vc;
-}
 - (void)gameInputKey:(NSString *)name down:(BOOL)down {
   CofreInputKey(name.UTF8String, down);
 }
@@ -1167,6 +1152,3 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
 }
 @end
 
-UIViewController *CofreMakeControlsEditor(void) {
-  return [[CofreAirBridgeAdapter new] controlsEditor];
-}

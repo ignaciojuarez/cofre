@@ -10,15 +10,9 @@ public final class CofreRootViewController: UIViewController {
         super.viewDidLoad()
         CofreUIKitTheme.apply()
         let backend = CofreBackendAdapter(bridge: bridge)
-        let services = CofreServices(backend: backend, airScreens: AirScreensAdapter(bridge: bridge))
+        let services = CofreServices(backend: backend)
         let root = CofreUI.makeRootViewController(services: services)
         addChild(root); root.view.frame = view.bounds; root.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         view.addSubview(root.view); root.didMove(toParent: self)
     }
-}
-
-@MainActor private final class AirScreensAdapter: NSObject, AirScreens {
-    let bridge: any CofreAirBridging
-    init(bridge: any CofreAirBridging) { self.bridge = bridge }
-    func controlsEditor() -> UIViewController { bridge.controlsEditor() }
 }

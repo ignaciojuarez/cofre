@@ -111,6 +111,5 @@ NS_ASSUME_NONNULL_BEGIN
           progress:(void (^)(double, NSString *))progress
         completion:(void (^)(NSError *_Nullable))completion;
 /// Returns Air's controls editor.
-- (UIViewController *)controlsEditor;
 @end
 NS_ASSUME_NONNULL_END

@@ -100,7 +100,6 @@ typedef NS_ENUM(NSInteger, CofreLaunchEvent) {
            profile:(nullable NSString *)profile
           progress:(void (^)(double, NSString *))progress
         completion:(void (^)(NSError *_Nullable))completion;
-- (UIViewController *)controlsEditor;
 // Game input for CofreGameInput.swift, sent through Air's callback bridge. Only
 // meaningful while the game runs.
 - (void)gameInputKey:(NSString *)name down:(BOOL)down;
