@@ -126,3 +126,8 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 - Air `PLATFORM=7` was attempted in a disposable copy but CMake linked device-only `libEGL.framework`; the script uses the documented disposable retag/ad-hoc workaround and validates all nested Mach-O files, including Java runtimes, Frameworks, and the app executable.
 - Install succeeded on `SIMULATOR_UDID`; `simctl launch` returned `NSPOSIXErrorDomain code=3` with no process, so the required Settings screenshot and interactive cases remain blocked.
 - `cd app/UI && swift test`: 48 tests, 0 failures. Whole-app compile check passed with an own derived data path (`/tmp/cofre-round4-core2`).
+
+### Round 4a correction after simulator launch
+- Final script run tested HEAD `83533df` on iPad `SIMULATOR_UDID`; install and launch succeeded.
+- Settings › Game with Renderer Auto shows Resolution `Full · 2420 × 1668` and no FSR control. Evidence: `/tmp/cofre-test/shots/round4a-settings-no-fsr.png`.
+- B-007 retest: fixed ✅. B-004/B-005/B-006/B-008 remain unverified interactively because this pass stopped after the required Settings proof; their fixes are present at `96c0aa0`, `4f0b3cb`, `7496a18`, and `192a226`.

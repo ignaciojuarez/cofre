@@ -7,3 +7,9 @@
 - Script validation: every Mach-O under the app was checked for `LC_BUILD_VERSION platform IOSSIMULATOR`; nested code was re-signed inside-out.
 - Install passed. Launch returned simulator `NSPOSIXErrorDomain code=3` with no process, so interactive verification could not proceed.
 - UI tests passed: 48/48. Whole-app compile passed with an own derived data path (`/tmp/cofre-round4-core2`).
+
+## Final proof
+
+- Final HEAD tested: `83533df`.
+- Final run installed and launched on iPad `SIMULATOR_UDID`.
+- Settings › Game, Renderer Auto: Resolution row is visible and no FSR control appears. Screenshot: `/tmp/cofre-test/shots/round4a-settings-no-fsr.png`.
