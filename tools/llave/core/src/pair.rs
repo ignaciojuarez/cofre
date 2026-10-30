@@ -15,7 +15,6 @@ use idevice::{
 
 use crate::models::PairEvent;
 
-const PROHIBITED_IPAD_UDID: &str = "COFRE_DEVICE_UDID";
 
 /// The usbmuxd connection, with the pairing record Llave just made. Llave never saves that record to usbmuxd, so
 /// the stock provider has none and every service after pairing (remote pairing, house_arrest) would fail.
@@ -77,15 +76,6 @@ pub async fn run_pair(
             usb_devs.into_iter().next().unwrap()
         }
     };
-
-    if dev.udid.eq_ignore_ascii_case(PROHIBITED_IPAD_UDID) {
-        let err = PairEvent::Error {
-            code: "DEVICE_RESTRICTED".to_string(),
-            message: "Pairing with iPad mini is prohibited".to_string(),
-        };
-        err.emit();
-        return Err("Pairing with iPad mini is prohibited".to_string());
-    }
 
     let usbmuxd_addr = UsbmuxdAddr::from_env_var().unwrap_or_default();
     let provider = dev.to_provider(usbmuxd_addr, "llave");
