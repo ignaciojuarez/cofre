@@ -579,7 +579,7 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
   // The installers' processors run in a headless JVM, which can start only once per app session.
   static BOOL headlessJVMUsed;
   if (headlessJVMUsed) {
-    done(CofreAirError(@"Close Cofre completely and open it again to install another Forge or NeoForge loader."));
+    done(CofreAirError(@"Reopen Cofre to install another loader."));
     return;
   }
   NSDictionary *profile = _profiles.profiles[name];
@@ -939,9 +939,7 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
     NSArray<NSString *> *listed = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil][@"gameVersions"] : @[];
     // Air loads the Metallum agent only for Minecraft 26+ (JavaLauncher: "MC major < 26" skips it), so a listed
     // older version such as 1.21.11 would get Metal's surface without its renderer: a black screen.
-    metalVersions = [listed filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(NSString *v, id _) {
-      return v.integerValue >= 26;
-    }]];
+    metalVersions = listed;
   });
   NSString *pick = global.length && ![global isEqualToString:@"auto"] ? global
                  : [metalVersions containsObject:game] ? @RENDERER_NAME_METAL

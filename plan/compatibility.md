@@ -108,3 +108,27 @@ No maintained, open, authoritative iOS-mod compatibility list exists. Existing d
 ## Deletion and rollout
 
 Delete the static `ModCompatibility.table` and its known-mod entries once `RendererManifest`, `CompatibilityScanner`, and the report UI are wired. Preserve the issue/badge types, but populate them from evidence. Roll out in this order: manifest generation → metadata/native scan → shader scan → Play-time resolver/probe → private crash aggregation → signed public observation feed.
+
+## Current implementation sources
+
+- Renderer and mod verdicts read the build-generated `RendererManifest.json`; integrations and game versions are never selected by a UI table. `CompatibilityScanner` adds archive metadata, native and graphics evidence when a jar is available.
+- Crash mod attribution scans installed jar entry packages and Fabric/Quilt metadata, cached per `mods/` directory. The renderer requirement remains a manifest-derived launch fact.
+- Air's Metallum gate uses the same manifest game-version set plus the session Java major (21+); there is no Minecraft-major cutoff.
+- Server protocol names come from PrismarineJS `protocolVersions.json`, refreshed over HTTPS with a seven-day cache and a generated bundled snapshot fallback (`scripts/generate-protocol-versions.py`).
+- Shader crash detection derives configured shader mod ids from the game's config filenames; generic shader-pack markers remain evidence because they are log format terms, not a mod compatibility list.
+
+## Current implementation sources
+
+- Renderer and mod verdicts read the build-generated `RendererManifest.json`; integrations and game versions are never selected by a UI table. `CompatibilityScanner` adds archive metadata, native and graphics evidence when a jar is available.
+- Crash mod attribution scans installed jar entry packages and Fabric/Quilt metadata, cached per `mods/` directory. The renderer requirement remains a manifest-derived launch fact.
+- Air's Metallum gate uses the same manifest game-version set plus the session Java major (21+); there is no Minecraft-major cutoff.
+- Server protocol names come from PrismarineJS `protocolVersions.json`, refreshed over HTTPS with a seven-day cache and a generated bundled snapshot fallback (`scripts/generate-protocol-versions.py`).
+- Shader crash detection derives configured shader mod ids from the game's config filenames; generic shader-pack markers remain evidence because they are log format terms, not a mod compatibility list.
+
+## Current implementation sources
+
+- Renderer and mod verdicts read the build-generated `RendererManifest.json`; integrations and game versions are never selected by a UI table. `CompatibilityScanner` adds archive metadata, native and graphics evidence when a jar is available.
+- Crash mod attribution scans installed jar entry packages and Fabric/Quilt metadata, cached per `mods/` directory. The renderer requirement remains a manifest-derived launch fact.
+- Air's Metallum gate uses the same manifest game-version set plus the session Java major (21+); there is no Minecraft-major cutoff.
+- Server protocol names come from PrismarineJS `protocolVersions.json`, refreshed over HTTPS with a seven-day cache and a generated bundled snapshot fallback (`scripts/generate-protocol-versions.py`).
+- Shader crash detection derives configured shader mod ids from the game's config filenames; generic shader-pack markers remain evidence because they are log format terms, not a mod compatibility list.

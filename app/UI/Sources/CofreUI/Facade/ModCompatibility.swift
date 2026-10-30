@@ -10,11 +10,13 @@ public struct ModCompatibility: Hashable, Sendable {
         if metalVersions.contains(gameVersion) { return "metallum" }
         return loader == "forge" || loader == "neoforge" ? "mobileglues" : "air"
     }
-    /// Minecraft versions the bundled Metallum runs, from the app's RendererManifest.json (empty in tests/previews).
-    /// Air loads Metallum only for Minecraft 26+, so older listed versions (1.21.11) don't count.
+    /// Versions supported by the exact shipped Metallum manifest. No version family is inferred here.
     nonisolated(unsafe) public static var metalVersions: Set<String> =
         ((Bundle.main.url(forResource: "RendererManifest", withExtension: "json")
-            .flatMap { try? RendererManifest.load(from: $0) })?.gameVersions ?? []).filter { (Int($0.prefix { $0.isNumber }) ?? 0) >= 26 }
+            .flatMap { try? RendererManifest.load(from: $0) })?.gameVersions ?? [])
+    public static var manifest: RendererManifest {
+        (Bundle.main.url(forResource: "RendererManifest", withExtension: "json").flatMap { try? RendererManifest.load(from: $0) }) ?? RendererManifest()
+    }
     public let id: String, name: String
     private let supportedMetalVersions: Set<String>?
     private let reason: String
@@ -27,10 +29,12 @@ public struct ModCompatibility: Hashable, Sendable {
     }
     public static func entry(for id: String, name: String? = nil) -> ModCompatibility? {
         let key = (name ?? id).lowercased().filter { $0.isLetter || $0.isNumber }
-        if key.contains("iris") { return .init(id:id, name:name ?? "Iris", metalVersions:["26.2"], reason:"requires Iris integration; shipped only for Minecraft 26.2.", verified:true) }
-        if key.contains("sodium") { return .init(id:id, name:name ?? "Sodium", metalVersions:["26.2","1.21.11"], reason:"requires Sodium integration unavailable for this Minecraft version.", verified:true) }
-        if ["oculus","embeddium","distanthorizons","immersiveportals"].contains(key) { return .init(id:id,name:name ?? id,metalVersions:[],reason:"renderer integration is not present in the shipped manifest.",verified:false) }
-        return nil
+        let integrations = manifest.integrations
+        guard let integration = integrations.keys.first(where: { key.contains($0.filter { $0.isLetter || $0.isNumber }) || $0.contains(key) }) else { return nil }
+        let versions = integrations[integration] ?? []
+        let label = name ?? id
+        let reason = "\(label) has no shipped \(integration.capitalized) integration for this Minecraft version."
+        return .init(id: id, name: label, metalVersions: versions, reason: reason, verified: true)
     }
 }
 public struct ModCompatibilityIssue: Hashable, Sendable {

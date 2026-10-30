@@ -25,8 +25,10 @@ public enum ShaderSwitch {
 
     /// A crash shaders likely caused: they're on, and the crash text names a shader mod or pack.
     public static func causedCrash(_ text: String, gameDirectory: URL) -> Bool {
+        guard isOn(in: gameDirectory) else { return false }
         let t = text.lowercased()
-        return isOn(in: gameDirectory) && ["iris", "oculus", "shaderpack", "shader pack", "shader"].contains { t.contains($0) }
+        let configuredMods = files.compactMap { URL(fileURLWithPath: $0).deletingPathExtension().lastPathComponent.lowercased() }
+        return configuredMods.contains { t.contains($0) } || t.contains("shaderpack") || t.contains("shader pack")
     }
 
     private static func properties(_ gameDirectory: URL, _ name: String) -> String {

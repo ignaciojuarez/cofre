@@ -46,15 +46,10 @@ extension CofreBackendAdapter {
     }
     public func pingServer(address: String) async throws -> ServerPing {
         let status = try await MinecraftServerPinger().ping(address)
-        let versions: [Int: [String]] = [
-            47: ["1.8.9", "1.8.8", "1.8"], 340: ["1.12.2"], 754: ["1.16.5", "1.16.4"],
-            758: ["1.18.2"], 762: ["1.19.4"], 763: ["1.20.1", "1.20"], 764: ["1.20.2"],
-            765: ["1.20.4", "1.20.3"], 766: ["1.20.6", "1.20.5"], 767: ["1.21.1", "1.21"],
-            768: ["1.21.3", "1.21.2"], 769: ["1.21.4"], 770: ["1.21.5"], 771: ["1.21.6"],
-            772: ["1.21.8", "1.21.7"], 773: ["1.21.10", "1.21.9"], 774: ["1.21.11"]]
+        let versions = await ProtocolVersionMap.shared.versions(for: status.protocolVersion ?? -1)
         return ServerPing(motd: status.motd, online: status.online, max: status.max,
             versionName: status.versionName, protocolVersion: status.protocolVersion,
-            gameVersions: status.protocolVersion.flatMap { versions[$0] } ?? [], iconPNG: status.faviconPNG,
+            gameVersions: versions, iconPNG: status.faviconPNG,
             latencyMS: Int(status.latency * 1000))
     }
     public func discoverServers(instanceID: String) async throws -> [ServerSummary] {

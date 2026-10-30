@@ -37,11 +37,12 @@ public struct GameExitReport: Hashable, Sendable {
     /// so a normal "Loaded shader pack" line can't make a mod crash look like a renderer one.
     public init(
         code: Int, crashReport: String?, log: String?, instance: String? = nil, files: [URL] = [], tail: Int = 60,
-        changedSettings: [String] = []
+        changedSettings: [String] = [], installedModsURL: URL? = nil
     ) {
         let logLines = (log ?? "").split(whereSeparator: \.isNewline).map(String.init)
         let (reason, clue) = Self.diagnose(
-            code: code, crashReport: crashReport, logLines: logLines, settingsChanged: !changedSettings.isEmpty)
+            code: code, crashReport: crashReport, logLines: logLines, settingsChanged: !changedSettings.isEmpty,
+            installedModsURL: installedModsURL)
         self.init(
             code: code, reason: reason, clue: clue, instance: instance, files: files,
             logTail: Array(logLines.suffix(tail)))
@@ -82,8 +83,8 @@ public struct GameExitReport: Hashable, Sendable {
         return ["error", "exception", "fatal", "caused by", "failed"].contains { l.contains($0) }
     }
 
-    static func diagnose(code: Int, crashReport: String?, logLines: [String], settingsChanged: Bool = false)
-        -> (Reason, String?)
+    static func diagnose(code: Int, crashReport: String?, logLines: [String], settingsChanged: Bool = false,
+                         installedModsURL: URL? = nil) -> (Reason, String?)
     {
         // System Details lists every mod and the shader pack, which would match anything.
         let report = (crashReport ?? "").split(whereSeparator: \.isNewline).map(String.init)
@@ -98,7 +99,7 @@ public struct GameExitReport: Hashable, Sendable {
         // OpenGL-only mods find no GL context on the Metal renderer; name the one at the top of the stack.
         if (report + logLines).contains(where: { $0.contains("No GLCapabilities instance set") }),
             let name = (report + logLines).lazy.compactMap({ line in
-                glOnlyMods.first { line.contains($0.package) }?.name
+                Self.modAttribution(for: line, modsURL: installedModsURL)
             }).first
         {
             return (.mods, "\(name) \(needsGL)")
@@ -120,12 +121,39 @@ public struct GameExitReport: Hashable, Sendable {
         return (code == 0 ? .quit : .unknown, errors.last.map(clean))
     }
 
-    /// Mods that draw with OpenGL directly, by package. The Metal renderer only runs Iris and Sodium where Metallum
-    /// ships support for them (Iris on 26.2; Sodium on 1.21.11 and 26.2).
-    static let glOnlyMods: [(package: String, name: String)] = [
-        ("net.irisshaders", "Iris"), ("net.coderbot.iris", "Iris"), ("com.seibel.distanthorizons", "Distant Horizons"),
-        ("net.caffeinemc", "Sodium"), ("me.jellysquid.mods.sodium", "Sodium"),
-    ]
+    /// Package attribution is derived from the installed archives. The cache is per mods directory.
+    private static var modCache: [URL: [(package: String, name: String)]] = [:]
+    private static let modCacheLock = NSLock()
+    private static func modAttribution(for line: String, modsURL: URL?) -> String? {
+        let packages: [(package: String, name: String)]
+        if let modsURL {
+            modCacheLock.lock(); defer { modCacheLock.unlock() }
+            if let cached = modCache[modsURL] { packages = cached }
+            else {
+                let found = Self.scanMods(at: modsURL)
+                modCache[modsURL] = found
+                packages = found
+            }
+        } else { return nil }
+        return packages.first { line.contains($0.package) }?.name
+    }
+    private static func scanMods(at url: URL) -> [(package: String, name: String)] {
+        guard let files = try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil) else { return [] }
+        return files.filter { $0.pathExtension.lowercased() == "jar" }.flatMap { jar in
+            guard let data = try? Data(contentsOf: jar) else { return [(package: String, name: String)]() }
+            let bytes = [UInt8](data); var p = 0; var packages = Set<String>(); var name = jar.deletingPathExtension().lastPathComponent
+            while p + 30 <= bytes.count, bytes[p] == 0x50, bytes[p+1] == 0x4b, bytes[p+2] == 3, bytes[p+3] == 4 {
+                let nl = Int(UInt16(bytes[p+26]) | UInt16(bytes[p+27]) << 8), xl = Int(UInt16(bytes[p+28]) | UInt16(bytes[p+29]) << 8)
+                let b0 = UInt32(bytes[p + 18]), b1 = UInt32(bytes[p + 19]), b2 = UInt32(bytes[p + 20]), b3 = UInt32(bytes[p + 21])
+                let size = Int(b0 | (b1 << 8) | (b2 << 16) | (b3 << 24))
+                let ns = p + 30, end = ns + nl, next = end + xl + size; guard next <= bytes.count else { break }
+                let entry = String(decoding: bytes[ns..<end], as: UTF8.self)
+                if entry.hasSuffix(".class"), let first = entry.split(separator: "/").first, first != "META-INF" { packages.insert(String(first)) }
+                p = next
+            }
+            return packages.map { ($0, name) }
+        }
+    }
     static let needsGL = "needs OpenGL, which the Metal renderer doesn't have on this Minecraft version."
 
     /// Changing Graphics or resource packs in game reloads every texture and shader; Metallum can crash there.
@@ -147,9 +175,10 @@ public struct GameExitReport: Hashable, Sendable {
 
     public var explanation: String {
         switch reason {
+        case .renderer where clue == Self.metalReload: "Metal crashed while reloading graphics."
         case .memory: "It ran out of memory."
         case .renderer: "The graphics renderer failed."
-        case .missingLibrary: "A game file is missing or couldn't load."
+        case .missingLibrary: "A game file is missing or didn't load."
         case .mods: "Some mods don't work together, or one needs another mod."
         case .java: "Minecraft hit a Java error."
         case .unknown: "It closed unexpectedly."
@@ -161,12 +190,13 @@ public struct GameExitReport: Hashable, Sendable {
         switch reason {
         case .memory: "Lower Memory in Settings › Game, or remove a few mods, then play again."
         case .renderer where clue == Self.metalReload && !changedSettings.isEmpty:
-            "You changed \(changedSettings.formatted()). That's saved and applies when you play again. "
-                + "For now, changing graphics settings or resource packs inside a world crashes Metal."
+            "Your change to \(changedSettings.formatted()) is saved for next time. "
+                + "For now, change graphics and resource packs before joining a world, not in one."
         case .renderer where clue == Self.metalReload:
-            "Play again, and for now don't change Graphics or resource packs while in a world."
+            "Play again. For now, change graphics and resource packs before joining a world, not in one."
         case .renderer: "Turn off shader packs, or pick another renderer in Settings › Renderer."
-        case .missingLibrary: "Play again so the game files are checked. Some versions don't run on iOS yet."
+        case .missingLibrary:
+            "Play again to recheck the game files. If it happens again, this version may not run on iOS yet."
         case .mods where clue?.hasSuffix(Self.needsGL) == true:
             "Turn that mod off in Mods › Installed, then play again. Shaders work on Minecraft 26.2 for now."
         case .mods: "Open Details to see which mod, then update or remove it, or add the mod it needs."
@@ -176,7 +206,7 @@ public struct GameExitReport: Hashable, Sendable {
         }
     }
 
-    /// What Copy details puts on the clipboard: enough for a bug report without the whole log.
+    /// What Details › Copy puts on the clipboard: enough for a bug report without the whole log.
     public var detailsText: String {
         var lines = ["\(title): \(explanation)"]
         if let instance { lines.append("Instance: \(instance)") }
