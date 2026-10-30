@@ -298,8 +298,7 @@
             guard let id = instanceID ?? activeInstance?.id else { return }
             activeInstanceID = id
             if rejoin == nil, server == nil, let instance = instances.first(where: { $0.id == id }) {
-                let renderer = preferences.renderer == "auto" && (Int(instance.gameVersion.split(separator: ".").first ?? "0") ?? 0) >= 26
-                    ? "metallum" : preferences.renderer
+                    let renderer = ModCompatibility.renderer(setting: preferences.renderer, instance: instance)
                 if case .warn(let issues) = ModCompatibilityChecker.decision(items: installed[.mods] ?? [], gameVersion: instance.gameVersion, renderer: renderer) {
                     pendingModCompatibility = issues
                     return
@@ -547,7 +546,10 @@
                     modInstalls[projectID]?.plan = plan
                     if let reason = plan.blocked {
                         fail(projectID, reason, retry: false)
-                    } else if plan.needsConfirmation {
+                    } else if plan.needsConfirmation || (ModCompatibility.entry(for: plan.target.id, name: plan.target.name)?.issue(
+                        gameVersion: self.modsInstance?.gameVersion ?? plan.target.version,
+                        renderer: self.modsInstance.map { ModCompatibility.renderer(setting: self.preferences.renderer, instance: $0) } ?? self.preferences.renderer
+                    ) != nil) {
                         modInstalls[projectID]?.phase = .confirm
                         modInstallSheet = projectID
                     } else {
@@ -656,7 +658,7 @@
 
         public func compatibilityIssue(for item: InstalledItem, instance: InstanceSummary? = nil) -> ModCompatibilityIssue? {
             guard let i = instance ?? modsInstance else { return nil }
-            let renderer = preferences.renderer == "auto" && (Int(i.gameVersion.split(separator: ".").first ?? "0") ?? 0) >= 26 ? "metallum" : preferences.renderer
+            let renderer = ModCompatibility.renderer(setting: preferences.renderer, instance: i)
             return ModCompatibility.entry(for: item.projectID ?? item.id, name: item.name)?.issue(gameVersion: i.gameVersion, renderer: renderer)
         }
 

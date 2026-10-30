@@ -3,6 +3,12 @@ import XCTest
 @testable import CofreUI
 
 final class ModCompatibilityTests: XCTestCase {
+    func testAutoUsesRendererForInstanceVersionAndLoader() {
+        let fabric = InstanceSummary(id: "f", name: "Fabric", loader: .fabric, gameVersion: "1.21.1")
+        XCTAssertEqual(ModCompatibility.renderer(setting: "auto", instance: fabric), "air")
+        let forge = InstanceSummary(id: "n", name: "Forge", loader: .forge, gameVersion: "1.21.1")
+        XCTAssertEqual(ModCompatibility.renderer(setting: "auto", instance: forge), "mobileglues")
+    }
     func testVerifiedIrisAndSodiumOnlyWorkOnMetal261211And262() {
         XCTAssertNil(ModCompatibility.entry(for: "iris")?.issue(gameVersion: "26.2", renderer: "metallum"))
         XCTAssertNotNil(ModCompatibility.entry(for: "iris")?.issue(gameVersion: "26.3", renderer: "metallum"))
