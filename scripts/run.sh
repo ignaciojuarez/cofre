@@ -81,6 +81,7 @@ if (( BUILD )); then
   rm -rf "$APP/PlugIns"
   mkdir -p "$APP/PlugIns"
   cp -R "$SIGNING/build/Build/Products/Debug-iphoneos/PacketTunnel.appex" "$APP/PlugIns/PacketTunnel.appex"
+  "$ROOT/scripts/slim-app.sh" "$APP"
   python3 "$ROOT/scripts/sign-development.py"
 fi
 [[ -d "$APP" ]] || bt_die "no signed app at $APP; run with --build"
