@@ -312,8 +312,7 @@
     public struct GamePreferences: Equatable, Sendable {
         /// `autoRAM` is on by default: Cofre (the backend) picks a safe amount. `ramMB` applies only when it's off.
         public var ramMB = 4096, autoRAM = true, deviceRAMMB = 8192
-        /// `fsr`: enlarge a smaller picture with MobileGlues' FSR (smooth) instead of whole pixels (sharp).
-        public var renderer = "auto", resolution = 1.0, fsr = false, graphicsApi = "auto"
+        public var renderer = "auto", resolution = 1.0, graphicsApi = "auto"
         public var java = "auto", jvmArgs = ""
         /// Zero means Auto: follow the display's maximum refresh rate.
         public var fpsOverlay = true, muteWithSwitch = true, microphone = false

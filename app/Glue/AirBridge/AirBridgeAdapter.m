@@ -927,7 +927,7 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
   NSMutableDictionary *profile = [_profiles.profiles[name] mutableCopy];
   NSString *own = profile[@"renderer"];
   if (own.length && ![own isEqualToString:@"auto"] && ![profile[@"cofreRendererPicked"] boolValue]) {
-    [self applySmoothUpscaleForRenderer:own];
+    [self applyResolution];
     return;
   }
   NSString *global = getPrefObject(@"video.renderer");
@@ -953,27 +953,16 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
   profiles[name] = profile;
   [self persistInstanceProfiles:profiles selected:name error:nil];
   NSLog(@"[Cofre] renderer auto -> %@ for %@", pick ?: @"Air auto", metadata[@"id"]);
-  [self applySmoothUpscaleForRenderer:pick ?: @"auto"];
+  [self applyResolution];
 }
 
-// Settings › Resolution keeps the picked size and Smooth upscale in Cofre's defaults. Smooth upscale is MobileGlues'
-// FSR, so when this launch runs MobileGlues the screen stays full size and FSR draws the picked size inside it
-// (scaled once); with any other renderer the screen itself is the picked size.
-- (void)applySmoothUpscaleForRenderer:(NSString *)renderer {
+// Settings › Resolution keeps the picked size in Cofre's defaults; Air reads video.resolution at launch. MobileGlues'
+// FSR stays off: its upscale shader is desktop GLSL 4.50, which ANGLE on iOS rejects, so the screen stays black.
+- (void)applyResolution {
   NSNumber *picked = [NSUserDefaults.standardUserDefaults objectForKey:@"cofre.render.scale"];
-  if (!picked) return;
-  double scale = picked.doubleValue;
-  BOOL smooth = [NSUserDefaults.standardUserDefaults boolForKey:@"cofre.render.smooth"] &&
-                [renderer containsString:@"mobileglues"] && scale < 0.99;
-  int preset = 0;
-  if (smooth) {
-    const double factors[] = {1.3, 1.5, 1.7, 2.0}, want = 1 / MAX(scale, 0.5);
-    for (int i = 0; i < 4; i++)
-      if (!preset || fabs(factors[i] - want) < fabs(factors[preset - 1] - want)) preset = i + 1;
-  }
-  setPrefObject(@"video.resolution", @(smooth ? 100 : scale * 100));
-  setPrefObject(@"mobileglues.fsr1_setting", @(preset));
-  NSLog(@"[Cofre] resolution %.0f%% smooth=%d fsr=%d renderer=%@", scale * 100, smooth, preset, renderer);
+  if (picked) setPrefObject(@"video.resolution", @(picked.doubleValue * 100));
+  setPrefObject(@"mobileglues.fsr1_setting", @0);
+  NSLog(@"[Cofre] resolution %.0f%% fsr=off", getPrefFloat(@"video.resolution"));
 }
 // Air's Java launcher sets Minecraft to Chinese (lang:zh_cn) when options.txt has no language, so write the
 // phone's language first. Only when none is set: after that the game owns options.txt.
