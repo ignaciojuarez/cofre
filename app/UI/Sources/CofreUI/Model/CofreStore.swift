@@ -169,7 +169,7 @@
                 self.preferences = try await self.backend.preferences(instanceID: nil)
             }
             libraryLoaded = true
-            if activeInstanceID == nil { activeInstanceID = instances.first?.id }
+            if activeInstanceID == nil { activeInstanceID = instanceStore?.lastPlayedID ?? instances.first?.id }
             await loadActiveInstance()
         }
 

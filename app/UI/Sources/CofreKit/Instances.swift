@@ -55,6 +55,9 @@ public final class InstanceStore: @unchecked Sendable {
         try loadProfiles()
     }
 
+    /// The instance played last: Air records it as `selectedProfile` in launcher_profiles.json.
+    public var lastPlayedID: String? { (document["selectedProfile"] as? String).flatMap { profiles[$0] == nil ? nil : $0 } }
+
     public func list() throws -> [Instance] {
         try loadProfiles()
         return profiles.compactMap { id, profile in makeInstance(id: id, profile: profile) }
