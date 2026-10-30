@@ -3,11 +3,17 @@ import CofreKit
 
 /// Compatibility is computed by CofreKit. This small value keeps existing UI call sites source-compatible.
 public struct ModCompatibility: Hashable, Sendable {
+    /// The renderer an instance runs, decided like the launch does (AirBridgeAdapter pickRendererForProfile): Auto is
+    /// Metal where the bundled Metallum supports the version, MobileGlues for Forge/NeoForge elsewhere, else Air's GL.
     public static func renderer(setting: String, gameVersion: String, loader: String) -> String {
         guard setting.lowercased() == "auto" else { return setting }
-        if loader == "forge" || loader == "neoforge" { return "mobileglues" }
-        return gameVersion == "1.21.11" || gameVersion.hasPrefix("26.") ? "metallum" : "air"
+        if metalVersions.contains(gameVersion) { return "metallum" }
+        return loader == "forge" || loader == "neoforge" ? "mobileglues" : "air"
     }
+    /// Minecraft versions the bundled Metallum runs, from the app's RendererManifest.json (empty in tests/previews).
+    nonisolated(unsafe) public static var metalVersions: Set<String> =
+        (Bundle.main.url(forResource: "RendererManifest", withExtension: "json")
+            .flatMap { try? RendererManifest.load(from: $0) })?.gameVersions ?? []
     public let id: String, name: String
     private let supportedMetalVersions: Set<String>?
     private let reason: String
