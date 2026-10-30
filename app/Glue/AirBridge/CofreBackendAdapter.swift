@@ -301,7 +301,7 @@
             let id = air.selectedProfileName()
             return LogStore(instance: id.isEmpty ? nil : air.gameDirectory(forProfile: id))
         }
-        private func kitSource(_ kind: LogKind) -> CofreKit.LogSource {
+        private func kitSource(_ kind: LogKind) -> CofreKit.LogFile {
             switch kind { case .latest: .game; case .launcher: .launcher; case .crash: .crash }
         }
         public func logLines(_ kind: LogKind) -> AsyncStream<LogLine> {

@@ -1,13 +1,13 @@
 import Foundation
 
 public enum LogLevel: String, CaseIterable, Sendable { case info, warning, error, success }
-public enum LogSource: String, CaseIterable, Sendable { case launcher, game, crash }
+public enum LogFile: String, CaseIterable, Sendable { case launcher, game, crash }
 public struct LogEntry: Identifiable, Hashable, Sendable {
     public let id: Int
     public let text: String
     public let level: LogLevel
-    public let source: LogSource
-    public init(id: Int, text: String, level: LogLevel, source: LogSource) { self.id = id; self.text = text; self.level = level; self.source = source }
+    public let source: LogFile
+    public init(id: Int, text: String, level: LogLevel, source: LogFile) { self.id = id; self.text = text; self.level = level; self.source = source }
 }
 
 /// Reads the game's launcher and instance logs. Metallum's per-frame chatter is omitted at the source.
@@ -19,15 +19,15 @@ public final class LogStore: @unchecked Sendable {
     }
     public var latestLog: URL { documents.appendingPathComponent("latestlog.txt") }
     public var gameLog: URL? { instance?.appendingPathComponent("logs/latest.log") }
-    public func read(_ source: LogSource) -> [LogEntry] {
+    public func read(_ source: LogFile) -> [LogEntry] {
         let url: URL? = source == .launcher ? latestLog : source == .game ? gameLog : newestCrashReport()
         guard let url, let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }
         return text.split(whereSeparator: \.isNewline).enumerated().compactMap { i, line in makeEntry(i, String(line), source: source) }
     }
-    public func tail(_ source: LogSource, limit: Int = 200) -> [LogEntry] { Array(read(source).suffix(limit)) }
-    public func search(_ query: String = "", levels: Set<LogLevel> = Set(LogLevel.allCases), sources: Set<LogSource> = Set(LogSource.allCases)) -> [LogEntry] {
+    public func tail(_ source: LogFile, limit: Int = 200) -> [LogEntry] { Array(read(source).suffix(limit)) }
+    public func search(_ query: String = "", levels: Set<LogLevel> = Set(LogLevel.allCases), sources: Set<LogFile> = Set(LogFile.allCases)) -> [LogEntry] {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return LogSource.allCases.filter(sources.contains).flatMap(read).filter { levels.contains($0.level) && (q.isEmpty || $0.text.lowercased().contains(q)) }
+        return LogFile.allCases.filter(sources.contains).flatMap(read).filter { levels.contains($0.level) && (q.isEmpty || $0.text.lowercased().contains(q)) }
     }
     public func newestCrashReport(since: Date = .distantPast) -> URL? {
         let dir = (instance ?? documents).appendingPathComponent("crash-reports")
@@ -36,10 +36,10 @@ public final class LogStore: @unchecked Sendable {
             guard let date = try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate, date >= since else { return nil }; return (url, date)
         }.max { $0.1 < $1.1 }?.0
     }
-    public func export(_ source: LogSource) throws -> URL {
+    public func export(_ source: LogFile) throws -> URL {
         guard let url = source == .launcher ? latestLog : source == .game ? gameLog : newestCrashReport(), FileManager.default.fileExists(atPath: url.path) else { throw CocoaError(.fileNoSuchFile) }; return url
     }
-    private func makeEntry(_ id: Int, _ text: String, source: LogSource) -> LogEntry? {
+    private func makeEntry(_ id: Int, _ text: String, source: LogFile) -> LogEntry? {
         let lower = text.lowercased()
         let noise = ["[metallum] push", "binddrawstate", "setpipeline", "renderenc", "passenc", "createcommandencoder", "drawmultipleindexed"]
         if source != .crash && noise.contains(where: { lower.contains($0) }) { return nil }
@@ -68,7 +68,7 @@ public struct ReportBundle: Sendable {
 
     public func make(at url: URL) throws -> URL {
         var files: [(String, Data)] = []
-        let logs = LogSource.allCases.flatMap(store.read).map(\.text).joined(separator: "\n")
+        let logs = LogFile.allCases.flatMap(store.read).map(\.text).joined(separator: "\n")
         let signature = Self.signature(logs + (context.clue ?? ""))
         var json: [String: Any] = ["appVersion": context.appVersion as Any, "build": context.build as Any, "device": context.device as Any, "ios": context.iOS as Any, "exitReason": context.exitReason as Any, "clue": context.clue as Any, "crashSignature": signature]
         if let i = context.instance { json["instance"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(i)) }
