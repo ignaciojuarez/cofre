@@ -10,14 +10,24 @@
         public var accountList = [Account(id: "steve", name: "Steve_42", kind: "Microsoft", isActive: true)]
         /// Seconds between simulated launch/test steps. 0 makes streams finish immediately.
         public var stepDelay: Double
-        /// GAP-13. `.serverJoin` (GAP-14) and `.instanceIcon`, so screenshots show what ships plus the Join server sheet.
-        /// Tests turn flags on.
-        public var capabilities: BackendCapabilities = [.serverJoin, .instanceIcon]
+        /// GAP-13. `.serverJoin` (GAP-14), `.instanceIcon` and the server flags, so screenshots show what ships plus the
+        /// Join server sheet and Servers. Tests turn flags on.
+        public var capabilities: BackendCapabilities = [
+            .serverJoin, .instanceIcon, .addServer, .serverFiles, .pingServers, .quickPlay, .discoverServers,
+        ]
         /// GAP-14. Where the Join server sheet starts; `nil` reads the card (resolving, then first visit, or ready once installed).
         public var serverJoinScenario: MockServerJoin.Scenario?
         private var joinedServers: Set<String> = []
-        /// Makes `search` throw, for the offline state.
+        /// Makes `search` and `discoverServers` throw, for the offline state.
         public var offline = false
+        /// Every server ping fails (no network), for the offline rows.
+        public var serversOffline = false
+        /// Seconds before `servers` and `discoverServers` answer, and before each ping. 0 answers at once.
+        public var serverDelay = 0.0, pingDelay = 0.0
+        /// Each instance's servers.dat.
+        public var serverLists = MockServers.saved()
+        /// The last `joinServer`, for tests.
+        public private(set) var lastJoin: (instanceID: String, address: String)?
         /// Makes `versions` throw, for M02's Try again state.
         public var failVersions = false
         /// The project ID whose download fails mid-install, for M05's failed state. Nothing installs.
@@ -34,7 +44,6 @@
             ],
         ]
         private var worldList: [String: [WorldSummary]] = [:]
-        private var extraServers: [ServerSummary] = []
         private var cfKey: String? = "cf_live_••••3f9a"
         private let (setupStream, setupContinuation) = AsyncStream<SetupState>.makeStream()
 
@@ -142,14 +151,8 @@
             ]
         }
         public func servers(instanceID: String) async throws -> [ServerSummary] {
-            [
-                MockServerJoin.ironwood,
-                ServerSummary(
-                    id: "s1", name: "friends.cofre.lan", address: "10.0.0.4", detail: "LAN · 3/8 online", pingMS: 24),
-                ServerSummary(
-                    id: "s2", name: "play.example.net", address: "play.example.net", detail: "1.21.1 · 112/500",
-                    pingMS: 140),
-            ] + extraServers
+            if serverDelay > 0 { try? await Task.sleep(for: .seconds(serverDelay)) }
+            return serverLists[instanceID] ?? []
         }
         public func preferences(instanceID: String?) async throws -> GamePreferences { prefs }
         public func setPreferences(_ preferences: GamePreferences, instanceID: String?) async throws {
@@ -196,9 +199,11 @@
             "JIT", "Game files", "Renderer · MobileGlues", "Java 21", "Starting Minecraft", "Loading", "In game",
         ]
         public func launch(instanceID: String, accountID: String?) -> AsyncThrowingStream<LaunchProgress, Error> {
+            run(Self.launchStages)
+        }
+        private func run(_ stages: [String]) -> AsyncThrowingStream<LaunchProgress, Error> {
             AsyncThrowingStream { c in
                 launchTask = Task {
-                    let stages = Self.launchStages
                     for (i, title) in stages.enumerated() {
                         if Task.isCancelled {
                             c.finish()
@@ -213,7 +218,8 @@
                     }
                     c.yield(
                         LaunchProgress(
-                            stage: stages.count, of: stages.count, title: "In game", fraction: 1, finished: true))
+                            stage: stages.count, of: stages.count, title: stages.last ?? "", fraction: 1,
+                            finished: true))
                     c.finish()
                 }
             }
@@ -612,8 +618,10 @@
             return url
         }
         public func addServer(instanceID: String, name: String, address: String) async throws -> ServerSummary {
-            let s = ServerSummary(id: UUID().uuidString, name: name, address: address)
-            extraServers.append(s)
+            let s = ServerSummary(
+                id: UUID().uuidString, name: name, address: address,
+                hasServerCard: address == MockServerJoin.ironwood.address, instanceID: instanceID)
+            serverLists[instanceID, default: []].append(s)
             return s
         }
         public func createInstance(name: String, version: String, loader: Loader, ownFolder: Bool, fabricAPI: Bool)
@@ -637,6 +645,36 @@
                 stepDelay: stepDelay)
             model.onInstalled = { [weak self] in self?.joinedServers.insert(request.id) }
             return model
+        }
+
+        // MARK: ServerService
+        public func discoverServers(instanceID: String) async throws -> [ServerSummary] {
+            if serverDelay > 0 { try? await Task.sleep(for: .seconds(serverDelay)) }
+            if offline { throw URLError(.notConnectedToInternet) }
+            let version = instanceList.first { $0.id == instanceID }?.gameVersion ?? ""
+            return MockServers.recommended.filter { $0.gameVersions.contains(version) }
+        }
+        public func removeServer(_ server: ServerSummary) async throws {
+            guard let inst = server.instanceID else { throw MockError.notFound }
+            serverLists[inst]?.removeAll { $0.id == server.id }
+        }
+        public func copyServer(_ server: ServerSummary, to instanceID: String) async throws -> ServerSummary {
+            let copy = ServerSummary(
+                id: UUID().uuidString, name: server.name, address: server.address, hasServerCard: server.hasServerCard,
+                instanceID: instanceID, iconPNG: server.iconPNG)
+            serverLists[instanceID, default: []].append(copy)
+            return copy
+        }
+        public func pingServer(address: String) async throws -> ServerPing {
+            if pingDelay > 0 { try? await Task.sleep(for: .seconds(pingDelay)) }
+            guard !serversOffline, let ping = MockServers.pings[address] else { throw URLError(.cannotConnectToHost) }
+            return ping
+        }
+        public func joinServer(instanceID: String, address: String, accountID: String?)
+            -> AsyncThrowingStream<LaunchProgress, Error>
+        {
+            lastJoin = (instanceID, address)
+            return run(Self.launchStages.dropLast() + ["Joining \(address)"])
         }
 
         // MARK: GAP-11 AirAppearance

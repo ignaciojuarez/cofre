@@ -170,6 +170,7 @@
             case .deleteInstance(let i): Text("Delete \(i.name)?")
             case .deleteWorld(let w): Text("Delete \(w.name)?")
             case .removeAccount(let a): Text("Remove \(a.name)?")
+            case .removeServer(let s): Text("Delete \(s.name)?")
             }
         }
         var message: Text {
@@ -177,6 +178,7 @@
             case .deleteInstance: Text("Worlds and mods in its folder are removed too.")
             case .deleteWorld: Text("It's removed from this device. This can't be undone.")
             case .removeAccount: Text("You can sign in again any time.")
+            case .removeServer: Text("It's gone from this instance's list in game too. Other instances keep theirs.")
             }
         }
         var actionTitle: LocalizedStringKey {
@@ -184,6 +186,7 @@
             case .deleteInstance: "Delete instance"
             case .deleteWorld: "Delete world"
             case .removeAccount: "Remove"
+            case .removeServer: "Delete"
             }
         }
     }

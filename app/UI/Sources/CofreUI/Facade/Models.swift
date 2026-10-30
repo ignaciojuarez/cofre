@@ -152,15 +152,31 @@
         }
     }
 
+    /// One entry of an instance's servers.dat, the only copy. Cofre never keeps its own list: renaming, reordering and
+    /// the resource-pack policy happen in game, and Cofre reads the file again when it shows the list.
     public struct ServerSummary: Identifiable, Hashable, Sendable {
+        /// Unique within one `servers(instanceID:)` result. The UI reloads after every write.
         public let id: String
+        /// `address` is servers.dat's `ip`: host, host:port, or a name with an SRV record.
         public var name: String, address: String
         public var detail: String?, pingMS: Int?
-        /// The server publishes a server card (GAP-14): its row gets a "Modded" badge and a Join button.
+        /// The server publishes a server card (GAP-14): its row gets a "Modded" badge and Join opens the card sheet.
         public var hasServerCard: Bool
+        /// The instance whose servers.dat holds it.
+        public var instanceID: String?
+        /// servers.dat `icon`, or the last ping's favicon (64×64 PNG).
+        public var iconPNG: Data?
+        /// Plain text. The UI strips `§` codes that slip through.
+        public var motd: String?
+        public var playersOnline: Int?, playersMax: Int?
+        /// Versions it accepts, newest first (the ping's protocol mapped to versions). Empty = unknown.
+        public var gameVersions: [String]
+        public var protocolVersion: Int?
+
         public init(
             id: String, name: String, address: String, detail: String? = nil, pingMS: Int? = nil,
-            hasServerCard: Bool = false
+            hasServerCard: Bool = false, instanceID: String? = nil, iconPNG: Data? = nil, motd: String? = nil,
+            playersOnline: Int? = nil, playersMax: Int? = nil, gameVersions: [String] = [], protocolVersion: Int? = nil
         ) {
             self.id = id
             self.name = name
@@ -168,6 +184,62 @@
             self.detail = detail
             self.pingMS = pingMS
             self.hasServerCard = hasServerCard
+            self.instanceID = instanceID
+            self.iconPNG = iconPNG
+            self.motd = motd
+            self.playersOnline = playersOnline
+            self.playersMax = playersMax
+            self.gameVersions = gameVersions
+            self.protocolVersion = protocolVersion
+        }
+
+        /// Whether `instance` can join: it runs one of `gameVersions`. Unknown when the server doesn't say.
+        public func fit(_ instance: InstanceSummary?) -> ServerFit {
+            guard let instance, let newest = gameVersions.first else { return .unknown }
+            return gameVersions.contains(instance.gameVersion) ? .fits : .needs(newest)
+        }
+
+        /// Fills the live fields from a ping.
+        public func updated(with ping: ServerPing) -> ServerSummary {
+            var s = self
+            s.motd = ping.motd
+            s.playersOnline = ping.online
+            s.playersMax = ping.max
+            s.pingMS = ping.latencyMS
+            s.protocolVersion = ping.protocolVersion ?? s.protocolVersion
+            if !ping.gameVersions.isEmpty { s.gameVersions = ping.gameVersions }
+            s.iconPNG = ping.iconPNG ?? s.iconPNG
+            return s
+        }
+    }
+
+    public enum ServerFit: Hashable, Sendable {
+        case unknown, fits
+        /// Play it on this version (the newest it accepts).
+        case needs(String)
+    }
+
+    /// Server List Ping (1.7+ status). `gameVersions` is `protocolVersion` mapped through the backend's table,
+    /// because `versionName` can be "Paper 1.21.1" or "Velocity 3.4".
+    public struct ServerPing: Hashable, Sendable {
+        public var motd: String
+        public var online: Int?, max: Int?
+        public var versionName: String?, protocolVersion: Int?
+        public var gameVersions: [String]
+        public var iconPNG: Data?
+        public var latencyMS: Int
+        public init(
+            motd: String, online: Int? = nil, max: Int? = nil, versionName: String? = nil, protocolVersion: Int? = nil,
+            gameVersions: [String] = [], iconPNG: Data? = nil, latencyMS: Int
+        ) {
+            self.motd = motd
+            self.online = online
+            self.max = max
+            self.versionName = versionName
+            self.protocolVersion = protocolVersion
+            self.gameVersions = gameVersions
+            self.iconPNG = iconPNG
+            self.latencyMS = latencyMS
         }
     }
 

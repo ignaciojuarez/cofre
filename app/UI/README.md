@@ -96,7 +96,7 @@ All additive (2026-10-29). Every new member has a default, so `CofreBackendAdapt
 | `capabilities: BackendCapabilities` | Requirements.swift | `[]`, which hides every control below | Turn on a flag only once its action works |
 | `deleteWorld(instanceID:worldID:)` | Requirements.swift | throws | `.deleteWorld`: world context menu → Delete (always confirmed) |
 | `backUpWorld(instanceID:worldID:) -> URL` | Requirements.swift | throws | `.backUpWorld`: zip URL for the share sheet |
-| `addServer(instanceID:name:address:) -> ServerSummary` | Requirements.swift | throws | `.addServer`: "+ Add server" (native alert with two fields) |
+| `addServer(instanceID:name:address:) -> ServerSummary` | Requirements.swift | throws | `.addServer`: Recommended "Add", Paste and links append to servers.dat |
 | `createInstance(name:version:loader:ownFolder:fabricAPI:)` | Requirements.swift | Calls the 3-argument `createInstance` | `.createOptions`: shows the "Own folder" and "Add Fabric API" switches in P04 |
 | `.envVariables`, `.rendererTuning` | Requirements.swift | hidden | Map `GamePreferences.envVariables`, `shaderCacheMB`, `multidraw`, `computeShaders` to Air prefs |
 | `.controllerNavigation` | Requirements.swift | hidden | Turn on once `ControllerFocusBridge` drives the launcher; shows the A/B/Y hint strip |
@@ -109,6 +109,9 @@ All additive (2026-10-29). Every new member has a default, so `CofreBackendAdapt
 | `.serverJoin` capability | Requirements.swift | off (on in `MockBackend`) | Turn on once `serverJoin(_:)` works. Shows "Modded" badges, Join buttons and `cofre://join` links |
 | `ServerSummary.hasServerCard` | Models.swift | `false` | The server publishes a card: its row gets "Modded" and Join |
 | `NavModel.serverJoin`, `NavModel.open(_ url:) -> Bool` | NavModel.swift | — | Shell: forward `scene(_:openURLContexts:)` to `nav.open(url)`; register the `cofre` URL scheme in Info.plist |
+| `ServerService` added to `CofreBackend` (plan/servers.md) | Services.swift | Throws; `joinServer` is a plain `launch` | servers.dat is the only saved list. `pingServer`, `joinServer` (Quick Play), `copyServer`, `removeServer`, `discoverServers(instanceID:)` (Recommended) |
+| `.serverFiles`, `.pingServers`, `.quickPlay`, `.discoverServers` | Requirements.swift | off (on in `MockBackend`) | Copy to and Delete · ping bars, MOTD, players · Join straight in · the Recommended section |
+| `ServerSummary.instanceID`, `iconPNG`, `motd`, `playersOnline`, `playersMax`, `gameVersions`, `protocolVersion` | Models.swift | `nil` / `[]` | Fill from servers.dat, the ping (`ServerPing`) and Modrinth. `fit(_:)` compares `gameVersions` with the instance |
 
 ### Join server sheet (GAP-14)
 
@@ -186,6 +189,7 @@ xcrun simctl launch <UDID> app.cofre.ui.previewhost -screen setup -setupStep 3 -
 xcrun simctl launch <UDID> app.cofre.ui.previewhost -screen play -canvas 1376x1032 -snapshot ipad13   # PNG in app Documents
 xcrun simctl launch <UDID> app.cofre.ui.previewhost -screen join -joinState needsAttention   # firstVisit|keyChanged|installing|update|error|ready|resolving|live
 xcrun simctl launch <UDID> app.cofre.ui.previewhost -screen join -joinURL 'cofre://join?server=mc.example.com'   # deep-link route
+xcrun simctl launch <UDID> app.cofre.ui.previewhost -screen servers -servers version   # mine|loading|pinging|offline|empty|version|newInstance|joining
 ```
 
 Use the shared simulators from `<local-volume>/Developer/kiwios/docs/simulators.md`. Never install on devices.

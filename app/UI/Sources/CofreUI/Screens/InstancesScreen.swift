@@ -467,9 +467,14 @@
                 // On failure the sheet stays open; the error shows in the banner.
                 guard let made else { return }
                 dismiss()
-                if plan != nil {
-                    // From Mods: stay there, on the new instance.
+                if let plan {
+                    // From Mods: stay there, on the new instance. From a server that needs this version: save it
+                    // there and show Servers, one tap from Join.
+                    if let server = plan.server {
+                        await store.addServer(address: server.address, name: server.name, from: server, to: made.id)
+                    }
                     await store.selectInstance(made.id)
+                    if plan.server != nil { nav.playPane = 2 }
                 } else {
                     nav.instance = made.id
                     nav.section = .instances

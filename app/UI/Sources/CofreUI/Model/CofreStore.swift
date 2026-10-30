@@ -71,6 +71,19 @@
         public var theme = CofreTheme.current
         public var lastError: String?
 
+        // Servers (plan/servers.md). `servers` above is the active instance's servers.dat, read again on every show.
+        /// The instance `servers` was loaded for; differs from the active one while it loads.
+        public var serversInstanceID: String?
+        /// Live ping per address (lowercased). Rows merge it over the saved fields.
+        public var serverPings: [String: ServerPingState] = [:]
+        /// "Recommended" (Modrinth's list) for `recommendedInstanceID`.
+        public var recommended: [ServerSummary] = []
+        public var recommendedInstanceID: String?
+        public var recommendedError: String?
+        public var recommendedLoading = false
+        /// The server the running launch joins; the launch screen names it.
+        public var joiningServer: ServerSummary?
+
         // Server join (GAP-14)
         /// Live Join server models by `ServerJoinRequest.id`. An installing one stays after its sheet closes.
         public var serverJoins: [String: any ServerJoinViewModel] = [:]
@@ -167,6 +180,8 @@
                 async let s = self.backend.servers(instanceID: id)
                 self.worlds = try await w
                 self.servers = try await s
+                self.serversInstanceID = id
+                self.pingServers()
                 if let mods { self.installed[.mods] = try await self.backend.installed(.mods, instanceID: mods) }
             }
         }
@@ -248,15 +263,6 @@
             return url
         }
 
-        public func addServer(name: String, address: String) async {
-            guard let inst = activeInstance?.id, !address.isEmpty else { return }
-            await run {
-                let s = try await self.backend.addServer(
-                    instanceID: inst, name: name.isEmpty ? address : name, address: address)
-                self.servers.append(s)
-            }
-        }
-
         // MARK: Server join (GAP-14)
 
         /// The live model for `request`, made on first use. `nil` without `.serverJoin` or when the backend has none.
@@ -293,9 +299,11 @@
 
         // MARK: Launch
 
-        public func play(_ instanceID: String? = nil) {
+        /// With `server`, launches straight into it (`joinServer`, plan/servers.md).
+        public func play(_ instanceID: String? = nil, server: ServerSummary? = nil) {
             guard let id = instanceID ?? activeInstance?.id else { return }
             activeInstanceID = id
+            joiningServer = server
             launchError = nil
             launchLog = []
             launch = LaunchProgress(stage: 1, of: 7, title: "JIT")
@@ -307,7 +315,11 @@
             }
             Task {
                 do {
-                    for try await p in backend.launch(instanceID: id, accountID: activeAccount?.id) {
+                    let stream =
+                        server.map {
+                            backend.joinServer(instanceID: id, address: $0.address, accountID: activeAccount?.id)
+                        } ?? backend.launch(instanceID: id, accountID: activeAccount?.id)
+                    for try await p in stream {
                         launch = p
                         if p.finished { UINotificationFeedbackGenerator().notificationOccurred(.success) }
                     }
@@ -673,10 +685,11 @@
             case .deleteInstance(let i): await delete(i.id)
             case .deleteWorld(let w): await deleteWorld(w)
             case .removeAccount(let a): await removeAccount(a)
+            case .removeServer(let s): await removeServer(s)
             }
         }
 
-        private func run(_ body: @escaping () async throws -> Void) async {
+        func run(_ body: @escaping () async throws -> Void) async {
             do { try await body() } catch { lastError = error.localizedDescription }
         }
     }
@@ -711,6 +724,8 @@
     /// Pre-fills P04 New instance.
     public struct NewInstancePlan: Equatable {
         public var name: String, version: String, loader: Loader
+        /// From a server that needs another version: saved in the new instance once it's made.
+        public var server: ServerSummary?
     }
 
     /// Destructive actions confirmed by the root view's alert, whichever menu, swipe or button started them.
@@ -718,11 +733,13 @@
         case deleteInstance(InstanceSummary)
         case deleteWorld(WorldSummary)
         case removeAccount(Account)
+        case removeServer(ServerSummary)
         public var id: String {
             switch self {
             case .deleteInstance(let i): "instance-\(i.id)"
             case .deleteWorld(let w): "world-\(w.id)"
             case .removeAccount(let a): "account-\(a.id)"
+            case .removeServer(let s): "server-\(s.id)"
             }
         }
     }

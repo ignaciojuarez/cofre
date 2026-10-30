@@ -3,7 +3,11 @@ import SwiftUI
 import UIKit
 
 // Launch arguments (all optional):
-//   -screen play|worlds|instances|mods|modpage|settings|jit|about|controls|setup|launch|join|gameExit   (default play)
+//   -screen play|worlds|servers|serversMock|instances|mods|modpage|settings|jit|about|controls|setup|launch|join|gameExit
+//                       (default play)
+//   -servers mine|loading|pinging|offline|empty|version|newInstance|joining
+//                       Servers pane state (-screen servers, plan/servers.md)
+//   (-screen serversMock) Layout B for comparison: worlds and servers as two sections of one list
 //   -exitReason memory|renderer|missingLibrary|mods|java|unknown|quit   Why the game stopped (-screen gameExit)
 //   -exitDetails YES    Open its Details sheet
 //   -joinState firstVisit|needsAttention|keyChanged|installing|update|error|ready|resolving|live   Join server sheet state
@@ -59,6 +63,19 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             nav.settingsPane = screen == "about" ? .about : .touch
         case "launch": nav.showingLaunch = true
         case "worlds": nav.playPane = 1
+        case "servers":
+            nav.playPane = 2
+            if let mock = services.backend as? MockBackend {
+                switch args.string(forKey: "servers") {
+                case "loading": mock.serverDelay = 600
+                case "pinging": mock.pingDelay = 600
+                case "offline":
+                    mock.serversOffline = true
+                    mock.offline = true
+                case "empty": mock.serverLists = [:]
+                default: break
+                }
+            }
         case "join":
             nav.playPane = 1
             if let mock = services.backend as? MockBackend {
@@ -115,10 +132,34 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
                 store.confirmInstall(id)
             }
         }
+        if screen == "servers", args.string(forKey: "servers") == "joining" {
+            // Join on Emberfall Network: straight into the server.
+            Task { @MainActor in
+                while store.serversLoading || store.servers.count < 3 { try? await Task.sleep(for: .milliseconds(100)) }
+                store.play("survival", server: store.live(store.servers[2]))
+                nav.showingLaunch = true
+            }
+        }
+        if screen == "servers", ["version", "newInstance"].contains(args.string(forKey: "servers")) {
+            // Play on Oakridge Towny (1.20.4) from Survival+ (1.21.1).
+            Task { @MainActor in
+                while store.serversLoading || store.servers.count < 4 { try? await Task.sleep(for: .milliseconds(100)) }
+                try? await Task.sleep(for: .milliseconds(300))
+                guard case .otherVersion(let choice)? = store.route(store.servers[3]) else { return }
+                if args.string(forKey: "servers") == "newInstance" {
+                    store.planInstance(for: choice)
+                    nav.sheet = .newInstance
+                } else {
+                    nav.serverVersion = choice
+                }
+            }
+        }
         let setupStep = args.object(forKey: "setupStep") != nil ? args.integer(forKey: "setupStep") : nil
         let root: UIViewController =
             screen == "touch"
             ? UIHostingController(rootView: TouchControlsMockPage(args.string(forKey: "touch") ?? "sheet"))
+            : screen == "serversMock"
+            ? UIHostingController(rootView: ServersVariationsMock())
             : screen == "gameExit"
             ? UIHostingController(
                 rootView: GameExitView(

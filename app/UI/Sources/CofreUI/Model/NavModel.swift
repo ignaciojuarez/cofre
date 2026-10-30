@@ -86,7 +86,7 @@
         public var instance: String?
         public var mod: ModsRoute?
         public var settingsPane: SettingsPane?
-        /// Play's compact segmented fallback: 0 = Play, 1 = Worlds.
+        /// Play's panes: 0 = Play, 1 = Worlds, 2 = Servers. Compact shows one; regular shows Play beside the other.
         public var playPane = 0
         public var sheet: ActiveSheet?
         /// ⌃⌘S: regular width shows the rail even when the sidebar would fit.
@@ -95,6 +95,10 @@
         public var showingAirScreen: AirScreenRoute?
         /// The Join server sheet (GAP-14). Shown only when the backend reports `.serverJoin`, and after setup.
         public var serverJoin: ServerJoinRequest?
+        /// Join on a server the instance can't join: pick one that fits, or make one (plan/servers.md).
+        public var serverVersion: ServerVersionChoice?
+        /// Runs once that sheet has finished closing, to start the launch or open P04.
+        @ObservationIgnored public var afterServerSheet: (() -> Void)?
 
         public init() {}
 

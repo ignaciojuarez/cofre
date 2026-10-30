@@ -2,12 +2,16 @@
     import SwiftUI
 
     // §3.2 AdaptiveSplit: primary (min width) + secondary (fixed width) side by side when both fit,
-    // else a fallback: `.stack` (VStack, same children via AnyLayout) or `.segmented` (one pane at a time).
+    // else a fallback: `.stack` (VStack, same children via AnyLayout), `.segmented` (one pane at a time) or `.panes`
+    // (one picker over the primary and the secondary's views).
 
     public struct AdaptiveSplit<P: View, S: View>: View {
         public enum Fallback {
             case stack
             case segmented(LocalizedStringKey, LocalizedStringKey)
+            /// One picker for the primary (index 0) and every view of the secondary (1…); the secondary reads the
+            /// selection to pick its view.
+            case panes([LocalizedStringKey])
         }
 
         let primaryMin: CGFloat, secondaryWidth: CGFloat, fallback: Fallback
@@ -36,13 +40,21 @@
             return c
         }
 
+        private var paneOptions: [(Int, LocalizedStringKey)] {
+            switch fallback {
+            case .segmented(let a, let b): [(0, a), (1, b)]
+            case .panes(let labels): labels.enumerated().map { ($0.offset, $0.element) }
+            case .stack: []
+            }
+        }
+
         public var body: some View {
             let fits = widthClass != .compact && ownWidth >= primaryMin + secondaryWidth
             Group {
                 switch (fits, fallback) {
-                case (false, .segmented(let a, let b)):
+                case (false, .segmented), (false, .panes):
                     let sel = pick ?? $localPick
-                    let picker = AnyView(Segmented("Pane", selection: sel, options: [(0, a), (1, b)]))
+                    let picker = AnyView(Segmented("Pane", selection: sel, options: paneOptions))
                     Group {
                         if sel.wrappedValue == 0 { primary } else { secondary }
                     }

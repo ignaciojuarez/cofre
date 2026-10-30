@@ -1,17 +1,18 @@
 #if canImport(UIKit)
     import SwiftUI
 
-    // P01 Play home + Worlds. AdaptiveSplit: side by side on regular, a Play · Worlds segmented control on compact.
+    // P01 Play home + Worlds | Servers. AdaptiveSplit: side by side on regular, one Play · Worlds · Servers picker on
+    // compact.
 
     public struct PlaySection: View {
         @Environment(NavModel.self) private var nav
         public init() {}
         public var body: some View {
             @Bindable var nav = nav
-            AdaptiveSplit(primaryMin: 480, secondaryWidth: 380, fallback: .segmented("Play", "Worlds")) {
+            AdaptiveSplit(primaryMin: 480, secondaryWidth: 380, fallback: .panes(["Play", "Worlds", "Servers"])) {
                 PlayHomePane()
             } secondary: {
-                WorldsPane()
+                PlaySidePane()
             }
             .selection($nav.playPane)
         }
@@ -148,47 +149,9 @@
         }
     }
 
-    /// A server. With a server card (GAP-14): a "Modded" badge and Join, which opens the Join server sheet.
-    /// While its install runs with the sheet closed, the row shows the percent.
-    struct ServerRow: View {
-        let server: ServerSummary
-        @Environment(CofreStore.self) private var store
-        @Environment(NavModel.self) private var nav
-
-        var body: some View {
-            let modded = server.hasServerCard && store.can(.serverJoin)
-            let progress = modded ? store.serverJoinProgress(address: server.address) : nil
-            Row(server.name) {
-                HStack(spacing: 6) {
-                    if modded { Badge("Modded", tone: .accent) }
-                    SubtitleText(text: Text(verbatim: server.detail ?? server.address))
-                }
-            } leading: {
-                PixelIcon(.cmd, size: 26)
-            } trailing: {
-                HStack(spacing: 8) {
-                    if let progress {
-                        Meta("\(Int((progress * 100).rounded()))%")
-                    } else if let ms = server.pingMS {
-                        Meta("\(ms) ms", tone: ms < 100 ? .success : .warn)
-                    }
-                    if modded {
-                        BlockButton("Join", size: .small) {
-                            nav.serverJoin = ServerJoinRequest(server: server.address)
-                        }
-                        .accessibilityLabel(Text("Join \(server.name)"))
-                    }
-                }
-            }
-        }
-    }
-
-    /// Worlds and servers. New worlds are made in game, so there's no "+ New" here.
+    /// Worlds. New worlds are made in game, so there's no "+ New" here. Servers have their own pane.
     public struct WorldsPane: View {
         @Environment(CofreStore.self) private var store
-        @State private var addingServer = false
-        @State private var serverName = ""
-        @State private var serverAddress = ""
         public init() {}
         public var body: some View {
             VStack(spacing: 0) {
@@ -199,27 +162,7 @@
                     } else {
                         WorldRows(worlds: store.worlds)
                     }
-                    if !store.servers.isEmpty {
-                        ListSection("Servers") {
-                            ForEach(store.servers) { s in ServerRow(server: s) }
-                        }
-                        .padding(.top, 6)
-                    }
-                    if store.can(.addServer) {
-                        BlockButton("+ Add server") {
-                            serverName = ""
-                            serverAddress = ""
-                            addingServer = true
-                        }
-                    }
                 }
-            }
-            .alert("Add server", isPresented: $addingServer) {
-                TextField("Name", text: $serverName)
-                TextField("Address", text: $serverAddress).textInputAutocapitalization(.never).autocorrectionDisabled()
-                    .keyboardType(.URL)
-                Button("Add") { Task { await store.addServer(name: serverName, address: serverAddress) } }
-                Button("Cancel", role: .cancel) {}
             }
         }
     }

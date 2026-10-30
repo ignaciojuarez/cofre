@@ -124,6 +124,10 @@ public enum CofreLinks {
                 }
                 .environment(store).environment(nav)
             }
+            // Servers: Join on a server the instance can't join.
+            .blockSheet(item: $nav.serverVersion, hugsContent: true, onDismiss: afterServerSheet) { choice in
+                ServerVersionSheet(choice: choice).environment(store).environment(nav)
+            }
             // Air's controls editor is a self-contained full-screen editor with its own exit menu; it only works
             // presented directly by UIKit.
             .onChange(of: nav.showingAirScreen) { _, route in
@@ -167,6 +171,13 @@ public enum CofreLinks {
                         ? nav.serverJoin : nil
                 },
                 set: { nav.serverJoin = $0 })
+        }
+
+        /// A launch or P04 started from the server sheet waits until it has closed.
+        private func afterServerSheet() {
+            let next = nav.afterServerSheet
+            nav.afterServerSheet = nil
+            next?()
         }
 
         /// "Launch & Join" waits for the sheet to finish closing, so the launch takeover can present.

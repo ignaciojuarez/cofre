@@ -55,11 +55,56 @@
         func removeAccount(id: String) async throws
     }
 
+    /// Servers (plan/servers.md). The instance's servers.dat is the only saved list: `servers(instanceID:)` reads it,
+    /// `addServer` (OptionalActions) appends Recommended picks, links and pasted addresses, these copy and delete.
+    /// Renaming, reordering and resource packs stay in game. Cofre's job is jumping straight in. Every member has a
+    /// default; controls stay hidden until `capabilities` has `.pingServers`, `.quickPlay`, `.serverFiles` or
+    /// `.discoverServers`.
+    public protocol ServerService: AnyObject {
+        /// "Recommended": popular servers on Modrinth's server list that fit the instance's version (and loader, when
+        /// the listing names one), most popular first. Never written anywhere. Throw when offline.
+        func discoverServers(instanceID: String) async throws -> [ServerSummary]
+        /// Server List Ping. Throw when it can't be reached; the row says so.
+        func pingServer(address: String) async throws -> ServerPing
+        /// Launches `instanceID` straight into `address`: Quick Play (`--quickPlayMultiplayer`) on 1.20+,
+        /// `--server`/`--port` before. Same stream as `launch`.
+        func joinServer(instanceID: String, address: String, accountID: String?)
+            -> AsyncThrowingStream<LaunchProgress, Error>
+        /// Appends a copy of the whole record (icon, `acceptTextures`, unknown tags) to `instanceID`'s servers.dat.
+        func copyServer(_ server: ServerSummary, to instanceID: String) async throws -> ServerSummary
+        /// Deletes it from `server.instanceID`'s servers.dat.
+        func removeServer(_ server: ServerSummary) async throws
+    }
+
+    extension ServerService {
+        public func discoverServers(instanceID: String) async throws -> [ServerSummary] {
+            throw UnsupportedAction(name: "Recommended servers")
+        }
+        public func pingServer(address: String) async throws -> ServerPing {
+            throw UnsupportedAction(name: "Server ping")
+        }
+        public func copyServer(_ server: ServerSummary, to instanceID: String) async throws -> ServerSummary {
+            throw UnsupportedAction(name: "Copying servers")
+        }
+        public func removeServer(_ server: ServerSummary) async throws {
+            throw UnsupportedAction(name: "Removing servers")
+        }
+    }
+
+    extension ServerService where Self: LaunchControl {
+        /// Default without Quick Play: a plain launch. The UI only offers it with `.quickPlay`.
+        public func joinServer(instanceID: String, address: String, accountID: String?)
+            -> AsyncThrowingStream<LaunchProgress, Error>
+        {
+            launch(instanceID: instanceID, accountID: accountID)
+        }
+    }
+
     /// Everything the UI needs from one object. The adapter writes one adapter around CofreBackendAdapter that conforms.
     public typealias CofreBackend = SetupService & LibraryService & ContentService & AccountService
         & LaunchControl & LogSource & InstanceActions & VersionCatalog & ProjectCatalog & InstallProgressSource
         & JITTester & SigningInfoSource & SystemCatalog & AirAppearance & OptionalActions & ServerJoinSource
-        & GameInputService
+        & GameInputService & ServerService
 
     /// What the shell hands to `CofreUI.makeRootViewController(services:)`.
     public struct CofreServices {

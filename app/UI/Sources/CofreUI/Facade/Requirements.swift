@@ -266,7 +266,7 @@ import Foundation
         public static let deleteWorld = BackendCapabilities(rawValue: 1 << 0)
         /// World context menu: Back up → `backUpWorld`, then the share sheet.
         public static let backUpWorld = BackendCapabilities(rawValue: 1 << 1)
-        /// Worlds pane "+ Add server" → `addServer`.
+        /// Servers: Recommended "Add", "Paste" and links write to servers.dat → `addServer`.
         public static let addServer = BackendCapabilities(rawValue: 1 << 2)
         /// X04 "Env variables" row, from `GamePreferences.envVariables`.
         public static let envVariables = BackendCapabilities(rawValue: 1 << 3)
@@ -284,6 +284,14 @@ import Foundation
         public static let serverJoin = BackendCapabilities(rawValue: 1 << 10)
         /// I02 Options icon grid → `setIcon(_:instanceID:)`.
         public static let instanceIcon = BackendCapabilities(rawValue: 1 << 11)
+        /// Servers (`ServerService`): "Copy to" and "Delete" in a server row's menu.
+        public static let serverFiles = BackendCapabilities(rawValue: 1 << 12)
+        /// MOTD, players and ping bars on server rows → `pingServer`.
+        public static let pingServers = BackendCapabilities(rawValue: 1 << 13)
+        /// Join on a server row launches straight into it → `joinServer`.
+        public static let quickPlay = BackendCapabilities(rawValue: 1 << 14)
+        /// Servers: the "Recommended" section → `discoverServers`.
+        public static let discoverServers = BackendCapabilities(rawValue: 1 << 15)
     }
 
     public protocol OptionalActions: AnyObject {

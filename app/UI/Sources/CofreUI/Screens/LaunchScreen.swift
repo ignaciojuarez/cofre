@@ -54,8 +54,11 @@
                 .ignoresSafeArea().accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 10) {
                     if let inst {
-                        Text(verbatim: "\(inst.name) · \(inst.loaderLabel)").cofreFont(.label).foregroundStyle(
-                            .white.opacity(0.85))
+                        Text(
+                            verbatim: ["\(inst.name) · \(inst.loaderLabel)", store.joiningServer?.address]
+                                .compactMap { $0 }.joined(separator: " → ")
+                        )
+                        .cofreFont(.label).foregroundStyle(.white.opacity(0.85))
                     }
                     Text(title(p)).cofreFont(.display).foregroundStyle(.white).shadow(color: .black, radius: 0, y: 2)
                         .accessibilityAddTraits(.isHeader)
@@ -88,7 +91,8 @@
 
         private var stageNames: [String] {
             let java = store.activeInstance?.javaVersion.map { "Java \($0)" } ?? "Java"
-            return ["JIT", "Game files", "Renderer", java, "Starting Minecraft", "Loading", "In game"]
+            let last = store.joiningServer.map { String(localized: "Join \($0.name)") } ?? String(localized: "In game")
+            return ["JIT", "Game files", "Renderer", java, "Starting Minecraft", "Loading", last]
         }
 
         var body: some View {
