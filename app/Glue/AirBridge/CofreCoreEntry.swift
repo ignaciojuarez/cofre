@@ -7,6 +7,9 @@ public final class CofreCoreEntry: NSObject {
     private static var root: UIViewController?
     @objc(startWithBridge:)
     @MainActor public static func start(withBridge bridge: Any) {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CofreVersion") as? String ?? Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CofreBuild") as? String ?? Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
+        NSLog("[Cofre] app version=%@ build=%@", version, build)
         guard let bridge = bridge as? any CofreAirBridging else { NSLog("[Cofre] UI fallback reason=bridge type"); return }
         self.bridge = bridge
         bridge.ensureAutomaticMemoryDefault()
