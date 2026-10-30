@@ -223,3 +223,19 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 - No source fixes made; no bug-fix commits.
 - Needs-owner: modpack import rollback leaves a non-empty `custom_gamedir` staging tree after force-quit; silent handling of empty deep-link server is safe but could use a clear invalid-address message; embedded app log version (`bef0297`) differs from this build script’s `CofreBuild 88f5334` and should be reconciled in build provenance.
 - Still uncovered: valid Files-based `.mrpack`, corrupt-file error sheet, wrong-loader explanation, link import, active download Cancel/Resume/Retry, portrait/landscape rotation and VoiceOver, Microsoft approval/passkey, and device-only JIT/game rendering.
+
+
+## Round 10 overnight testing (2026-10-30 · CofreBuild 80e0b8c · iPad Pro 1 SIMULATOR_UDID)
+
+| Area | Test case | Result | Evidence |
+|---|---|---|---|
+| Build | `scripts/sim.sh SIMULATOR_UDID`, install, launch | PASS; script printed `CofreBuild 80e0b8c`, matching `git rev-parse --short HEAD`; app launched | `/tmp/cofre-round10-build.log` |
+| Empty link | `cofre://join?server=` | PASS; clear “That link has no server address.” alert, no crash | `/tmp/cofre-test/shots/round10-empty-link.png` |
+| Valid link | `cofre://join?server=example.com:25565` | PASS; Join server sheet showed exact address and Add + Join | live AX snapshot |
+| Modpack rollback | Fabulously Optimized import, terminate mid-import, inspect/relaunch | BLOCKED; not reached in remaining session time | — |
+| Files imports | valid/corrupt/wrong-loader fixtures through Files | BLOCKED; not reached | — |
+| Rotation/VoiceOver | Mods and Instances rotation; main-button labels | BLOCKED; not reached | — |
+
+### Round 10 notes
+- Build/install/launch used only the requested iPad simulator; no physical device or credentials.
+- No source fixes were made.
