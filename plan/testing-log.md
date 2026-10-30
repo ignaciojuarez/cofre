@@ -286,21 +286,24 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 - Build: `./scripts/run.sh --build --no-install` exited 0; build lock released. Shared checkout included concurrent uncommitted Metal-warning edits; this was not an isolated HEAD build.
 - Install: cable `devicectl device install app` succeeded for `com.ignaciojuarez.cofre`.
 - Device-control blocker: `device_open` returned `No device COFRE_DEVICE_UDID on 'This machine' (hostId local). Call device_list for current ids.` Refreshed inventory still contains only simulators. Current tool instructions require device_open and prohibit direct CLI fallback, so no scenario launches or screenshots were attempted.
+- Rerun 2026-10-30 (HEAD 84dfd2b + fixes) with direct devicectl/agent-device access: every scenario reaches the launch, then stops because Documents/StikJIT/pairingFile.plist and the signed-in account are gone. The untested `copy to --destination Documents` in scripts/scenario.sh most likely replaced the Documents folder (container tmp/ survived; Documents was recreated at 13:25). Re-pair with Llave and sign in again before rerunning.
+
 
 | Scenario | Result | Log reason |
 |---|---|---|
-| fabric-1.21.1-sodium | BLOCKED / not run | Physical iPad absent from required device-control interface |
-| fabric-26.2-sodium-iris | BLOCKED / not run | Physical iPad absent from required device-control interface |
-| forge-1.20.1-deps | BLOCKED / not run | Physical iPad absent from required device-control interface |
-| neoforge-1.21.1 | BLOCKED / not run | Physical iPad absent from required device-control interface |
-| pack-fabulously-optimized | BLOCKED / not run | Physical iPad absent from required device-control interface |
-| pack-small-neoforge | BLOCKED / not run | Physical iPad absent from required device-control interface |
-| quilt-1.21.1-qsl | BLOCKED / not run | Physical iPad absent from required device-control interface |
-| vanilla-1.16.5 | BLOCKED / not run | Physical iPad absent from required device-control interface |
-| vanilla-1.20.1 | BLOCKED / not run | Physical iPad absent from required device-control interface |
-| vanilla-1.21.1 | BLOCKED / not run | Physical iPad absent from required device-control interface |
-| vanilla-1.21.11 | BLOCKED / not run | Physical iPad absent from required device-control interface |
-| vanilla-26.3 | BLOCKED / not run | Physical iPad absent from required device-control interface |
+| fabric-1.21.1-sodium | FAIL | instance, loader, Sodium ok; FAIL at launch: JIT needsPairing (pairing key gone) |
+| fabric-26.2-sodium-iris | FAIL | instance, loader, mods ok; FAIL at launch: JIT needsPairing (pairing key gone) |
+| forge-1.20.1-deps | FAIL | instance ok; FAIL at launch: JIT needsPairing (pairing key gone) (Forge installer needs JIT) |
+| neoforge-1.21.1 | FAIL | instance ok; FAIL at launch: JIT needsPairing (pairing key gone) (installer needs JIT) |
+| pack-fabulously-optimized | FAIL | pack ok (50/50 mods, 0 overrides rejected after fix); launches the pack instance after fix; FAIL at launch: JIT needsPairing (pairing key gone) |
+| pack-small-neoforge | FAIL | instance ok; FAIL at launch: JIT needsPairing (pairing key gone) (NeoForge installer needs JIT) |
+| quilt-1.21-qsl | FAIL | renamed from quilt-1.21.1-qsl: Modrinth QSL has no 1.21.1 build; loader, QSL ok on 1.21; FAIL at launch: JIT needsPairing (pairing key gone) |
+| vanilla-1.16.5 | FAIL | FAIL at launch: JIT needsPairing (pairing key gone) |
+| vanilla-1.20.1 | FAIL | FAIL at launch: JIT needsPairing (pairing key gone) |
+| vanilla-1.21.1 | FAIL | FAIL at launch: JIT needsPairing (pairing key gone) |
+| vanilla-1.21.11 | FAIL | FAIL at launch: JIT needsPairing (pairing key gone); Metal title screen unverified |
+| vanilla-26.3 | FAIL | FAIL at launch: JIT needsPairing (pairing key gone) |
 
 - 1.21.11 investigation: shipped RendererManifest.json lists 1.21.11 with 102 mapped classes. Patch 0003 gates the agent on manifest support and Java >= 21; it no longer uses the old MC >= 26 condition. The comment in pickRendererForProfile claiming the old gate is stale. Existing historical black-screen evidence does not establish the failure on this build. No speculative fallback or compatibility list added; title screen remains unverified.
+- 1.21.11 black screen evidence (`/tmp/cofre-ipad-logs4/latestlog.txt`, 08:56) predates 656c9e1: Auto picked Metal, but Air skipped the Metallum agent ("MC major 1 < 26 … Java 8"), so EGL fell back to ANGLE with zero-size framebuffers. The current gate (manifest + Java >= 21) loads the agent for 1.21.11; Auto keeps Metal there. Not re-verified on device (no pairing).
 - No launch fixes committed. Scenario runner remains unverified; its inGame verdict alone does not prove a rendered title screen. Final rebuild/device verification remains outstanding.
