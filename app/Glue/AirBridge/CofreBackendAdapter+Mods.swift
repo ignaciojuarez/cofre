@@ -635,8 +635,11 @@ struct CofreModVersion {
         private func loadModVersions(projectID: String, source: Int, loaders: [String] = [], gameVersions: [String] = []) async throws -> [CofreModVersion] {
             if source == 1 {
                 return try await modCatalog.modrinth.versions(projectID: projectID, loaders: loaders, gameVersions: gameVersions).map { v in
-                    let file = v.files.first(where: { $0.primary }) ?? v.files.first
-                    let version = CofreModVersion(data: ["id": v.id, "projectID": v.projectID, "apiSource": 1, "name": v.name, "version": v.versionNumber, "gameVersions": v.gameVersions, "loaders": v.loaders, "channel": v.versionType, "dependencies": v.dependencies.map { ["project_id": $0.projectID as Any, "version_id": $0.versionID as Any, "dependency_type": $0.dependencyType] }, "file": ["url": file?.url?.absoluteString as Any, "size": file?.size as Any, "hashes": file?.hashes as Any]])
+                    // The same file keys Air's rows carry; `download` needs the URL and the file name.
+                    let file: [String: Any] = (v.files.first(where: { $0.primary }) ?? v.files.first).map {
+                        ["url": $0.url?.absoluteString ?? "", "filename": $0.filename, "size": $0.size, "hashes": $0.hashes]
+                    } ?? [:]
+                    let version = CofreModVersion(data: ["id": v.id, "projectID": v.projectID, "apiSource": 1, "name": v.name, "version": v.versionNumber, "gameVersions": v.gameVersions, "loaders": v.loaders, "channel": v.versionType, "dependencies": v.dependencies.map { ["project_id": $0.projectID as Any, "version_id": $0.versionID as Any, "dependency_type": $0.dependencyType] }, "file": file])
                     modCatalog.versions[version.id] = version
                     return version
                 }
