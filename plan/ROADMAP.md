@@ -30,6 +30,7 @@ same step.
 | 6 | **Downloads and versions** | A downloads strip on Play, resume/retry, background downloads, disk-space preflight, a version picker (releases/snapshots) and loader version list | 🎯 |
 | 7 | **Modpack import + Files** | Import `.mrpack`/`.zip` from a file or link with staged rollback, "Open in Cofre" from Files and the share sheet | 🎯 |
 | 8 | **iOS niceties** | Heat and Low Power Mode banner, autosave-before-suspend note, Wi-Fi-only for big downloads | 🎯 |
+| 9a | **Own Modrinth client** | Mod pages load slowly because Air fetches every version (hundreds for Sodium). A CofreKit Modrinth client asks for the instance's versions first and the rest in the background | 🎯 |
 | 9 | **Engine seam** | Dissolve `CofreBackendAdapter`, the facade protocols and `MockBackend` into CofreKit + `GameEngine` | 🎯 |
 
 Z's variations, recommended picks taken (Ignacio: "I like it all"):
@@ -55,9 +56,9 @@ Z's variations, recommended picks taken (Ignacio: "I like it all"):
 
 | Topic | Question |
 |---|---|
-| **Performance presets** | Quality / Balanced / Battery tiles, heat-aware lowering, and the one-tap Performance pack ([performance](performance.md), design-draft §6). Not started until Ignacio decides |
-| Design draft open questions (1–8) | Settings › Game and Renderer as "defaults for new instances"? Undo toast instead of confirm for world delete? Shader-crash "Turn shaders off"? Heat-aware on by default? Performance pack on 26.x? Notes and groups in `cofre.json`? Wait for Wi-Fi above 200 MB? `.mcworld` error only? |
-| Auto-triage | Which mailbox receives reports? Public or private issues? ([auto-triage](auto-triage.md)) |
+| **Performance presets** | ⏸ Ignacio: not yet. Quality / Balanced / Battery tiles, heat-aware lowering, Performance pack ([performance](performance.md), design-draft §6) |
+| Design draft open questions (1–8) | Settings › Game and Renderer as "defaults for new instances"? Undo toast instead of confirm for world delete? ~~Shader-crash "Turn shaders off"~~ ✅ yes, built in `5824a14`. Heat-aware on by default? Performance pack on 26.x? Notes and groups in `cofre.json`? Wait for Wi-Fi above 200 MB? `.mcworld` error only? |
+| Auto-triage | ⏸ Ignacio: not yet. Report bundle + Share stay; sending, triage and agent PRs wait |
 | ✕ in menus | Change the icon to "← Back"? |
 | Companion state mod | An optional tiny Fabric mod that reports exact game state (flying, swimming, which screen is open). Low priority |
 | Public release | Our own Azure app for Microsoft sign-in; Metallum license and provenance; GitHub publishing (needs approval) ([PUBLIC_RELEASE](PUBLIC_RELEASE.md)) |
