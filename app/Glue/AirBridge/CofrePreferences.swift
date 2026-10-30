@@ -59,6 +59,7 @@ public struct CofrePreferenceStore {
     }
 
     public func load(instanceID: String?) -> GamePreferences {
+        applyFirstResolution()
         var p = GamePreferences()
         p.autoRAM = bool(.autoRAM, instanceID, default: p.autoRAM)
         p.ramMB = p.autoRAM
@@ -121,6 +122,26 @@ public struct CofrePreferenceStore {
     }
 
     public func stringValue(_ key: Key, profile: String?) -> String? { object(key, profile) as? String }
+
+    /// Air saves 100% on first launch. A new install (JIT never set up) on iPhone starts at ½ instead: sharp 2×2
+    /// pixels, cooler and longer battery. Runs once and never changes a value the player picked.
+    private func applyFirstResolution() {
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: "cofre.resolution.defaulted") else { return }
+        defaults.set(true, forKey: "cofre.resolution.defaulted")
+        guard Self.isPhone, !defaults.bool(forKey: "cofre.setup.jit"), double(.resolution, nil, default: 100) == 100
+        else { return }
+        put(.resolution, 50.0, nil)
+        NSLog("[Cofre] resolution default 50%% (iPhone)")
+    }
+
+    /// The hardware, not the UI idiom (Air rewrites the idiom).
+    private static var isPhone: Bool {
+        var system = utsname()
+        uname(&system)
+        return withUnsafeBytes(of: system.machine) { String(decoding: $0.prefix { $0 != 0 }, as: UTF8.self) }
+            .hasPrefix("iPhone")
+    }
 
     private func put(_ key: Key, _ value: Any, _ profile: String?) { write(key.rawValue, value, key.profileField == nil ? nil : profile) }
     private func object(_ key: Key, _ profile: String?) -> Any? { read(key.rawValue, key.profileField == nil ? nil : profile) }

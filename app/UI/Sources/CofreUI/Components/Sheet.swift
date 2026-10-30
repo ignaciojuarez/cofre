@@ -3,8 +3,10 @@ import SwiftUI
 // §2 #22 Sheet: form-sized and centered on regular, bottom sheet with detents on compact. Opaque panel, no glass.
 
 extension View {
-    public func blockSheet<C: View>(isPresented: Binding<Bool>, @ViewBuilder content: @escaping () -> C) -> some View {
-        sheet(isPresented: isPresented) { BlockSheetContent(content: content()) }
+    public func blockSheet<C: View>(
+        isPresented: Binding<Bool>, hugsContent: Bool = false, @ViewBuilder content: @escaping () -> C
+    ) -> some View {
+        sheet(isPresented: isPresented) { BlockSheetContent(content: content(), hugsContent: hugsContent) }
     }
 
     /// `hugsContent`: a short sheet as tall as its content on compact, and fitted to it on regular (iOS 18).

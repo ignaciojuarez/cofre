@@ -25,6 +25,8 @@ import UIKit
 //                       to Documents/<snapshot>.png, e.g. an iPad 13" window on an 11" simulator.
 //   -snapshot name      File name for -canvas output
 //   -touch a|b|c|ipad|settings|sheet   Touch-controls design mock (-screen touch)
+//   -resolutionOpen YES Open the Resolution picker (-screen resolution). -native 2266x1488 sizes it for that screen
+//   -landscape YES      Turn the app to landscape (the iPhone's game orientation)
 
 @main
 final class AppDelegate: UIResponder, UIApplicationDelegate {}
@@ -51,6 +53,9 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             nav.mod = .installed
             (services.backend as? MockBackend)?.failVersions = args.bool(forKey: "failVersions")
         case "settings": nav.section = .settings
+        case "resolution":
+            nav.section = .settings
+            nav.settingsPane = .game
         case "jit":
             nav.section = .settings
             nav.settingsPane = .jitJava
@@ -162,7 +167,13 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
                     showDetails: args.bool(forKey: "exitDetails"), close: {}))
             : UIHostingController(
                 rootView: CofreRootView(store: store, nav: nav, setupStart: setupStep)
-                    .environment(\.showsAllVersions, args.bool(forKey: "allVersions")))
+                    .environment(\.showsAllVersions, args.bool(forKey: "allVersions"))
+                    .environment(\.opensResolutionPicker, args.bool(forKey: "resolutionOpen"))
+                    .environment(
+                        \.screenPixels,
+                        args.string(forKey: "native").flatMap(Self.size(from:)).map {
+                            RenderResolution(width: Int($0.width), height: Int($0.height))
+                        }))
         root.view.backgroundColor = .cofre.page
         let window = UIWindow(windowScene: scene)
         // On the window, so presented sheets get it too.
@@ -180,6 +191,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         }
         window.makeKeyAndVisible()
         self.window = window
+        if args.bool(forKey: "landscape") { scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight)) }
     }
 
     static func size(from s: String) -> CGSize? {
