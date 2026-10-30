@@ -44,18 +44,16 @@ extern NSMutableArray<NSDictionary *> *remoteVersionList;
 static UIWindow *cofreLaunchOverlayWindow;
 
 static void (^cofreLaunchEventHandler)(CofreLaunchEvent, double, NSString *);
-static BOOL cofreAwaitingFirstFrame;
 static atomic_bool cofreAwaitingFirstDrawable;
 static id (*cofreOriginalNextDrawable)(id, SEL);
 
 BOOL CofreOwnsLaunchUI(void) { return YES; }
-void CofreLaunchSurfaceAttached(void) { cofreAwaitingFirstFrame = YES; if (cofreLaunchEventHandler) cofreLaunchEventHandler(CofreLaunchEventSurfaceShown, 0, nil); }
-void CofreLaunchFirstFramePresented(void) { cofreAwaitingFirstFrame = NO; NSLog(@"[Cofre] first-frame source=gl/air"); if (cofreLaunchEventHandler) cofreLaunchEventHandler(CofreLaunchEventFirstFrame, 1, @"gl"); }
+void CofreLaunchSurfaceAttached(void) { if (cofreLaunchEventHandler) cofreLaunchEventHandler(CofreLaunchEventSurfaceShown, 0, nil); }
+void CofreLaunchFirstFramePresented(void) { NSLog(@"[Cofre] first-frame source=gl/air"); if (cofreLaunchEventHandler) cofreLaunchEventHandler(CofreLaunchEventFirstFrame, 1, @"gl"); }
 static id CofreNextDrawable(CAMetalLayer *layer, SEL cmd) {
   if (atomic_exchange(&cofreAwaitingFirstDrawable, false)) {
     method_setImplementation(class_getInstanceMethod(CAMetalLayer.class, @selector(nextDrawable)), (IMP)cofreOriginalNextDrawable);
     dispatch_async(dispatch_get_main_queue(), ^{
-      cofreAwaitingFirstFrame = NO;
       NSLog(@"[Cofre] first-frame source=metal");
       if (cofreLaunchEventHandler) cofreLaunchEventHandler(CofreLaunchEventFirstFrame, 1, @"metal");
     });
@@ -69,7 +67,6 @@ static void CofreArmFirstDrawable(void) {
   atomic_store(&cofreAwaitingFirstDrawable, true);
 }
 void CofreLaunchGameExited(int code) { dispatch_async(dispatch_get_main_queue(), ^{ if (cofreLaunchEventHandler) cofreLaunchEventHandler(CofreLaunchEventExited, 0, [NSString stringWithFormat:@"exit code %d", code]); }); }
-BOOL CofreLaunchAwaitingFirstFrame(void) { return cofreAwaitingFirstFrame; }
 
 static void CofreFinishSurface(UIWindow *window);
 
@@ -961,11 +958,8 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
                                                          encoding:NSUTF8StringEncoding error:nil];
   NSLog(@"[Cofre] game %@ for Minecraft %@", lang, game);
 }
-- (BOOL)launchAwaitingFirstFrame {
-  return CofreLaunchAwaitingFirstFrame();
-}
 - (void)hideCofreLaunchOverlay {
-  NSLog(@"[Cofre] launch finish reason=cancelled");
+  NSLog(@"[Cofre] launch overlay closing");
   CofreFinishSurface(UIWindow.mainWindow);
 }
 - (void)searchProjects:(NSDictionary *)filters

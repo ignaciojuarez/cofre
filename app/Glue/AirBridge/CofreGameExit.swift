@@ -10,12 +10,8 @@ import UIKit
 
     static func handle(code: Int, root: UIViewController?, bridge: (any CofreAirBridging)?) {
         NSLog("[Cofre] launch exit code=%d", code)
-        // Before the first frame Cofre's launch screen is still up and shows the failure itself (store.launchError).
-        // CofreCore can't link symbols in Air's executable, so ask through the bridge object.
-        if bridge?.launchAwaitingFirstFrame == true {
-            NSLog("[Cofre] game exit shown on the launch screen")
-            return
-        }
+        // Shown before the first frame too: the launch screen closes when the game exits, and Java can't start
+        // again in this process, so this screen (Play again reopens Cofre) is the only way on.
         guard window == nil,
             let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first
         else { return }
