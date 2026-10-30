@@ -153,3 +153,23 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 - `device_list` showed all iPads booted; `device_open` confirmed C51 and EF were already owned by other active sessions. I did not close or reuse those sessions and did not drive another thread's UI.
 - No interactive screenshots or UX findings were produced because the shared-device ownership constraint prevented a valid session. No bug status was changed; B-004/B-005/B-006/B-008 remain handoff pending interactive retest.
 - No physical device was used, no credentials were read, and no files were changed outside this log.
+
+## Round 6 hands-on (2026-10-30 · HEAD ea522ee · iPad Pro 1 C51DB8A8…)
+
+| Area | Test case | Result | Evidence |
+|---|---|---|---|
+| Build | `scripts/sim.sh SIMULATOR_UDID`, install and launch | PASS; `CofreBuild ea522ee`; app launched into Play | `/tmp/cofre-round6-build.log` |
+| B-004 | Instances ⋯ → Edit; rename to emoji + 61 typed chars | PASS; saved and displayed emoji name with deterministic ` 1` suffix | `/tmp/cofre-test/shots/round6-B004-rename.png` |
+| B-004 | Duplicate-name rejection, duplicate/restore/delete/export/import sequence | BLOCKED: time; existing instances were preserved | — |
+| B-005 | Fabric 1.21.1 Sodium/Iris renderer badge, required/optional deps, incompatible Get anyway/Cancel | BLOCKED: this session remained on Quilt while switching and network install flows were not completed | — |
+| B-006 | Mods → Data with no worlds | PASS; explicit world-owned explanation shown | `/tmp/cofre-test/shots/round6-B006-data.png` |
+| B-008 | `cofre://join?server=example.com:25565` and empty server link | FAIL: deep link returned to Play/Servers without Add + Join sheet; no address surfaced | `/tmp/cofre-test/shots/round6-B008-empty.png` |
+| Modpacks | valid/corrupt Modrinth `.mrpack` via Files | BLOCKED: no downloaded fixture opened in Files | — |
+| Lifecycle | terminate mid-download/install, relaunch; rotate | PARTIAL: rotate screenshot captured; kill-mid-flow not reached | `/tmp/cofre-test/shots/round6-rotate.png` |
+| UX | first-time Play/Instances/Mods pass | PASS with UX note: iPad split layout is readable; Mods empty state and Data explanation are clear | `/tmp/cofre-test/shots/round6-B006-data.png` |
+| Accounts | Microsoft sign-in with supplied secret | BLOCKED; secret not read because sign-in flow was not reached | — |
+
+### Round 6 notes
+- Build/install used only C51; no physical device. Device state was left dark/default; no credentials or tokens were read or logged.
+- B-008 regression remains needs-owner despite source fix history: `simctl openurl` did not present the expected address sheet on a fresh launch.
+- No source fixes were made; therefore no bug-fix commits. `cd app/UI && swift test` and whole-app compile were not rerun in this hands-on pass (prior round results remain recorded above).
