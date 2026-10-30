@@ -255,6 +255,8 @@
         public let id: String
         public var name: String, version: String, enabled: Bool
         public var kind: ContentKind
+        public var inUse: Bool
+        public var world: String?
         public var updateTo: String?
         /// e.g. "Fabric API missing".
         public var issue: String?
@@ -274,6 +276,8 @@
             self.version = version
             self.enabled = enabled
             self.kind = kind
+            self.inUse = false
+            self.world = nil
             self.updateTo = updateTo
             self.issue = issue
             self.projectID = projectID

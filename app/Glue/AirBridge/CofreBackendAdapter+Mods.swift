@@ -352,7 +352,7 @@ struct CofreModVersion {
             var items: [InstalledItem]
             if let files = try? ContentStore(gameDirectory: URL(fileURLWithPath: directory)).list(fileKind) {
                 items = files.map { file in
-                    InstalledItem(id: file.id, name: file.name, version: file.version, enabled: file.enabled, kind: kind)
+                    InstalledItem(id: file.id, name: file.name, version: file.version, enabled: file.enabled, kind: kind, issue: nil, projectID: nil, versionID: nil, updateVersionID: nil).withContentState(inUse: file.inUse, world: file.world)
                 }
             } else {
                 let rows: [Any] = await withCheckedContinuation { c in
@@ -677,3 +677,5 @@ struct CofreModVersion {
         }
     }
 #endif
+
+private extension InstalledItem { func withContentState(inUse: Bool, world: String?) -> InstalledItem { var x = self; x.inUse = inUse; x.world = world; return x } }

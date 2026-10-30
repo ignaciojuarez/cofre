@@ -70,47 +70,33 @@
     struct InstalledRows: View {
         let items: [InstalledItem]
         @Environment(CofreStore.self) private var store
-
         var body: some View {
             ForEach(items) { item in
-                Toggle(isOn: Binding(get: { item.enabled }, set: { store.setEnabled($0, item: item) })) {
-                    HStack(spacing: 8) {
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(verbatim: item.name).cofreFont(.rowTitle).foregroundStyle(Color.cofre.ink).lineLimit(1)
-                            if let issue = store.compatibilityIssue(for: item) { Badge(issue.badge, tone: .warn) }
-                            Group {
-                                if let issue = item.issue {
-                                    Text("Needs dep · \(issue)").foregroundStyle(Color.cofre.danger)
-                                } else if let to = item.updateTo {
-                                    Text(verbatim: "\(VersionLabel.clean(item.version)) → \(to)")
-                                        .foregroundStyle(Color.cofre.warn)
-                                } else {
-                                    Text(verbatim: item.enabled ? VersionLabel.clean(item.version) : String(localized: "Off"))
-                                        .foregroundStyle(Color.cofre.muted)
-                                }
-                            }
-                            .cofreFont(.caption).lineLimit(1)
-                        }
-                        Spacer(minLength: 4)
-                        // A renderer warning shows once, under the name; the row's own switch turns the mod off.
-                        if item.issue != nil {
-                            Badge("Needs dep", tone: .danger)
-                        } else if item.updateTo != nil {
-                            Badge("Update", tone: .warn)
-                        }
-                    }
+                Group {
+                    if item.kind == .mods {
+                        Toggle(isOn: Binding(get: { item.enabled }, set: { store.setEnabled($0, item: item) })) { row(item) }
+                            .toggleStyle(.block)
+                    } else { row(item) }
                 }
-                .toggleStyle(.block)
-                .padding(.horizontal, 11).padding(.vertical, 6)
-                .frame(minHeight: 44)
-                .block(.panel)
-                .blockHover()
+                .padding(.horizontal, 11).padding(.vertical, 6).frame(minHeight: 44).block(.panel).blockHover()
                 .opacity(item.enabled ? 1 : 0.6)
                 .contextMenu {
-                    Button(item.enabled ? "Turn off" : "Turn on") { store.setEnabled(!item.enabled, item: item) }
-                    if item.updateTo != nil { Button("Update") { Task { await store.updateAll() } } }
+                    if item.kind == .mods { Button(item.enabled ? "Turn off" : "Turn on") { store.setEnabled(!item.enabled, item: item) } }
                     Button("Delete", role: .destructive) { store.deleteItem(item) }
                 }
+            }
+        }
+        @ViewBuilder private func row(_ item: InstalledItem) -> some View {
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(verbatim: item.name).cofreFont(.rowTitle).foregroundStyle(Color.cofre.ink).lineLimit(1)
+                    if let issue = store.compatibilityIssue(for: item) { Badge(issue.badge, tone: .warn) }
+                    Text(verbatim: item.kind == .mods ? (item.enabled ? VersionLabel.clean(item.version) : String(localized: "Off")) : (item.inUse ? "In use" : "Change in game"))
+                        .cofreFont(.caption).foregroundStyle(Color.cofre.muted).lineLimit(1)
+                }
+                Spacer(minLength: 4)
+                if item.updateTo != nil { Badge("Update", tone: .warn) }
+                if item.kind != .mods && item.inUse { Badge("In use", tone: .success) }
             }
         }
     }
