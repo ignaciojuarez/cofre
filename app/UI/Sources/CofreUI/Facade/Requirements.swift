@@ -312,7 +312,7 @@ import Foundation
     }
 
 // MARK: GAP-12 · Extended preferences (addition, not in §4.2)
-// `GamePreferences` has more fields than `CofrePreferences` (autoRAM, fsrMode, fpsOverlay, vsync, fpsCap,
+// `GamePreferences` has more fields than `CofrePreferences` (autoRAM, fpsOverlay, vsync, fpsCap,
 // mute, mic, gyro, virtual mouse, hotbar swipe, TouchController, button scale, layouts, download source,
 // verify files). Map each to its Air pref key in `LibraryService.preferences`.
 #endif

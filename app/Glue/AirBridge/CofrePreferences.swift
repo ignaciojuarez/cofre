@@ -12,7 +12,7 @@ public struct CofrePreferenceStore {
         case ramCeiling = "java.ram_ceiling"
         case renderer = "video.renderer"
         case resolution = "video.resolution"
-        case fsrMode = "mobileglues.fsr1_setting"
+        case fsr = "mobileglues.fsr1_setting"
         case graphicsAPI = "video.graphics_api"
         case java = "java.java_version"
         case javaArgs = "java.java_args"
@@ -47,6 +47,9 @@ public struct CofrePreferenceStore {
         }
     }
 
+    /// MobileGlues' FSR presets 1–4 (Ultra quality, Quality, Balanced, Performance): screen size ÷ factor is drawn.
+    static let fsrFactors = [1.3, 1.5, 1.7, 2.0]
+
     public typealias Read = (_ key: String, _ profile: String?) -> Any?
     public typealias Write = (_ key: String, _ value: Any, _ profile: String?) -> Void
 
@@ -67,11 +70,12 @@ public struct CofrePreferenceStore {
             : integer(.ramAllocation, instanceID, default: p.ramMB)
         p.deviceRAMMB = Int(ProcessInfo.processInfo.physicalMemory / 1_048_576)
         p.renderer = string(.renderer, instanceID, default: p.renderer)
-        p.resolution = double(.resolution, instanceID, default: p.resolution * 100) / 100
-        let fsr = integer(.fsrMode, instanceID, default: 0)
-        // MobileGlues' presets: 1 Ultra quality (1.3×), 2 Quality (1.5×), 3 Balanced (1.7×), 4 Performance (2×).
-        p.fsrMode = [.off, .ultra, .quality, .performance, .performance][safe: fsr] ?? .off
-        p.fsr = p.fsrMode != .off
+        // With FSR the screen stays full size and MobileGlues draws smaller inside it, so the size the player picked
+        // is the screen size divided by the FSR preset's factor.
+        let stored = double(.resolution, instanceID, default: p.resolution * 100) / 100
+        let preset = integer(.fsr, instanceID, default: 0)
+        p.fsr = Self.fsrFactors.indices.contains(preset - 1)
+        p.resolution = p.fsr ? stored / Self.fsrFactors[preset - 1] : stored
         p.graphicsApi = string(.graphicsAPI, instanceID, default: p.graphicsApi)
         p.java = string(.java, instanceID, default: p.java)
         p.jvmArgs = string(.javaArgs, instanceID, default: p.jvmArgs)
@@ -99,8 +103,17 @@ public struct CofrePreferenceStore {
         put(.autoRAM, p.autoRAM, instanceID)
         if !p.autoRAM { put(.ramAllocation, p.ramMB, instanceID) }
         put(.renderer, p.renderer, instanceID)
-        put(.resolution, p.resolution * 100, instanceID)
-        put(.fsrMode, ["off": 0, "ultra": 1, "quality": 2, "performance": 4][p.fsrMode.rawValue] ?? 0, instanceID)
+        // Smooth upscale: full-size screen plus the MobileGlues FSR preset nearest the picked size (½ at most), so
+        // the picture is scaled once. Otherwise the screen itself is the picked size and FSR is off.
+        if p.fsr, p.renderer.contains("mobileglues"), p.resolution < 0.99 {
+            let factor = 1 / max(p.resolution, 0.5)
+            let preset = Self.fsrFactors.indices.min { abs(Self.fsrFactors[$0] - factor) < abs(Self.fsrFactors[$1] - factor) }!
+            put(.resolution, 100.0, instanceID)
+            put(.fsr, preset + 1, instanceID)
+        } else {
+            put(.resolution, p.resolution * 100, instanceID)
+            put(.fsr, 0, instanceID)
+        }
         put(.graphicsAPI, p.graphicsApi == "auto" ? "" : p.graphicsApi, instanceID)
         put(.java, p.java, instanceID)
         put(.javaArgs, p.jvmArgs, instanceID)

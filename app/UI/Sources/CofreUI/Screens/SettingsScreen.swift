@@ -116,18 +116,10 @@
                         "Renderer", value: store.renderers.first { $0.id == p.renderer }?.name ?? p.renderer,
                         accent: true)
                 }.buttonStyle(RowButtonStyle())
-                ResolutionRow(scale: prefBinding(store, instanceID, \.resolution))
-                // FSR is a MobileGlues setting; Auto never loads MobileGlues (it picks Metal or ANGLE).
-                if p.renderer.contains("mobileglues") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("FSR 1.0 upscale").cofreFont(.rowTitle).foregroundStyle(Color.cofre.ink)
-                        Segmented(
-                            "FSR 1.0 upscale", selection: prefBinding(store, instanceID, \.fsrMode),
-                            options: [(.off, "Off"), (.ultra, "Ultra"), (.quality, "Quality"), (.performance, "Perf")],
-                            size: .small)
-                    }
-                    .padding(12).block(.panel)
-                }
+                // FSR is a MobileGlues setting, so Smooth upscale shows only when MobileGlues is the renderer.
+                ResolutionRow(
+                    scale: prefBinding(store, instanceID, \.resolution),
+                    smooth: p.renderer.contains("mobileglues") ? prefBinding(store, instanceID, \.fsr) : nil)
                 ToggleRow("FPS overlay", isOn: prefBinding(store, instanceID, \.fpsOverlay))
                 Text("VSync and Max Framerate are in the game: Options › Video Settings.")
                     .cofreFont(.caption).foregroundStyle(Color.cofre.muted).padding(.horizontal, 2)

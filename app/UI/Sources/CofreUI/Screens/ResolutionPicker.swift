@@ -22,6 +22,8 @@
     /// Settings row: the current choice and its real pixel size ("Balanced · 1133 × 744"). Opens the picker.
     struct ResolutionRow: View {
         @Binding var scale: Double
+        /// Smooth upscale (MobileGlues FSR); nil when the renderer can't do it.
+        var smooth: Binding<Bool>?
         @Environment(\.screenPixels) private var screenPixels
         @Environment(\.opensResolutionPicker) private var opens
         @State private var showing = false
@@ -31,25 +33,28 @@
             Button {
                 showing = true
             } label: {
-                ValueRow("Resolution", value: native.label(scale))
+                ValueRow("Resolution", value: native.label(scale) + (smooth?.wrappedValue == true && scale < 0.99 ? " · smooth" : ""))
             }
             .buttonStyle(RowButtonStyle())
             .onAppear { if opens { showing = true } }
-            .blockSheet(isPresented: $showing, hugsContent: true) { ResolutionPicker(scale: $scale, native: native) }
+            .blockSheet(isPresented: $showing, hugsContent: true) { ResolutionPicker(scale: $scale, smooth: smooth, native: native) }
         }
     }
 
     struct ResolutionPicker: View {
         @Binding var scale: Double
+        var smooth: Binding<Bool>?
         let native: RenderResolution
         @Environment(\.dismiss) private var dismiss
 
         var body: some View {
+            // FSR enlarges at most 2×, so smooth stops at ½.
+            let isSmooth = smooth?.wrappedValue == true
             VStack(alignment: .leading, spacing: 0) {
                 SheetHeader("Resolution")
                 VStack(alignment: .leading, spacing: 10) {
                     ListSection(spacing: 4) {
-                        ForEach(native.presets) { preset in
+                        ForEach(native.presets.filter { !isSmooth || $0.scale >= 0.5 }) { preset in
                             let on = native.preset(for: scale) == preset
                             Button {
                                 scale = preset.scale
@@ -62,15 +67,25 @@
                                 ) {
                                     Radio(isOn: on)
                                 } trailing: {
-                                    if native.isSharp(preset) { Badge("Sharp", tone: .success) }
+                                    if !isSmooth, native.isSharp(preset) { Badge("Sharp", tone: .success) }
                                 }
                             }
                             .buttonStyle(RowButtonStyle())
                         }
                     }
+                    if let smooth {
+                        ToggleRow(
+                            "Smooth upscale (FSR)", subtitle: "Softer edges instead of sharp pixels. Down to ½.",
+                            isOn: Binding(
+                                get: { smooth.wrappedValue },
+                                set: {
+                                    smooth.wrappedValue = $0
+                                    if $0 { scale = max(scale, 0.5) }
+                                }))
+                    }
                     BlockSlider(
-                        "Custom", value: $scale, in: 0.25...1, step: 0.05,
-                        note: "Sizes between the presets may look uneven.",
+                        "Custom", value: $scale, in: (isSmooth ? 0.5 : 0.25)...1, step: 0.05,
+                        note: isSmooth ? "Smooth upscale uses the nearest FSR step." : "Sizes between the presets may look uneven.",
                         accessibilityValue: { "\(RenderResolution.percent($0)), \(native.size($0))" }
                     ) { "\(RenderResolution.percent($0)) · \(native.size($0))" }
                     Text("Minecraft's Fullscreen Resolution setting does nothing on iPhone and iPad; this sets the real size.")
