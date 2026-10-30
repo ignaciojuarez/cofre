@@ -35,7 +35,10 @@ import UIKit
         let intent = bridge.flatMap { makeRejoinIntent($0) }
         if let intent { RejoinIntentStore.save(intent) }
         NSLog("[Cofre] game exit screen reason=%@ crashReport=%d", report.reason.rawValue, report.files.count > 1)
-        let host = UIHostingController(rootView: GameExitView(report: report, intent: intent, reportURL: reportBundle, reportPreview: ReportPreviewData(fields: preview.fields.map { "\($0.name): \($0.value)" }, files: preview.files), close: AppExit.close, retry: { AppExit.close() }))
+        let host = UIHostingController(rootView: GameExitView(report: report, intent: intent, reportURL: reportBundle, reportPreview: ReportPreviewData(fields: preview.fields.map { "\($0.name): \($0.value)" }, files: preview.files), close: AppExit.close, retry: { AppExit.close() },
+            turnShadersOff: instanceURL.flatMap { dir in
+                ShaderSwitch.causedCrash((crashText ?? "") + logText, gameDirectory: dir) ? { try ShaderSwitch.turnOff(in: dir) } : nil
+            }))
         host.view.backgroundColor = .cofre.page
         host.overrideUserInterfaceStyle = .dark
         let w = UIWindow(windowScene: scene)

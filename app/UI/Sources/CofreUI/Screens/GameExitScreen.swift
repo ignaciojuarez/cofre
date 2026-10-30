@@ -20,8 +20,10 @@
     /// The whole screen for a hosting controller: measures its window like `CofreRootView`.
     public struct GameExitView: View {
         let report: GameExitReport, intent: RejoinIntent?, reportURL: URL?, reportPreview: ReportPreviewData?, close: () -> Void, retry: () -> Void, showDetails: Bool
-        /// `showDetails` opens Details right away (preview host).
-        public init(report: GameExitReport, intent: RejoinIntent? = nil, reportURL: URL? = nil, reportPreview: ReportPreviewData? = nil, showDetails: Bool = false, close: @escaping () -> Void, retry: (() -> Void)? = nil) {
+        let turnShadersOff: (() throws -> Void)?
+        /// `showDetails` opens Details right away (preview host). `turnShadersOff` is set when shaders likely caused the crash.
+        public init(report: GameExitReport, intent: RejoinIntent? = nil, reportURL: URL? = nil, reportPreview: ReportPreviewData? = nil, showDetails: Bool = false, close: @escaping () -> Void, retry: (() -> Void)? = nil, turnShadersOff: (() throws -> Void)? = nil) {
+            self.turnShadersOff = turnShadersOff
             self.report = report
             self.intent = intent
             self.reportURL = reportURL
@@ -33,7 +35,7 @@
 
         public var body: some View {
             GeometryReader { g in
-                GameExitScreen(report: report, intent: intent, reportURL: reportURL, reportPreview: reportPreview, size: g.size, close: close, retry: retry, showDetails: showDetails).sizeClasses(
+                GameExitScreen(report: report, intent: intent, reportURL: reportURL, reportPreview: reportPreview, size: g.size, close: close, retry: retry, turnShadersOff: turnShadersOff, showDetails: showDetails).sizeClasses(
                     SizeClasses(g.size))
             }
             .preferredColorScheme(.dark)
@@ -43,7 +45,9 @@
 
     struct GameExitScreen: View {
         let report: GameExitReport, intent: RejoinIntent?, reportURL: URL?, reportPreview: ReportPreviewData?, size: CGSize, close: () -> Void, retry: () -> Void
+        let turnShadersOff: (() throws -> Void)?
         @State var showDetails = false
+        @State private var shadersOff = false
         @State private var copied = false
         @State private var showReportShare = false
 
@@ -113,6 +117,15 @@
         }
 
         @ViewBuilder private var actions: some View {
+            if let turnShadersOff {
+                if shadersOff {
+                    Banner("Shaders are off. Play again to try without them; turn them back on in game.", icon: .check, tone: .success)
+                } else {
+                    BlockButton("Turn shaders off", size: .large) {
+                        shadersOff = (try? turnShadersOff()) != nil
+                    }
+                }
+            }
             if let intent {
                 BlockButton("Play again · \(intent.displayName)", role: .primary, size: .large) {
                     let content = UNMutableNotificationContent()
