@@ -137,7 +137,7 @@ public struct GameExitReport: Hashable, Sendable {
         } else {
             for token in line.split(whereSeparator: { $0 == " " || $0 == "(" }) {
                 let parts = token.replacingOccurrences(of: "knot//", with: "").split(separator: ".")
-                if parts.count > 2, let mod = parts.dropLast().last, mod.allSatisfy({ $0.isLowercase || $0.isNumber || $0 == "_" }) {
+                if (token.contains("net.") || token.contains("com.")), let mod = parts.dropLast().last(where: { $0.allSatisfy({ $0.isLowercase || $0.isNumber || $0 == "_" }) }) {
                     return mod.replacingOccurrences(of: "_", with: " ").capitalized
                 }
             }
