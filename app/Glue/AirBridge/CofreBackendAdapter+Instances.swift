@@ -141,10 +141,27 @@
         public func installLoader(instanceID: String, loader: Loader, version: String) async throws {
             if loader == .forge || loader == .neoforge {
                 try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in
+                    let lock = NSLock()
+                    var finished = false
+                    let timeout = DispatchWorkItem {
+                        lock.lock()
+                        guard !finished else { lock.unlock(); return }
+                        finished = true
+                        lock.unlock()
+                        c.resume(throwing: NSError(
+                            domain: "CofreLoader", code: NSURLErrorTimedOut,
+                            userInfo: [NSLocalizedDescriptionKey: "Timed out installing \(loader == .neoforge ? "NeoForge" : "Forge"). Check your connection and try again."]))
+                    }
+                    DispatchQueue.global().asyncAfter(deadline: .now() + 120, execute: timeout)
                     air.installForgeLoader(
                         loader.rawValue, forProfile: instanceID, version: version,
                         progress: { p, message in NSLog("[Cofre] loader %.0f%% %@", p * 100, message) }
                     ) { error in
+                        lock.lock()
+                        guard !finished else { lock.unlock(); return }
+                        finished = true
+                        timeout.cancel()
+                        lock.unlock()
                         if let error { c.resume(throwing: error) } else { c.resume() }
                     }
                 }
@@ -175,7 +192,24 @@
                     let file = files.first(where: { ($0["primary"] as? Bool) == true }) ?? files.first
                 {
                     await withCheckedContinuation { continuation in
-                        air.installInstanceMod(file, forProfile: instanceID) { _ in continuation.resume() }
+                        let lock = NSLock()
+                        var finished = false
+                        let timeout = DispatchWorkItem {
+                            lock.lock()
+                            guard !finished else { lock.unlock(); return }
+                            finished = true
+                            lock.unlock()
+                            continuation.resume()
+                        }
+                        DispatchQueue.global().asyncAfter(deadline: .now() + 120, execute: timeout)
+                        air.installInstanceMod(file, forProfile: instanceID) { _ in
+                            lock.lock()
+                            guard !finished else { lock.unlock(); return }
+                            finished = true
+                            timeout.cancel()
+                            lock.unlock()
+                            continuation.resume()
+                        }
                     }
                 }
             }

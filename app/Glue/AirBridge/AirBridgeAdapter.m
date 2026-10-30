@@ -599,7 +599,17 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
           ? [NSString stringWithFormat:@"%@-%@", game, version]
           : version;
   NSString *vendor = neo ? @"NeoForge" : @"Forge";
-  NSString *versionID = [NSString stringWithFormat:@"%@-%@", vendor, full];
+  // Minecraft's version IDs are lower-case and differ between the loaders.
+  // NeoForge uses `neoforge-<loader>`, while Forge uses `<mc>-forge-<loader>`.
+  NSString *versionID;
+  if (neo) {
+    versionID = [NSString stringWithFormat:@"neoforge-%@", full];
+  } else {
+    NSString *forgeVersion = [version hasPrefix:[game stringByAppendingString:@"-"]]
+                                  ? [version substringFromIndex:game.length + 1]
+                                  : version;
+    versionID = [NSString stringWithFormat:@"%@-forge-%@", game, forgeVersion];
+  }
   BOOL mirror = [getPrefObject(@"general.download_source") isEqual:@"bmclapi"];
   NSString *host = mirror ? @"https://bmclapi2.bangbang93.com/maven"
                    : neo  ? @"https://maven.neoforged.net/releases"
