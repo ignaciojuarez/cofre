@@ -30,13 +30,11 @@ public final class CofreRootViewController: UIViewController {
         addChild(root); root.view.frame = view.bounds; root.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         view.addSubview(root.view); root.didMove(toParent: self)
         let center = NotificationCenter.default
-        urlObservers.append(center.addObserver(forName: Notification.Name("UISceneOpenURLContextsNotification"), object: nil, queue: .main) { [weak self] note in
-            for context in note.userInfo?["UISceneOpenURLContextsKey"] as? Set<UIOpenURLContext> ?? [] { _ = self?.nav.open(context.url) }
+        urlObservers.append(center.addObserver(forName: Notification.Name("CofreOpenURL"), object: nil, queue: .main) { [weak self] note in
+            guard let url = note.object as? URL else { return }
+            _ = self?.nav.open(url)
         })
-        urlObservers.append(center.addObserver(forName: UIScene.willConnectNotification, object: nil, queue: .main) { [weak self] note in
-            let options = note.userInfo?["UISceneConnectionOptionsKey"] as? UIScene.ConnectionOptions
-            for context in options?.urlContexts ?? [] { _ = self?.nav.open(context.url) }
-        })
+        center.post(name: Notification.Name("CofreRootReady"), object: nil)
     }
 
     deinit { urlObservers.forEach(NotificationCenter.default.removeObserver) }
