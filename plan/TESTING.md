@@ -244,3 +244,19 @@ Status: `open` · `fixed` · `handoff` · `device-only` · `blocked` · `can't-r
 - Severity: S2 · Status: fixed · Commit: abc1234
 - Retest: repro ✅ · neighbour (iPhone, kill + reopen) ✅
 ```
+
+## Driving the real iPad mini
+
+The owner allows driving Cofre on their iPad mini (UDID `COFRE_DEVICE_UDID`, cable to this Mac) for testing. Stay inside Cofre; screenshot only Cofre; never the iPhone. T3's device list shows only simulators, so use the `agent-device` CLI directly. The physical-device runner must be signed with Cofre's team:
+
+```sh
+export AGENT_DEVICE_IOS_TEAM_ID=APPLE_TEAM_ID \
+  AGENT_DEVICE_IOS_RUNNER_APP_BUNDLE_ID=com.ignaciojuarez.agentdevice.runner \
+  AGENT_DEVICE_IOS_RUNNER_TEST_BUNDLE_ID=com.ignaciojuarez.agentdevice.runner.uitests
+AD=<local-home>/.t3/tools/agent-device/0.21.31/node_modules/agent-device/dist/src/cli.js
+node $AD open com.ignaciojuarez.cofre --platform ios --udid COFRE_DEVICE_UDID --session cofre-ipad
+node $AD snapshot -i --session cofre-ipad        # then press/fill/scroll … --settle --session cofre-ipad
+node $AD close --session cofre-ipad              # always, when done
+```
+
+The variables must be set when the `agent-device` background service starts (the first command starts it); if it was started without them, stop that service (the `node … agent-device … daemon.js` process using `~/.agent-device`, not T3's) and run again.
