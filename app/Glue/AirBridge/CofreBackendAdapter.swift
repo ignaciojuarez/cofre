@@ -216,7 +216,7 @@
 
         public func launch(instanceID: String, accountID: String?) -> AsyncThrowingStream<LaunchProgress, Error> {
             UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "cofre.launch.started.\(instanceID)")
-            AsyncThrowingStream { continuation in
+            return AsyncThrowingStream { continuation in
                 launchTask?.cancel()
                 let task = Task { @MainActor in
                     do {
