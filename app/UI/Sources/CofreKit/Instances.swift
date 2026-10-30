@@ -115,7 +115,8 @@ public final class InstanceStore: @unchecked Sendable {
         let staging = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString); try fm.createDirectory(at: staging, withIntermediateDirectories: true)
         defer { try? fm.removeItem(at: staging) }; try unzip(archive, to: staging)
         let candidates = try fm.contentsOfDirectory(at: staging, includingPropertiesForKeys: [.isDirectoryKey])
-        guard let source = candidates.first(where: { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }) ?? (fm.fileExists(atPath: staging.appendingPathComponent("cofre.json").path) ? staging : nil) else { throw StoreError.invalidArchive }
+        // Cofre's exports keep the instance folder's contents at the top; older ones wrapped them in one folder.
+        guard let source = fm.fileExists(atPath: staging.appendingPathComponent("cofre.json").path) ? staging : candidates.first(where: { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }) else { throw StoreError.invalidArchive }
         let meta = try readMeta(at: source); let n = name ?? meta.name; let i = try create(name: n, version: meta.gameVersion, loader: meta.loader, loaderVersion: meta.loaderVersion)
         try fm.removeItem(at: i.gameDirectory); try fm.copyItem(at: source, to: i.gameDirectory); return try refresh(i.id)
     }
