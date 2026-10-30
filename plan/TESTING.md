@@ -21,13 +21,15 @@ Legend: ✅ testable on the simulator · ⚠️ partly (UI states only) · 📱 
 
 ### Simulator build
 
-> **TODO (setup agent fills this in):**
-> - Build command and derived data path:
-> - Bundle ID (real app `com.ignaciojuarez.cofre`? PreviewHost `app.cofre.ui.previewhost`?):
-> - Backend: real CofreKit on a real `Documents/`, or PreviewEngine? What's stubbed?
-> - Install / relaunch: `xcrun simctl install <UDID> <app>` · `xcrun simctl launch <UDID> <bundle>`
-> - Data container: `xcrun simctl get_app_container <UDID> <bundle> data`
-> - Known simulator-only failures to ignore:
+> **Verified 2026-10-30 (disposable real-app probe):**
+> - Air has `PLATFORM=7` (`iossimulator`) and its Swift target compiles with `SDKPATH=$(xcrun --sdk iphonesimulator --show-sdk-path)`.
+> - The normal native recipe is not end-to-end simulator-clean: several commands remain hard-coded to `xcrun -sdk iphoneos` and `actool --platform iphoneos`. Do not run this against `.work/air` during device builds.
+> - Existing device payload binaries report `LC_BUILD_VERSION platform IOS` (including Air, renderer dylibs, Java runtime dylibs, and CofreCore). A disposable copy was retagged with `vtool ... -set-build-version 7`, every nested Mach-O was ad-hoc signed, and the VPN plug-in/provisioning profile were removed from that copy.
+> - Real bundle ID: `com.ignaciojuarez.cofre`. Install/relaunch: `xcrun simctl install <UDID> <app>` · `xcrun simctl launch <UDID> com.ignaciojuarez.cofre`.
+> - Probe result: real Cofre launcher UI runs on both shared devices. It reaches the setup screen; no PreviewHost or mock data was installed. Screenshots: `/tmp/cofre-sim-probe-1793344038/iphone-2.png` and `/tmp/cofre-sim-probe-1793344038/ipad.png`.
+> - Installed probe UDIDs: iPhone `SIMULATOR_UDID`; iPad `SIMULATOR_UDID`.
+> - This is launcher-only evidence. The full game is not verified: the probe has no PacketTunnel (Network Extension is unavailable in Simulator), no JIT pairing/TXM, and no Microsoft account. Do not enter credentials in logs or files; owner must provide the test account at runtime.
+> - JIT/game launch, first frame, VPN setup, pairing, device-only Metal behavior, and Forge/NeoForge JVM installation remain device-only or unverified. Re-tagging is not a release build; a proper simulator build needs simulator-native Air/Java/renderer outputs and a simulator-safe app target.
 
 ### Test Microsoft account
 - Comes from a secret at run time (`request_secret`, `delivery: "file"`). **Never** write it in the repo, the log, a commit or a screenshot name.
