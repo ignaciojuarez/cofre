@@ -181,3 +181,25 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 - Whole-app compile: PASS (`/tmp/cofre-B008-core`).
 - `scripts/run.sh --build --no-install`: PASS; `scripts/sim.sh` installed on spare phone simulator `SIMULATOR_UDID`.
 - Warm/cold `simctl openurl` reached the iOS “Open in Cofre?” prompt; screenshots: `/tmp/cofre-B008-warm-simctl.png`, `/tmp/cofre-B008-cold-simctl.png`. The simulator was already owned by another agent-device session, so its prompt could not be accepted for an app-state screenshot.
+
+## Round 7b overnight testing (2026-10-30 · HEAD bef0297 · iPad Pro 1 SIMULATOR_UDID)
+
+| Area | Test case | Result | Evidence |
+|---|---|---|---|
+| Build | `scripts/sim.sh SIMULATOR_UDID`, install and launch | PASS; `CofreBuild bef0297`; app launched | `/tmp/cofre-round7b-build.log` |
+| Instances | Duplicate `Survival+`; delete; Recently deleted; restore | PASS; duplicate created as `Survival+ copy`, delete confirmation shown, row appeared under Recently deleted, restore returned it | `/tmp/cofre-test/shots/round7b-instances-duplicate-delete-restore.png` |
+| Instances | Restore with same-named instance; export `.zip` and import from Files | BLOCKED: restore-clash and Files picker import were not completed; tried duplicate/delete/restore and Import pack entry point; no destructive follow-up | — |
+| B-005 | Fabric 1.21.1 Mods; Sodium/Iris details and dependency sheet | PARTIAL PASS: switched `Survival+` to Fabric 1.21.1; Sodium detail showed `Fits 1.21.1` and no Metal incompatibility; Iris sheet correctly listed Sodium as needed. Close left no install. No incompatible candidate exposed by current catalog, so Get anyway/Cancel could not be exercised | live snapshot of Iris install sheet (14-node accessibility capture) |
+| Modpacks | corrupt `.mrpack`, real `.mrpack`, wrong-loader pack | BLOCKED: created `Documents/corrupt.mrpack` (3 random bytes) and reached Import pack entry, but Files picker did not open from the current Mods detail state; no import result claimed | `/.../Documents/corrupt.mrpack` |
+| Lifecycle | terminate during active download/install and relaunch | PARTIAL PASS: triggered Distant Horizons install path, terminated Cofre, relaunched; no stuck progress was shown and no `.part`/`.tmp` files were found. Exact mid-transfer timing could not be guaranteed | device log marker `/Documents/latestlog.txt`; disk check recorded in session |
+| Accounts | Microsoft sign-in with supplied runtime secret | BLOCKED at Microsoft web flow: email accepted, then Microsoft presented a passkey/security-key sheet instead of password; no OTP/approval available. Secret was read only in shell typing commands and never logged | device screenshot from `device_screenshot` (03:12); no credentials in repo |
+| Controls | Settings → Controls panes and toggles | PASS: Auto/Touch/Controller/Keyboard, Dock/Classic/Minimal, sliders, Fade, Left-handed, Gyro all visible and labeled | `/tmp/cofre-test/shots/round7b-controls.png` |
+| Logs | Settings → Logs; filters and Share report | PASS: Game/Crash/Cofre tabs, All/Warnings/Errors filters, search, Share report sheet; redaction copy visible | live snapshot; Share report sheet |
+| Downloads | Play/download strip and empty state | PASS (empty-state observation): no active download strip after relaunch; no stuck progress remained after kill/reopen. Active Cancel/Resume/Retry controls remain uncovered | — |
+| Worlds/UX | Play, Instances, Mods, Settings first-time pass | PASS: iPad split layout readable; Controls and Logs screens coherent; Mods search/detail flow responsive; no new UX defect requiring code change | `/tmp/cofre-test/shots/round7b-controls.png` |
+
+### Round 7b notes
+- Build output printed `CofreBuild bef0297`; simulator install was successful. `[Cofre] UI root installed`, `app foreground`, and `app active` markers were present in `Documents/latestlog.txt` (no secrets).
+- No source bugs met the “small clear fix” threshold in this pass; no bug-fix commits.
+- B-008 remains the prior logged regression/needs-owner item; it was not changed here. B-004/B-006 were exercised in prior rounds and remain passing.
+- Still uncovered: a true incompatible mod with Get anyway/Cancel, restore-name clash resolution, Files-based valid/wrong-loader `.mrpack` imports, exact kill during transfer, active Downloads Cancel/Resume/Retry, and Microsoft approval/OTP completion.

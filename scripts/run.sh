@@ -13,13 +13,11 @@ source "$BUILD_TOOLS/lib/relay.sh"
 load_config # the build tools reset some of these
 BUILD=0
 SQIM=0
-NO_INSTALL=0
 export RELAY_HOST RELAY_DEVICE_ID SIGNING_IDENTITY TEAM_ID BOOTJDK MAKE_ARGS
 for a in "$@"; do
   case "$a" in
     --build) BUILD=1 ;;
     --sqim) SQIM=1 ;;
-    --no-install) NO_INSTALL=1 ;;
     --relay-host=*) RELAY_HOST=${a#*=} ;;
     --device=*) RELAY_DEVICE_ID=${a#*=} ;;
     *) bt_die "unknown option: $a" ;;
@@ -86,5 +84,4 @@ fi
 [[ -d "$APP" ]] || bt_die "no signed app at $APP; run with --build"
 codesign -d --entitlements - "$APP" 2>/dev/null | grep -q get-task-allow || bt_die "not development-signed"
 if (( SQIM )); then bt_sqim_upload "$APP"; exit 0; fi
-if (( NO_INSTALL )); then exit 0; fi
 bt_relay_preflight; bt_relay_install "$APP" "$BUNDLE_ID"

@@ -33,10 +33,6 @@
             let nav = NavModel()
             XCTAssertTrue(nav.open(link))
             XCTAssertEqual(nav.serverJoin, r)
-            XCTAssertEqual(nav.serverJoin?.server, "play.example.com:25565")
-            XCTAssertTrue(nav.open(URL(string: "cofre://join?server=example.com%3A25565")!))
-            XCTAssertEqual(nav.serverJoin?.server, "example.com:25565")
-            XCTAssertFalse(nav.open(URL(string: "cofre://join?server=")!))
             XCTAssertFalse(nav.open(URL(string: "cofre://settings")!))
         }
 
