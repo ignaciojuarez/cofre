@@ -9,11 +9,66 @@
 #import <UIKit/UIKit.h>
 #import <dlfcn.h>
 #import <objc/message.h>
+#import <objc/runtime.h>
 
 static NSString *const CofreCorePath =
     @"@executable_path/Frameworks/CofreCore.framework/CofreCore";
 
 static BOOL cofreOwnsJIT = NO;
+static NSMutableArray<NSURL *> *cofrePendingURLs;
+static BOOL cofreRootReady = NO;
+static NSString *const CofreOpenURLNotification = @"CofreOpenURL";
+
+static void CofreReceiveURL(NSURL *url) {
+  if (!url) return;
+  NSLog(@"[Cofre] open url scheme=%@", url.scheme.lowercaseString ?: @"");
+  dispatch_async(dispatch_get_main_queue(), ^{
+    if (cofreRootReady) {
+      [[NSNotificationCenter defaultCenter] postNotificationName:CofreOpenURLNotification object:url];
+    } else {
+      if (!cofrePendingURLs) cofrePendingURLs = [NSMutableArray array];
+      [cofrePendingURLs addObject:url];
+    }
+  });
+}
+
+static void CofreDrainPendingOpenURLs(void) {
+  dispatch_async(dispatch_get_main_queue(), ^{
+    if (!cofreRootReady || cofrePendingURLs.count == 0) return;
+    NSArray<NSURL *> *urls = [cofrePendingURLs copy];
+    [cofrePendingURLs removeAllObjects];
+    for (NSURL *url in urls) {
+      [[NSNotificationCenter defaultCenter] postNotificationName:CofreOpenURLNotification object:url];
+    }
+  });
+}
+
+static void CofreSceneOpenURLContexts(id self, SEL _cmd, UIScene *scene, NSSet<UIOpenURLContext *> *contexts) {
+  for (UIOpenURLContext *context in contexts) CofreReceiveURL(context.URL);
+}
+
+static void CofreSceneWillConnect(id self, SEL _cmd, UIScene *scene, UISceneSession *session,
+                                  UISceneConnectionOptions *options) {
+  SEL original = NSSelectorFromString(@"cofre_original_scene:willConnectToSession:options:");
+  ((void (*)(id, SEL, UIScene *, UISceneSession *, UISceneConnectionOptions *))objc_msgSend)(self, original, scene, session, options);
+  for (UIOpenURLContext *context in options.URLContexts) CofreReceiveURL(context.URL);
+}
+
+static void CofreInstallSceneHooks(void) {
+  Class cls = NSClassFromString(@"SceneDelegate");
+  if (!cls) return;
+  SEL open = @selector(scene:openURLContexts:);
+  if (!class_getInstanceMethod(cls, open)) {
+    class_addMethod(cls, open, (IMP)CofreSceneOpenURLContexts, "v@:@@");
+  }
+  SEL willConnect = @selector(scene:willConnectToSession:options:);
+  SEL originalAlias = NSSelectorFromString(@"cofre_original_scene:willConnectToSession:options:");
+  Method original = class_getInstanceMethod(cls, willConnect);
+  if (original && !class_getInstanceMethod(cls, originalAlias)) {
+    class_addMethod(cls, originalAlias, method_getImplementation(original), method_getTypeEncoding(original));
+    class_replaceMethod(cls, willConnect, (IMP)CofreSceneWillConnect, method_getTypeEncoding(original));
+  }
+}
 
 BOOL CofreOwnsJIT(void) { return cofreOwnsJIT; }
 
@@ -121,7 +176,13 @@ BOOL CofreHandleGameExit(int code) {
 }
 
 __attribute__((constructor)) static void CofreStartup(void) {
+  cofrePendingURLs = [NSMutableArray array];
+  CofreInstallSceneHooks();
   NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
+  [center addObserverForName:@"CofreRootReady" object:nil queue:NSOperationQueue.mainQueue usingBlock:^(__unused NSNotification *note) {
+    cofreRootReady = YES;
+    CofreDrainPendingOpenURLs();
+  }];
   [center addObserverForName:UIApplicationDidFinishLaunchingNotification
                       object:nil
                        queue:[NSOperationQueue mainQueue]

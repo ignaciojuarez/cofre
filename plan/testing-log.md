@@ -173,3 +173,11 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 - Build/install used only C51; no physical device. Device state was left dark/default; no credentials or tokens were read or logged.
 - B-008 regression remains needs-owner despite source fix history: `simctl openurl` did not present the expected address sheet on a fresh launch.
 - No source fixes were made; therefore no bug-fix commits. `cd app/UI && swift test` and whole-app compile were not rerun in this hands-on pass (prior round results remain recorded above).
+
+### Round 7 B-008 implementation (2026-10-30)
+- Root cause confirmed: Air's `SceneDelegate` had no URL forwarding; UIKit does not post the observed notifications.
+- Fix built: runtime SceneDelegate hooks in Cofre glue, pending cold-launch delivery, and `CofreOpenURL` observer in the root.
+- `cd app/UI && swift test`: PASS (48 UI + 29 Kit tests).
+- Whole-app compile: PASS (`/tmp/cofre-B008-core`).
+- `scripts/run.sh --build --no-install`: PASS; `scripts/sim.sh` installed on spare phone simulator `SIMULATOR_UDID`.
+- Warm/cold `simctl openurl` reached the iOS “Open in Cofre?” prompt; screenshots: `/tmp/cofre-B008-warm-simctl.png`, `/tmp/cofre-B008-cold-simctl.png`. The simulator was already owned by another agent-device session, so its prompt could not be accepted for an app-state screenshot.
