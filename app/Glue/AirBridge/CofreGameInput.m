@@ -121,17 +121,11 @@ NSDictionary<NSString *, NSNumber *> *CofreGameScreenState(void) {
 
 void CofreSDLTextInputStateChanged(BOOL active, const char *reason) {
     NSString *why = reason ? [NSString stringWithUTF8String:reason] : @"sdl";
-    dispatch_async(dispatch_get_main_queue(), ^{
-        if (active) {
-            NSLog(@"[Cofre] keyboard show reason=%@", why);
-        } else {
-            NSLog(@"[Cofre] keyboard hide");
-        }
-        [[NSNotificationCenter defaultCenter]
-            postNotificationName:@"CofreSDLTextInputStateChanged"
-                          object:nil
-                        userInfo:@{@"active": @(active), @"reason": why}];
-    });
+    if (active) {
+        NSLog(@"[Cofre] keyboard show reason=%@", why);
+    } else {
+        NSLog(@"[Cofre] keyboard hide reason=%@", why);
+    }
 }
 
 @interface CofreGameOverlayView : UIView

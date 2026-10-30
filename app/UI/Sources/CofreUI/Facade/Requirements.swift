@@ -55,23 +55,6 @@ import Foundation
         }
     }
 
-    /// Pure policy state used by the production bridge and unit tests.
-    public struct CofreKeyboardPolicy: Equatable, Sendable {
-        public enum Event: Sendable { case textInputRequested, textInputStopped, manualShow, manualHide }
-        public private(set) var textInputFocused = false
-        public private(set) var manuallyShown = false
-        public init() {}
-        public var shouldShow: Bool { textInputFocused || manuallyShown }
-        public mutating func apply(_ event: Event) {
-            switch event {
-            case .textInputRequested: textInputFocused = true
-            case .textInputStopped: textInputFocused = false
-            case .manualShow: manuallyShown = true
-            case .manualHide: manuallyShown = false
-            }
-        }
-    }
-
     public protocol GameInputService: AnyObject {
         var inputMode: CofreInputMode { get }
         var inputModeOverride: CofreInputMode { get set }
@@ -79,7 +62,6 @@ import Foundation
         func release(_ key: CofreInputKey)
         func mouseButton(_ button: CofreMouseButton, down: Bool)
         func look(deltaX: Float, deltaY: Float)
-        func textInputRequests() -> AsyncStream<Bool>
         func showKeyboard()
         func hideKeyboard()
         // Touch overlay (plan/touch-controls.md §5)
@@ -103,7 +85,6 @@ import Foundation
         public func release(_ key: CofreInputKey) {}
         public func mouseButton(_ button: CofreMouseButton, down: Bool) {}
         public func look(deltaX: Float, deltaY: Float) {}
-        public func textInputRequests() -> AsyncStream<Bool> { AsyncStream { $0.finish() } }
         public func showKeyboard() {}
         public func hideKeyboard() {}
         public func inputModeUpdates() -> AsyncStream<CofreInputMode> {

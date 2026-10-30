@@ -9,13 +9,11 @@ public final class CofreGameInput: NSObject, GameInputService {
 
     private let defaults = UserDefaults.standard
     private var observers: [NSObjectProtocol] = []
-    private var continuations: [UUID: AsyncStream<Bool>.Continuation] = [:]
     private var modeContinuations: [UUID: AsyncStream<CofreInputMode>.Continuation] = [:]
     private var detectedMode: CofreInputMode = .touch
     /// Auto: the last input used wins (plan/touch-controls.md U10).
     private var tracker = CofreInputModeTracker()
     private var lastAnnounced: CofreInputMode?
-    private var policy = CofreKeyboardPolicy()
     /// Air's bridge is injected when the backend is created; it owns callback routing.
     public weak var bridge: (any CofreAirBridging)?
 
@@ -60,14 +58,6 @@ public final class CofreGameInput: NSObject, GameInputService {
         })
         observers.append(center.addObserver(forName: .GCMouseDidBecomeCurrent, object: nil, queue: .main) {
             [weak self] _ in self?.used(.keyboardMouse)
-        })
-        observers.append(center.addObserver(
-            forName: Notification.Name("CofreSDLTextInputStateChanged"), object: nil, queue: .main
-        ) { [weak self] note in
-            guard let self else { return }
-            let active = note.userInfo?["active"] as? Bool ?? false
-            self.policy.apply(active ? .textInputRequested : .textInputStopped)
-            self.continuations.values.forEach { $0.yield(active) }
         })
         recomputeMode()
     }
@@ -177,22 +167,11 @@ public final class CofreGameInput: NSObject, GameInputService {
 
     public func look(deltaX: Float, deltaY: Float) { bridge?.gameInputLookX(deltaX, y: deltaY) }
 
-    public func textInputRequests() -> AsyncStream<Bool> {
-        AsyncStream { continuation in
-            let id = UUID()
-            continuations[id] = continuation
-            continuation.yield(policy.shouldShow)
-            continuation.onTermination = { [weak self] _ in self?.continuations.removeValue(forKey: id) }
-        }
-    }
-
     public func showKeyboard() {
-        policy.apply(.manualShow)
         bridge?.setGameKeyboardShown(true)
     }
 
     public func hideKeyboard() {
-        policy.apply(.manualHide)
         bridge?.setGameKeyboardShown(false)
     }
 }
@@ -207,7 +186,6 @@ extension CofreBackendAdapter {
     public func release(_ key: CofreInputKey) { CofreGameInput.shared.release(key) }
     public func mouseButton(_ button: CofreMouseButton, down: Bool) { CofreGameInput.shared.mouseButton(button, down: down) }
     public func look(deltaX: Float, deltaY: Float) { CofreGameInput.shared.look(deltaX: deltaX, deltaY: deltaY) }
-    public func textInputRequests() -> AsyncStream<Bool> { CofreGameInput.shared.textInputRequests() }
     public func showKeyboard() { CofreGameInput.shared.showKeyboard() }
     public func hideKeyboard() { CofreGameInput.shared.hideKeyboard() }
     public func inputModeUpdates() -> AsyncStream<CofreInputMode> { CofreGameInput.shared.inputModeUpdates() }
