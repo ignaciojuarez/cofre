@@ -63,7 +63,7 @@
     /// Starts a launch and shows the takeover.
     @MainActor func startLaunch(_ store: CofreStore, _ nav: NavModel, instanceID: String? = nil, rejoin: RejoinIntent? = nil) {
         store.play(instanceID, rejoin: rejoin)
-        nav.showingLaunch = true
+        if store.pendingModCompatibility == nil { nav.showingLaunch = true }
     }
 
     /// World rows (Worlds pane, instance detail).
@@ -111,6 +111,7 @@
                     HStack(spacing: 8) {
                         VStack(alignment: .leading, spacing: 1) {
                             Text(verbatim: item.name).cofreFont(.rowTitle).foregroundStyle(Color.cofre.ink).lineLimit(1)
+                            if let issue = store.compatibilityIssue(for: item) { Badge(issue.badge, tone: .warn) }
                             Group {
                                 if let issue = item.issue {
                                     Text("Needs dep · \(issue)").foregroundStyle(Color.cofre.danger)
@@ -125,7 +126,10 @@
                             .cofreFont(.caption).lineLimit(1)
                         }
                         Spacer(minLength: 4)
-                        if item.issue != nil {
+                        if let issue = store.compatibilityIssue(for: item), item.enabled {
+                            Button("Turn off") { store.setEnabled(false, item: item) }.buttonStyle(.bordered)
+                            Badge(issue.badge, tone: .warn)
+                        } else if item.issue != nil {
                             Badge("Needs dep", tone: .danger)
                         } else if item.updateTo != nil {
                             Badge("Update", tone: .warn)

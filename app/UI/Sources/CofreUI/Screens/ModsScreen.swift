@@ -112,7 +112,10 @@
                                 {
                                     ProjectIcon(project: p, size: 28)
                                 } trailing: {
-                                    GetButton(project: p) { endEditing() }
+                                    HStack(spacing: 5) {
+                                        if let issue = ModCompatibility.entry(for: p.id, name: p.title)?.issue(gameVersion: store.modsInstance?.gameVersion ?? "", renderer: store.preferences.renderer == "auto" ? "metallum" : store.preferences.renderer) { Badge(issue.badge, tone: .warn) }
+                                        GetButton(project: p) { endEditing() }
+                                    }
                                 }
                             }
                             .buttonStyle(RowButtonStyle())
@@ -172,6 +175,7 @@
                                 HStack(spacing: 4) {
                                     ForEach(p.loaders) { Badge($0.displayName, tone: $0.tone) }
                                     if p.clientSide { Badge("Client") }
+                            if let issue = ModCompatibility.entry(for: p.id, name: p.title)?.issue(gameVersion: store.modsInstance?.gameVersion ?? "", renderer: store.preferences.renderer == "auto" ? "metallum" : store.preferences.renderer) { Badge(issue.badge, tone: .warn) }
                                 }
                             }
                         }
@@ -244,6 +248,7 @@
                                 .keyboardShortcut(.return, modifiers: .command)
                             }
                         }
+                        if let issue = ModCompatibility.entry(for: p.id, name: p.title)?.issue(gameVersion: store.modsInstance?.gameVersion ?? "", renderer: store.preferences.renderer == "auto" ? "metallum" : store.preferences.renderer) { Banner(issue.title, icon: .cross, tone: .warn) }
                         if let picked {
                             ListSection("Details", spacing: 4) {
                                 Row("Version", trailing: { Self.detail(picked.number) })

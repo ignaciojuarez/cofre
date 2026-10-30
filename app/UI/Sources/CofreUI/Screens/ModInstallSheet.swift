@@ -119,7 +119,13 @@
                 Text("Already has \(ListFormatter.localizedString(byJoining: plan.present)).")
                     .cofreFont(.secondary).foregroundStyle(Color.cofre.muted)
             }
-            BlockButton(installTitle(job, plan), role: .primary) { store.confirmInstall(id) }
+            if let issue = ModCompatibility.entry(for: plan.target.id, name: plan.target.name)?.issue(gameVersion: plan.target.version, renderer: store.preferences.renderer == "auto" ? "metallum" : store.preferences.renderer) {
+                Banner(issue.title, icon: .cross, tone: .warn)
+                Text(issue.reason).cofreFont(.secondary).foregroundStyle(Color.cofre.muted)
+            }
+            BlockButton(
+                ModCompatibility.entry(for: plan.target.id, name: plan.target.name)?.issue(gameVersion: plan.target.version, renderer: store.preferences.renderer == "auto" ? "metallum" : store.preferences.renderer) == nil ? installTitle(job, plan) : "Get anyway",
+                role: .primary) { store.confirmInstall(id) }
                 .keyboardShortcut(.return, modifiers: .command)
         }
 

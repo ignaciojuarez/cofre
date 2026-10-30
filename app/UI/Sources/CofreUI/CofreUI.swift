@@ -115,6 +115,16 @@ public enum CofreLinks {
             } message: { c in
                 c.message
             }
+            .alert(
+                store.pendingModCompatibility?.first?.title ?? "Mod compatibility", isPresented: Binding(
+                    get: { store.pendingModCompatibility != nil }, set: { if !$0 { store.pendingModCompatibility = nil } }))
+            {
+                Button("Turn off and play") { store.playAnywayAfterModWarning(turnOff: true); nav.showingLaunch = true }
+                Button("Play anyway") { store.playAnywayAfterModWarning(turnOff: false); nav.showingLaunch = true }
+                Button("Cancel", role: .cancel) { store.pendingModCompatibility = nil }
+            } message: {
+                Text(store.pendingModCompatibility?.map { "\($0.modName): \($0.reason)" }.joined(separator: "\n") ?? "")
+            }
             .background { commands }
             .fullScreenTakeover(isPresented: $nav.showingLaunch) { LaunchScreen().environment(store).environment(nav) }
             .blockSheet(item: $nav.sheet) { sheet in

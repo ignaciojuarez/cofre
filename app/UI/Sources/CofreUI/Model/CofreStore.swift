@@ -62,6 +62,7 @@
         public var launchError: String?
         public var launchLog: [LogLine] = []
         public var logs: [LogKind: [LogLine]] = [:]
+        public var pendingModCompatibility: [ModCompatibilityIssue]?
 
         // System
         public var renderers: [RendererOption] = []
@@ -303,6 +304,29 @@
         public func play(_ instanceID: String? = nil, server: ServerSummary? = nil, rejoin: RejoinIntent? = nil) {
             guard let id = instanceID ?? activeInstance?.id else { return }
             activeInstanceID = id
+            if rejoin == nil, server == nil, let instance = instances.first(where: { $0.id == id }) {
+                let renderer = preferences.renderer == "auto" && (Int(instance.gameVersion.split(separator: ".").first ?? "0") ?? 0) >= 26
+                    ? "metallum" : preferences.renderer
+                if case .warn(let issues) = ModCompatibilityChecker.decision(items: installed[.mods] ?? [], gameVersion: instance.gameVersion, renderer: renderer) {
+                    pendingModCompatibility = issues
+                    return
+                }
+            }
+            startPlay(id, server: server, rejoin: rejoin)
+        }
+
+        public func playAnywayAfterModWarning(turnOff: Bool) {
+            guard let id = activeInstance?.id else { pendingModCompatibility = nil; return }
+            if turnOff {
+                for item in installed[.mods] ?? [] where item.enabled && pendingModCompatibility?.contains(where: { $0.modID == (item.projectID ?? item.id) || $0.modName == item.name }) == true {
+                    setEnabled(false, item: item)
+                }
+            }
+            pendingModCompatibility = nil
+            startPlay(id, server: nil, rejoin: nil)
+        }
+
+        private func startPlay(_ id: String, server: ServerSummary?, rejoin: RejoinIntent?) {
             joiningServer = server
             launchError = nil
             launchLog = []
@@ -564,6 +588,12 @@
             let items = installed[query.kind] ?? []
             // An exact project match beats a same-name one.
             return items.first { $0.projectID == p.id } ?? items.first { $0.matches(p.id, title: p.title) }
+        }
+
+        public func compatibilityIssue(for item: InstalledItem, instance: InstanceSummary? = nil) -> ModCompatibilityIssue? {
+            guard let i = instance ?? modsInstance else { return nil }
+            let renderer = preferences.renderer == "auto" && (Int(i.gameVersion.split(separator: ".").first ?? "0") ?? 0) >= 26 ? "metallum" : preferences.renderer
+            return ModCompatibility.entry(for: item.projectID ?? item.id, name: item.name)?.issue(gameVersion: i.gameVersion, renderer: renderer)
         }
 
         /// Update: exactly the build the backend offered, so a beta never replaces a release unasked.
