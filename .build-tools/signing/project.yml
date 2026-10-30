@@ -35,7 +35,6 @@ targets:
       - path: ../../app/Glue/AirBridge/CofreBackendAdapter+Mods.swift
       - path: ../../app/Glue/AirBridge/ServerJoinAdapter.swift
       - path: ../../app/Glue/AirBridge/CofreCoreEntry.swift
-      - path: ../../app/UI/Sources/CofreKit/Logs.swift
       - path: ../../app/Glue/AirBridge/CofreGameExit.swift
       - path: ../../app/Glue/AirBridge/CofreGameInput.swift
       - path: ../../app/Shell/CofreRootViewController.swift
@@ -62,7 +61,6 @@ targets:
     platform: iOS
     sources:
       - path: ../../tests/preferences/CofrePreferencesTests.swift
-      - path: ../../app/UI/Tests/CofreKitTests/LogStoreTests.swift
     dependencies:
       - target: CofreCore
       - package: CofreUI
