@@ -85,6 +85,8 @@ typedef NS_ENUM(NSInteger, CofreLaunchEvent) {
              progress:(void (^)(CofreLaunchEvent, double, NSString *_Nullable))progress;
 /// Hides Cofre's launch overlay. Java may continue if it already started.
 - (void)hideCofreLaunchOverlay;
+/// The launch is past the surface but before the game's first frame (Cofre's launch screen shows any failure).
+@property(nonatomic, readonly) BOOL launchAwaitingFirstFrame;
 - (void)searchProjects:(NSDictionary *)filters
                 source:(NSInteger)source
             completion:(void (^)(NSArray *, NSError *_Nullable))completion;

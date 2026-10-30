@@ -1019,6 +1019,9 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
                                                          encoding:NSUTF8StringEncoding error:nil];
   NSLog(@"[Cofre] game %@ for Minecraft %@", lang, game);
 }
+- (BOOL)launchAwaitingFirstFrame {
+  return CofreLaunchAwaitingFirstFrame();
+}
 - (void)hideCofreLaunchOverlay {
   NSLog(@"[Cofre] launch finish reason=cancelled");
   CofreFinishSurface(UIWindow.mainWindow);
