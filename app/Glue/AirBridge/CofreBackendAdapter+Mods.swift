@@ -113,6 +113,9 @@ struct CofreModVersion {
             }
             return rows.compactMap { row in
                 guard let id = row["id"] as? String, !id.isEmpty else { return nil }
+                // Modrinth mirrors can answer with other project types (a resource pack on the Packs tab would
+                // then be installed as a modpack and fail), so keep only what this tab asked for.
+                if source == 1, let actual = row["projectType"] as? String, actual != projectType { return nil }
                 var project = row
                 project["apiSource"] = source
                 project["projectType"] = projectType
