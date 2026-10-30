@@ -102,10 +102,11 @@ public final class CofreGameInput: NSObject, GameInputService {
         }
     }
 
-    private var keyboardWatched = false
+    /// The keyboard input whose handler is chained; a reconnected keyboard is a new object and gets chained again.
+    private weak var watchedKeyboard: GCKeyboardInput?
     private func watchKeyboard() {
-        guard !keyboardWatched, let input = GCKeyboard.coalesced?.keyboardInput else { return }
-        keyboardWatched = true
+        guard let input = GCKeyboard.coalesced?.keyboardInput, input !== watchedKeyboard else { return }
+        watchedKeyboard = input
         let previous = input.keyChangedHandler
         input.keyChangedHandler = { [weak self] k, b, code, pressed in
             previous?(k, b, code, pressed)
