@@ -137,6 +137,13 @@ public final class InstanceStore: @unchecked Sendable {
     }
 
     public func rollbackJVMArguments(_ id: String) throws -> Instance { guard var p = profiles[id], let old = p["lastGoodJavaArgs"] else { throw StoreError.missingProfile }; p["javaArgs"] = old; profiles[id] = p; try saveProfiles(); return try refresh(id) }
+    /// Removes an instance and its files. Used to roll back staged imports.
+    public func remove(_ id: String) throws {
+        guard let instance = makeInstance(id: id, profile: profiles[id] ?? [:]) else { throw StoreError.missingProfile }
+        try? fm.removeItem(at: instance.gameDirectory)
+        profiles.removeValue(forKey: id)
+        try saveProfiles()
+    }
     public func setMetadata(_ id: String, notes: String? = nil, group: String?? = nil, favorite: Bool? = nil, icon: String?? = nil) throws -> Instance {
         guard var i = makeInstance(id: id, profile: profiles[id] ?? [:]) else { throw StoreError.missingProfile }; if let notes { i.notes = notes }; if let group { i.group = group }; if let favorite { i.favorite = favorite }; if let icon { i.icon = icon }; try saveMeta(i); return i
     }

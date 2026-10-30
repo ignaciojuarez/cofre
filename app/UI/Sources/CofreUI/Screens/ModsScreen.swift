@@ -635,6 +635,7 @@
             .fileImporter(isPresented: $picking, allowedContentTypes: [.mrpack, .zip]) { r in
                 if case .success(let url) = r { store.importPack(url) }
             }
+            .task { if let url = nav.pendingFile { nav.pendingFile = nil; store.importPack(url) } }
         }
 
         private func browse(_ source: ProjectSource) {

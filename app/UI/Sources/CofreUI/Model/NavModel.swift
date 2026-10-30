@@ -93,6 +93,7 @@
         public var serverJoin: ServerJoinRequest?
         /// Join on a server the instance can't join: pick one that fits, or make one (plan/servers.md).
         public var serverVersion: ServerVersionChoice?
+        public var pendingFile: URL?
         /// Runs once that sheet has finished closing, to start the launch or open P04.
         @ObservationIgnored public var afterServerSheet: (() -> Void)?
 
@@ -101,9 +102,10 @@
         /// Routes a deep link. `cofre://join?server=…&card=…&pin=…` opens the Join server sheet. The shell forwards
         /// `scene(_:openURLContexts:)` here; returns `false` for links Cofre doesn't handle.
         @discardableResult public func open(_ url: URL) -> Bool {
-            guard let request = ServerJoinRequest(url: url) else { return false }
-            serverJoin = request
-            return true
+            if let request = ServerJoinRequest(url: url) { serverJoin = request; return true }
+            let ext = url.pathExtension.lowercased()
+            guard ["mrpack", "zip", "mcworld"].contains(ext) else { return false }
+            pendingFile = url; sheet = .importPack; return true
         }
 
         // §3.3: section and selection are saved per scene in `stateRestorationActivity`.

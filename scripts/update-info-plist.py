@@ -9,7 +9,7 @@ info = plistlib.loads(path.read_bytes())
 info["CFBundleURLTypes"] = [{"CFBundleURLSchemes": ["cofre"]}]
 info["CFBundleDocumentTypes"] = [{
     "CFBundleTypeName": "iPhone Pairing File",
-    "LSItemContentTypes": ["com.apple.mobiledevicepairing", "com.apple.property-list"],
+    "LSItemContentTypes": ["com.apple.mobiledevicepairing", "com.apple.property-list", "com.cofre.mrpack", "public.zip-archive", "com.cofre.mcworld"],
 }]
 info["UTImportedTypeDeclarations"] = [{
     "UTTypeIdentifier": "com.apple.mobiledevicepairing",
@@ -17,6 +17,12 @@ info["UTImportedTypeDeclarations"] = [{
     "UTTypeTagSpecification": {
         "public.filename-extension": ["mobiledevicepairing", "plist"],
     },
+}, {
+    "UTTypeIdentifier": "com.cofre.mrpack", "UTTypeConformsTo": ["public.zip-archive"],
+    "UTTypeTagSpecification": {"public.filename-extension": ["mrpack"]},
+}, {
+    "UTTypeIdentifier": "com.cofre.mcworld", "UTTypeConformsTo": ["public.zip-archive"],
+    "UTTypeTagSpecification": {"public.filename-extension": ["mcworld"]},
 }]
 # Cofre's own version for Settings → About. CFBundleShortVersionString stays Air's: Air's update checks read it.
 info["CofreVersion"] = "0.1"
