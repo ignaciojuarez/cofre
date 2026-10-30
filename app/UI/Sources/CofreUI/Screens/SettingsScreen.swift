@@ -385,7 +385,6 @@
             LogView(lines: shown, follow: true).frame(minHeight: 260)
                 .task(id: kind) { await store.streamLog(kind) }
             HStack(spacing: 8) {
-                BlockButton("Pause") {}
                 BlockButton("Share report…", icon: .paper, role: .primary, isLoading: sharing) {
                     Task {
                         sharing = true

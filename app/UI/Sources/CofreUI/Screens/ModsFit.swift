@@ -62,7 +62,8 @@
 
         var body: some View {
             VStack(spacing: 14) {
-                collage(Array((popular.isEmpty ? MockBackend.projects : popular).prefix(6)))
+                // Real popular mods only; while loading or offline, a plain icon instead of sample mods.
+                if popular.isEmpty { PixelIcon(.chest, size: 64) } else { collage(Array(popular.prefix(6))) }
                 VStack(spacing: 6) {
                     Text("Play with mods").cofreFont(.title2).foregroundStyle(Color.cofre.ink)
                         .multilineTextAlignment(.center).accessibilityAddTraits(.isHeader)
