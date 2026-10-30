@@ -12,7 +12,7 @@ public enum OptionsDiff {
     public static func changes(before: String, after: String) -> [String] {
         func parse(_ text: String) -> [String: String] {
             text.split(whereSeparator: \.isNewline).reduce(into: [:]) { result, line in
-                let parts = line.split(separator: ":", maxSplits: 1).map(String.init)
+                let parts = line.split(separator: ":", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
                 if parts.count == 2 { result[parts[0]] = parts[1] }
             }
         }
