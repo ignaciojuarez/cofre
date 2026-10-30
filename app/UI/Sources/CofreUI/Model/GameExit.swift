@@ -18,6 +18,8 @@ public struct GameExitReport: Hashable, Sendable {
     public var files: [URL]
     /// Last lines of the log, for Details.
     public var logTail: [String]
+    /// Settings changed in game that reload every texture, by menu name ("Mipmap levels").
+    public var changedSettings: [String] = []
 
     public init(
         code: Int, reason: Reason, clue: String? = nil, instance: String? = nil, files: [URL] = [],
@@ -34,13 +36,16 @@ public struct GameExitReport: Hashable, Sendable {
     /// Diagnoses from text. The crash report decides first; the log only counts on lines that read like errors,
     /// so a normal "Loaded shader pack" line can't make a mod crash look like a renderer one.
     public init(
-        code: Int, crashReport: String?, log: String?, instance: String? = nil, files: [URL] = [], tail: Int = 60
+        code: Int, crashReport: String?, log: String?, instance: String? = nil, files: [URL] = [], tail: Int = 60,
+        changedSettings: [String] = []
     ) {
         let logLines = (log ?? "").split(whereSeparator: \.isNewline).map(String.init)
-        let (reason, clue) = Self.diagnose(code: code, crashReport: crashReport, logLines: logLines)
+        let (reason, clue) = Self.diagnose(
+            code: code, crashReport: crashReport, logLines: logLines, settingsChanged: !changedSettings.isEmpty)
         self.init(
             code: code, reason: reason, clue: clue, instance: instance, files: files,
             logTail: Array(logLines.suffix(tail)))
+        self.changedSettings = changedSettings
     }
 
     /// Checked in order: the first reason with a matching line wins.
@@ -77,14 +82,18 @@ public struct GameExitReport: Hashable, Sendable {
         return ["error", "exception", "fatal", "caused by", "failed"].contains { l.contains($0) }
     }
 
-    static func diagnose(code: Int, crashReport: String?, logLines: [String]) -> (Reason, String?) {
+    static func diagnose(code: Int, crashReport: String?, logLines: [String], settingsChanged: Bool = false)
+        -> (Reason, String?)
+    {
         // System Details lists every mod and the shader pack, which would match anything.
         let report = (crashReport ?? "").split(whereSeparator: \.isNewline).map(String.init)
             .prefix { !$0.hasPrefix("-- System Details --") }.map { $0 }
         let errors = logLines.filter(isError)
         // A crash inside Apple's GPU driver names AGXMetal in the fatal trace but has no error word on that line.
+        // Metallum's per-draw logging can push the reload line out of the tail, so a setting changed in game counts too.
         if logLines.contains(where: { $0.contains("AGXMetal") }) {
-            return (.renderer, logLines.contains { $0.contains("Reloading ResourceManager") } ? metalReload : "Metal crashed in the GPU driver.")
+            let reloading = settingsChanged || logLines.contains { $0.contains("Reloading ResourceManager") }
+            return (.renderer, reloading ? metalReload : "Metal crashed in the GPU driver.")
         }
         // OpenGL-only mods find no GL context on the Metal renderer; name the one at the top of the stack.
         if (report + logLines).contains(where: { $0.contains("No GLCapabilities instance set") }),
@@ -151,6 +160,9 @@ public struct GameExitReport: Hashable, Sendable {
     public var nextStep: String {
         switch reason {
         case .memory: "Lower Memory in Settings › Game, or remove a few mods, then play again."
+        case .renderer where clue == Self.metalReload && !changedSettings.isEmpty:
+            "You changed \(changedSettings.formatted()). That's saved and applies when you play again. "
+                + "For now, changing graphics settings or resource packs inside a world crashes Metal."
         case .renderer where clue == Self.metalReload:
             "Play again, and for now don't change Graphics or resource packs while in a world."
         case .renderer: "Turn off shader packs, or pick another renderer in Settings › Renderer."

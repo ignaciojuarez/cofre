@@ -32,6 +32,12 @@ final class GameExitTests: XCTestCase {
         XCTAssertEqual(midGame.clue, GameExitReport.metalReload)
         XCTAssertTrue(midGame.nextStep.contains("Graphics"))
         XCTAssertEqual(diagnose(134, log: fatal).clue, "Metal crashed in the GPU driver.")
+
+        // Metallum's logging pushed the reload line out of the tail; the changed setting still tells, and is named.
+        let named = GameExitReport(code: 134, crashReport: nil, log: fatal, changedSettings: ["Mipmap levels"])
+        XCTAssertEqual(named.clue, GameExitReport.metalReload)
+        XCTAssertTrue(named.nextStep.contains("Mipmap levels"))
+        XCTAssertTrue(named.nextStep.contains("saved"))
     }
 
     func testGLOnlyModOnMetalNamesTheMod() {

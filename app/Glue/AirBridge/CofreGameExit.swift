@@ -27,8 +27,12 @@ import UIKit
         let crashURL = logs.newestCrashReport(since: .distantPast)
         let logText = logs.tail(.game, limit: 512).map(\.text).joined(separator: "\n")
         let crashText = crashURL.flatMap { try? String(contentsOf: $0, encoding: .utf8) }
-        let report = GameExitReport(code: code, crashReport: crashText, log: logText, instance: bridge.flatMap(instanceLabel), files: [logs.gameLog].compactMap { $0 } + (crashURL.map { [$0] } ?? []))
-        if let bridge { let id = bridge.selectedProfileName(); let before = UserDefaults.standard.string(forKey: "cofre.options.before.\(id)") ?? ""; if let dir = bridge.gameDirectory(forProfile: id), let after = try? String(contentsOf: dir.appendingPathComponent("options.txt"), encoding: .utf8) { for change in OptionsDiff.changes(before: before, after: after) { NSLog("%@", change) } } }
+        // Settings changed in game: logged as breadcrumbs, and named on the screen when they caused the crash.
+        let before = bridge.flatMap { UserDefaults.standard.string(forKey: "cofre.options.before.\($0.selectedProfileName())") } ?? ""
+        let after = instanceURL.flatMap { try? String(contentsOf: $0.appendingPathComponent("options.txt"), encoding: .utf8) } ?? ""
+        let changes = OptionsDiff.changed(before: before, after: after)
+        OptionsDiff.changes(before: before, after: after).forEach { NSLog("%@", $0) }
+        let report = GameExitReport(code: code, crashReport: crashText, log: logText, instance: bridge.flatMap(instanceLabel), files: [logs.gameLog].compactMap { $0 } + (crashURL.map { [$0] } ?? []), changedSettings: OptionsDiff.reloadingNames(changes))
         let bundleURL = FileManager.default.temporaryDirectory.appendingPathComponent("report-\(UUID().uuidString).zip")
         let reportBundle = try? ReportBundle(store: logs, context: .init(exitReason: report.reason.rawValue, clue: report.clue)).make(at: bundleURL)
         let preview = ReportBundle(store: logs, context: .init(exitReason: report.reason.rawValue, clue: report.clue)).preview()
