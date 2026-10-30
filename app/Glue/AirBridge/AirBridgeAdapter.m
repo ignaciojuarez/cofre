@@ -13,7 +13,6 @@
 #import "PLProfiles.h"
 #import "ServerItem.h"
 #import "ServerService.h"
-#import "AmeLaunchProgress.h"
 #import "SurfaceViewController.h"
 #import "UIKit+hook.h"
 #import "WorldItem.h"
@@ -47,69 +46,35 @@ extern NSMutableArray<NSDictionary *> *remoteVersionList;
 
 static UIWindow *cofreLaunchOverlayWindow;
 
-static void CofreHideAirOverlay(SurfaceViewController *surface) {
-  UIView *airOverlay = [surface valueForKey:@"launchOverlayView"];
-  airOverlay.hidden = YES;
-  airOverlay.alpha = 0;
-  UIButton *cancel = [surface valueForKey:@"launchCancelButton"];
-  cancel.hidden = YES;
-  cancel.enabled = NO;
-}
-
-/// Runs `then` once `window` is landscape, polling every 50 ms up to `tries`.
-static void CofreWhenLandscape(UIWindow *window, int tries, dispatch_block_t then) {
-  CGSize size = window.bounds.size;
-  if (size.width > size.height || tries <= 0) {
-    NSLog(@"[Cofre] launch surface size=%.0fx%.0f", size.width, size.height);
-    then();
-    return;
-  }
-  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 50 * NSEC_PER_MSEC),
-                 dispatch_get_main_queue(),
-                 ^{ CofreWhenLandscape(window, tries - 1, then); });
-}
-
-static void CofreFinishSurface(UIWindow *window);
-
-// Metal renderers (Metallum) never go through Air's GL swap, so Air's first-frame notification never comes
-// and the launch would wait for Air's 45 s timeout with Cofre's overlay window catching every touch. The
-// first drawable any CAMetalLayer takes after the game surface is up is the game's first frame.
+static void (^cofreLaunchEventHandler)(CofreLaunchEvent, double, NSString *);
+static BOOL cofreAwaitingFirstFrame;
 static atomic_bool cofreAwaitingFirstDrawable;
-static id (*CofreOriginalNextDrawable)(id, SEL);
+static id (*cofreOriginalNextDrawable)(id, SEL);
 
+BOOL CofreOwnsLaunchUI(void) { return YES; }
+void CofreLaunchSurfaceAttached(void) { cofreAwaitingFirstFrame = YES; if (cofreLaunchEventHandler) cofreLaunchEventHandler(CofreLaunchEventSurfaceShown, 0, nil); }
+void CofreLaunchFirstFramePresented(void) { cofreAwaitingFirstFrame = NO; NSLog(@"[Cofre] first-frame source=gl/air"); if (cofreLaunchEventHandler) cofreLaunchEventHandler(CofreLaunchEventFirstFrame, 1, @"gl"); }
 static id CofreNextDrawable(CAMetalLayer *layer, SEL cmd) {
   if (atomic_exchange(&cofreAwaitingFirstDrawable, false)) {
-    // One frame is all Cofre needs: hand nextDrawable straight back to Metal for the rest of the session.
-    method_setImplementation(class_getInstanceMethod(CAMetalLayer.class, @selector(nextDrawable)),
-                             (IMP)CofreOriginalNextDrawable);
+    method_setImplementation(class_getInstanceMethod(CAMetalLayer.class, @selector(nextDrawable)), (IMP)cofreOriginalNextDrawable);
     dispatch_async(dispatch_get_main_queue(), ^{
-      NSLog(@"[Cofre] first Metal drawable; game is presenting");
-      [NSNotificationCenter.defaultCenter postNotificationName:@"PojavFirstFrameRendered" object:nil];
+      cofreAwaitingFirstFrame = NO;
+      NSLog(@"[Cofre] first-frame source=metal");
+      if (cofreLaunchEventHandler) cofreLaunchEventHandler(CofreLaunchEventFirstFrame, 1, @"metal");
     });
   }
-  return CofreOriginalNextDrawable(layer, cmd);
+  return cofreOriginalNextDrawable(layer, cmd);
 }
-
 static void CofreArmFirstDrawable(void) {
-  Method m = class_getInstanceMethod(CAMetalLayer.class, @selector(nextDrawable));
-  IMP previous = method_setImplementation(m, (IMP)CofreNextDrawable);
-  if (previous != (IMP)CofreNextDrawable) CofreOriginalNextDrawable = (id (*)(id, SEL))previous;
+  Method method = class_getInstanceMethod(CAMetalLayer.class, @selector(nextDrawable));
+  IMP previous = method_setImplementation(method, (IMP)CofreNextDrawable);
+  if (previous != (IMP)CofreNextDrawable) cofreOriginalNextDrawable = (id (*)(id, SEL))previous;
   atomic_store(&cofreAwaitingFirstDrawable, true);
 }
+void CofreLaunchGameExited(int code) { dispatch_async(dispatch_get_main_queue(), ^{ if (cofreLaunchEventHandler) cofreLaunchEventHandler(CofreLaunchEventExited, 0, [NSString stringWithFormat:@"exit code %d", code]); }); }
+BOOL CofreLaunchAwaitingFirstFrame(void) { return cofreAwaitingFirstFrame; }
 
-/// Air drops its own launch overlay on the first frame, or after 45 s when the renderer never reports one.
-/// Follow it so Cofre's overlay window can never stay on top of the game and swallow touches.
-static void CofreFinishWhenAirOverlayGone(SurfaceViewController *surface, UIWindow *window) {
-  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 500 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
-    if (!cofreLaunchOverlayWindow) return;
-    if (![[surface valueForKey:@"launchOverlayDismissed"] boolValue]) {
-      CofreFinishWhenAirOverlayGone(surface, window);
-      return;
-    }
-    NSLog(@"[Cofre] Air launch overlay gone before Completed; dismissing Cofre overlay");
-    CofreFinishSurface(window);
-  });
-}
+static void CofreFinishSurface(UIWindow *window);
 
 static void CofrePresentSurface(UIWindow *window, NSDictionary *metadata) {
   // As UIKit_launchMinecraftSurfaceVC does: remember who played last.
@@ -128,22 +93,15 @@ static void CofrePresentSurface(UIWindow *window, NSDictionary *metadata) {
     // Minecraft sizes its window from the surface's first layout, so turn to
     // landscape first, as Air's own Play button does.
     AmeGameLandscapeLockEnter();
-    CofreWhenLandscape(window, 40, ^{
-      CofreArmFirstDrawable();
+    dispatch_async(dispatch_get_main_queue(), ^{
       SurfaceViewController *surface = [[SurfaceViewController alloc] initWithMetadata:metadata];
+      CofreArmFirstDrawable();
       [CofreGameOverlayHost installOnSurface:surface];
       window.alpha = 0;
       window.rootViewController = surface;
       [window makeKeyAndVisible];
       [UIView animateWithDuration:0.2 animations:^{ window.alpha = 1; }];
 
-      // SurfaceViewController creates these private views during init/viewDidLoad.
-      // Repeat briefly so Air's own spinner and Cancel button never flash through.
-      for (NSNumber *delay in @[@0, @0.05, @0.2, @0.5, @1.0]) {
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay.doubleValue * NSEC_PER_SEC)),
-                       dispatch_get_main_queue(), ^{ CofreHideAirOverlay(surface); });
-      }
-      CofreFinishWhenAirOverlayGone(surface, window);
       NSLog(@"[Cofre] launch surface presented with Cofre overlay");
     });
   });
@@ -964,7 +922,7 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
 // download plus the real AmeLaunchProgress stages; completion waits for a frame.
 - (void)launchProfile:(NSString *)profile
             accountID:(NSString *)accountID
-             progress:(void (^)(NSString *))progress {
+             progress:(void (^)(CofreLaunchEvent, double, NSString *))progress {
   [_profiles setSelectedProfileName:profile];
   if (accountID.length &&
       ![[BaseAuthenticator.current authData][@"accountId"] isEqual:accountID]) {
@@ -973,7 +931,7 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
       BaseAuthenticator.current = saved;
   }
   if (!BaseAuthenticator.current) {
-    progress(@"failed:Sign in to your Minecraft account first.");
+    progress(CofreLaunchEventFailed, 0, @"Sign in to your Minecraft account first.");
     return;
   }
   NSString *versionID = _profiles.selectedProfile[@"lastVersionId"];
@@ -988,91 +946,36 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
             ?: @{@"id" : versionID ?: @"", @"type" : @"custom"};
     MinecraftResourceDownloadTask *task = [MinecraftResourceDownloadTask new];
     __block BOOL failed = NO;
-    __block id stageObserver = nil;
-    __block id exitObserver = nil;
-    void (^emitFailure)(NSString *) = ^(NSString *message) {
-      if (stageObserver) {
-        [NSNotificationCenter.defaultCenter removeObserver:stageObserver];
-        stageObserver = nil;
-      }
-      if (exitObserver) {
-        [NSNotificationCenter.defaultCenter removeObserver:exitObserver];
-        exitObserver = nil;
-      }
-      NSLog(@"[Cofre] launch failed=%@", message);
-      progress([NSString stringWithFormat:@"failed:%@", message]);
-    };
-    task.handleError = ^{
-      dispatch_async(dispatch_get_main_queue(), ^{
-        failed = YES;
-      });
+    UIWindow *window = UIWindow.mainWindow;
+    task.handleError = ^{ failed = YES; };
+    cofreLaunchEventHandler = ^(CofreLaunchEvent event, double fraction, NSString *message) {
+      progress(event, fraction, message);
     };
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
       [task downloadVersion:version];
     });
-    // Same completion test as Air's progress observer, polled.
-    [NSTimer
-        scheduledTimerWithTimeInterval:0.25
-                               repeats:YES
-                                 block:^(NSTimer *timer) {
-                                   if (failed) {
-                                     [timer invalidate];
-                                     NSLog(@"[Cofre] launch download failed");
-                                     emitFailure(@"Couldn't download the game files. Check your connection and the launcher log.");
-                                     return;
-                                   }
-                                   NSProgress *total = task.progress;
-                                   task.textProgress.completedUnitCount =
-                                       total.totalUnitCount *
-                                       total.fractionCompleted;
-                                   if (!task.textProgress.finished) {
-                                     progress([NSString
-                                         stringWithFormat:
-                                             @"downloading:%.3f",
-                                             total.fractionCompleted]);
-                                     return;
-                                   }
-                                   [timer invalidate];
-                                   if (!task.metadata) {
-                                     emitFailure(@"Air couldn't read this version's files.");
-                                     return;
-                                   }
-                                   [self pickRendererForProfile:profile metadata:task.metadata];
-                                   [self setGameLanguageForProfile:profile metadata:task.metadata];
-                                   NSLog(@"[Cofre] launch files ready; starting the game");
-                                   UIWindow *window = UIWindow.mainWindow;
-                                   stageObserver = [NSNotificationCenter.defaultCenter
-                                       addObserverForName:AmeLaunchProgressChangedNotification
-                                                   object:nil
-                                                    queue:NSOperationQueue.mainQueue
-                                               usingBlock:^(NSNotification *note) {
-                                                 AmeLaunchStage stage = AmeLaunchProgressCurrentStage();
-                                                 double fraction = AmeLaunchProgressCurrentFraction();
-                                                 NSString *key = AmeLaunchProgressCurrentKey() ?: @"";
-                                                 progress([NSString stringWithFormat:@"air:%ld:%.4f:%@", (long)stage, fraction, key]);
-                                                 if (stage == AmeLaunchStageCompleted) {
-                                                   if (stageObserver) {
-                                                     [NSNotificationCenter.defaultCenter removeObserver:stageObserver];
-                                                     stageObserver = nil;
-                                                   }
-                                                   if (exitObserver) {
-                                                     [NSNotificationCenter.defaultCenter removeObserver:exitObserver];
-                                                     exitObserver = nil;
-                                                   }
-                                                   CofreFinishSurface(window);
-                                                   progress(@"completed");
-                                                 }
-                                               }];
-                                   exitObserver = [NSNotificationCenter.defaultCenter
-                                       addObserverForName:@"CofreAirJVMExitNotification"
-                                                   object:nil
-                                                    queue:NSOperationQueue.mainQueue
-                                               usingBlock:^(NSNotification *note) {
-                                                 NSInteger code = [note.userInfo[@"code"] integerValue];
-                                                 emitFailure([NSString stringWithFormat:@"Minecraft exited before the first frame (exit code %ld). Check the launch log.", (long)code]);
-                                               }];
-                                   CofrePresentSurface(window, task.metadata);
-                                 }];
+    [NSTimer scheduledTimerWithTimeInterval:0.25 repeats:YES block:^(NSTimer *timer) {
+      if (failed) {
+        [timer invalidate];
+        progress(CofreLaunchEventFailed, 0, @"Couldn't download the game files. Check your connection and the launcher log.");
+        return;
+      }
+      NSProgress *total = task.progress;
+      task.textProgress.completedUnitCount = total.totalUnitCount * total.fractionCompleted;
+      if (!task.textProgress.finished) {
+        progress(CofreLaunchEventDownloading, total.fractionCompleted, @"Game files");
+        return;
+      }
+      [timer invalidate];
+      if (!task.metadata) {
+        progress(CofreLaunchEventFailed, 0, @"Air couldn't read this version's files.");
+        return;
+      }
+      [self pickRendererForProfile:profile metadata:task.metadata];
+      [self setGameLanguageForProfile:profile metadata:task.metadata];
+      progress(CofreLaunchEventPreparing, 0, @"Starting Minecraft");
+      CofrePresentSurface(window, task.metadata);
+    }];
   });
 }
 // Air's "auto" always picks ANGLE. Minecraft 26+ rejects ANGLE's OpenGL
@@ -1118,7 +1021,7 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
   NSLog(@"[Cofre] game %@ for Minecraft %@", lang, game);
 }
 - (void)hideCofreLaunchOverlay {
-  NSLog(@"[Cofre] launch overlay hidden; Java may continue");
+  NSLog(@"[Cofre] launch finish reason=cancelled");
   CofreFinishSurface(UIWindow.mainWindow);
 }
 - (void)searchProjects:(NSDictionary *)filters

@@ -89,7 +89,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)setServerIp:(NSString *)address forProfile:(NSString *)profile;
 - (void)launchProfile:(NSString *)profile
             accountID:(nullable NSString *)accountID
-             progress:(void (^)(NSString *stage))progress;
+             progress:(void (^)(CofreLaunchEvent, double, NSString *_Nullable))progress;
 - (void)hideCofreLaunchOverlay;
 /// Searches projects from the selected catalog.
 - (void)searchProjects:(NSDictionary *)filters

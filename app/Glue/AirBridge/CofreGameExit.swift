@@ -2,6 +2,9 @@ import CofreUI
 import SwiftUI
 import UIKit
 
+@_silgen_name("CofreLaunchAwaitingFirstFrame")
+private func CofreLaunchAwaitingFirstFrame() -> Bool
+
 /// Cofre's crash screen over a stopped game, in place of Air's PLCrashView. Patch 0004 asks `CofreHandleGameExit`
 /// (CofreStartup.m), which calls `handle` on the main queue while the JVM thread waits for the process to end.
 @MainActor enum CofreGameExit {
@@ -10,7 +13,7 @@ import UIKit
     static func handle(code: Int, root: UIViewController?, bridge: (any CofreAirBridging)?) {
         NSLog("[Cofre] launch exit code=%d", code)
         // Before the first frame Cofre's launch screen is still up and shows the failure itself (store.launchError).
-        if let w = root?.viewIfLoaded?.window, !w.isHidden, w.alpha > 0 {
+        if CofreLaunchAwaitingFirstFrame() {
             NSLog("[Cofre] game exit shown on the launch screen")
             return
         }

@@ -219,6 +219,17 @@
             return AsyncThrowingStream { continuation in
                 launchTask?.cancel()
                 let task = Task { @MainActor in
+                    var finished = false
+                    var awaitingFirstFrame = false
+                    var watchdog: Task<Void, Never>?
+                    func finish(_ reason: String, error: Error? = nil) {
+                        guard !finished else { return }
+                        finished = true
+                        watchdog?.cancel()
+                        NSLog("[Cofre] launch state=%@", reason)
+                        Task { @MainActor in self.air.hideCofreLaunchOverlay() }
+                        if let error { continuation.finish(throwing: error) } else { continuation.finish() }
+                    }
                     do {
                         try Task.checkCancellation()
                         if !self.isJITEnabled {
@@ -238,48 +249,33 @@
                         }
                         try Task.checkCancellation()
                         NSLog("[Cofre] launch JIT ready; starting Air")
-                        // Air downloads first, then publishes its real launch stages. Completion is emitted only after
-                        // AmeLaunchStageCompleted (the first rendered frame).
-                        self.air.launchProfile(instanceID, accountID: accountID) { event in
-                            let parts = event.split(separator: ":", maxSplits: 3).map(String.init)
-                            let kind = parts.first ?? ""
-                            switch kind {
-                            case "downloading":
-                                let f = min(max(Double(parts.dropFirst().first ?? "0") ?? 0, 0), 0.999)
-                                continuation.yield(
-                                    LaunchProgress(
-                                        stage: 2, of: 7, title: "Game files", fraction: f))
-                            case "air":
-                                let airStage = Int(parts.count > 1 ? parts[1] : "0") ?? 0
-                                let fraction = Double(parts.count > 2 ? parts[2] : "0") ?? 0
-                                let mapped: (Int, String) = switch airStage {
-                                case 2: (3, "Renderer")
-                                case 3: (4, "Java")
-                                case 4, 5: (5, "Starting Minecraft")
-                                case 6: (6, "Loading")
-                                case 7: (7, "In game")
-                                // Air's first stages run once its game view is up, so they count as past Game files.
-                                default: (3, "Renderer")
+                        self.air.launchProfile(instanceID, accountID: accountID) { event, fraction, message in
+                            switch event {
+                            case .downloading:
+                                continuation.yield(LaunchProgress(stage: 2, of: 7, title: "Game files", fraction: min(max(fraction, 0), 0.999)))
+                            case .preparing:
+                                continuation.yield(LaunchProgress(stage: 5, of: 7, title: message ?? "Starting Minecraft"))
+                            case .surfaceShown:
+                                awaitingFirstFrame = true
+                                NSLog("[Cofre] launch state=surfaceShown")
+                                watchdog = Task { @MainActor in
+                                    try? await Task.sleep(for: .seconds(60))
+                                    guard !Task.isCancelled, awaitingFirstFrame else { return }
+                                    finish("failed reason=launchTimeout", error: CofreBackendError.unavailable("Minecraft took too long to show its first frame"))
                                 }
-                                NSLog("[Cofre] launch Air stage=%d title=%@ fraction=%.3f", airStage, mapped.1, fraction)
-                                continuation.yield(LaunchProgress(stage: mapped.0, of: 7, title: mapped.1, fraction: fraction))
-                            case "completed":
+                            case .firstFrame:
+                                guard awaitingFirstFrame else { return }
+                                awaitingFirstFrame = false
                                 continuation.yield(LaunchProgress(stage: 7, of: 7, title: "In game", finished: true))
-                                continuation.finish()
-                            case "failed":
-                                let value = parts.dropFirst().joined(separator: ":")
-                                continuation.finish(
-                                    throwing: NSError(
-                                        domain: "CofreAir", code: 1,
-                                        userInfo: [
-                                                NSLocalizedDescriptionKey: value.isEmpty
-                                                ? "Minecraft couldn't start. Check the launcher log." : value
-                                        ]))
-                            default: break
+                                finish("inGame")
+                            case .failed, .cancelled, .exited:
+                                finish(event == .cancelled ? "cancelled" : "failed", error: NSError(domain: "CofreAir", code: 1, userInfo: [NSLocalizedDescriptionKey: message ?? "Minecraft couldn't start. Check the launcher log."]))
+                            @unknown default: break
                             }
                         }
+
                     } catch {
-                        continuation.finish(throwing: error)
+                        finish("failed", error: error)
                     }
                 }
                 launchTask = task

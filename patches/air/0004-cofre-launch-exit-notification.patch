@@ -1,37 +1,62 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Cofre <cofre@example.invalid>
 Date: Thu, 29 Oct 2026 14:00:00 -0700
-Subject: [PATCH 4/4] Let Cofre own Air's game exit
+Subject: [PATCH 4/4] Let Cofre own Air launch and game exit
 
-Reason: Cofre owns the launch and crash screens. It needs the JVM exit code (a notification for the launch screen) and must stop Air's crash UI (PLCrashView, log view) when CofreHandleGameExit() returns YES.
-Drop when: Air exposes a game-exit callback that can replace its crash UI.
+Reason: Cofre owns launch completion, first-frame handoff, and crash screens.
+Drop when: Air exposes equivalent supported launch and game-exit callbacks.
 ---
- Natives/PLLogOutputView.m | 6 ++++++
- 1 file changed, 6 insertions(+)
-
 diff --git a/Natives/PLLogOutputView.m b/Natives/PLLogOutputView.m
-index 1283697..1f15325 100644
+index 1283697..f74b8d0 100644
 --- a/Natives/PLLogOutputView.m
 +++ b/Natives/PLLogOutputView.m
-@@ -3,6 +3,9 @@
+@@ -3,6 +3,10 @@
  #import "SurfaceViewController.h"
  #import "utils.h"
- 
-+// Cofre shows game exits itself while its UI is installed (app/Glue/AirBridge/CofreStartup.m).
+
++// Cofre owns launch completion and receives the JVM exit boundary.
 +BOOL CofreHandleGameExit(int code);
++void CofreLaunchGameExited(int code);
 +
  @interface PLLogOutputView()<UITableViewDataSource, UITableViewDelegate>
  @property(nonatomic) UITableView* logTableView;
  @property(nonatomic) UINavigationBar* navigationBar;
-@@ -186,6 +189,9 @@ + (void)appendToLog:(NSString *)string {
- }
- 
- + (void)handleExitCode:(int)code {
-+    [[NSNotificationCenter defaultCenter] postNotificationName:@"CofreAirJVMExitNotification"
-+                                                        object:nil userInfo:@{@"code": @(code)}];
-+    if (CofreHandleGameExit(code)) return;
-     if (!current) return;
-     
-     // 如果有错误，显示新的崩溃界面
---
-2.39.0
+diff --git a/Natives/SurfaceViewController.m b/Natives/SurfaceViewController.m
+index 98c31ee..bcc750d 100644
+--- a/Natives/SurfaceViewController.m
++++ b/Natives/SurfaceViewController.m
+@@ -24,6 +24,10 @@
+ #import "ios_uikit_bridge.h"
+ #import "LanPortDetector.h"
+ #import "BackgroundManager.h"
++
++extern BOOL CofreOwnsLaunchUI(void);
++extern void CofreLaunchSurfaceAttached(void);
++extern void CofreLaunchFirstFramePresented(void);
+ // ★ [LAUNCH-PROGRESS] 启动阶段上报 API(遮罩订阅 AmeLaunchProgressChangedNotification)
+ #import "AmeLaunchProgress.h"
+
+@@ -1686,6 +1690,12 @@ - (void)launchMinecraft {
+ ///   │        [ 取消启动 ]              │
+ ///   └─────────────────────────────────┘
+ - (void)setupLaunchOverlay {
++    if (CofreOwnsLaunchUI()) {
++        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onFirstFrameRendered) name:@"PojavFirstFrameRendered" object:nil];
++        CofreLaunchSurfaceAttached();
++        NSLog(@"[Cofre] Air launch UI disabled; Cofre owns launch surface");
++        return;
++    }
+     // ============================================================
+     // FCL 风格启动界面：中间转圈圈 + 显示自定义启动器背景
+     // ============================================================
+@@ -2045,6 +2055,10 @@ - (void)updateLaunchProgressUI {
+
+ /// 首帧渲染通知回调：淡出并移除启动遮罩层
+ - (void)onFirstFrameRendered {
++    if (CofreOwnsLaunchUI()) {
++        CofreLaunchFirstFramePresented();
++        return;
++    }
+     // ★ [LAUNCH-PROGRESS] 首帧渲染 = 启动完成，先把阶段推到 Completed。
+     AmeLaunchProgressSetStage(AmeLaunchStageCompleted);
+     dispatch_async(dispatch_get_main_queue(), ^{

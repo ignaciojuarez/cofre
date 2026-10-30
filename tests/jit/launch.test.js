@@ -18,10 +18,12 @@ try {
 import Foundation
 ${progress}
 ${status}
+enum CofreLaunchEvent { case preparing, downloading, surfaceShown, firstFrame, failed, cancelled, exited }
 enum CofreBackendError: LocalizedError {
-    case jit(String)
-    var errorDescription: String? { if case .jit(let message) = self { return message }; return nil }
+    case jit(String), unavailable(String)
+    var errorDescription: String? { switch self { case .jit(let message), .unavailable(let message): return message } }
 }
+enum RejoinIntent { enum Kind: String { case server }; }
 @MainActor final class CofreJIT {
     static var result: CofreJITStatus = .enabled("debugger")
     static var enabled = false
@@ -42,16 +44,17 @@ enum CofreBackendError: LocalizedError {
     var calls = 0
     var fails = false
     func hideCofreLaunchOverlay() {}
-    func launchProfile(_ profile: String, accountID: String?, progress: (String) -> Void) {
+    func setServerIp(_ address: String, forProfile profile: String) {}
+    func launchProfile(_ profile: String, accountID: String?, progress: (CofreLaunchEvent, Double, String?) -> Void) {
         precondition(CofreJIT.enabled, "Air started before JIT")
         precondition(profile == "instance" && accountID == "account")
         calls += 1
-        progress("preparing")
-        if fails { progress("failed:Minecraft couldn't start. Check the launcher log.") }
+        progress(.preparing, 0, "Starting Minecraft")
+        if fails { progress(.failed, 0, "Minecraft couldn't start. Check the launcher log.") }
         else {
-            progress("air:2:0.4:")
-            progress("air:6:0.8:")
-            progress("completed")
+            progress(.downloading, 0.4, "Game files")
+            progress(.surfaceShown, 0, nil)
+            progress(.firstFrame, 1, nil)
         }
     }
 }

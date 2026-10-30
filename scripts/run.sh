@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$(cd -P "$(dirname "$0")/.." && pwd)"
 BUILD_TOOLS="${BUILD_TOOLS:-<local-volume>/Developer/kiwios/tools/build-runners}"
 source "$BUILD_TOOLS/lib/common.sh"
 source "$BUILD_TOOLS/lib/device.sh"
@@ -49,7 +49,7 @@ if (( BUILD )); then
   cp "$ROOT"/app/Glue/CofreConstants.h "$ROOT"/app/Glue/AirBridge/*.[hm] "$AIR/Natives/CofreGlue/"
   rm -rf "$ROOT/artifacts/Payload/PlugIns" "$ROOT/artifacts/Payload/Cofre.app/PlugIns" 2>/dev/null || true
   cp -R "$ROOT"/app/Resources/AppIcon/*.appiconset "$AIR/Natives/Assets.xcassets/"
-  (cd "$AIR" && eval "gmake -j4 dsym package PLATFORM=2 BOOTJDK=\"$BOOTJDK\" JOBS=4 $MAKE_ARGS")
+  (cd -P "$AIR" && eval "gmake -j4 dsym package PLATFORM=2 BOOTJDK=\"$BOOTJDK\" JOBS=4 $MAKE_ARGS")
   mkdir -p "$ROOT/artifacts/Payload"; rm -rf "$APP"; IPA=$(find -L "$ROOT/.work/air/artifacts" -maxdepth 1 -type f -name "*-ios.ipa" -print -quit)
   if [[ -n "$IPA" && -f "$IPA" ]]; then unzip -q -o "$IPA" -d "$ROOT/artifacts"; else BUILT_APP=$(find "$AIR/Natives/build" -maxdepth 1 -type d -name "*.app" -print -quit); [[ -n "$BUILT_APP" && -d "$BUILT_APP" ]] || bt_die "no IPA or app artifact"; cp -R "$BUILT_APP" "$ROOT/artifacts/Payload/AngelAuraAmethyst.app"; fi
   mv "$ROOT/artifacts/Payload/AngelAuraAmethyst.app" "$APP"

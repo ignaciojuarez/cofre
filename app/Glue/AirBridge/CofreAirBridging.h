@@ -1,6 +1,15 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 NS_ASSUME_NONNULL_BEGIN
+typedef NS_ENUM(NSInteger, CofreLaunchEvent) {
+    CofreLaunchEventPreparing = 0,
+    CofreLaunchEventDownloading,
+    CofreLaunchEventSurfaceShown,
+    CofreLaunchEventFirstFrame,
+    CofreLaunchEventFailed,
+    CofreLaunchEventCancelled,
+    CofreLaunchEventExited,
+};
 @protocol CofreAirBridging <NSObject>
 - (NSArray<NSDictionary *> *)instances;
 - (nullable NSURL *)gameDirectoryForProfile:(NSString *)profile;
@@ -73,7 +82,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)setServerIp:(NSString *)address forProfile:(NSString *)profile;
 - (void)launchProfile:(NSString *)profile
             accountID:(nullable NSString *)accountID
-             progress:(void (^)(NSString *))progress;
+             progress:(void (^)(CofreLaunchEvent, double, NSString *_Nullable))progress;
 /// Hides Cofre's launch overlay. Java may continue if it already started.
 - (void)hideCofreLaunchOverlay;
 - (void)searchProjects:(NSDictionary *)filters
