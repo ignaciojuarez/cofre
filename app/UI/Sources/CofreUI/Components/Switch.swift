@@ -13,7 +13,7 @@ private struct BlockSwitch: View {
     let configuration: ToggleStyleConfiguration
     @Environment(\.isEnabled) private var enabled
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.cofreTheme) private var theme
+    private let theme = CofreTheme.standard
 
     var body: some View {
         let on = configuration.isOn

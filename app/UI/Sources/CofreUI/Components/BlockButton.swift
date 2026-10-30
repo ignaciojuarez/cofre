@@ -33,7 +33,7 @@ private struct BlockButtonBody: View {
 
     @Environment(\.isEnabled) private var enabled
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.cofreTheme) private var theme
+    private let theme = CofreTheme.standard
     @State private var hovering = false
 
     var body: some View {

@@ -150,7 +150,7 @@
                 for (name, sizeClass, size, type) in layouts {
                     let model = MockServerJoin(scenario: scenario, stepDelay: 60)
                     let host = UIHostingController(
-                        rootView: JoinServerSheet(model: model).environment(\.cofreTheme, .standard))
+                        rootView: JoinServerSheet(model: model))
                     host.traitOverrides.horizontalSizeClass = sizeClass
                     host.traitOverrides.preferredContentSizeCategory = type
                     host.overrideUserInterfaceStyle = .dark

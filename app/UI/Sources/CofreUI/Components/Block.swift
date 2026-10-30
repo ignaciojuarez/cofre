@@ -14,7 +14,7 @@ public struct BlockBackground: View {
     var flat = false
     var tabBar = false
 
-    @Environment(\.cofreTheme) private var theme
+    private let theme = CofreTheme.standard
 
     public init(_ kind: BlockKind = .panel, lip: CGFloat = 2, selected: Bool = false) {
         self.kind = kind
@@ -92,7 +92,7 @@ struct BlockHover: ViewModifier {
 
 struct FocusRing: ViewModifier {
     @Environment(\.isFocused) private var focused
-    @Environment(\.cofreTheme) private var theme
+    private let theme = CofreTheme.standard
     func body(content: Content) -> some View {
         content
             .focusEffectDisabled()
@@ -123,11 +123,10 @@ struct HitArea: ViewModifier {
 
 /// Window background: `page` plus the 2 pt stone texture tiled at 128 pt.
 public struct PageBackground: View {
-    @Environment(\.colorScheme) private var scheme
     public init() {}
     public var body: some View {
         Color.cofre.page.overlay {
-            Image(decorative: StoneTexture.image(light: scheme == .light), scale: 0.5)
+            Image(decorative: StoneTexture.image, scale: 0.5)
                 .resizable(resizingMode: .tile)
                 .opacity(0.9)
                 .accessibilityIgnoresInvertColors()
@@ -138,12 +137,9 @@ public struct PageBackground: View {
 }
 
 enum StoneTexture {
-    @MainActor private static var cache: [Bool: CGImage] = [:]
-
     /// 64 px bitmap, shown at scale 0.5 so a tile is 128 pt.
-    @MainActor static func image(light: Bool) -> CGImage {
-        if let hit = cache[light] { return hit }
-        let pal = light ? CofreTheme.current.palette.stone.light : CofreTheme.current.palette.stone.dark
+    @MainActor static let image: CGImage = {
+        let pal = CofreUIColors.stone
         var rng = Mulberry32(seed: 5)
         let ctx = CGContext(
             data: nil, width: 64, height: 64, bitsPerComponent: 8, bytesPerRow: 0,
@@ -156,10 +152,8 @@ enum StoneTexture {
                 ctx.fill(CGRect(x: x * 2, y: 60 - y * 2, width: 4, height: 4))
             }
         }
-        let img = ctx.makeImage()!
-        cache[light] = img
-        return img
-    }
+        return ctx.makeImage()!
+    }()
 }
 
 /// Same seeded generator as the mockups (`rng` in ipad.html), so scenes match.

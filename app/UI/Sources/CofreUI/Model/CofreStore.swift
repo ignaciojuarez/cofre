@@ -72,7 +72,6 @@
         public var javaRuntimes: [JavaRuntime] = []
         public var storage: StorageUsage?
         public var curseForgeKey: String?
-        public var theme = CofreTheme.current
         public var lastError: String?
 
         // Servers (plan/servers.md). `servers` above is the active instance's servers.dat, read again on every show.
@@ -95,8 +94,6 @@
         public var pendingJoinLaunch: String?
         /// A destructive action waiting for the one shared confirmation alert (root view).
         public var pendingConfirmation: Confirmation?
-        /// Set by the hosting controller so window-level UIKit state follows X07.
-        @ObservationIgnored public var onThemeChange: ((CofreTheme) -> Void)?
         private var lastTrash: InstanceStore.TrashToken?
         @ObservationIgnored private let defaults: UserDefaults
 
@@ -726,7 +723,7 @@
             }
         }
 
-        // MARK: Logs, system, look
+        // MARK: Logs, system
 
         public func streamLog(_ kind: LogKind) async {
             logs[kind] = []
@@ -757,20 +754,6 @@
                 try backend.setCurseForgeKey(key.isEmpty ? nil : key)
                 curseForgeKey = key.isEmpty ? nil : key
             } catch { lastError = error.localizedDescription }
-        }
-
-        /// X07: swaps the accent family and appearance for both stacks and pushes the colors to Air (GAP-11).
-        public func applyTheme(accent: AccentFamily? = nil, appearance: Appearance? = nil) {
-            var t = CofreTheme.current
-            if let accent { t.accent = accent }
-            if let appearance { t.appearance = appearance }
-            CofreTheme.current = t
-            theme = t
-            CofreUIKitTheme.apply(t)
-            onThemeChange?(t)
-            backend.applyAirAppearance(
-                accentHex: UIColor.cofre.face.hexString(), cardHex: UIColor.cofre.panel.hexString(),
-                textHex: UIColor.cofre.ink.hexString())
         }
 
         /// Runs the pending confirmation's action.

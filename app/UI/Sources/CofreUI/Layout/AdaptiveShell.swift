@@ -11,7 +11,7 @@
         let content: (NavModel.Section) -> Content
         @Environment(\.horizontalSizeClass) private var sizeClass
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
-        @Environment(\.cofreTheme) private var theme
+        private let theme = CofreTheme.standard
         @State private var width: CGFloat = 0
         @State private var keyboardUp = false
 

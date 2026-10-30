@@ -9,7 +9,7 @@
         @Bindable var nav: NavModel
         @Environment(CofreStore.self) private var store
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
-        @Environment(\.cofreTheme) private var theme
+        private let theme = CofreTheme.standard
 
         public init(style: Style, nav: NavModel) {
             self.style = style

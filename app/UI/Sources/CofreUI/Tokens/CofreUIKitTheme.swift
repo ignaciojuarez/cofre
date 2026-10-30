@@ -16,8 +16,7 @@
     @MainActor
     public enum CofreUIKitTheme {
         /// Call once at launch, before the first Air presentation (appearance only affects views created afterward).
-        /// Calling again re-applies after an X07 accent or theme change.
-        public static func apply(_ t: CofreTheme = .current) {
+        public static func apply() {
             CofreFonts.register()
             let scope = [CofreAirHostController.self]
             let c = UIColor.cofre
@@ -72,12 +71,6 @@
 
             let button = UIButton.appearance(whenContainedInInstancesOf: scope)
             button.tintColor = c.accent
-        }
-
-        /// §5.3 #4: the window's style drives both stacks.
-        public static func applyInterfaceStyle(_ t: CofreTheme, to window: UIWindow?) {
-            window?.overrideUserInterfaceStyle = t.interfaceStyle
-            window?.tintColor = .cofre.accent
         }
     }
 #endif

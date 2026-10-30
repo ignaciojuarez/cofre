@@ -680,12 +680,6 @@
             return run(Self.launchStages.dropLast() + ["Joining \(address)"])
         }
 
-        // MARK: GAP-11 AirAppearance
-        public private(set) var lastAppearance: (String, String, String)?
-        public func applyAirAppearance(accentHex: String, cardHex: String, textHex: String) {
-            lastAppearance = (accentHex, cardHex, textHex)
-        }
-
         enum MockError: LocalizedError {
             case notFound
             var errorDescription: String? { "Not found" }

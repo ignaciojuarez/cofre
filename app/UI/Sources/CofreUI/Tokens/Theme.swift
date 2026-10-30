@@ -30,35 +30,12 @@ public struct Motion: Sendable {
     public init() {}
 }
 
-public enum Appearance: String, CaseIterable, Codable, Sendable { case dark, light, auto }
-
 public struct CofreTheme: Sendable {
-    public var palette: Palette = .purple
-    public var accent: AccentFamily = .purple
-    public var appearance: Appearance = .dark
     public var space = Spacing()
     public var block = BlockMetrics()
     public var motion = Motion()
     public init() {}
     public static let standard = CofreTheme()
-
-    /// The theme dynamic colors resolve against. Set it, then re-render (the root view keys on `accent.id`).
-    public static var current: CofreTheme {
-        get { box.lock.withLock { box.theme } }
-        set { box.lock.withLock { box.theme = newValue } }
-    }
-    private final class Box: @unchecked Sendable {
-        let lock = NSLock()
-        var theme = CofreTheme()
-    }
-    private static let box = Box()
-
-    public var colorScheme: ColorScheme? { appearance == .auto ? nil : (appearance == .light ? .light : .dark) }
-    #if canImport(UIKit)
-        public var interfaceStyle: UIUserInterfaceStyle {
-            appearance == .auto ? .unspecified : (appearance == .light ? .light : .dark)
-        }
-    #endif
 }
 
 /// Status and loader tones. Tints are the tone mixed into `panel` (§1.1).
@@ -87,7 +64,6 @@ public enum WidthClass: Int, Comparable, Sendable {
 }
 
 extension EnvironmentValues {
-    @Entry public var cofreTheme: CofreTheme = .standard
     @Entry public var widthClass: WidthClass = .compact
     /// True when a pane was pushed onto a stack; `ColumnHeader` shows its back button only then.
     @Entry public var isPushed: Bool = false
@@ -97,35 +73,10 @@ extension EnvironmentValues {
 
 // MARK: - Colors
 
-/// Dynamic `UIColor` (`NSColor` on the Mac) tokens. Each resolves light/dark, Increase Contrast and the current accent at draw time.
-public struct CofreUIColors: @unchecked Sendable {
-    public let page = dyn(\.palette.page), side = dyn(\.palette.side), panel = dyn(\.palette.panel)
-    public let raised = dyn(\.palette.raised), button = dyn(\.palette.button), buttonBevel = dyn(\.palette.buttonBevel)
-    public let well = dyn(\.palette.well), bevel = dyn(\.palette.bevel), lip = dyn(\.palette.lip)
-    public let outline = dyn(\.palette.outline, highContrast: \.palette.outlineHC)
-    public let ink = dyn(\.palette.ink), inkSoft = dyn(\.palette.inkSoft)
-    public let muted = dyn(\.palette.muted, highContrast: \.palette.inkSoft)
-    public let success = dyn(\.palette.success), warn = dyn(\.palette.warn), danger = dyn(\.palette.danger),
-        quilt = dyn(\.palette.quilt)
-    public let accent = dyn(\.accent.accent), face = dyn(\.accent.face), faceBevel = dyn(\.accent.faceBevel)
-    public let faceLip = dyn(\.accent.faceLip), onFace = dyn(\.accent.onFace)
-    public let hover = PlatformColor.dynamic { light, _ in
-        let t = CofreTheme.current
-        return PlatformColor(
-            hex: light ? t.palette.ink.light : t.palette.ink.dark,
-            alpha: light ? t.palette.hoverOpacity.light : t.palette.hoverOpacity.dark)
-    }
-
+extension CofreUIColors {
     /// `tone` mixed into `panel` (or `well` for neutral). `amount` overrides the tone's default (banners use 0.16).
     public func tint(_ tone: Tone, amount: CGFloat? = nil) -> PlatformColor {
-        if tone == .neutral { return well }
-        let base = color(for: tone)
-        let mix = amount ?? tone.tintAmount
-        let panel = self.panel
-        return .dynamic { light, hc in
-            base.resolved(light: light, highContrast: hc).mixed(
-                into: panel.resolved(light: light, highContrast: hc), amount: mix)
-        }
+        tone == .neutral ? well : color(for: tone).mixed(into: panel, amount: amount ?? tone.tintAmount)
     }
 
     public func color(for tone: Tone) -> PlatformColor {
@@ -138,10 +89,9 @@ public struct CofreUIColors: @unchecked Sendable {
         case .quilt: quilt
         }
     }
-
 }
 
-/// SwiftUI wrappers around the same `UIColor` tokens, so both stacks resolve identical values.
+/// SwiftUI wrappers around the same `UIColor` tokens, so both stacks draw identical values.
 public struct CofreColors: @unchecked Sendable {
     private let ui = PlatformColor.cofre
     public var page: Color { Color(platform: ui.page) }
@@ -172,15 +122,6 @@ public struct CofreColors: @unchecked Sendable {
 
 extension PlatformColor { public static let cofre = CofreUIColors() }
 
-private func dyn(_ key: KeyPath<CofreTheme, ColorPair>, highContrast: KeyPath<CofreTheme, ColorPair>? = nil)
-    -> PlatformColor
-{
-    .dynamic { light, hc in
-        let t = CofreTheme.current
-        let pair = (hc ? highContrast : nil).map { t[keyPath: $0] } ?? t[keyPath: key]
-        return PlatformColor(hex: light ? pair.light : pair.dark)
-    }
-}
 extension Color { public static let cofre = CofreColors() }
 
 extension Color {
@@ -194,37 +135,6 @@ extension Color {
 }
 
 extension PlatformColor {
-    /// Resolves at draw time from light/dark and Increase Contrast, the only traits tokens read.
-    static func dynamic(_ make: @escaping (_ light: Bool, _ highContrast: Bool) -> PlatformColor) -> PlatformColor {
-        #if canImport(UIKit)
-            UIColor { tc in make(tc.userInterfaceStyle == .light, tc.accessibilityContrast == .high) }
-        #else
-            // AppKit can't build a high-contrast appearance on demand, so contrast reads the system setting.
-            NSColor(name: nil) {
-                make(
-                    $0.bestMatch(from: [.aqua, .darkAqua]) == .aqua,
-                    NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast)
-            }
-        #endif
-    }
-
-    /// This color for one appearance, as plain RGB. On the Mac, contrast follows the system setting.
-    func resolved(light: Bool, highContrast: Bool) -> PlatformColor {
-        #if canImport(UIKit)
-            resolvedColor(
-                with: UITraitCollection {
-                    $0.userInterfaceStyle = light ? .light : .dark
-                    $0.accessibilityContrast = highContrast ? .high : .normal
-                })
-        #else
-            var out = self
-            NSAppearance(named: light ? .aqua : .darkAqua)?.performAsCurrentDrawingAppearance {
-                out = usingColorSpace(.sRGB) ?? self
-            }
-            return out
-        #endif
-    }
-
     func mixed(into other: PlatformColor, amount: CGFloat) -> PlatformColor {
         var r1: CGFloat = 0
         var g1: CGFloat = 0
@@ -239,16 +149,4 @@ extension PlatformColor {
         return PlatformColor(
             red: r2 + (r1 - r2) * amount, green: g2 + (g1 - g2) * amount, blue: b2 + (b1 - b2) * amount, alpha: 1)
     }
-
-    #if canImport(UIKit)
-        /// Hex string for Air's `general.*_color` prefs.
-        func hexString(for style: UIUserInterfaceStyle = .dark) -> String {
-            var r: CGFloat = 0
-            var g: CGFloat = 0
-            var b: CGFloat = 0
-            var a: CGFloat = 0
-            resolvedColor(with: UITraitCollection(userInterfaceStyle: style)).getRed(&r, green: &g, blue: &b, alpha: &a)
-            return String(format: "#%02x%02x%02x", Int(r * 255), Int(g * 255), Int(b * 255))
-        }
-    #endif
 }

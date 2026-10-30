@@ -65,7 +65,6 @@
                     case .jitJava: JITJavaContent()
                     case .accounts: AccountsDataContent()
                     case .logs: LogsContent()
-                    case .look: LookContent()
                     case .about: AboutContent()
                     }
                 }
@@ -394,75 +393,6 @@
         }
     }
     private struct ReportSheetItem: Identifiable { let id = UUID(); let url: URL; let preview: ReportPreviewData? }
-
-    // MARK: X07 Look & more
-
-    struct LookContent: View {
-        @Environment(CofreStore.self) private var store
-        @State private var confirmReset = false
-        var body: some View {
-            ListSection("Look", spacing: 4) {
-                HStack {
-                    Text("Theme").cofreFont(.rowTitle).foregroundStyle(Color.cofre.ink)
-                    Spacer()
-                    Segmented(
-                        "Theme",
-                        selection: Binding(get: { store.theme.appearance }, set: { store.applyTheme(appearance: $0) }),
-                        options: [(.dark, "Dark"), (.light, "Light"), (.auto, "Auto")], size: .small
-                    )
-                    .frame(maxWidth: 220)
-                }
-                .padding(.horizontal, 11).padding(.vertical, 6).block(.panel)
-                HStack(spacing: 8) {
-                    Text("Accent").cofreFont(.rowTitle).foregroundStyle(Color.cofre.ink)
-                    Spacer()
-                    ForEach(AccentFamily.all) { a in
-                        let on = store.theme.accent.id == a.id
-                        Button {
-                            store.applyTheme(accent: a)
-                        } label: {
-                            Rectangle().fill(Color(uiColor: UIColor(hex: a.face.dark)))
-                                .overlay(alignment: .top) {
-                                    Color(uiColor: UIColor(hex: a.faceBevel.dark)).frame(height: 3)
-                                }
-                                .overlay { Rectangle().strokeBorder(Color.cofre.outline, lineWidth: 2) }
-                                .frame(width: 26, height: 26)
-                                .overlay {
-                                    if on { Rectangle().strokeBorder(Color.cofre.ink, lineWidth: 2).padding(-4) }
-                                }
-                                .frame(width: 44, height: 44)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .blockPointer()
-                        .accessibilityLabel(Text(verbatim: a.name))
-                        .accessibilityAddTraits(on ? .isSelected : [])
-                    }
-                }
-                .padding(.horizontal, 11).block(.panel)
-                // No handlers yet (GAP-13): shown only when the backend supports them.
-                if store.can(.appIcon) { Row("App icon · background", trailing: { Meta("Pixel") }) }
-                if store.can(.language) { Row("Language", trailing: { Meta("English") }) }
-            }
-            if store.can(.lanRoom) {
-                ListSection("Play together", spacing: 4) {
-                    Row("LAN room", trailing: { Meta("Terracotta") })
-                }
-            }
-            ListSection("Extras", spacing: 4) {
-                ToggleRow("AirPlay fullscreen", isOn: prefBinding(store, nil, \.airPlayFullscreen))
-                ToggleRow("Capes (Cosmetica)", isOn: prefBinding(store, nil, \.capes))
-                ToggleRow("Check for updates", isOn: prefBinding(store, nil, \.checkUpdates))
-            }
-            BlockButton("Reset all settings", role: .ghostDestructive) { confirmReset = true }
-                .confirmationDialog("Reset all settings?", isPresented: $confirmReset, titleVisibility: .visible) {
-                    Button("Reset", role: .destructive) {
-                        store.save(GamePreferences())
-                        store.applyTheme(accent: .purple, appearance: .dark)
-                    }
-                }
-        }
-    }
 
     // MARK: About (X06 second half): Cofre, its maker, expiry, credits
 

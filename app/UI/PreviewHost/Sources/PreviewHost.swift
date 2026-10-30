@@ -22,7 +22,6 @@ import UIKit
 //   -get culling        Tap Get on that mock mod (-screen mods). With -getConfirm YES, also tap Install;
 //                       -getFail fabric-api fails that download; -getSlow YES holds each download for a while
 //   -type xl|ax3        Dynamic Type override
-//   -appearance light   Light theme
 //   -canvas 1376x1032   Lay the UI out at this point size (scaled to fit) and write a full-size PNG
 //                       to Documents/<snapshot>.png, e.g. an iPad 13" window on an 11" simulator.
 //   -snapshot name      File name for -canvas output
@@ -39,9 +38,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options: UIScene.ConnectionOptions) {
         guard let scene = scene as? UIWindowScene else { return }
         let args = UserDefaults.standard
-        var theme = CofreTheme.current
-        if args.string(forKey: "appearance") == "light" { theme.appearance = .light }
-        CofreUI.bootstrap(theme: theme)
+        CofreUI.bootstrap()
 
         let screen = args.string(forKey: "screen") ?? "play"
         let services = CofreServices.mock(setupComplete: screen != "setup")
@@ -183,7 +180,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         case "ax3": window.traitOverrides.preferredContentSizeCategory = .accessibilityExtraExtraLarge
         default: break
         }
-        window.overrideUserInterfaceStyle = theme.interfaceStyle
+        window.overrideUserInterfaceStyle = .dark
         if let canvas = args.string(forKey: "canvas").flatMap(Self.size(from:)) {
             window.rootViewController = CanvasController(
                 child: root, canvas: canvas, snapshot: args.string(forKey: "snapshot") ?? screen)

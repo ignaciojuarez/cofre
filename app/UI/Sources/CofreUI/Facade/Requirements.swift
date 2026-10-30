@@ -230,13 +230,6 @@ import Foundation
         func setCurseForgeKey(_ key: String?) throws
     }
 
-    // MARK: GAP-11 · Air appearance (all Air VCs)
-    /// Writes `general.accent_color`, `general.card_color`, `general.text_color`, sets
-    /// `background_glass_style = "native"`, `background_glass_handdrawn = NO`, then posts `AMEGlassStyleChanged`.
-    public protocol AirAppearance: AnyObject {
-        func applyAirAppearance(accentHex: String, cardHex: String, textHex: String)
-    }
-
     // MARK: GAP-13 · Capabilities and optional actions (addition, not in §4.2)
     /// Controls the backend can't do yet stay hidden. The backend reports what it supports; every member has a
     /// default (nothing supported, actions throw), so adapters written before this compile unchanged.
@@ -257,10 +250,6 @@ import Foundation
         public static let rendererTuning = BackendCapabilities(rawValue: 1 << 5)
         /// Controller navigation in the launcher (`ControllerFocusBridge`). Shows the A/B/Y hint strip.
         public static let controllerNavigation = BackendCapabilities(rawValue: 1 << 6)
-        /// X07 rows: app icon, language, LAN room. No handlers exist yet.
-        public static let appIcon = BackendCapabilities(rawValue: 1 << 7)
-        public static let language = BackendCapabilities(rawValue: 1 << 8)
-        public static let lanRoom = BackendCapabilities(rawValue: 1 << 9)
         /// GAP-14 Join server sheet: "Modded" badges and Join buttons on server rows, and `cofre://join` links.
         public static let serverJoin = BackendCapabilities(rawValue: 1 << 10)
         /// I02 Options icon grid → `setIcon(_:instanceID:)`.
@@ -338,5 +327,5 @@ import Foundation
 // MARK: GAP-12 · Extended preferences (addition, not in §4.2)
 // `GamePreferences` has more fields than `CofrePreferences` (autoRAM, fsrMode, fpsOverlay, vsync, fpsCap,
 // mute, mic, gyro, virtual mouse, hotbar swipe, TouchController, button scale, layouts, download source,
-// verify files, AirPlay, capes, updates). Map each to its Air pref key in `LibraryService.preferences`.
+// verify files). Map each to its Air pref key in `LibraryService.preferences`.
 #endif

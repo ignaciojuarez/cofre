@@ -5,15 +5,11 @@
 
     /// The Mac pairing helper (Llave) reads the same tokens and fonts through AppKit.
     final class CofreUIMacTests: XCTestCase {
-        func testTokensResolvePerAppearance() {
+        func testTokensResolve() {
             let c = NSColor.cofre
-            XCTAssertEqual(hex(c.page.resolved(light: false, highContrast: false)), 0x0f0d17)
-            XCTAssertEqual(hex(c.page.resolved(light: true, highContrast: false)), 0xece7f7)
-            XCTAssertEqual(hex(c.ink.resolved(light: true, highContrast: false)), 0x1b1530)
-            XCTAssertEqual(hex(c.face.resolved(light: false, highContrast: false)), 0x5b3fd6)
-            XCTAssertNotEqual(
-                hex(c.tint(.success).resolved(light: false, highContrast: false)),
-                hex(c.panel.resolved(light: false, highContrast: false)))
+            XCTAssertEqual(hex(c.page), 0x0f0d17)
+            XCTAssertEqual(hex(c.face), 0x5b3fd6)
+            XCTAssertNotEqual(hex(c.tint(.success)), hex(c.panel))
         }
 
         func testBundledFontsRegister() {

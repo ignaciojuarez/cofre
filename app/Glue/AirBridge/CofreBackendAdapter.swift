@@ -410,7 +410,6 @@
         public func clearCache() async throws { throw unavailable("cache management") }
         public func curseForgeKey() -> String? { nil }
         public func setCurseForgeKey(_ key: String?) throws { throw unavailable("CurseForge key storage") }
-        public func applyAirAppearance(accentHex: String, cardHex: String, textHex: String) {}
 
         private var pairingURL: URL {
             FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent(

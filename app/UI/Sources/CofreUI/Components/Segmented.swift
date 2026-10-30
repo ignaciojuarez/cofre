@@ -9,7 +9,7 @@ public struct Segmented<Value: Hashable>: View {
     let size: ControlSize
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.cofreTheme) private var theme
+    private let theme = CofreTheme.standard
 
     public init(
         _ title: LocalizedStringKey, selection: Binding<Value>, options: [(Value, LocalizedStringKey)],

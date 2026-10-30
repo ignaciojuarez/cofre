@@ -11,88 +11,36 @@ import SwiftUI
 
 // DESIGN_SYSTEM §1.1. This is the only file that writes hex values.
 
-/// One color token: a dark value and a light value.
-public struct ColorPair: Sendable, Hashable {
-    public let dark: UInt32
-    public let light: UInt32
-    public init(dark: UInt32, light: UInt32) {
-        self.dark = dark
-        self.light = light
-    }
-    public init(_ both: UInt32) { self.init(dark: both, light: both) }
-}
-
-/// Surface, text and status tokens. Accent tokens live in `AccentFamily`.
-public struct Palette: Sendable, Hashable {
-    public var page, side, panel, raised, button, buttonBevel, well, bevel, lip, outline, outlineHC: ColorPair
-    public var ink, inkSoft, muted, success, warn, danger, quilt: ColorPair
-    /// Hover overlay is `ink` at this opacity.
-    public var hoverOpacity: (dark: Double, light: Double)
+/// `UIColor` (`NSColor` on the Mac) tokens. Cofre has one look: dark, with the purple accent.
+public struct CofreUIColors: @unchecked Sendable {
+    public let page = token(0x0f0d17), side = token(0x0b0a11), panel = token(0x1a1727)
+    public let raised = token(0x221e34), button = token(0x2b2641), buttonBevel = token(0x3d3560)
+    public let well = token(0x0c0b12), bevel = token(0x342d52), lip = token(0x07060b)
+    public let outline = token(0x05040a, highContrast: 0x8a82a3)
+    public let ink = token(0xecedf3), inkSoft = token(0xc5c7d1)
+    public let muted = token(0xa29cb8, highContrast: 0xc5c7d1)
+    public let success = token(0x45c27a), warn = token(0xf0b84f), danger = token(0xf07a68), quilt = token(0x5ad1e8)
+    public let accent = token(0x9a86ff), face = token(0x5b3fd6), faceBevel = token(0x8a74ff)
+    public let faceLip = token(0x3a2694), onFace = token(0xffffff)
+    /// `ink` at 8%.
+    public let hover = PlatformColor(hex: 0xecedf3, alpha: 0.08)
     /// Stone texture cells behind every screen.
-    public var stone: (dark: [UInt32], light: [UInt32])
-
-    public static func == (a: Palette, b: Palette) -> Bool { a.page == b.page && a.ink == b.ink && a.panel == b.panel }
-    public func hash(into h: inout Hasher) {
-        h.combine(page)
-        h.combine(ink)
-        h.combine(panel)
-    }
-
-    public static let purple = Palette(
-        page: .init(dark: 0x0f0d17, light: 0xece7f7),
-        side: .init(dark: 0x0b0a11, light: 0xe2dbf2),
-        panel: .init(dark: 0x1a1727, light: 0xf8f6fd),
-        raised: .init(dark: 0x221e34, light: 0xe9e3f8),
-        button: .init(dark: 0x2b2641, light: 0xddd4f3),
-        buttonBevel: .init(dark: 0x3d3560, light: 0xf4f0fe),
-        well: .init(dark: 0x0c0b12, light: 0xf3f0fb),
-        bevel: .init(dark: 0x342d52, light: 0xffffff),
-        lip: .init(dark: 0x07060b, light: 0xc3b8e2),
-        outline: .init(dark: 0x05040a, light: 0x2b2244),
-        outlineHC: .init(dark: 0x8a82a3, light: 0x2b2244),
-        ink: .init(dark: 0xecedf3, light: 0x1b1530),
-        inkSoft: .init(dark: 0xc5c7d1, light: 0x3b3354),
-        muted: .init(dark: 0xa29cb8, light: 0x585071),
-        success: .init(dark: 0x45c27a, light: 0x136336),
-        warn: .init(dark: 0xf0b84f, light: 0x7a4f00),
-        danger: .init(dark: 0xf07a68, light: 0xa3301d),
-        quilt: .init(0x5ad1e8),
-        hoverOpacity: (0.08, 0.06),
-        stone: ([0x0f0d17, 0x121020, 0x0d0b14, 0x151225], [0xece7f7, 0xe7e1f4, 0xe2dbf1, 0xefebf9])
-    )
+    static let stone: [UInt32] = [0x0f0d17, 0x121020, 0x0d0b14, 0x151225]
 }
 
-/// The four tokens an X07 accent swatch swaps. Pushed to Air's `general.accent_color` as `face`.
-public struct AccentFamily: Sendable, Hashable, Identifiable {
-    public let id: String
-    public let name: String
-    public var face, faceBevel, faceLip, accent, onFace: ColorPair
-
-    public static let purple = AccentFamily(
-        id: "purple", name: "Amethyst",
-        face: .init(0x5b3fd6), faceBevel: .init(dark: 0x8a74ff, light: 0x8069ef), faceLip: .init(0x3a2694),
-        accent: .init(dark: 0x9a86ff, light: 0x5333c9), onFace: .init(0xffffff))
-    public static let emerald = AccentFamily(
-        id: "emerald", name: "Emerald",
-        face: .init(0x1a7a43), faceBevel: .init(0x4cc27e), faceLip: .init(0x0f5a2f),
-        accent: .init(dark: 0x57d58c, light: 0x136336), onFace: .init(0xffffff))
-    public static let copper = AccentFamily(
-        id: "copper", name: "Copper",
-        face: .init(0xb4531f), faceBevel: .init(0xe0814a), faceLip: .init(0x7a3410),
-        accent: .init(dark: 0xf09a62, light: 0x9a3f0e), onFace: .init(0xffffff))
-    public static let diamond = AccentFamily(
-        id: "diamond", name: "Diamond",
-        face: .init(0x13788c), faceBevel: .init(0x3fb3c9), faceLip: .init(0x0a4c59),
-        accent: .init(dark: 0x5ad1e8, light: 0x0d6475), onFace: .init(0xffffff))
-    public static let redstone = AccentFamily(
-        id: "redstone", name: "Redstone",
-        face: .init(0xb02a2a), faceBevel: .init(0xe05a5a), faceLip: .init(0x6e1414),
-        accent: .init(dark: 0xf07a68, light: 0xa3301d), onFace: .init(0xffffff))
-
-    public static let all: [AccentFamily] = [.purple, .emerald, .copper, .diamond, .redstone]
+/// Increase Contrast swaps in `highContrast`; it's the only trait tokens read. On the Mac it follows the system setting.
+private func token(_ hex: UInt32, highContrast: UInt32? = nil) -> PlatformColor {
+    guard let highContrast else { return PlatformColor(hex: hex) }
+    #if canImport(UIKit)
+        return UIColor { PlatformColor(hex: $0.accessibilityContrast == .high ? highContrast : hex) }
+    #else
+        return NSColor(name: nil) { _ in
+            PlatformColor(hex: NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast ? highContrast : hex)
+        }
+    #endif
 }
 
-/// Fixed colors used only inside pixel art (icons and scenes). Not themeable on purpose.
+/// Fixed colors used only inside pixel art (icons and scenes).
 enum PixelArtColors {
     // PixelScene: the moonlit lake. The sky stays dark at the top so white titles read on any crop.
     enum Lake {

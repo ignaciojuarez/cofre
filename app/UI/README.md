@@ -12,7 +12,7 @@ skip Dynamic Type, and only tokens, fonts and components build. Screens, layout,
 | Tokens (only hex values) · theme · fonts · UIKit theme | `Sources/CofreUI/Tokens/` | — |
 | Components (§2, one file each) | `Sources/CofreUI/Components/` | 27 |
 | Layout containers (§3.2) | `Sources/CofreUI/Layout/` | 7 |
-| Screens: Setup S01–S08 · Play P01 · Launch P02 · Instances P03/I02/P04 · Mods M01–M04 · Settings X00–X07 + About | `Sources/CofreUI/Screens/` | 26 screen IDs |
+| Screens: Setup S01–S08 · Play P01 · Launch P02 · Instances P03/I02/P04 · Mods M01–M04 · Settings X00–X06 + About | `Sources/CofreUI/Screens/` | 25 screen IDs |
 | Join server sheet (GAP-14): join, needs you, key changed, installing, update, error, ready | `Sources/CofreUI/Screens/ServerJoin/` | 1 sheet, 7 states |
 | Nav model + observable store | `Sources/CofreUI/Model/` | — |
 | Service protocols · facade gaps · UI value types | `Sources/CofreUI/Facade/` | — |
@@ -80,8 +80,7 @@ One adapter conforming to `CofreBackend` (typealias in `Facade/Services.swift`),
 | `SigningInfoSource` | GAP-08 | S03, X06 | new |
 | `SystemCatalog` | GAP-09 | X02, X04, X05 | new (CF key in Keychain) |
 | `AirScreens` | GAP-10 | X03, P04 Forge/NeoForge | Glue, UIKit |
-| `AirAppearance` | GAP-11 | all Air VCs | Air prefs + `AMEGlassStyleChanged` |
-| `GamePreferences` extra keys | GAP-12 (addition) | X01–X07 | Air pref keys |
+| `GamePreferences` extra keys | GAP-12 (addition) | X01–X06 | Air pref keys |
 | `ServerJoinSource` + `ServerJoinViewModel` | GAP-14 (addition) | Join server sheet | `CofreServerJoin` view-models (see below) |
 
 `MockBackend` implements all of it with the mockups' sample data and is the reference for expected values.
@@ -100,7 +99,6 @@ All additive (2026-10-29). Every new member has a default, so `CofreBackendAdapt
 | `createInstance(name:version:loader:ownFolder:fabricAPI:)` | Requirements.swift | Calls the 3-argument `createInstance` | `.createOptions`: shows the "Own folder" and "Add Fabric API" switches in P04 |
 | `.envVariables`, `.rendererTuning` | Requirements.swift | hidden | Map `GamePreferences.envVariables`, `shaderCacheMB`, `multidraw`, `computeShaders` to Air prefs |
 | `.controllerNavigation` | Requirements.swift | hidden | Turn on once `ControllerFocusBridge` drives the launcher; shows the A/B/Y hint strip |
-| `.appIcon`, `.language`, `.lanRoom` | Requirements.swift | hidden | X07 rows; no handlers yet |
 | `GamePreferences.autoRAM` now defaults to `true` | Models.swift | — | Pick a safe amount when it's on. The UI says "Cofre picks a safe amount automatically" |
 | `GamePreferences.envVariables`, `shaderCacheMB`, `multidraw`, `computeShaders` | Models.swift | `[:]`, 512, "Auto", `true` | GAP-12 pref keys |
 | `ProjectSummary.pageURL: URL?` | Models.swift | `nil` → `fallbackPageURL` (Modrinth project, CurseForge search) | The project's web page, used by M02 Share |
@@ -200,4 +198,3 @@ Screenshots: `cofre-design/system/screens/`; Join server sheet: `cofre-design/se
 - Menu-bar commands (`buildMenu` forward) and `ControllerFocusBridge` aren't built. Shortcuts are SwiftUI `keyboardShortcut`s.
 - Controls with no working backend are hidden behind `BackendCapabilities` (see above). Worlds have no "+ New": worlds are made in game.
 - Switch thumb animates linearly over 120 ms, not in 3 steps.
-- Light theme passes contrast tests but has no screenshots yet.

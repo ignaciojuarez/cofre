@@ -36,8 +36,7 @@
                 GameExitScreen(report: report, intent: intent, reportURL: reportURL, reportPreview: reportPreview, size: g.size, close: close, retry: retry, showDetails: showDetails).sizeClasses(
                     SizeClasses(g.size))
             }
-            .environment(\.cofreTheme, CofreTheme.current)
-            .preferredColorScheme(CofreTheme.current.colorScheme)
+            .preferredColorScheme(.dark)
             .tint(Color.cofre.accent)
         }
     }

@@ -54,7 +54,7 @@ public struct ContentView: View {
         .frame(width: 520, height: 620 - Self.titleBar)
         .background { PageBackground() }
         .environment(\.widthClass, .medium)
-        .preferredColorScheme(CofreTheme.standard.colorScheme)
+        .preferredColorScheme(.dark)
         .tint(Color.cofre.accent)
         .background {
             // Esc closes, except mid-transfer: the key is on its way into Cofre.

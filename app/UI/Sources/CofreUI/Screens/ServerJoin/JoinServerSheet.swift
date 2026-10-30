@@ -66,7 +66,7 @@
 
         @JoinDismiss private var dismiss
         @Environment(\.joinCard) private var cardContext
-        @Environment(\.cofreTheme) private var theme
+        private let theme = CofreTheme.standard
         @Environment(\.dynamicTypeSize) private var typeSize
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
         @State private var headerHeight: CGFloat = 76
@@ -231,7 +231,7 @@
     public struct JoinServerCard: View {
         let request: ServerJoinRequest
         let onClose: () -> Void
-        @Environment(\.cofreTheme) private var theme
+        private let theme = CofreTheme.standard
 
         public init(request: ServerJoinRequest, onClose: @escaping () -> Void) {
             self.request = request
@@ -399,7 +399,7 @@
     /// A short note: an inset well, or a tinted panel with a 4 pt bar for a tone (warn, accent, danger).
     struct JoinNote<Content: View>: View {
         let tone: Tone?, content: Content
-        @Environment(\.cofreTheme) private var theme
+        private let theme = CofreTheme.standard
 
         init(tone: Tone? = nil, @ViewBuilder content: () -> Content) {
             self.tone = tone

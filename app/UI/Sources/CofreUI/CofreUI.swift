@@ -6,10 +6,9 @@ import SwiftUI
     /// Entry points for the shell. See README.md.
     public enum CofreUI {
         /// Registers fonts and applies the UIKit theme for Air's leftover screens. Safe to call more than once.
-        @MainActor public static func bootstrap(theme: CofreTheme = .current) {
+        @MainActor public static func bootstrap() {
             CofreFonts.register()
-            CofreTheme.current = theme
-            CofreUIKitTheme.apply(theme)
+            CofreUIKitTheme.apply()
         }
 
         /// The whole Cofre UI in one hosting controller. `CofreRootViewController` embeds this as its child.
@@ -20,11 +19,7 @@ import SwiftUI
             let store = CofreStore(services: services)
             let host = UIHostingController(rootView: CofreRootView(store: store, nav: nav ?? NavModel()))
             host.view.backgroundColor = .cofre.page
-            host.overrideUserInterfaceStyle = CofreTheme.current.interfaceStyle
-            store.onThemeChange = { [weak host] t in
-                host?.overrideUserInterfaceStyle = t.interfaceStyle
-                CofreUIKitTheme.applyInterfaceStyle(t, to: host?.view.window)
-            }
+            host.overrideUserInterfaceStyle = .dark
             return host
         }
     }
@@ -99,7 +94,6 @@ public enum CofreLinks {
                     }
                 }
             }
-            .id(store.theme.accent.id)
             .overlay(alignment: .top) { errorBanner }
             .alert(
                 store.pendingConfirmation?.title ?? Text(verbatim: ""), isPresented: confirming,
@@ -159,8 +153,7 @@ public enum CofreLinks {
             .onOpenURL { nav.open($0) }
             .environment(store)
             .environment(nav)
-            .environment(\.cofreTheme, store.theme)
-            .preferredColorScheme(store.theme.colorScheme)
+            .preferredColorScheme(.dark)
             .tint(Color.cofre.accent)
             .task {
                 await store.start()

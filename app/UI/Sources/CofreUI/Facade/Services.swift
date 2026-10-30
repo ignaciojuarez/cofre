@@ -103,7 +103,7 @@
     /// Everything the UI needs from one object. The adapter writes one adapter around CofreBackendAdapter that conforms.
     public typealias CofreBackend = SetupService & LibraryService & ContentService & AccountService
         & LaunchControl & LogSource & InstanceActions & VersionCatalog & ProjectCatalog & InstallProgressSource
-        & JITTester & SigningInfoSource & SystemCatalog & AirAppearance & OptionalActions & ServerJoinSource
+        & JITTester & SigningInfoSource & SystemCatalog & OptionalActions & ServerJoinSource
         & GameInputService & ServerService
 
     /// What the shell hands to `CofreUI.makeRootViewController(services:)`.

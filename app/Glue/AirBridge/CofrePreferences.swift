@@ -28,9 +28,6 @@ public struct CofrePreferenceStore {
         case touchLayout = "control.default_ctrl"
         case downloadSource = "general.download_source"
         case verifyFiles = "general.check_sha"
-        case airPlayFullscreen = "video.fullscreen_airplay"
-        case capes = "general.cosmetica"
-        case checkUpdates = "general.auto_check_update"
         case envVariables = "java.env_variables"
         case shaderCacheMB = "mobileglues.max_glsl_cache_size"
         case multidraw = "mobileglues.multidraw_mode"
@@ -88,9 +85,6 @@ public struct CofrePreferenceStore {
         p.touchLayout = string(.touchLayout, instanceID, default: p.touchLayout)
         p.downloadSource = string(.downloadSource, instanceID, default: "bmclapi") == "official" ? .official : .mirror
         p.verifyFiles = bool(.verifyFiles, instanceID, default: p.verifyFiles)
-        p.airPlayFullscreen = bool(.airPlayFullscreen, instanceID, default: p.airPlayFullscreen)
-        p.capes = bool(.capes, instanceID, default: p.capes)
-        p.checkUpdates = bool(.checkUpdates, instanceID, default: p.checkUpdates)
         p.envVariables = Self.parseEnv(string(.envVariables, instanceID, default: ""))
         p.shaderCacheMB = integer(.shaderCacheMB, instanceID, default: 128)
         let multidraw = integer(.multidraw, instanceID, default: 0)
@@ -120,9 +114,6 @@ public struct CofrePreferenceStore {
         put(.touchLayout, p.touchLayout, instanceID)
         put(.downloadSource, p.downloadSource == .official ? "official" : "bmclapi", instanceID)
         put(.verifyFiles, p.verifyFiles, instanceID)
-        put(.airPlayFullscreen, p.airPlayFullscreen, instanceID)
-        put(.capes, p.capes, instanceID)
-        put(.checkUpdates, p.checkUpdates, instanceID)
         put(.envVariables, p.envVariables.map { "\($0.key)=\($0.value)" }.sorted().joined(separator: " "), nil)
         put(.shaderCacheMB, p.shaderCacheMB, nil)
         put(.multidraw, p.multidraw == "Auto" ? 0 : (Int(p.multidraw) ?? 0), nil)

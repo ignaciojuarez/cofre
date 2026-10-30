@@ -5,7 +5,7 @@
     // so resizing between compact and regular keeps the selection (W1 → I1).
 
     public enum SettingsPane: String, CaseIterable, Codable, Hashable, Sendable, Identifiable {
-        case game, renderer, touch, controller, jitJava, accounts, logs, look, about
+        case game, renderer, touch, controller, jitJava, accounts, logs, about
         public var id: String { rawValue }
 
         var title: LocalizedStringKey {
@@ -17,7 +17,6 @@
             case .jitJava: "JIT & Java"
             case .accounts: "Accounts & data"
             case .logs: "Logs"
-            case .look: "Look & more"
             case .about: "About"
             }
         }
@@ -29,13 +28,12 @@
             case .jitJava: .bolt
             case .accounts: .head
             case .logs: .paper
-            case .look: .book
             case .about: .shield
             }
         }
         static let groups: [(LocalizedStringKey, [SettingsPane])] = [
             ("Game", [.game, .renderer]), ("Controls", [.touch, .controller]),
-            ("System", [.jitJava, .accounts, .logs, .look, .about]),
+            ("System", [.jitJava, .accounts, .logs, .about]),
         ]
     }
 

@@ -37,7 +37,7 @@ import UIKit
         NSLog("[Cofre] game exit screen reason=%@ crashReport=%d", report.reason.rawValue, report.files.count > 1)
         let host = UIHostingController(rootView: GameExitView(report: report, intent: intent, reportURL: reportBundle, reportPreview: ReportPreviewData(fields: preview.fields.map { "\($0.name): \($0.value)" }, files: preview.files), close: AppExit.close, retry: { AppExit.close() }))
         host.view.backgroundColor = .cofre.page
-        host.overrideUserInterfaceStyle = CofreTheme.current.interfaceStyle
+        host.overrideUserInterfaceStyle = .dark
         let w = UIWindow(windowScene: scene)
         w.windowLevel = .normal + 2  // over the game and Cofre's launch overlay
         w.rootViewController = host

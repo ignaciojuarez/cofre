@@ -314,7 +314,6 @@
             buttonScale = 1.0
         public var controllerLayout = "Default", touchLayout = "Default"
         public var downloadSource = DownloadSource.official, verifyFiles = true
-        public var airPlayFullscreen = true, capes = false, checkUpdates = true
         /// Shown only with `BackendCapabilities.envVariables` / `.rendererTuning` (GAP-13).
         public var envVariables: [String: String] = [:]
         public var shaderCacheMB = 512, multidraw = "Auto", computeShaders = true
