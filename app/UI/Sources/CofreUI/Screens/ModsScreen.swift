@@ -72,7 +72,6 @@
                         "Type", selection: $store.query.kind,
                         options: [
                             (.mods, "Mods"), (.modpacks, "Packs"), (.shaders, "Shaders"), (.resourcePacks, "Resource"),
-                            (.dataPacks, "Data"),
                         ])
                 }
                 .padding(.horizontal, width == .compact ? 16 : 20).padding(.bottom, 4)
@@ -87,8 +86,6 @@
                             nav.settingsPane = .accounts
                         }
                     }
-                } else if store.query.kind == .dataPacks {
-                    EmptyState("Data packs belong to a world", message: "Open a world to add data packs there.", icon: .grass)
                 } else if let err = store.searchError, store.results.isEmpty, !store.searching {
                     EmptyState(
                         "Can't reach \(store.query.source.displayName)",
@@ -115,7 +112,7 @@
                                     ProjectIcon(project: p, size: 28)
                                 } trailing: {
                                     HStack(spacing: 5) {
-                                        if let inst = store.modsInstance, let issue = ModCompatibility.entry(for: p.id, name: p.title)?.issue(gameVersion: inst.gameVersion, renderer: ModCompatibility.renderer(setting: store.preferences.renderer, gameVersion: inst.gameVersion, loader: inst.loader.rawValue)) { Badge(issue.badge, tone: .warn) }
+                                        if let inst = store.modsInstance, ModCompatibility.entry(for: p.id, name: p.title)?.issue(gameVersion: inst.gameVersion, renderer: ModCompatibility.renderer(setting: store.preferences.renderer, gameVersion: inst.gameVersion, loader: inst.loader.rawValue)) != nil { Badge("Won't run", tone: .warn) }
                                         GetButton(project: p) { endEditing() }
                                     }
                                 }
@@ -180,11 +177,12 @@
                                     if p.clientSide { Badge("Client") }
                                 }
                                 // Its own line: next to three loader badges it pushed the page past the screen edge.
-                                if let issue = ModCompatibility.entry(for: p.id, name: p.title)?.issue(
+                                if ModCompatibility.entry(for: p.id, name: p.title)?.issue(
                                     gameVersion: store.modsInstance?.gameVersion ?? "",
                                     renderer: store.modsInstance.map { ModCompatibility.renderer(setting: store.preferences.renderer, gameVersion: $0.gameVersion, loader: $0.loader.rawValue) } ?? store.preferences.renderer)
+                                    != nil
                                 {
-                                    Badge(issue.badge, tone: .warn)
+                                    Badge("Won't run", tone: .warn)
                                 }
                             }
                         }
@@ -532,7 +530,7 @@
                     Segmented(
                         "Content", selection: $kind,
                         options: [
-                            (.mods, "Mods"), (.shaders, "Shaders"), (.resourcePacks, "Packs"), (.dataPacks, "Data"),
+                            (.mods, "Mods"), (.shaders, "Shaders"), (.resourcePacks, "Packs"),
                         ])
                     HStack(spacing: 8) {
                         Field("Filter", text: $filter, kind: .search)
@@ -548,9 +546,7 @@
                     }
                 }
                 .padding(.horizontal, width == .compact ? 16 : 20).padding(.bottom, 4)
-                if kind == .dataPacks {
-                    EmptyState("Data packs belong to a world", message: "Open a world to add data packs there.", icon: .grass)
-                } else if all.isEmpty {
+                if all.isEmpty {
                     EmptyState(
                         kind == .mods ? "No mods yet" : "Nothing here yet", message: "Get them in Get mods.",
                         icon: .chest

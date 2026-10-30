@@ -19,7 +19,7 @@
         }
 
         public var body: some View {
-            CenteredCard(scene: UInt32(7 + step)) {
+            CenteredCard {
                 Group {
                     switch step {
                     case 0: WelcomeStep(next: { step = store.firstOpenStep })

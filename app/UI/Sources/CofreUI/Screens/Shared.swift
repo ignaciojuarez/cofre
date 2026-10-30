@@ -90,7 +90,7 @@
             HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(verbatim: item.name).cofreFont(.rowTitle).foregroundStyle(Color.cofre.ink).lineLimit(1)
-                    if let issue = store.compatibilityIssue(for: item) { Badge(issue.badge, tone: .warn) }
+                    if store.compatibilityIssue(for: item) != nil { Badge("Won't run", tone: .warn) }
                     Text(verbatim: item.kind == .mods ? (item.enabled ? VersionLabel.clean(item.version) : String(localized: "Off")) : (item.inUse ? "In use" : "Change in game"))
                         .cofreFont(.caption).foregroundStyle(Color.cofre.muted).lineLimit(1)
                 }

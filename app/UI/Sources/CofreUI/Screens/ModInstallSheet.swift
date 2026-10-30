@@ -61,6 +61,18 @@
 
         @ViewBuilder private func confirm(_ job: ModInstall, _ plan: ModInstallPlan) -> some View {
             let target = store.instances.first { $0.id == job.instanceID }
+            let issue = target.flatMap {
+                ModCompatibility.entry(for: plan.target.id, name: plan.target.name)?.issue(
+                    gameVersion: $0.gameVersion,
+                    renderer: ModCompatibility.renderer(
+                        setting: store.preferences.renderer, gameVersion: $0.gameVersion, loader: $0.loader.rawValue))
+            }
+            // The warning leads, in one line.
+            if let issue {
+                Banner("Won't run on \(issue.gameVersion) with Metal", icon: .ore, tone: .warn)
+                Text(verbatim: issue.reason).cofreFont(.secondary).foregroundStyle(Color.cofre.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Row(
                 plan.target.name,
                 subtitle: plan.makesInstance
@@ -119,13 +131,11 @@
                 Text("Already has \(ListFormatter.localizedString(byJoining: plan.present)).")
                     .cofreFont(.secondary).foregroundStyle(Color.cofre.muted)
             }
-            if let target, let issue = ModCompatibility.entry(for: plan.target.id, name: plan.target.name)?.issue(gameVersion: target.gameVersion, renderer: ModCompatibility.renderer(setting: store.preferences.renderer, gameVersion: target.gameVersion, loader: target.loader.rawValue)) {
-                Banner(issue.title, icon: .cross, tone: .warn)
-                Text(issue.reason).cofreFont(.secondary).foregroundStyle(Color.cofre.muted)
-            }
+            // Secondary when it won't run, so the risky path doesn't look recommended.
             BlockButton(
-                target.flatMap { ModCompatibility.entry(for: plan.target.id, name: plan.target.name)?.issue(gameVersion: $0.gameVersion, renderer: ModCompatibility.renderer(setting: store.preferences.renderer, gameVersion: $0.gameVersion, loader: $0.loader.rawValue)) } == nil ? installTitle(job, plan) : "Get anyway",
-                role: .primary) { store.confirmInstall(id) }
+                issue == nil ? installTitle(job, plan) : String(localized: "Install anyway · \(Fmt.fileSize(job.downloadBytes) ?? "")"),
+                role: issue == nil ? .primary : .secondary
+            ) { store.confirmInstall(id) }
                 .keyboardShortcut(.return, modifiers: .command)
         }
 

@@ -322,7 +322,7 @@
             try Task.checkCancellation()
             switch result {
             case .enabled: break
-            case .needsPairing: throw CofreBackendError.jit("No pairing key yet. Pair this device in Settings first.")
+            case .needsPairing: throw CofreBackendError.jit("This device isn't paired yet. Pair it in Settings.")
             case .needsVPN: throw CofreBackendError.jit("The VPN isn't on")
             case .failed(let message, let step):
                 throw CofreBackendError.jit(step.map { "JIT failed at \($0): \(message)" } ?? message)
@@ -339,7 +339,7 @@
                     let (kind, message): (JITStep.Kind, String) =
                         switch result {
                         case .enabled: (.debugger, "")
-                        case .needsPairing: (.pairing, "No pairing key yet")
+                        case .needsPairing: (.pairing, "This device isn't paired yet")
                         case .needsVPN: (.vpn, "The VPN isn't on")
                         case .failed(let m, let step): (step.flatMap(JITStep.Kind.init) ?? .debugger, m)
                         case .unavailable, .enabling: (.debugger, "JIT didn't turn on")

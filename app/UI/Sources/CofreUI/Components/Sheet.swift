@@ -81,15 +81,18 @@ private struct FormSizing: ViewModifier {
 /// Header for sheets: title plus a close button (Esc also closes).
 public struct SheetHeader<Trailing: View>: View {
     let title: LocalizedStringKey, trailing: Trailing
+    /// Closes something that isn't a system sheet (the Join server card); `nil` dismisses the sheet.
+    var close: (() -> Void)?
     @Environment(\.dismiss) private var dismiss
-    public init(_ title: LocalizedStringKey, @ViewBuilder trailing: () -> Trailing) {
+    public init(_ title: LocalizedStringKey, close: (() -> Void)? = nil, @ViewBuilder trailing: () -> Trailing) {
         self.title = title
+        self.close = close
         self.trailing = trailing()
     }
     public var body: some View {
         HStack(spacing: 10) {
             Button {
-                dismiss()
+                if let close { close() } else { dismiss() }
             } label: {
                 Text(verbatim: "‹").cofreFont(.header).foregroundStyle(Color.cofre.accent).frame(
                     minWidth: 44, minHeight: 44, alignment: .leading)
@@ -104,5 +107,7 @@ public struct SheetHeader<Trailing: View>: View {
 }
 
 extension SheetHeader where Trailing == EmptyView {
-    public init(_ title: LocalizedStringKey) { self.init(title) { EmptyView() } }
+    public init(_ title: LocalizedStringKey, close: (() -> Void)? = nil) {
+        self.init(title, close: close) { EmptyView() }
+    }
 }

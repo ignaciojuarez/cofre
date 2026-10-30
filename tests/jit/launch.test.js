@@ -100,7 +100,7 @@ ${launch}
     static func main() async {
         await run(.enabled("debugger"))
         await run(.failed("must not run"), alreadyEnabled: true)
-        await run(.needsPairing, expectedError: "No pairing key yet")
+        await run(.needsPairing, expectedError: "This device isn't paired yet. Pair it in Settings.")
         await run(.needsVPN, expectedError: "The VPN isn't on")
         await run(.failed("attach failed", step: "debugger"), expectedError: "JIT failed at debugger: attach failed")
         await run(.failed("VPN denied"), expectedError: "VPN denied")

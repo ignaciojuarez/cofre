@@ -4,7 +4,7 @@
     import UserNotifications
 
     // G01 Game stopped: Cofre's screen when Minecraft exits mid-game, in place of Air's crash screen. A card over the
-    // lake: what happened, one next step, Close Cofre. Share log, Copy details and the raw log come after. Side by
+    // lake: what happened, one next step, Close Cofre. Share log and Details (with Copy) come after. Side by
     // side in iPhone landscape (where the game runs), stacked in portrait and on iPad.
 
     /// Java can't start twice in one process, and iOS has no relaunch (Air's Restart only exits), so closing goes to
@@ -139,7 +139,7 @@
                 BlockButton("Close Cofre", role: .primary, size: .large, action: close)
             }
             // Honest about restarts: Java can't start twice in one app run.
-            Text("Minecraft can only start once each time Cofre opens. Open Cofre again from the Home Screen to play.")
+            Text("Minecraft runs once per launch. Open Cofre again to play.")
                 .cofreFont(.caption).foregroundStyle(Color.cofre.muted)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
@@ -150,21 +150,22 @@
                 } else {
                     ShareLink(items: report.files) { Text("Share log") }.buttonStyle(.block()).disabled(report.files.isEmpty)
                 }
-                BlockButton(copied ? "Copied" : "Copy details") {
-                    UIPasteboard.general.string = report.detailsText
-                    copied = true
-                    Task {
-                        try? await Task.sleep(for: .seconds(2))
-                        copied = false
-                    }
-                }
+                BlockButton("Details") { showDetails = true }
             }
-            BlockButton("Details", role: .ghost) { showDetails = true }
         }
 
         private var details: some View {
             VStack(alignment: .leading, spacing: 10) {
-                SheetHeader("Details")
+                SheetHeader("Details") {
+                    BlockButton(copied ? "Copied" : "Copy", size: .small, fullWidth: false) {
+                        UIPasteboard.general.string = report.detailsText
+                        copied = true
+                        Task {
+                            try? await Task.sleep(for: .seconds(2))
+                            copied = false
+                        }
+                    }
+                }
                 VStack(alignment: .leading, spacing: 10) {
                     Row("Exit code", trailing: { Meta("\(report.code)") })
                     if let clue = report.clue {

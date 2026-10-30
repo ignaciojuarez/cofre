@@ -182,7 +182,7 @@
         @Environment(NavModel.self) private var nav
         var body: some View {
             Button("Play") { startLaunch(store, nav, instanceID: instance.id) }
-            Button("Edit") {
+            Button("Rename…") {
                 nav.instance = instance.id
                 nav.section = .instances
                 nav.instanceEdit = instance.id
@@ -250,12 +250,14 @@
                         VersionPickerSheet(loader: loader, selection: .constant(store.instances.first(where: { $0.id == id })?.loaderVersion ?? "")).environment(store)
                     }
                 }
-                .alert("Rename instance", isPresented: $showingRename) {
-                    TextField("Name", text: $rename)
-                    Button("Save") { Task { await store.renameInstance(id, to: rename) } }
+                .alert("Rename", isPresented: $showingRename) {
+                    let valid = canRename(inst)
+                    TextField("Name", text: $rename).submitLabel(.done).onSubmit { if valid { save() } }
                     Button("Cancel", role: .cancel) {}
+                    Button("Save", action: save).disabled(!valid)
                 }
-                .onChange(of: nav.instanceEdit) { _, editID in
+                // `initial`: ⋯ › Rename… on a list row sets it before this pane exists.
+                .onChange(of: nav.instanceEdit, initial: true) { _, editID in
                     guard editID == id, let name = store.instances.first(where: { $0.id == id })?.name else { return }
                     rename = name
                     showingRename = true
@@ -264,6 +266,17 @@
             } else {
                 DetailPlaceholder()
             }
+        }
+
+        /// Save waits for a new, non-empty name.
+        private func canRename(_ inst: InstanceSummary) -> Bool {
+            let name = rename.trimmingCharacters(in: .whitespacesAndNewlines)
+            return !name.isEmpty && name != inst.name
+        }
+
+        private func save() {
+            let name = rename.trimmingCharacters(in: .whitespacesAndNewlines)
+            Task { await store.renameInstance(id, to: name) }
         }
 
         /// The live list when it's this instance's, so the count matches the rows below.
@@ -490,6 +503,8 @@
                         if creating, loader != .vanilla, !loaderVersion.isEmpty {
                             Row("Installing \(loader.displayName) \(loaderVersion)…", leading: { Spinner() })
                         }
+                        // Here, not on the page banner the sheet would hide.
+                        if let error = store.lastError, !creating { Banner(error, icon: .cross, tone: .danger) }
                         BlockButton("Create", role: .primary, isLoading: creating) { create() }
                             .disabled(name.isEmpty || version.isEmpty)
                             .keyboardShortcut(.defaultAction)
@@ -497,7 +512,10 @@
                     .padding(16)
                 }
             }
-            .onDisappear { store.newInstancePlan = nil }
+            .onDisappear {
+                store.newInstancePlan = nil
+                store.lastError = nil
+            }
             .task(id: "\(kind.rawValue)-\(versionsAttempt)") {
                 do {
                     versions = try await store.backend.gameVersions(kind)
@@ -539,7 +557,7 @@
                     name: name, version: version, loader: loader, loaderVersion: loaderVersion,
                     ownFolder: ownFolder, fabricAPI: fabricAPI)
                 creating = false
-                // On failure the sheet stays open; the error shows in the banner.
+                // On failure the sheet stays open; the error shows above Create.
                 guard let made else { return }
                 dismiss()
                 if let plan {

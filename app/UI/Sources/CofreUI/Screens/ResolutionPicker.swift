@@ -55,14 +55,11 @@
                                 scale = preset.scale
                                 dismiss()
                             } label: {
-                                Row(
-                                    preset.name,
-                                    subtitle: "\(native.size(preset.scale)) · \(RenderResolution.share(preset.scale)) of pixels",
-                                    isSelected: on
-                                ) {
+                                Row(preset.name, subtitle: native.size(preset.scale), isSelected: on) {
                                     Radio(isOn: on)
                                 } trailing: {
-                                    if native.isSharp(preset) { Badge("Sharp", tone: .success) }
+                                    // Only where something is off.
+                                    if !native.isSharp(preset) { Badge("Uneven", tone: .warn) }
                                 }
                             }
                             .buttonStyle(RowButtonStyle())
@@ -70,12 +67,10 @@
                     }
                     BlockSlider(
                         "Custom", value: $scale, in: 0.25...1, step: 0.05,
-                        note: "Sizes between the presets may look uneven.",
+                        note: native.preset(for: scale) == nil ? "Pixels look uneven at this size" : nil,
                         accessibilityValue: { "\(RenderResolution.percent($0)), \(native.size($0))" }
                     ) { "\(RenderResolution.percent($0)) · \(native.size($0))" }
-                    Text("Minecraft's Fullscreen Resolution setting does nothing on iPhone and iPad; this sets the real size.")
-                        .cofreFont(.caption).foregroundStyle(Color.cofre.muted).padding(.horizontal, 2)
-                        .fixedSize(horizontal: false, vertical: true)
+                    GameOwnsNote("Fullscreen Resolution in game does nothing.")
                 }
                 .padding(.horizontal, 16).padding(.top, 6).padding(.bottom, 16)
             }

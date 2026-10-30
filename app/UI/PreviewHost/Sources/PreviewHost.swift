@@ -28,14 +28,10 @@ import UIKit
 //   -resolutionOpen YES Open the Resolution picker (-screen resolution). -native 2266x1488 sizes it for that screen
 //   -scrollY 420        Scroll the tallest scroll view down this far (points) after launch, for screenshots
 //   -landscape YES      Turn the app to landscape (the iPhone's game orientation). -portrait YES turns it upright
-//   Design review (DesignReview/, cleaner versions awaiting approval; the real screens are untouched):
-//   -review join|joinEmpty|rename|modWarning|data|resolution|controls|exit|loaderError|onboarding
-//                       Show the cleaner version of that surface (exit and loaderError read the two flags below)
-//   -rename survival    Open that instance and its Rename alert (⋯ → Edit)
+//   -rename survival    Open that instance and its Rename alert (⋯ → Rename…)
 //   -metal YES          Renderer Auto, with 1.21.1, 1.21.11, 26.2 and 26.3 as Metal versions, and Iris not installed,
 //                       so Get iris warns that it won't run with Metal
-//   -kind data          Get mods on the Data chip
-//   -exitReason metalReload   A Metal crash after Mipmap levels changed in game
+//   -exitReason metalReload   A Metal crash after Mipmap levels changed in game (-screen gameExit)
 //   -loaderError forge|pairing   New instance open after that loader install error
 
 @main
@@ -174,7 +170,6 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             mock.prefs.renderer = "auto"
             mock.mods.removeAll { $0.id == "iris" }
         }
-        if args.string(forKey: "kind") == "data" { store.query.kind = .dataPacks }
         if let id = args.string(forKey: "rename") {
             nav.section = .instances
             nav.instance = id
@@ -190,20 +185,19 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
                 while !store.libraryLoaded { try? await Task.sleep(for: .milliseconds(100)) }
                 nav.sheet = .newInstance
                 try? await Task.sleep(for: .milliseconds(500))
-                store.lastError = DesignReview.loaderError(kind, clean: false)
+                store.lastError =
+                    kind == "pairing"
+                    ? "This device isn't paired yet. Pair it in Settings." : "Reopen Cofre to install another loader."
             }
         }
         let setupStep = args.object(forKey: "setupStep") != nil ? args.integer(forKey: "setupStep") : nil
         let exitReport =
             args.string(forKey: "exitReason") == "metalReload"
-            ? DesignReview.metalReloadReport
+            ? Self.metalReloadReport
             : MockGameExit.report(
                 args.string(forKey: "exitReason").flatMap(GameExitReport.Reason.init) ?? .memory)
-        let review: UIViewController? = args.string(forKey: "review").map {
-            UIHostingController(rootView: DesignReview.view($0, store: store, nav: nav, setupStep: setupStep))
-        }
         let root: UIViewController =
-            review ?? (screen == "touch"
+            screen == "touch"
             ? UIHostingController(rootView: TouchControlsMockPage(args.string(forKey: "touch") ?? "sheet"))
             : screen == "gameExit"
             ? UIHostingController(
@@ -218,7 +212,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
                         \.screenPixels,
                         args.string(forKey: "native").flatMap(Self.size(from:)).map {
                             RenderResolution(width: Int($0.width), height: Int($0.height))
-                        })))
+                        }))
         root.view.backgroundColor = .cofre.page
         let window = UIWindow(windowScene: scene)
         // On the window, so presented sheets get it too.
@@ -252,6 +246,20 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     static func scrollViews(in view: UIView) -> [UIScrollView] {
         ((view as? UIScrollView).map { [$0] } ?? []) + view.subviews.flatMap(scrollViews(in:))
+    }
+
+    /// A Metal crash in the GPU driver right after Mipmap levels changed in game.
+    static var metalReloadReport: GameExitReport {
+        let log = """
+            [17:41:52] [Render thread/INFO]: Loaded 1287 recipes
+            [17:41:58] [Render thread/INFO]: Reloading ResourceManager: vanilla, fabric
+            [17:42:09] Thread 14 Crashed: AGXMetalG16X 0x1c2f0 -[AGXG16XFamilyRenderContext drawPrimitives]
+            """
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("latestlog.txt")
+        try? log.write(to: url, atomically: true, encoding: .utf8)
+        return GameExitReport(
+            code: -1, crashReport: nil, log: log, instance: "Survival+ · Fabric 26.3", files: [url],
+            changedSettings: ["Mipmap levels"])
     }
 
     static func size(from s: String) -> CGSize? {

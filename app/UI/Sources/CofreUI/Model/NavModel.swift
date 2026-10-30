@@ -92,7 +92,6 @@
         public var showingLaunch = false
         /// The Join server sheet (GAP-14). Shown only when the backend reports `.serverJoin`, and after setup.
         public var serverJoin: ServerJoinRequest?
-        public var linkError: String?
         /// Join on a server the instance can't join: pick one that fits, or make one (plan/servers.md).
         public var serverVersion: ServerVersionChoice?
         public var pendingFile: URL?
@@ -106,8 +105,8 @@
         @discardableResult public func open(_ url: URL) -> Bool {
             if url.scheme?.lowercased() == "cofre", url.host()?.lowercased() == "join",
                URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "server" })?.value?.trimmingCharacters(in: .whitespaces).isEmpty != false {
-                linkError = "That link has no server address."
-                return false
+                serverJoin = ServerJoinRequest(server: "")  // The sheet explains it.
+                return true
             }
             if let request = ServerJoinRequest(url: url) { serverJoin = request; return true }
             let ext = url.pathExtension.lowercased()

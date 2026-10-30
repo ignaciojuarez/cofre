@@ -39,7 +39,4 @@ public struct RenderResolution: Equatable, Sendable {
     }
 
     public static func percent(_ scale: Double) -> String { "\(Int((scale * 100).rounded()))%" }
-
-    /// Share of the screen's pixels drawn: 100%, 25%, 11%.
-    public static func share(_ scale: Double) -> String { percent(scale * scale) }
 }

@@ -34,7 +34,7 @@
             let card = (style ?? (sizeClass == .regular ? .card : .bottomSheet)) == .card
             Group {
                 if let request, request.card == nil, request.pin == nil, !request.discoverCard {
-                    PlainServerJoinView(request: request)
+                    PlainServerJoinView(request: request, card: card)
                 } else if let model = fixed ?? request.flatMap({ store?.serverJoins[$0.id] }) {
                     JoinSheetModelView(model: model, card: card)
                 } else {
@@ -56,32 +56,82 @@
         static let unavailableState = ServerJoinState.error(.init(code: .hostNotFound, recoveryAction: .dismiss))
     }
 
+    /// A plain `cofre://join?server=host:port` link: save the server to an instance and join. An empty address shows
+    /// the error here, where the link was opened.
     private struct PlainServerJoinView: View {
-        let request: ServerJoinRequest
+        let request: ServerJoinRequest, card: Bool
         @Environment(CofreStore.self) private var store
         @Environment(NavModel.self) private var nav
         @JoinDismiss private var dismiss
+        @State private var instanceID: String?
         @State private var saving = false
+        @State private var height: CGFloat = 240
+
         var body: some View {
-            VStack(alignment: .leading, spacing: 20) {
-                Text("Join server").font(.title2.bold())
-                Text(request.server).textSelection(.enabled)
-                if let instance = store.activeInstance {
-                    Text("Add to \(instance.name) and join with Minecraft \(instance.gameVersion).")
-                    Button(saving ? "Adding…" : "Add + Join") {
-                        saving = true
-                        Task {
-                            if let server = await store.addServer(address: request.server, to: instance.id) {
-                                nav.afterServerSheet = { store.play(instance.id, server: server); nav.showingLaunch = true }
-                                dismiss()
+            VStack(alignment: .leading, spacing: 0) {
+                SheetHeader("Join server", close: dismiss)
+                VStack(alignment: .leading, spacing: 10) {
+                    if request.server.isEmpty {
+                        Banner("This link has no server address", icon: .cross, tone: .danger)
+                        note("Ask for a new link, or add the server in Play › Servers.")
+                        BlockButton("Close") { dismiss() }
+                    } else if let instance = store.instances.first(where: { $0.id == instanceID }) ?? store.activeInstance {
+                        ListSection(spacing: 4) {
+                            Row(request.server, subtitle: String(localized: "Saved to Servers")) {
+                                ServerIcon(url: nil, size: 24)
+                            } trailing: {}
+                            // Any instance can join; the menu only shows when there's a choice.
+                            Menu {
+                                Picker("Instance", selection: Binding(get: { instance.id }, set: { instanceID = $0 })) {
+                                    ForEach(store.instances) { Text(verbatim: $0.name).tag($0.id) }
+                                }
+                            } label: {
+                                Row(instance.name, subtitle: instance.loaderLabel) {
+                                    InstanceGlyph(icon: instance.icon, size: 24)
+                                } trailing: {
+                                    if store.instances.count > 1 { Meta("Change ▾") }
+                                }
                             }
-                            saving = false
+                            .buttonStyle(.plain)
                         }
-                    }.buttonStyle(.borderedProminent).disabled(saving)
-                    if let error = store.lastError { Text(error).foregroundStyle(.red) }
-                } else { Text("Create an instance first to join this server.") }
-                Button("Cancel") { dismiss() }
-            }.padding(24).background(Color.cofre.page)
+                        if let error = store.lastError { Banner(error, icon: .cross, tone: .danger) }
+                        BlockButton("Add and join", icon: .play, role: .primary, isLoading: saving) { join(instance) }
+                            .keyboardShortcut(.defaultAction)
+                    } else {
+                        Banner("Make an instance first", icon: .grass, tone: .warn)
+                        BlockButton("New instance", role: .primary) {
+                            nav.afterServerSheet = { nav.sheet = .newInstance }
+                            dismiss()
+                        }
+                    }
+                }
+                .padding(16)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
+            .frame(maxWidth: card ? 440 : .infinity, alignment: .top)
+            .background(Color.cofre.page)
+            .environment(\.widthClass, card ? .medium : .compact)
+            .environment(\.isPushed, false)
+            .presentationBackground(Color.cofre.page)
+            .presentationDragIndicator(.visible)
+            .presentationDetents([.height(height)])
+            .onDisappear { store.lastError = nil }
+        }
+
+        private func note(_ text: LocalizedStringKey) -> some View {
+            Text(text).cofreFont(.secondary).foregroundStyle(Color.cofre.muted).fixedSize(horizontal: false, vertical: true)
+        }
+
+        private func join(_ instance: InstanceSummary) {
+            saving = true
+            Task {
+                if let server = await store.addServer(address: request.server, to: instance.id) {
+                    nav.afterServerSheet = { store.play(instance.id, server: server); nav.showingLaunch = true }
+                    dismiss()
+                }
+                saving = false
+            }
         }
     }
 

@@ -40,8 +40,5 @@ final class RenderResolutionTests: XCTestCase {
     func testLabels() {
         XCTAssertEqual(iPadMini.label(0.5), "Balanced · 1133 × 744")
         XCTAssertEqual(iPadMini.label(0.7), "70% · 1586 × 1042")
-        XCTAssertEqual(RenderResolution.share(1), "100%")
-        XCTAssertEqual(RenderResolution.share(0.5), "25%")
-        XCTAssertEqual(RenderResolution.share(1.0 / 3), "11%")
     }
 }

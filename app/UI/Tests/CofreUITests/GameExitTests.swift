@@ -30,14 +30,14 @@ final class GameExitTests: XCTestCase {
         let midGame = diagnose(134, log: "[17:03:20] [Render thread/INFO]: Reloading ResourceManager: vanilla\n" + fatal)
         XCTAssertEqual(midGame.reason, .renderer)
         XCTAssertEqual(midGame.clue, GameExitReport.metalReload)
-        XCTAssertTrue(midGame.nextStep.contains("Graphics"))
+        XCTAssertEqual(midGame.explanation, "Metal crashed while reloading graphics.")
+        XCTAssertTrue(midGame.nextStep.contains("before joining a world"))
         XCTAssertEqual(diagnose(134, log: fatal).clue, "Metal crashed in the GPU driver.")
 
         // Metallum's logging pushed the reload line out of the tail; the changed setting still tells, and is named.
         let named = GameExitReport(code: 134, crashReport: nil, log: fatal, changedSettings: ["Mipmap levels"])
         XCTAssertEqual(named.clue, GameExitReport.metalReload)
-        XCTAssertTrue(named.nextStep.contains("Mipmap levels"))
-        XCTAssertTrue(named.nextStep.contains("saved"))
+        XCTAssertTrue(named.nextStep.hasPrefix("Your change to Mipmap levels is saved for next time."))
     }
 
     func testGLOnlyModOnMetalNamesTheMod() {

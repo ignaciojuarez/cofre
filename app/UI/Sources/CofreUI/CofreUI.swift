@@ -204,9 +204,9 @@ public enum CofreLinks {
         }
 
         @ViewBuilder private var errorBanner: some View {
-            if let err = store.lastError ?? nav.linkError {
+            if let err = store.lastError {
                 Banner(err, icon: .cross, tone: .danger) {
-                    BlockButton("OK", size: .small) { store.lastError = nil; nav.linkError = nil }
+                    BlockButton("OK", size: .small) { store.lastError = nil }
                 }
                     .padding(.horizontal, 16).padding(.top, 8)
                     .frame(maxWidth: 560)

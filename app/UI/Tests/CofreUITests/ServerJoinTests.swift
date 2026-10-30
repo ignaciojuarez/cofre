@@ -36,8 +36,8 @@
             XCTAssertEqual(nav.serverJoin?.server, "play.example.com:25565")
             XCTAssertTrue(nav.open(URL(string: "cofre://join?server=example.com%3A25565")!))
             XCTAssertEqual(nav.serverJoin?.server, "example.com:25565")
-            XCTAssertFalse(nav.open(URL(string: "cofre://join?server=")!))
-            XCTAssertEqual(nav.linkError, "That link has no server address.")
+            XCTAssertTrue(nav.open(URL(string: "cofre://join?server=")!), "the sheet explains an empty link")
+            XCTAssertEqual(nav.serverJoin?.server, "")
             XCTAssertFalse(nav.open(URL(string: "cofre://settings")!))
         }
 

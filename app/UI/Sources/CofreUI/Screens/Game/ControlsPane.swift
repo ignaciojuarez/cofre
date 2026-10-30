@@ -50,13 +50,16 @@
             }
             ListSection("Touch", spacing: 4) {
                 BlockSlider("Button size", value: $settings.buttonScale, in: 0.6...1.5, step: 0.05) {
-                    "\(Int(($0 * 100).rounded())) %"
+                    "\(Int(($0 * 100).rounded()))%"
                 }
                 BlockSlider("Opacity", value: $settings.opacity, in: 0.2...1, step: 0.05) {
-                    "\(Int(($0 * 100).rounded())) %"
+                    "\(Int(($0 * 100).rounded()))%"
                 }
-                BlockSlider("Stick area", value: $settings.stickArea, in: 0.2...0.6, step: 0.05) {
-                    "\(Int(($0 * 100).rounded())) % of the screen"
+                BlockSlider(
+                    "Stick area", value: $settings.stickArea, in: 0.2...0.6, step: 0.05,
+                    note: "Left side of the screen that moves you"
+                ) {
+                    "\(Int(($0 * 100).rounded()))%"
                 }
                 BlockSlider("Hold to break", value: $settings.holdToBreak, in: 0.1...0.5, step: 0.05) {
                     "\(Int(($0 * 1000).rounded())) ms"
