@@ -79,6 +79,9 @@ static id (*CofreOriginalNextDrawable)(id, SEL);
 
 static id CofreNextDrawable(CAMetalLayer *layer, SEL cmd) {
   if (atomic_exchange(&cofreAwaitingFirstDrawable, false)) {
+    // One frame is all Cofre needs: hand nextDrawable straight back to Metal for the rest of the session.
+    method_setImplementation(class_getInstanceMethod(CAMetalLayer.class, @selector(nextDrawable)),
+                             (IMP)CofreOriginalNextDrawable);
     dispatch_async(dispatch_get_main_queue(), ^{
       NSLog(@"[Cofre] first Metal drawable; game is presenting");
       [NSNotificationCenter.defaultCenter postNotificationName:@"PojavFirstFrameRendered" object:nil];
@@ -88,11 +91,9 @@ static id CofreNextDrawable(CAMetalLayer *layer, SEL cmd) {
 }
 
 static void CofreArmFirstDrawable(void) {
-  static dispatch_once_t once;
-  dispatch_once(&once, ^{
-    Method m = class_getInstanceMethod(CAMetalLayer.class, @selector(nextDrawable));
-    CofreOriginalNextDrawable = (id (*)(id, SEL))method_setImplementation(m, (IMP)CofreNextDrawable);
-  });
+  Method m = class_getInstanceMethod(CAMetalLayer.class, @selector(nextDrawable));
+  IMP previous = method_setImplementation(m, (IMP)CofreNextDrawable);
+  if (previous != (IMP)CofreNextDrawable) CofreOriginalNextDrawable = (id (*)(id, SEL))previous;
   atomic_store(&cofreAwaitingFirstDrawable, true);
 }
 
