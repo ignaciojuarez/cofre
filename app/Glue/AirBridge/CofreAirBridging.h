@@ -58,6 +58,8 @@ typedef NS_ENUM(NSInteger, CofreLaunchEvent) {
                (void (^)(NSURL *_Nullable, NSError *_Nullable))completion;
 
 - (NSString *)selectedProfileName;
+/// Re-reads launcher_profiles.json after Cofre (CofreKit's InstanceStore) wrote it.
+- (void)reloadProfiles;
 - (void)modsForProfile:(NSString *)profile
             completion:(void (^)(NSArray *))completion;
 - (void)removeAccountToken:(NSString *)accountID;

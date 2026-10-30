@@ -61,12 +61,35 @@
                     } else {
                         let favorites = shown.filter { $0.favorite }
                         let grouped = Dictionary(grouping: shown.filter { !$0.favorite }) { $0.group ?? "Other" }
+                        let pad: CGFloat = width == .compact ? 16 : 20
+                        // Headers are list rows too: a ListSection inside a List gets the system's black row.
                         BlockList {
                             if !favorites.isEmpty {
-                                ListSection("★ Favorites", spacing: 4) { ForEach(favorites) { instanceRow($0) } }
+                                SectionLabel("★ Favorites").blockListRow(horizontal: pad)
+                                ForEach(favorites) { instanceRow($0) }
                             }
                             ForEach(grouped.keys.sorted(), id: \.self) { key in
-                                ListSection(key, spacing: 4) { ForEach(grouped[key] ?? []) { instanceRow($0) } }
+                                if !favorites.isEmpty || grouped.count > 1 {
+                                    SectionLabel(Text(verbatim: key)).blockListRow(horizontal: pad)
+                                }
+                                ForEach(grouped[key] ?? []) { instanceRow($0) }
+                            }
+                            if !store.recentlyDeleted.isEmpty {
+                                SectionLabel("Recently deleted").blockListRow(horizontal: pad)
+                                ForEach(store.recentlyDeleted) { deleted in
+                                    Row(
+                                        deleted.name,
+                                        subtitle: [Loader(rawValue: deleted.loader.rawValue)?.displayName, deleted.gameVersion]
+                                            .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " "),
+                                        trailing: {
+                                            BlockButton("Restore", size: .small, fullWidth: false) {
+                                                Task { await store.restore(deleted) }
+                                            }
+                                        }
+                                    )
+                                    .opacity(0.75)
+                                    .blockListRow(horizontal: pad)
+                                }
                             }
                         }
                     }

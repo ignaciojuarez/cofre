@@ -180,6 +180,12 @@ static void CofreLoadVersionList(void (^done)(void)) {
 - (NSString *)selectedProfileName {
   return _profiles.selectedProfileName ?: @"";
 }
+// Air keeps launcher_profiles.json in memory and saves all of it on its own changes; reload after Cofre writes it
+// so neither side overwrites the other.
+- (void)reloadProfiles {
+  [PLProfiles updateCurrent];
+  _profiles = [PLProfiles current];
+}
 
 #pragma mark - Instances
 

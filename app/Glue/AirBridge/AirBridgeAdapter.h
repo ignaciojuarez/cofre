@@ -51,6 +51,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// Returns the selected Air profile name.
 - (NSString *)selectedProfileName;
+- (void)reloadProfiles;
 /// Adds a server to a profile and reports an optional error.
 /// Scans installed mods for a profile.
 - (void)modsForProfile:(NSString *)profile

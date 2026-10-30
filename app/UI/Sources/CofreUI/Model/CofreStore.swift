@@ -96,6 +96,8 @@
         /// A destructive action waiting for the one shared confirmation alert (root view).
         public var pendingConfirmation: Confirmation?
         private var lastTrash: InstanceStore.TrashToken?
+        /// Deleted instances that can still be restored (their files sit in the instances' trash).
+        public private(set) var recentlyDeleted: [InstanceStore.Deleted] = []
         @ObservationIgnored private let defaults: UserDefaults
 
         private enum Keys {
@@ -163,6 +165,7 @@
             await run {
                 if let instanceStore = self.instanceStore {
                     self.instances = try instanceStore.list().map(Self.summary)
+                    self.recentlyDeleted = instanceStore.recentlyDeleted()
                 } else {
                     self.instances = try await self.backend.instances()
                 }
@@ -362,7 +365,12 @@
                 let i: InstanceSummary
                 if let instanceStore = self.instanceStore {
                     let k = Instance.Loader(rawValue: loader.rawValue) ?? .unknown
-                    i = Self.summary(try instanceStore.create(name: name, version: version, loader: k, loaderVersion: loaderVersion))
+                    let made = try instanceStore.create(name: name, version: version, loader: k, loaderVersion: loaderVersion)
+                    // The engine's installer writes the loader's real version id into the profile.
+                    if let v = loaderVersion, loader != .vanilla {
+                        try await self.backend.installLoader(instanceID: made.id, loader: loader, version: v)
+                    }
+                    i = Self.summary(try instanceStore.list().first { $0.id == made.id } ?? made)
                 } else {
                     i = self.can(.createOptions)
                         ? try await self.backend.createInstance(name: name, version: version, loader: loader, ownFolder: ownFolder, fabricAPI: fabricAPI)
@@ -396,11 +404,21 @@
 
         public func delete(_ id: String) async {
             await run {
-                if let instanceStore = self.instanceStore { self.lastTrash = try instanceStore.trash(id) }
-                else { try await self.backend.delete(instanceID: id) }
+                if let instanceStore = self.instanceStore {
+                    self.lastTrash = try instanceStore.trash(id)
+                    self.recentlyDeleted = instanceStore.recentlyDeleted()
+                } else { try await self.backend.delete(instanceID: id) }
                 self.instances.removeAll { $0.id == id }
             }
             if activeInstanceID == id { activeInstanceID = instances.first?.id }
+        }
+
+        public func restore(_ deleted: InstanceStore.Deleted) async {
+            guard let instanceStore else { return }
+            await run {
+                self.instances.append(Self.summary(try instanceStore.restore(deleted)))
+                self.recentlyDeleted = instanceStore.recentlyDeleted()
+            }
         }
 
         public func undoDelete() async {
@@ -408,6 +426,7 @@
             await run {
                 self.instances.append(Self.summary(try instanceStore.restore(token)))
                 self.lastTrash = nil
+                self.recentlyDeleted = instanceStore.recentlyDeleted()
             }
         }
 
@@ -435,7 +454,9 @@
 
         private static func summary(_ i: Instance) -> InstanceSummary {
             let loader = Loader(rawValue: i.loader.rawValue) ?? .vanilla
-            return InstanceSummary(id: i.id, name: i.name, loader: loader, gameVersion: i.gameVersion,
+            // Air's "latest-release" alias resolves to the newest release at launch.
+            let game = ["latest-release": "Latest release", "latest-snapshot": "Latest snapshot"][i.gameVersion] ?? i.gameVersion
+            return InstanceSummary(id: i.id, name: i.name, loader: loader, gameVersion: game,
                                    loaderVersion: i.loaderVersion, javaVersion: i.javaVersion.map(String.init),
                                    icon: InstanceIcon.resolve(png: nil, picked: i.icon, id: i.id, loader: loader),
                                    favorite: i.favorite, group: i.group, notes: i.notes)
