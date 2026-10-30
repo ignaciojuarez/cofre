@@ -820,6 +820,7 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
   NSString *field = CofreProfileFieldForPreference(key);
   if (profile.length && field.length) {
     NSMutableDictionary *candidate = self.profiles.profiles[profile];
+    if ([field isEqualToString:@"renderer"] && [candidate[@"cofreRendererPicked"] boolValue]) return @"auto";
     if ([field isEqualToString:@"allocatedMemory"]) {
       NSNumber *value = candidate[field];
       if (value.integerValue > 0) return value;
@@ -839,6 +840,7 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
     NSMutableDictionary *candidate = [self.profiles.profiles[profile] mutableCopy];
     if (!candidate) candidate = [NSMutableDictionary dictionary];
     candidate[field] = value;
+    if ([field isEqualToString:@"renderer"]) [candidate removeObjectForKey:@"cofreRendererPicked"];
     [self.profiles saveProfile:candidate withName:profile];
     return;
   }
@@ -916,23 +918,39 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
     }];
   });
 }
-// Air's "auto" always picks ANGLE. Minecraft 26+ rejects ANGLE's OpenGL
-// ("glGetError mismatch") and its Vulkan fallback fails to compile shaders, so
-// unless the player chose a renderer, run 26+ on Air's Metal path. For older
-// versions Air treats Metal as auto, so saving it in the instance is safe.
+// An instance on "auto" follows the global Renderer setting; when that is auto too, Cofre picks per launch:
+// Metal where the bundled Metallum supports the version (RendererManifest.json), MobileGlues for Forge and
+// NeoForge elsewhere (Air's own auto, ANGLE, can't build their main framebuffer), else Air's auto. Air reads
+// the renderer from the instance, so the pick is written there and marked, and re-made every launch.
 - (void)pickRendererForProfile:(NSString *)name metadata:(NSDictionary *)metadata {
   NSString *game = metadata[@"inheritsFrom"] ?: metadata[@"id"];
-  NSString *chosen = _profiles.profiles[name][@"renderer"];
-  if (!chosen.length)
-    chosen = getPrefObject(@"video.renderer");
-  if (game.integerValue < 26 || (chosen.length && ![chosen isEqualToString:@"auto"]))
-    return;
   NSMutableDictionary *profile = [_profiles.profiles[name] mutableCopy];
-  profile[@"renderer"] = @RENDERER_NAME_METAL;
+  NSString *own = profile[@"renderer"];
+  if (own.length && ![own isEqualToString:@"auto"] && ![profile[@"cofreRendererPicked"] boolValue])
+    return;
+  NSString *global = getPrefObject(@"video.renderer");
+  NSString *versionID = [metadata[@"id"] lowercaseString];
+  static NSArray<NSString *> *metalVersions;
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    NSData *data = [NSData dataWithContentsOfURL:[NSBundle.mainBundle URLForResource:@"RendererManifest" withExtension:@"json"]];
+    metalVersions = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil][@"gameVersions"] : @[];
+  });
+  NSString *pick = global.length && ![global isEqualToString:@"auto"] ? global
+                 : [metalVersions containsObject:game] ? @RENDERER_NAME_METAL
+                 : [versionID containsString:@"forge"] ? @RENDERER_NAME_MOBILEGLUES
+                 : nil;
+  if (pick) {
+    profile[@"renderer"] = pick;
+    profile[@"cofreRendererPicked"] = @YES;
+  } else {
+    [profile removeObjectForKey:@"renderer"];
+    [profile removeObjectForKey:@"cofreRendererPicked"];
+  }
   NSMutableDictionary *profiles = [_profiles.profiles mutableCopy];
   profiles[name] = profile;
   [self persistInstanceProfiles:profiles selected:name error:nil];
-  NSLog(@"[Cofre] renderer auto -> Metal for Minecraft %@", game);
+  NSLog(@"[Cofre] renderer auto -> %@ for %@", pick ?: @"Air auto", metadata[@"id"]);
 }
 // Air's Java launcher sets Minecraft to Chinese (lang:zh_cn) when options.txt has no language, so write the
 // phone's language first. Only when none is set: after that the game owns options.txt.

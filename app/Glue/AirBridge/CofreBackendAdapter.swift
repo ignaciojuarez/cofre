@@ -370,7 +370,7 @@
         public func renderers() async -> [RendererOption] {
             let candidates: [(String, String, String, String?)] = [
                 ("auto", "Auto", "Picks per version", nil),
-                ("libmetallum.dylib", "Metal", "Best for Minecraft 26+", "libmetallum.dylib"),
+                ("libmetallum.dylib", "Metal", "Minecraft 1.21.11 and 26.x", "libmetallum.dylib"),
                 ("libmobileglues.dylib", "MobileGlues", "OpenGL 4 · modern packs", "libmobileglues.dylib"),
                 ("libtinygl4angle.dylib", "ANGLE", "OpenGL ES on Metal", "libtinygl4angle.dylib"),
                 ("libOSMesa.8.dylib", "Zink", "OpenGL on Vulkan", "libOSMesa.8.dylib"),
