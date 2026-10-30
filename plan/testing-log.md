@@ -203,3 +203,23 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 - No source bugs met the “small clear fix” threshold in this pass; no bug-fix commits.
 - B-008 remains the prior logged regression/needs-owner item; it was not changed here. B-004/B-006 were exercised in prior rounds and remain passing.
 - Still uncovered: a true incompatible mod with Get anyway/Cancel, restore-name clash resolution, Files-based valid/wrong-loader `.mrpack` imports, exact kill during transfer, active Downloads Cancel/Resume/Retry, and Microsoft approval/OTP completion.
+
+### Round 8 overnight testing (2026-10-30 · CofreBuild 88f5334 · iPad Pro 1 SIMULATOR_UDID)
+
+| Area | Test case | Result | Evidence |
+|---|---|---|---|
+| Build | `scripts/sim.sh SIMULATOR_UDID`, install, launch | PASS; build script reported `CofreBuild 88f5334`; app installed/launched. Device log marker still reports embedded app version `bef0297`, plus `[Cofre] UI root installed`, `app foreground`, `app active` | `/tmp/cofre-round8-build.log` |
+| B-008 | Warm `cofre://join?server=example.com:25565`; accept/open and inspect Join sheet | PASS; Join server sheet showed exact `example.com:25565`, target instance, and Add + Join | `/tmp/cofre-test/shots/round8-B008-warm.png` |
+| B-008 | Terminate app, cold `cofre://join?server=example.com:25565`; accept/open and inspect | PASS; cold launch reached the same Join sheet with exact address | `/tmp/cofre-test/shots/round8-B008-cold-prompt.png` |
+| B-008 | `cofre://join?server=` | PASS for safety; no crash and app returned to Play with no stale sheet. UX is silent rather than an explicit invalid-address message | `/tmp/cofre-test/shots/round8-B008-empty-after-cancel.png` |
+| B-005 | Fabric 26.3, Mods → Iris → Get; inspect incompatibility warning; Cancel; inspect `mods/` | PASS; warning said Iris will not run on 26.3 with Metal and offered Get anyway. Cancel left `instances/default/fabric263/mods/` empty | `/tmp/cofre-test/shots/round8-B005-warning.png` |
+| B-005 | Same sheet → Get anyway; inspect installed state and disk | PASS; sheet confirmed Iris and Sodium OK; both jars present under `instances/default/fabric263/mods/` and UI showed Installed | `/tmp/cofre-test/shots/round8-B005-installed.png` |
+| Modpacks | Packs tab, Modrinth list, Fabulously Optimized → Install pack | PARTIAL/BLOCKED by live download; sheet showed New instance, progress UI, correct Fabric 26.3 context and “Packs make their own instance.” Killing during download left no final instance but left populated `instances/default/custom_gamedir/modrinth_6AC115EB-DEA4-4C20-A7B7-9ABA9ABD7347` staging files. Needs owner fix for rollback cleanup | `/tmp/cofre-test/shots/round8-modpack-sheet.png`, `/tmp/cofre-test/shots/round8-modpack-progress2.png`, `/tmp/cofre-test/shots/round8-modpack-after.png` |
+| Modpacks | In-app/file import entry point; corrupt random-bytes `.mrpack` copied to Documents/Inbox | BLOCKED: Files picker opened, but simulator Files provider exposed no app Inbox file and navigation was not completed; no import result claimed. Corrupt fixture removed afterward | `/tmp/cofre-test/shots/round8-import-files.png`, `/tmp/cofre-test/shots/round8-import-onmypad.png` |
+| Restore | Create `Clash`, delete, create second `Clash`, restore deleted | PASS; list ended with two live `Clash` rows (both Fabric 1.21.1), no overwrite | live AX snapshot after restore; `/tmp/cofre-test/shots/round8-restore-clash.png` (not captured before close; snapshot evidence in session) |
+| UX | First-time iPad Mods/Instances pass; Packs button and system Files picker; Dynamic Type extra-extra-large then restore | PARTIAL PASS; iPad split layout readable and warning copy clear. Files picker has no visible app location in simulator. Dynamic Type setting was restored to `large`; screenshot captured during setting | `/tmp/cofre-test/shots/round8-packs-tab.png`, `/tmp/cofre-test/shots/round8-dynamic-xxl.png` |
+
+### Round 8 notes
+- No source fixes made; no bug-fix commits.
+- Needs-owner: modpack import rollback leaves a non-empty `custom_gamedir` staging tree after force-quit; silent handling of empty deep-link server is safe but could use a clear invalid-address message; embedded app log version (`bef0297`) differs from this build script’s `CofreBuild 88f5334` and should be reconciled in build provenance.
+- Still uncovered: valid Files-based `.mrpack`, corrupt-file error sheet, wrong-loader explanation, link import, active download Cancel/Resume/Retry, portrait/landscape rotation and VoiceOver, Microsoft approval/passkey, and device-only JIT/game rendering.
