@@ -175,7 +175,13 @@
                                 HStack(spacing: 4) {
                                     ForEach(p.loaders) { Badge($0.displayName, tone: $0.tone) }
                                     if p.clientSide { Badge("Client") }
-                            if let issue = ModCompatibility.entry(for: p.id, name: p.title)?.issue(gameVersion: store.modsInstance?.gameVersion ?? "", renderer: store.preferences.renderer == "auto" ? "metallum" : store.preferences.renderer) { Badge(issue.badge, tone: .warn) }
+                                }
+                                // Its own line: next to three loader badges it pushed the page past the screen edge.
+                                if let issue = ModCompatibility.entry(for: p.id, name: p.title)?.issue(
+                                    gameVersion: store.modsInstance?.gameVersion ?? "",
+                                    renderer: store.preferences.renderer == "auto" ? "metallum" : store.preferences.renderer)
+                                {
+                                    Badge(issue.badge, tone: .warn)
                                 }
                             }
                         }

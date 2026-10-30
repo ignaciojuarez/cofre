@@ -126,10 +126,8 @@
                             .cofreFont(.caption).lineLimit(1)
                         }
                         Spacer(minLength: 4)
-                        if let issue = store.compatibilityIssue(for: item), item.enabled {
-                            Button("Turn off") { store.setEnabled(false, item: item) }.buttonStyle(.bordered)
-                            Badge(issue.badge, tone: .warn)
-                        } else if item.issue != nil {
+                        // A renderer warning shows once, under the name; the row's own switch turns the mod off.
+                        if item.issue != nil {
                             Badge("Needs dep", tone: .danger)
                         } else if item.updateTo != nil {
                             Badge("Update", tone: .warn)

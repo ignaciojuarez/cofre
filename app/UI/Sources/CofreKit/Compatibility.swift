@@ -62,7 +62,8 @@ public final class CompatibilityScanner: @unchecked Sendable {
         var r = ShaderRequirements()
         for e in entries where e.name.lowercased().hasSuffix(".glsl") || e.name.lowercased().contains("shaders/") {
             let text = String(decoding: e.data, as: UTF8.self)
-            if let v = text.firstMatch(of: #"(?m)^\s*#version\s+(\d+)"#), let n = Int(v.1) { r.glslMin = max(r.glslMin, n) }
+            if let v = text.range(of: #"(?m)^\s*#version\s+\d+"#, options: .regularExpression),
+                let n = Int(text[v].split(separator: " ").last ?? "") { r.glslMin = max(r.glslMin, n) }
             r.compute = r.compute || e.name.lowercased().contains("compute") || text.contains("gl_GlobalInvocationID")
             r.ssbo = r.ssbo || text.contains("std430") || text.contains("buffer ")
             r.imageLoadStore = r.imageLoadStore || text.contains("imageLoad") || text.contains("imageStore")
