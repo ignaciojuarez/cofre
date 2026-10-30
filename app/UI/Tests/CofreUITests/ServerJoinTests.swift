@@ -37,6 +37,7 @@
             XCTAssertTrue(nav.open(URL(string: "cofre://join?server=example.com%3A25565")!))
             XCTAssertEqual(nav.serverJoin?.server, "example.com:25565")
             XCTAssertFalse(nav.open(URL(string: "cofre://join?server=")!))
+            XCTAssertEqual(nav.linkError, "That link has no server address.")
             XCTAssertFalse(nav.open(URL(string: "cofre://settings")!))
         }
 
