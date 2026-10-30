@@ -131,20 +131,8 @@
                 }
                 .padding(12).block(.panel)
                 ToggleRow("FPS overlay", isOn: prefBinding(store, instanceID, \.fpsOverlay))
-                ToggleRow("VSync", isOn: prefBinding(store, instanceID, \.vsync))
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack {
-                        Text("FPS cap").cofreFont(.rowTitle).foregroundStyle(Color.cofre.ink)
-                        Spacer()
-                        SelectButton(
-                            "FPS cap", selection: prefBinding(store, instanceID, \.fpsCap),
-                            options: GamePreferences.fpsCapOptions
-                        ).compactStyle()
-                    }
-                    Text("Auto follows the display, up to 120 Hz. Picking a cap turns VSync on.")
-                        .cofreFont(.caption).foregroundStyle(Color.cofre.muted)
-                }
-                .padding(.horizontal, 11).padding(.vertical, 7).block(.panel)
+                Text("VSync and Max Framerate are in the game: Options › Video Settings.")
+                    .cofreFont(.caption).foregroundStyle(Color.cofre.muted).padding(.horizontal, 2)
             }
             ListSection("Audio", spacing: 4) {
                 ToggleRow("Mute with switch", isOn: prefBinding(store, instanceID, \.muteWithSwitch))

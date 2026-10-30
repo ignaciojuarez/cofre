@@ -17,12 +17,6 @@
             XCTAssertEqual(WidthClass.resolve(sizeClass: .regular, width: 1376), .expanded)
         }
 
-        func testFPSCapOptionsUseAutoAndSupportedRates() {
-            XCTAssertEqual(GamePreferences().fpsCap, 0)
-            XCTAssertEqual(GamePreferences.fpsCapOptions.map(\.0), [0, 120, 90, 60, 30])
-            XCTAssertEqual(GamePreferences.fpsCapOptions.map(\.1), ["Auto", "120", "90", "60", "30"])
-        }
-
         func testSizeClassBreakpoints() {
             func classes(_ w: CGFloat, _ h: CGFloat) -> [UserInterfaceSizeClass] {
                 let c = SizeClasses(CGSize(width: w, height: h))

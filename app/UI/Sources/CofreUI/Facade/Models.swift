@@ -305,7 +305,7 @@
         public var renderer = "auto", resolution = 1.0, fsr = true, fsrMode = FSRMode.ultra, graphicsApi = "auto"
         public var java = "auto", jvmArgs = ""
         /// Zero means Auto: follow the display's maximum refresh rate.
-        public var fpsOverlay = true, vsync = false, fpsCap = 0, muteWithSwitch = true, microphone = false
+        public var fpsOverlay = true, muteWithSwitch = true, microphone = false
         public var gyroAim = true, virtualMouse = false, hotbarSwipe = true, touchControllerMod = true,
             buttonScale = 1.0
         public var controllerLayout = "Default", touchLayout = "Default"
@@ -315,10 +315,6 @@
         public var envVariables: [String: String] = [:]
         public var shaderCacheMB = 512, multidraw = "Auto", computeShaders = true
         public init() {}
-
-        public static let fpsCapOptions: [(Int, String)] = [
-            (0, "Auto"), (120, "120"), (90, "90"), (60, "60"), (30, "30")
-        ]
 
         public enum FSRMode: String, CaseIterable, Sendable { case off, ultra, quality, performance }
         public enum DownloadSource: String, CaseIterable, Sendable { case official, mirror }

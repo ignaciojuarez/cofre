@@ -64,6 +64,9 @@ static void CofreEnsureStarted(void) {
                                           bridge);
     [bridge ensureAutomaticMemoryDefault];
     CofreConfigureAirJIT();
+    // The game owns VSync and its frame limit in options.txt. With this Air setting on, Air's Java launcher
+    // overwrites both (VSync off, 260 FPS) at every launch, undoing what the player picked in game.
+    setPrefBool(@"video.disable_game_vsync", NO);
   });
 }
 

@@ -17,8 +17,6 @@ public struct CofrePreferenceStore {
         case java = "java.java_version"
         case javaArgs = "java.java_args"
         case fpsOverlay = "video.performance_hud"
-        case fpsCap = "video.max_fps"
-        case disableVSync = "video.disable_game_vsync"
         case muteWithSwitch = "video.silence_with_switch"
         case microphone = "video.allow_microphone"
         case gyroAim = "control.gyroscope_enable"
@@ -79,8 +77,6 @@ public struct CofrePreferenceStore {
         p.java = string(.java, instanceID, default: p.java)
         p.jvmArgs = string(.javaArgs, instanceID, default: p.jvmArgs)
         p.fpsOverlay = bool(.fpsOverlay, instanceID, default: p.fpsOverlay)
-        p.fpsCap = integer(.fpsCap, instanceID, default: p.fpsCap)
-        p.vsync = !bool(.disableVSync, instanceID, default: !p.vsync)
         p.muteWithSwitch = bool(.muteWithSwitch, instanceID, default: p.muteWithSwitch)
         p.microphone = bool(.microphone, instanceID, default: p.microphone)
         p.gyroAim = bool(.gyroAim, instanceID, default: p.gyroAim)
@@ -113,8 +109,6 @@ public struct CofrePreferenceStore {
         put(.java, p.java, instanceID)
         put(.javaArgs, p.jvmArgs, instanceID)
         put(.fpsOverlay, p.fpsOverlay, instanceID)
-        put(.fpsCap, max(0, p.fpsCap), instanceID)
-        put(.disableVSync, !p.vsync, instanceID)
         put(.muteWithSwitch, p.muteWithSwitch, instanceID)
         put(.microphone, p.microphone, instanceID)
         put(.gyroAim, p.gyroAim, instanceID)

@@ -1093,10 +1093,14 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
   [self persistInstanceProfiles:profiles selected:name error:nil];
   NSLog(@"[Cofre] renderer auto -> Metal for Minecraft %@", game);
 }
-// Air's Java launcher sets Minecraft to Chinese (lang:zh_cn) when options.txt
-// has no language. Write the phone's language first; Air only fills a missing
-// one. Also undo that Chinese default on phones not set to Chinese.
+// Air's Java launcher sets Minecraft to Chinese (lang:zh_cn) when options.txt has no language, so write the
+// phone's language first. Only when none is set: after that the game owns options.txt.
 - (void)setGameLanguageForProfile:(NSString *)name metadata:(NSDictionary *)metadata {
+  NSString *path = [amePCLVersionGameDirAbsolute(_profiles.profiles[name], nil)
+      stringByAppendingPathComponent:@"options.txt"];
+  NSString *text = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil] ?: @"";
+  if ([text hasPrefix:@"lang:"] || [text containsString:@"\nlang:"]) return;
+
   NSString *game = metadata[@"inheritsFrom"] ?: metadata[@"id"] ?: @"";
   NSArray<NSString *> *parts = [game componentsSeparatedByString:@"."];
   // 1.10 and older need "en_US"; lowercase crashes the oldest versions.
@@ -1107,56 +1111,10 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
   region = legacy ? region.uppercaseString : region.lowercaseString;
   NSString *lang = [NSString stringWithFormat:@"lang:%@_%@", language, region];
 
-  NSString *path = [amePCLVersionGameDirAbsolute(_profiles.profiles[name], nil)
-      stringByAppendingPathComponent:@"options.txt"];
-  NSString *text = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil] ?: @"";
-  NSMutableArray<NSString *> *lines = [[text componentsSeparatedByString:@"\n"] mutableCopy];
-
-  // Keep Minecraft's limiter aligned with Cofre's display pacing. Auto uses the
-  // panel maximum; an explicit cap is clamped so a 60 Hz device never asks the
-  // game to produce an unpresentable rate. These are standard Minecraft option
-  // keys and work for the versions Air supports without changing upstream.
-  NSInteger displayMax = MAX(30, (NSInteger)UIScreen.mainScreen.maximumFramesPerSecond);
-  NSInteger requested = [getPrefObject(@"video.max_fps") integerValue];
-  NSInteger cap = requested > 0 ? MIN(requested, displayMax) : displayMax;
-  BOOL vsync = getPrefObject(@"video.disable_game_vsync") == nil
-                   ? YES
-                   : ![getPrefObject(@"video.disable_game_vsync") boolValue];
-  // While VSync is off, Air's PojavLauncher.java rewrites maxFps:260 on every launch, so a cap turns VSync on.
-  if (requested > 0 && !vsync) {
-    setPrefBool(@"video.disable_game_vsync", NO);
-    vsync = YES;
-  }
-  void (^setOption)(NSString *, NSString *) = ^(NSString *key, NSString *value) {
-    NSUInteger index = [lines indexOfObjectPassingTest:^BOOL(NSString *line, NSUInteger idx, BOOL *stop) {
-      return [line hasPrefix:[key stringByAppendingString:@":"]];
-    }];
-    NSString *entry = [NSString stringWithFormat:@"%@:%@", key, value];
-    if (index == NSNotFound) [lines addObject:entry];
-    else lines[index] = entry;
-  };
-  setOption(@"maxFps", [NSString stringWithFormat:@"%ld", (long)cap]);
-  setOption(@"enableVsync", vsync ? @"true" : @"false");
-  NSLog(@"[Cofre] frame rate cap=%@ display=%ld Hz vsync=%@",
-        requested > 0 ? [NSString stringWithFormat:@"%ld", (long)requested] : @"auto",
-        (long)displayMax, vsync ? @"on" : @"off");
-
   [NSFileManager.defaultManager createDirectoryAtPath:path.stringByDeletingLastPathComponent
                           withIntermediateDirectories:YES attributes:nil error:nil];
-  NSUInteger i = [lines indexOfObjectPassingTest:^BOOL(NSString *line, NSUInteger idx, BOOL *stop) {
-    return [line hasPrefix:@"lang:"];
-  }];
-  if (i == NSNotFound) {
-    [lines insertObject:lang atIndex:0];
-  } else if ([lines[i].lowercaseString isEqualToString:@"lang:zh_cn"] && ![language isEqualToString:@"zh"]) {
-    lines[i] = lang;
-  } else {
-    [[lines componentsJoinedByString:@"\n"] writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:nil];
-    return;
-  }
-  [NSFileManager.defaultManager createDirectoryAtPath:path.stringByDeletingLastPathComponent
-                          withIntermediateDirectories:YES attributes:nil error:nil];
-  [[lines componentsJoinedByString:@"\n"] writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:nil];
+  [[NSString stringWithFormat:@"%@\n%@", lang, text] writeToFile:path atomically:YES
+                                                         encoding:NSUTF8StringEncoding error:nil];
   NSLog(@"[Cofre] game %@ for Minecraft %@", lang, game);
 }
 - (void)hideCofreLaunchOverlay {
