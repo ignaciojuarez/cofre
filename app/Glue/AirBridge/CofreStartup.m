@@ -129,6 +129,13 @@ static void CofreEnsureStarted(void) {
     if (!entry) {
       return;
     }
+    // Air derives POJAV_GAME_DIR from realpath (/private/var/...). Its zip-slip guard standardizes both the
+    // root (which exists, so /private is dropped) and each entry (not yet created, so /private stays), then
+    // rejects every modpack override as "escaping the extraction root". Hand Air the standardized form.
+    const char *gameDir = getenv("POJAV_GAME_DIR");
+    if (gameDir) {
+      setenv("POJAV_GAME_DIR", @(gameDir).stringByStandardizingPath.UTF8String, 1);
+    }
     CofreAirBridgeAdapter *bridge = [CofreAirBridgeAdapter new];
     ((void (*)(id, SEL, id))objc_msgSend)(entry, @selector(startWithBridge:),
                                           bridge);
