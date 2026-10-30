@@ -88,7 +88,6 @@ NS_ASSUME_NONNULL_BEGIN
                  source:(NSInteger)source
              completion:(void (^)(NSArray *, NSError *_Nullable))completion;
 /// Minecraft version and loader for mod compatibility.
-- (NSDictionary *)modContextForProfile:(NSString *)profile;
 /// Searches multiplayer servers.
 /// Imports a modpack into a profile.
 - (void)importPack:(NSURL *)url

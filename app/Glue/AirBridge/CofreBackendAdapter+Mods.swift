@@ -104,17 +104,15 @@ struct CofreModVersion {
             let projectType = Self.projectType(query.kind)
             var filters = ["query": query.text, "limit": "50", "projectType": projectType]
             if let instanceID = query.instanceID {
-                let context = air.modContext(forProfile: instanceID)
-                filters["mcVersion"] = context["minecraft"] as? String
-                if query.kind == .mods, let loader = context["loader"] as? String, loader != "vanilla" {
-                    filters["loader"] = loader
-                }
+                let target = modTarget(instanceID)
+                if !target.game.isEmpty { filters["mcVersion"] = target.game }
+                if query.kind == .mods, target.loader != .vanilla { filters["loader"] = target.loader.rawValue }
             }
             if source == 1 {
                 let facets = [["project_type:\(projectType)"]] + (filters["mcVersion"].flatMap { [["versions:\($0)"]] } ?? []) + (filters["loader"].flatMap { [["categories:\($0)"]] } ?? [])
                 let hits = try await modCatalog.modrinth.search(query: query.text, facets: facets)
-                return hits.compactMap { hit in
-                    guard hit.projectType == projectType else { return nil }
+                // The project_type facet already limits the type (data packs come back labelled "mod").
+                return hits.map { hit in
                     let id = hit.projectID
                     modCatalog.projects[id] = ["id": id, "title": hit.title, "description": hit.description, "imageUrl": hit.iconURL?.absoluteString ?? "", "url": hit.pageURL?.absoluteString ?? "", "downloads": hit.downloads, "projectType": projectType, "apiSource": 1]
                     let loaders = hit.categories.compactMap { Loader(rawValue: $0.lowercased()) }
@@ -610,12 +608,10 @@ struct CofreModVersion {
         }
         private static let userAgent = "ignaciojuarez/cofre (github.com/ignaciojuarez/cofre)"
 
+        /// The instance's Minecraft version and loader, read by CofreKit from launcher_profiles.json.
         private func modTarget(_ instanceID: String) -> (game: String, loader: Loader) {
-            let context = air.modContext(forProfile: instanceID)
-            return (
-                context["minecraft"] as? String ?? "",
-                Loader(rawValue: (context["loader"] as? String ?? "").lowercased()) ?? .vanilla
-            )
+            guard let instance = try? serverInstance(instanceID) else { return ("", .vanilla) }
+            return (instance.gameVersion, Loader(rawValue: instance.loader.rawValue) ?? .vanilla)
         }
 
         private func source(of projectID: String) -> Int {

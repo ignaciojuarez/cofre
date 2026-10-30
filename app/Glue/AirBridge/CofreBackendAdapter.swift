@@ -28,7 +28,7 @@
             [.addServer, .serverFiles, .pingServers, .quickPlay, .discoverServers, .envVariables, .rendererTuning, .serverJoin, .instanceIcon]
         }
         let air: any CofreAirBridging
-        var serverInstances: InstanceStore?
+        var instances: InstanceStore?
         var launchingGameDirectory: URL?
         let modCatalog = CofreModCatalog()
         private lazy var accountStore: AccountStore = {

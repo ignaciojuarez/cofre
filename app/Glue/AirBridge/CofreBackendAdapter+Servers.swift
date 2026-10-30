@@ -5,7 +5,7 @@ import CofreUI
 
 extension CofreBackendAdapter {
     func serverInstance(_ id: String) throws -> Instance {
-        guard let instance = try serverInstances?.list().first(where: { $0.id == id }) else {
+        guard let instance = try instances?.list().first(where: { $0.id == id }) else {
             throw InstanceStore.StoreError.missingProfile
         }
         return instance

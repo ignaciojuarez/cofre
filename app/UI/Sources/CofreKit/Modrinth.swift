@@ -10,11 +10,18 @@ public final class Modrinth {
         public let projectType: String
         public let categories: [String]
         public let downloads: Int
-        public let iconURL: URL?
-        public let pageURL: URL?
-        enum CodingKeys: String, CodingKey { case projectID = "project_id", slug, title, description, projectType = "project_type", categories, downloads, iconURL = "icon_url", pageURL = "project_url" }
+        /// Kept as text: Modrinth sends "" for projects without an icon, which isn't a valid URL to decode.
+        let icon: String?
+        public var iconURL: URL? { Modrinth.url(icon) }
+        /// Search hits carry no page link; it follows from the type and slug.
+        public var pageURL: URL? { slug.flatMap { Modrinth.url("https://modrinth.com/\(projectType)/\($0)") } }
+        enum CodingKeys: String, CodingKey { case projectID = "project_id", slug, title, description, projectType = "project_type", categories, downloads, icon = "icon_url" }
     }
-    public struct Project: Codable, Sendable { public let id: String; public let title: String; public let description: String?; public let iconURL: URL?; public let projectType: String; enum CodingKeys: String, CodingKey { case id, title, description, iconURL = "icon_url", projectType = "project_type" } }
+    public struct Project: Codable, Sendable {
+        public let id: String; public let title: String; public let description: String?; let icon: String?; public let projectType: String
+        public var iconURL: URL? { Modrinth.url(icon) }
+        enum CodingKeys: String, CodingKey { case id, title, description, icon = "icon_url", projectType = "project_type" }
+    }
     public struct Version: Codable, Sendable { public let id: String; public let projectID: String; public let name: String; public let versionNumber: String; public let gameVersions: [String]; public let loaders: [String]; public let versionType: String; public let dependencies: [Dependency]; public let files: [File]; enum CodingKeys: String, CodingKey { case id, projectID = "project_id", name, versionNumber = "version_number", gameVersions = "game_versions", loaders, versionType = "version_type", dependencies, files } }
     public struct Dependency: Codable, Sendable { public let versionID: String?; public let projectID: String?; public let dependencyType: String; enum CodingKeys: String, CodingKey { case versionID = "version_id", projectID = "project_id", dependencyType = "dependency_type" } }
     public struct File: Codable, Sendable { public let hashes: [String: String]; public let url: URL?; public let filename: String; public let size: Int64; public let primary: Bool }
@@ -51,6 +58,7 @@ public final class Modrinth {
     public func projects(ids: [String]) async throws -> [Project] {
         try await post("projects", body: try JSONSerialization.data(withJSONObject: ["ids": ids]), as: [Project].self)
     }
+    static func url(_ text: String?) -> URL? { text.flatMap { $0.isEmpty ? nil : URL(string: $0) } }
     private func json(_ value: [String]) throws -> String { String(data: try JSONEncoder().encode(value), encoding: .utf8)! }
     private func get<T: Decodable>(_ path: String, query: [URLQueryItem] = [], as type: T.Type) async throws -> T { try await request(path, query: query, method: "GET", body: nil, as: type) }
     private func post<T: Decodable>(_ path: String, body: Data, as type: T.Type) async throws -> T { try await request(path, query: [], method: "POST", body: body, as: type) }

@@ -85,7 +85,6 @@ typedef NS_ENUM(NSInteger, CofreLaunchEvent) {
                  source:(NSInteger)source
              completion:(void (^)(NSArray *, NSError *_Nullable))completion;
 /// Minecraft version and loader for mod compatibility.
-- (NSDictionary *)modContextForProfile:(NSString *)profile;
 - (void)importPack:(NSURL *)url
            profile:(nullable NSString *)profile
           progress:(void (^)(double, NSString *))progress

@@ -490,6 +490,7 @@
                 results = try await found
                 searchError = nil
             } catch is CancellationError {} catch {
+                NSLog("[Cofre] search failed: %@", String(describing: error))
                 results = []
                 searchError = error.localizedDescription
             }

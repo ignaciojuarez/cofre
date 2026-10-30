@@ -67,9 +67,11 @@ import UIKit
     private static func instanceLabel(_ bridge: any CofreAirBridging) -> String? {
         let name = bridge.selectedProfileName()
         guard !name.isEmpty else { return nil }
-        let context = bridge.modContext(forProfile: name)
-        let loader = (context["loader"] as? String).flatMap { $0 == "vanilla" || $0.isEmpty ? nil : $0.capitalized }
-        let version = [loader, context["minecraft"] as? String].compactMap { $0 }.joined(separator: " ")
+        let instance = ProcessInfo.processInfo.environment["POJAV_GAME_DIR"].flatMap {
+            try? InstanceStore(root: URL(fileURLWithPath: $0)).list().first { $0.id == name }
+        }
+        let loader = instance.flatMap { Loader(rawValue: $0.loader.rawValue) }.flatMap { $0 == .vanilla ? nil : $0.displayName }
+        let version = [loader, instance?.gameVersion].compactMap { $0 }.joined(separator: " ")
         return version.isEmpty ? name : "\(name) · \(version)"
     }
 

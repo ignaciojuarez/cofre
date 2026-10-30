@@ -991,10 +991,6 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
                        : [ModrinthAPI sharedInstance];
   [api searchModWithFilters:filters completion:completion];
 }
-- (NSDictionary *)modContextForProfile:(NSString *)profile {
-  NSDictionary *data = _profiles.profiles[profile];
-  return [ModpackExportService parseVersionId:data[@"lastVersionId"] ?: @""];
-}
 - (void)projectVersions:(NSString *)projectID
                  source:(NSInteger)source
              completion:(void (^)(NSArray *, NSError *))completion {
