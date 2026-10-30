@@ -69,7 +69,8 @@ public struct CofrePreferenceStore {
         p.renderer = string(.renderer, instanceID, default: p.renderer)
         p.resolution = double(.resolution, instanceID, default: p.resolution * 100) / 100
         let fsr = integer(.fsrMode, instanceID, default: 0)
-        p.fsrMode = [.off, .ultra, .quality, .performance][safe: fsr] ?? .off
+        // MobileGlues' presets: 1 Ultra quality (1.3×), 2 Quality (1.5×), 3 Balanced (1.7×), 4 Performance (2×).
+        p.fsrMode = [.off, .ultra, .quality, .performance, .performance][safe: fsr] ?? .off
         p.fsr = p.fsrMode != .off
         p.graphicsApi = string(.graphicsAPI, instanceID, default: p.graphicsApi)
         p.java = string(.java, instanceID, default: p.java)
@@ -99,7 +100,7 @@ public struct CofrePreferenceStore {
         if !p.autoRAM { put(.ramAllocation, p.ramMB, instanceID) }
         put(.renderer, p.renderer, instanceID)
         put(.resolution, p.resolution * 100, instanceID)
-        put(.fsrMode, ["off": 0, "ultra": 1, "quality": 2, "performance": 3][p.fsrMode.rawValue] ?? 0, instanceID)
+        put(.fsrMode, ["off": 0, "ultra": 1, "quality": 2, "performance": 4][p.fsrMode.rawValue] ?? 0, instanceID)
         put(.graphicsAPI, p.graphicsApi == "auto" ? "" : p.graphicsApi, instanceID)
         put(.java, p.java, instanceID)
         put(.javaArgs, p.jvmArgs, instanceID)
