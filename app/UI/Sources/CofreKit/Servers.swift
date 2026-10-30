@@ -187,7 +187,6 @@ private final class ConnectionTransport: @unchecked Sendable {
     func cancel() { connection.cancel() }
 }
 
-public enum NBTValue: Sendable { case byte(Int8), string(String), compound([(String, NBTValue)]), list([NBTValue]), raw(UInt8, Data); var type: UInt8 { switch self { case .byte: 1; case .string: 8; case .compound: 10; case .list: 9; case .raw(let type, _): type } } }
 
 public struct CofreServerRecord: Sendable { public var name: String; public var ip: String; public var icon: Data?; public var acceptTextures: Int8?; public var hidden: Bool; public var unknown: [(String, NBTValue)] = []
     public init(name: String, ip: String, icon: Data? = nil, acceptTextures: Int8? = nil, hidden: Bool = false, unknown: [(String, NBTValue)] = []) { self.name=name; self.ip=ip; self.icon=icon; self.acceptTextures=acceptTextures; self.hidden=hidden; self.unknown=unknown }
@@ -259,48 +258,3 @@ public enum ServersDatCodec {
     private static func utf16(_ s:String)->Data { var d=Data(); d.append(contentsOf:UInt16(s.utf8.count).bigEndianBytes); d.append(contentsOf:s.utf8); return d }
 }
 private extension FixedWidthInteger { var bigEndianBytes:[UInt8] { withUnsafeBytes(of: bigEndian, Array.init) } }
-private struct Reader {
-    var d: Data; var i = 0
-    mutating func take(_ count: Int) throws -> Data {
-        guard count >= 0, count <= d.count - i else { throw MinecraftServerPingError.malformedResponse }
-        defer { i += count }; return d.subdata(in: i..<i+count)
-    }
-    mutating func byte() throws -> UInt8 { try take(1)[0] }
-    mutating func int32() throws -> Int { Int(Int32(bitPattern: try take(4).reduce(UInt32(0)) { ($0 << 8) | UInt32($1) })) }
-    mutating func string() throws -> String {
-        let size = try take(2).reduce(0) { ($0 << 8) | Int($1) }
-        guard let value = String(data: try take(size), encoding: .utf8) else { throw MinecraftServerPingError.malformedResponse }; return value
-    }
-    mutating func compound(depth: Int = 0) throws -> [(String, NBTValue)] {
-        guard depth < 64 else { throw MinecraftServerPingError.malformedResponse }
-        var result: [(String, NBTValue)] = []
-        while true {
-            let type = try byte(); if type == 0 { return result }
-            let key = try string(); result.append((key, try val(type, depth: depth + 1)))
-        }
-    }
-    mutating func val(_ type: UInt8, depth: Int) throws -> NBTValue {
-        guard depth < 64 else { throw MinecraftServerPingError.malformedResponse }
-        let start = i
-        switch type {
-        case 1: return .byte(Int8(bitPattern: try byte()))
-        case 8: return .string(try string())
-        case 10: return .compound(try compound(depth: depth))
-        case 9:
-            let element = try byte(), count = try int32()
-            guard count >= 0, count <= d.count - i else { throw MinecraftServerPingError.malformedResponse }
-            var values: [NBTValue] = []
-            for _ in 0..<count { values.append(try val(element, depth: depth + 1)) }
-            if element == 10 { return .list(values) }
-        case 2: _ = try take(2)
-        case 3, 5: _ = try take(4)
-        case 4, 6: _ = try take(8)
-        case 7, 11, 12:
-            let count = try int32(), width = type == 7 ? 1 : (type == 11 ? 4 : 8)
-            guard count >= 0, count <= (d.count - i) / width else { throw MinecraftServerPingError.malformedResponse }
-            _ = try take(count * width)
-        default: throw MinecraftServerPingError.malformedResponse
-        }
-        return .raw(type, d.subdata(in: start..<i))
-    }
-}

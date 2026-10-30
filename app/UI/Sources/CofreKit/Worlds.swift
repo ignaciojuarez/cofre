@@ -65,15 +65,21 @@ public final class WorldStore: @unchecked Sendable {
     @discardableResult public func delete(_ world: String) throws -> TrashToken { try ensureWritable(); let source=saves.appendingPathComponent(world); guard fm.fileExists(atPath:source.path) else { throw Failure.missingWorld }; let trash=instance.gameDirectory.appendingPathComponent(".trash",isDirectory:true); try fm.createDirectory(at:trash,withIntermediateDirectories:true); let dest=trash.appendingPathComponent("world-\(UUID().uuidString)"); try fm.moveItem(at:source,to:dest); let token=TrashToken(original:source,trashed:dest); deleted.append(token); return token }
     public func undo(_ token: TrashToken) throws { try ensureWritable(); guard fm.fileExists(atPath:token.trashed.path) else { throw Failure.missingWorld }; try fm.createDirectory(at:token.original.deletingLastPathComponent(),withIntermediateDirectories:true); try? fm.removeItem(at:token.original); try fm.moveItem(at:token.trashed,to:token.original); deleted.removeAll { $0 == token } }
     private func ensureWritable() throws { if running() { throw Failure.gameRunning } }
-    private func read(_ url: URL) throws -> World { let data=try Data(contentsOf:url.appendingPathComponent("level.dat")); let parsed=try NBTWorldReader.read(gzip:data); let root=NBTWorldReader.value(parsed,"Data") ?? parsed; let name=root.string("LevelName") ?? url.lastPathComponent; let mode=(root.int("GameType") ?? 0); let modes=["Survival","Creative","Adventure","Spectator"]; let date=root.long("LastPlayed").map { Date(timeIntervalSince1970:Double($0)/1000) }; let size=(fm.enumerator(at:url, includingPropertiesForKeys:[.fileSizeKey])?.compactMap{$0 as? URL}.reduce(Int64(0)){ $0 + Int64((try? $1.resourceValues(forKeys:[.fileSizeKey]).fileSize) ?? 0) }) ?? 0; return World(id:url.lastPathComponent,folder:url.lastPathComponent,displayName:name,gameMode:modes.indices.contains(mode) ? modes[mode] : "Unknown",lastPlayed:date,sizeBytes:size,iconPNG:try? Data(contentsOf:url.appendingPathComponent("icon.png")),gameVersion:root.string("Version")) }
+    /// A world always lists, even when its level.dat can't be read (it then shows its folder name).
+    private func read(_ url: URL) throws -> World {
+        let root = (try? NBT.read(Data(contentsOf: url.appendingPathComponent("level.dat")))).map { $0["Data"] ?? $0 }
+        let mode = Int(root?["GameType"]?.integer ?? 0)
+        let modes = ["Survival", "Creative", "Adventure", "Spectator"]
+        let size = (fm.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey])?.compactMap { $0 as? URL }.reduce(Int64(0)) {
+            $0 + Int64((try? $1.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+        }) ?? 0
+        return World(
+            id: url.lastPathComponent, folder: url.lastPathComponent,
+            displayName: root?["LevelName"]?.string ?? url.lastPathComponent,
+            gameMode: modes.indices.contains(mode) ? modes[mode] : "Unknown",
+            lastPlayed: root?["LastPlayed"]?.integer.map { Date(timeIntervalSince1970: Double($0) / 1000) },
+            sizeBytes: size, iconPNG: try? Data(contentsOf: url.appendingPathComponent("icon.png")),
+            gameVersion: root?["Version"]?["Name"]?.string)
+    }
 }
 
-private enum NBTWorldReader {
-    enum Value { case string(String), int(Int), long(Int64), compound([String:Value]) }
-    static func read(gzip data: Data) throws -> Value { var d=data; if d.starts(with:[0x1f,0x8b]) { let end=d.count-8; d=inflate(Data(d[10..<end]), size: 1<<20) }; var r=R(d: d); guard r.byte()==10 else { throw WorldStore.Failure.invalidArchive }; _=r.string(); return r.compound() }
-    static func inflate(_ d:Data,size:Int)->Data { var n=size; while n < 32<<20 { var out=Data(count:n); let x=out.withUnsafeMutableBytes { dst in d.withUnsafeBytes { src in compression_decode_buffer(dst.bindMemory(to:UInt8.self).baseAddress!,n,src.bindMemory(to:UInt8.self).baseAddress!,d.count,nil,COMPRESSION_ZLIB) } }; if x>0 { return out.prefix(x) }; n *= 2 }; return Data() }
-    static func value(_ v:Value,_ key:String)->Value? { guard case .compound(let c)=v else{return nil}; return c[key] }
-    static func readValue(_ v:Value,_ key:String)->Value? { value(v,key) }
-}
-private extension NBTWorldReader.Value { func string(_ k:String)->String? { if case .string(let x)=NBTWorldReader.readValue(self,k) { return x }; return nil }; func int(_ k:String)->Int? { if case .int(let x)=NBTWorldReader.readValue(self,k) { return x }; return nil }; func long(_ k:String)->Int64? { if case .long(let x)=NBTWorldReader.readValue(self,k) { return x }; return nil } }
-private struct R { let d:Data; var i=0; mutating func byte()->UInt8 { defer{i+=1}; return d[i] }; mutating func u16()->Int { let x=Int(d[i])<<8|Int(d[i+1]); i+=2; return x }; mutating func string()->String { let n=u16(); defer{i+=n}; return String(decoding:d[i..<i+n],as:UTF8.self) }; mutating func i32()->Int { let x=Int(Int32(bitPattern:UInt32(d[i])<<24|UInt32(d[i+1])<<16|UInt32(d[i+2])<<8|UInt32(d[i+3]))); i+=4; return x }; mutating func i64()->Int64 { var x:Int64=0; for _ in 0..<8 { x=(x<<8)|Int64(byte()) }; return x }; mutating func compound()->NBTWorldReader.Value { var c:[String:NBTWorldReader.Value]=[:]; while d[i] != 0 { let t=byte(), k=string(); c[k]=val(t) }; i+=1; return .compound(c) }; mutating func val(_ t:UInt8)->NBTWorldReader.Value { switch t { case 3:return .int(i32()); case 4:return .long(i64()); case 8:return .string(string()); case 10:return compound(); default: return .string("") } } }
