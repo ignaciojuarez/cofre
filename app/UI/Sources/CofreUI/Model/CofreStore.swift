@@ -452,6 +452,14 @@
             }
         }
 
+        public func renameInstance(_ id: String, to name: String) async {
+            guard let instanceStore, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+            await run {
+                let i = try instanceStore.rename(id, to: name.trimmingCharacters(in: .whitespacesAndNewlines))
+                if let n = self.instances.firstIndex(where: { $0.id == id }) { self.instances[n] = Self.summary(i) }
+            }
+        }
+
         private static func summary(_ i: Instance) -> InstanceSummary {
             let loader = Loader(rawValue: i.loader.rawValue) ?? .vanilla
             // Air's "latest-release" alias resolves to the newest release at launch.

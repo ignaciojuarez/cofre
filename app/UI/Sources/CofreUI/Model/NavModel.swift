@@ -81,6 +81,7 @@
         public var section: Section = .play
         /// Instance detail selection (Instances section).
         public var instance: String?
+        public var instanceEdit: String?
         public var mod: ModsRoute?
         public var settingsPane: SettingsPane?
         /// Play's panes: 0 = Play, 1 = Worlds, 2 = Servers. Compact shows one; regular shows Play beside the other.

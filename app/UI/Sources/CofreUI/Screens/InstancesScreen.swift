@@ -185,6 +185,7 @@
             Button("Edit") {
                 nav.instance = instance.id
                 nav.section = .instances
+                nav.instanceEdit = instance.id
             }
             Button("Duplicate") { Task { await store.duplicate(instance.id) } }
             Button("Export .mrpack") {
@@ -204,6 +205,8 @@
         @State private var tab = 0
         @State private var exported: URL?
         @State private var showingLoaderPicker = false
+        @State private var showingRename = false
+        @State private var rename = ""
 
         public init(id: String) { self.id = id }
 
@@ -246,6 +249,17 @@
                     if let loader = store.instances.first(where: { $0.id == id })?.loader {
                         VersionPickerSheet(loader: loader, selection: .constant(store.instances.first(where: { $0.id == id })?.loaderVersion ?? "")).environment(store)
                     }
+                }
+                .alert("Rename instance", isPresented: $showingRename) {
+                    TextField("Name", text: $rename)
+                    Button("Save") { Task { await store.renameInstance(id, to: rename) } }
+                    Button("Cancel", role: .cancel) {}
+                }
+                .onChange(of: nav.instanceEdit) { _, editID in
+                    guard editID == id, let name = store.instances.first(where: { $0.id == id })?.name else { return }
+                    rename = name
+                    showingRename = true
+                    nav.instanceEdit = nil
                 }
             } else {
                 DetailPlaceholder()
