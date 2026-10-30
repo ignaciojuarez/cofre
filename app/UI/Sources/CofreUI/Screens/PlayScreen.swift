@@ -58,7 +58,7 @@
                                 store.preferences.autoRAM ? "Auto" : "\(store.preferences.ramMB / 1024) GB",
                                 label: "Memory")
                             Stat("\(Int(store.preferences.resolution * 100))%", label: "Resolution")
-                            Stat("\(store.preferences.fpsCap)", label: "FPS cap")
+                            Stat(GamePreferences.fpsCapOptions.first { $0.0 == store.preferences.fpsCap }?.1 ?? "\(store.preferences.fpsCap)", label: "FPS cap")
                         }
                         let recent = store.instances.filter { $0.id != inst.id }.prefix(3)
                         if !recent.isEmpty {
