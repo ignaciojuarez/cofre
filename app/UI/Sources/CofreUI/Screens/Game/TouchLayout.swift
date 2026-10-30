@@ -119,6 +119,12 @@ public enum TouchLayout {
         return CGRect(x: (size.width - w) / 2, y: size.height - h, width: w, height: h)
     }
 
+    /// Which of the 9 hotbar slots (0-based) a point falls on, if any.
+    public static func hotbarSlot(at p: CGPoint, in hotbar: CGRect) -> Int? {
+        guard hotbar.contains(p) else { return nil }
+        return min(8, Int((p.x - hotbar.minX) / (hotbar.width / 9)))
+    }
+
     static func autoGuiScale(width: CGFloat, height: CGFloat) -> Int {
         var scale = 1
         while CGFloat(scale + 1) * 320 <= width && CGFloat(scale + 1) * 240 <= height { scale += 1 }

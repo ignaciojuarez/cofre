@@ -227,12 +227,12 @@ final class TouchControlsTests: XCTestCase {
     }
 
     @MainActor
-    func testHitTestingPassesTheHotbarAndMenusThrough() {
+    func testHitTestingOwnsTheWorldAndPassesMenusThrough() {
         let m = TouchOverlayModel(input: nil, settings: TouchControlSettings())
         m.insets = phoneInsets
         m.pixelsPerPoint = 3
         let hotbar = m.hotbar(in: phone)
-        XCTAssertFalse(m.captures(CGPoint(x: hotbar.midX, y: hotbar.midY), in: phone), "hotbar taps reach the game")
+        XCTAssertTrue(m.captures(CGPoint(x: hotbar.midX, y: hotbar.midY), in: phone), "the overlay picks hotbar slots")
         XCTAssertTrue(m.captures(CGPoint(x: phone.width / 2, y: phone.height / 2), in: phone), "the world is ours")
         m.screen = GameScreenState(inWorld: false)
         XCTAssertFalse(m.captures(CGPoint(x: phone.width / 2, y: phone.height / 2), in: phone), "menus go to the game")
@@ -241,6 +241,22 @@ final class TouchControlsTests: XCTestCase {
         m.screen = .world
         m.mode = .controller
         XCTAssertFalse(m.captures(CGPoint(x: phone.width / 2, y: phone.height / 2), in: phone))
+    }
+
+    @MainActor
+    func testHotbarTapPicksTheSlotAndNothingElse() {
+        let spy = SpyInput()
+        let m = TouchOverlayModel(input: spy, settings: TouchControlSettings())
+        m.pixelsPerPoint = 3
+        let hotbar = m.hotbar(in: phone)
+        let third = CGPoint(x: hotbar.minX + hotbar.width * 2.5 / 9, y: hotbar.midY)
+        XCTAssertEqual(TouchLayout.hotbarSlot(at: third, in: hotbar), 2)
+        m.worldBegan(at: third, size: phone)
+        XCTAssertNil(m.world, "a hotbar tap doesn't look, use or attack")
+        XCTAssertTrue(spy.events.contains("+3"))
+        m.worldEnded()
+        XCTAssertFalse(m.touchOnHotbar)
+        XCTAssertNil(TouchLayout.hotbarSlot(at: CGPoint(x: hotbar.midX, y: hotbar.minY - 1), in: hotbar))
     }
 
     @MainActor

@@ -43,6 +43,15 @@ public final class CofreGameInput: NSObject, GameInputService {
         observers = names.map { name in
             center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in self?.recomputeMode() }
         }
+        // Air installs fresh pad handlers when a controller (re)connects; chain onto those once they're in.
+        observers.append(center.addObserver(forName: .GCControllerDidConnect, object: nil, queue: .main) {
+            [weak self] note in
+            guard let pad = note.object as? GCController else { return }
+            DispatchQueue.main.async {
+                self?.watchedPads.remove(pad)
+                self?.watch(pad)
+            }
+        })
         // "Became current" fires when a pad or mouse is actually used; the handlers below catch every press.
         observers.append(center.addObserver(forName: .GCControllerDidBecomeCurrent, object: nil, queue: .main) {
             [weak self] note in

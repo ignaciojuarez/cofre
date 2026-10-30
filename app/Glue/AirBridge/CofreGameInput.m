@@ -46,6 +46,7 @@ static void CofreAirInputKey(const char *name, BOOL down) {
 }
 
 static void CofreAirInputMouseButton(int button, BOOL down) {
+    if (button < 0 || button > 2) return;
     int key = button == 1 ? GLFW_MOUSE_BUTTON_RIGHT : button == 2 ? GLFW_MOUSE_BUTTON_MIDDLE : GLFW_MOUSE_BUTTON_LEFT;
     CallbackBridge_nativeSendMouseButton(key, down ? 1 : 0, 0);
 }
@@ -167,9 +168,10 @@ void CofreSDLTextInputStateChanged(BOOL active, const char *reason) {
         overlay.backgroundColor = UIColor.clearColor;
         [container addSubview:overlay];
 
-        // Cofre's SwiftUI overlay (CofreCore.framework) owns world touches; menus and the hotbar fall through
-        // to Air, so Air's hotbar taps must stay on.
-        setPrefBool(@"control.gesture_hotbar", YES);
+        // Cofre's SwiftUI overlay (CofreCore.framework) owns every world touch, the hotbar included; game
+        // screens fall through to Air's touch view. Air would re-show its hidden buttons when a controller
+        // disconnects, so it must not manage them.
+        setPrefBool(@"control.hardware_hide", NO);
         // ⌨ in the overlay is the only keyboard toggle; Air's two-finger tap would open it behind Cofre's back.
         setPrefBool(@"control.two_finger_keyboard", NO);
         Class entry = NSClassFromString(@"CofreCoreEntry");

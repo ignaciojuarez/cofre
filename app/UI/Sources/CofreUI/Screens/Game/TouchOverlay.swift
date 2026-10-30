@@ -27,6 +27,8 @@ public final class TouchOverlayModel {
     var knob = CGSize.zero
     var stickKeys: Set<CofreInputKey> = []
     var world: WorldTouch?
+    /// This finger started on the hotbar: it picked a slot and does nothing else until it lifts.
+    @ObservationIgnored var touchOnHotbar = false
     var hapticTick = 0
     /// Minimal: this jump press already turned into a sneak swipe.
     var swiped = false
@@ -118,18 +120,13 @@ public final class TouchOverlayModel {
         TouchLayout.hotbar(in: size, screen: screen, defaultPixelsPerPoint: pixelsPerPoint)
     }
 
-    /// Hit test for the UIKit host: which touches the overlay keeps (the rest go to the game).
+    /// Hit test for the UIKit host: which touches the overlay keeps (the rest go to the game's menus).
     public func captures(_ p: CGPoint, in size: CGSize) -> Bool {
         let shown = controls
         guard !shown.isEmpty else { return false }
-        let f = frames(in: size)
-        if trayOpen { return true }
-        if screen.inWorld {
-            let docked = shown.filter { $0 == .chat || $0 == .inventory }.compactMap { f[$0] }
-            if docked.contains(where: { TouchLayout.hitRect($0).contains(p) }) { return true }
-            return !hotbar(in: size).contains(p)
-        }
-        return shown.compactMap { f[$0] }.contains { TouchLayout.hitRect($0).contains(p) }
+        // In the world every touch is ours, the hotbar included; on game screens only our buttons are.
+        if trayOpen || screen.inWorld { return true }
+        return shown.compactMap { frames(in: size)[$0] }.contains { TouchLayout.hitRect($0).contains(p) }
     }
 
     // MARK: Idle (rule U4)
@@ -292,8 +289,16 @@ public final class TouchOverlayModel {
 
     // MARK: World (look, use, attack)
 
-    func worldBegan(at p: CGPoint) {
+    func worldBegan(at p: CGPoint, size: CGSize) {
         touched()
+        if let slot = TouchLayout.hotbarSlot(at: p, in: hotbar(in: size)),
+            let key = CofreInputKey(rawValue: String(slot + 1))
+        {
+            touchOnHotbar = true
+            tap(key)
+            buzz()
+            return
+        }
         if trayOpen {
             trayOpen = false
             return
@@ -321,6 +326,7 @@ public final class TouchOverlayModel {
     }
 
     func worldEnded() {
+        touchOnHotbar = false
         holdTask?.cancel()
         guard var w = world else { return }
         let actions = w.end(time: ProcessInfo.processInfo.systemUptime)
@@ -363,7 +369,7 @@ public struct TouchOverlayView: View {
             let k = TouchLayout.scale(for: size, buttonScale: model.settings.buttonScale)
             let shown = model.controls
             ZStack(alignment: .topLeading) {
-                if model.screen.inWorld && !shown.isEmpty { lookSurface }
+                if model.screen.inWorld && !shown.isEmpty { lookSurface(size: size) }
                 if shown.contains(.stick), let rest = f[.stick] { stick(rest: rest, size: size) }
                 ForEach(shown.filter { $0 != .stick }, id: \.self) { c in
                     if let r = f[c] { button(c, frame: r) }
@@ -383,12 +389,14 @@ public struct TouchOverlayView: View {
         .sensoryFeedback(.impact(weight: .light, intensity: 0.7), trigger: model.hapticTick)
     }
 
-    private var lookSurface: some View {
+    private func lookSurface(size: CGSize) -> some View {
         Color.clear.contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { v in
-                        if model.world == nil && v.translation == .zero { model.worldBegan(at: v.startLocation) }
+                        if model.world == nil && !model.touchOnHotbar && v.translation == .zero {
+                            model.worldBegan(at: v.startLocation, size: size)
+                        }
                         model.worldMoved(to: v.location)
                     }
                     .onEnded { _ in model.worldEnded() }
