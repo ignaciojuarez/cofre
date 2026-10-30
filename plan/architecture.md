@@ -43,7 +43,7 @@ app/UI (one Swift package)
 
 - **Previews and tests** run on fixture folders (a sample `Documents/` in test resources) through the real
   CofreKit types, plus `PreviewEngine`. That replaces the 1,200-line `MockBackend` and its drift.
-- **The ObjC bridge** (`CofreAirBridging`, 34 methods today) shrinks to the engine. Profiles, worlds, mods,
+- **The ObjC bridge** (`CofreAirBridging`, 33 methods today) shrinks to the engine. Profiles, worlds, mods,
   servers, accounts and preferences leave it as CofreKit owns them.
 
 ## What goes away
@@ -69,4 +69,4 @@ Order: Instances → Accounts → Logs → Worlds → Content (+ Modrinth) → D
 Engine seam first slice (BM): `GameEngine` now names the remaining Air work (launch, sign-in/refresh,
 JIT, input, loader installation, renderer/preferences keys and CurseForge). `PreviewEngine` is Air-free
 and emits no sample launcher data. The bridge inventory is recorded in `/tmp/cofre-audit/engine-seam.md`;
-four uncalled bridge methods and the superseded Draft/Servers comparison previews are removed.
+the uncalled `modsForProfile` bridge method and the superseded Draft/Servers comparison previews are removed.

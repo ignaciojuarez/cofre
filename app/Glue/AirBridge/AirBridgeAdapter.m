@@ -269,6 +269,12 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
   return out;
 }
 
+- (NSURL *)gameDirectoryForProfile:(NSString *)profile {
+  NSDictionary *p = self.profiles.profiles[profile];
+  NSString *path = p ? amePCLVersionGameDirAbsolute(p, nil) : nil;
+  return path.length ? [NSURL fileURLWithPath:path isDirectory:YES] : nil;
+}
+
 - (NSArray<NSURL *> *)instanceMetadataURLs:(NSURL *)url
                                   resource:(NSInteger)resource {
   return [PLMirrorCenter
@@ -430,6 +436,13 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
                              expectedSHA1:file[@"hashes"][@"sha1"]
                                  progress:nil
                                completion:completion];
+}
+
+- (NSString *)modsFolderForProfile:(NSString *)profile {
+  if (!_profiles.profiles[profile])
+    return nil;
+  return [[ModService sharedService] ensureModsFolderForProfile:profile
+                                                           error:nil];
 }
 
 - (void)duplicateProfile:(NSString *)name
@@ -953,6 +966,10 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
   id api = source == 2 ? [CurseForgeAPI sharedInstance]
                        : [ModrinthAPI sharedInstance];
   [api searchModWithFilters:filters completion:completion];
+}
+- (NSDictionary *)modContextForProfile:(NSString *)profile {
+  NSDictionary *data = _profiles.profiles[profile];
+  return [ModpackExportService parseVersionId:data[@"lastVersionId"] ?: @""];
 }
 - (void)projectVersions:(NSString *)projectID
                  source:(NSInteger)source

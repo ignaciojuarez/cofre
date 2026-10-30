@@ -12,6 +12,7 @@ typedef NS_ENUM(NSInteger, CofreLaunchEvent) {
 };
 @protocol CofreAirBridging <NSObject>
 - (NSArray<NSDictionary *> *)instances;
+- (nullable NSURL *)gameDirectoryForProfile:(NSString *)profile;
 // Instance catalogs and profile operations. Air owns paths, mirrors and
 // persistence.
 - (NSArray<NSURL *> *)instanceMetadataURLs:(NSURL *)url
@@ -43,6 +44,7 @@ typedef NS_ENUM(NSInteger, CofreLaunchEvent) {
                 completion:(void (^)(NSError *_Nullable))completion;
 /// The instance's mods folder (made if missing). Cofre lists, toggles and
 /// installs content there and in its sibling shaderpacks/resourcepacks.
+- (nullable NSString *)modsFolderForProfile:(NSString *)profile;
 - (void)duplicateProfile:(NSString *)profile
               completion:(void (^)(NSDictionary *_Nullable,
                                    NSError *_Nullable))completion;
@@ -83,6 +85,7 @@ typedef NS_ENUM(NSInteger, CofreLaunchEvent) {
                  source:(NSInteger)source
              completion:(void (^)(NSArray *, NSError *_Nullable))completion;
 /// Minecraft version and loader for mod compatibility.
+- (NSDictionary *)modContextForProfile:(NSString *)profile;
 - (void)importPack:(NSURL *)url
            profile:(nullable NSString *)profile
           progress:(void (^)(double, NSString *))progress
