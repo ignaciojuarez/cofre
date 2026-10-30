@@ -51,7 +51,7 @@ public final class ModpackImport: @unchecked Sendable {
     }
 
     public func importPack(_ archive: URL, name: String? = nil) async throws -> Result {
-        let staging = fm.temporaryDirectory.appendingPathComponent("cofre-import-(UUID().uuidString)", isDirectory: true)
+        let staging = fm.temporaryDirectory.appendingPathComponent("cofre-import-\(UUID().uuidString)", isDirectory: true)
         try fm.createDirectory(at: staging, withIntermediateDirectories: true)
         defer { try? fm.removeItem(at: staging) }
         try Zip.extract(archive, to: staging)
@@ -105,14 +105,14 @@ public final class ModpackImport: @unchecked Sendable {
         guard let key = curseForgeKey, !key.isEmpty else { throw Failure.curseForgeKeyRequired(URL(string: "https://www.curseforge.com/minecraft/modpacks")!) }
         var added: [String] = []
         for file in manifest.files where file.required ?? true {
-            let page = URL(string: "https://api.curseforge.com/v1/mods/(file.projectID)/files/(file.fileID)/download")!
+            let page = URL(string: "https://api.curseforge.com/v1/mods/\(file.projectID)/files/\(file.fileID)/download")!
             var request = URLRequest(url: page); request.setValue(key, forHTTPHeaderField: "x-api-key")
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let http = response as? HTTPURLResponse, (200..<400).contains(http.statusCode), let url = http.url else { throw Failure.curseForgeDownloadUnavailable(file.projectID, file.fileID, page) }
             // The API normally redirects to the CDN. Use the queue so the staged file gets the same lifecycle.
-            let destination = root.appendingPathComponent("mods/(file.projectID)-(file.fileID).jar")
+            let destination = root.appendingPathComponent("mods/\(file.projectID)-\(file.fileID).jar")
             try data.write(to: destination)
-            _ = url; added.append("mods/(file.projectID)-(file.fileID).jar")
+            _ = url; added.append("mods/\(file.projectID)-\(file.fileID).jar")
         }
         added += try copyOverrides(from: root, names: ["overrides", "client-overrides"])
         return (manifest.name ?? manifestURL.deletingLastPathComponent().lastPathComponent, manifest.minecraft.version, loader.0, loader.1, added)
