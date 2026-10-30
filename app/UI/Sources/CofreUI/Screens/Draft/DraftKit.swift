@@ -54,7 +54,7 @@
             case "instances": InstancesDraft(state: state, wide: wide)
             case "import": ImportDraft(state: state)
             case "files": FilesDraft(state: state)
-            case "content": ContentDraft(state: state)
+            case "content": Text("Content")
             case "worlds": EmptyState("Worlds moved to Play", message: "", icon: .grass)
             case "beforePlay": BeforePlayDraft(state: state)
             case "versions": VersionsDraft(state: state)

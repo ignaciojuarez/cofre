@@ -266,20 +266,11 @@ struct CofreModVersion {
                         ? "\(name) only downloads in CurseForge's app."
                         : "\(name) has no file Cofre can install.")
             }
-            var request = URLRequest(url: url)
-            request.timeoutInterval = 60
-            request.setValue(Self.userAgent, forHTTPHeaderField: "User-Agent")
-            let (temp, response) = try await URLSession.shared.download(for: request)
-            guard (response as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) ?? false else {
-                throw modError("\(name) didn't download (HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0)).")
-            }
-            if let expected = version.sha1?.lowercased(), try await Self.sha1(of: temp) != expected {
-                throw modError("\(name) downloaded damaged. Try again.")
-            }
             let destination = folder.appendingPathComponent(filename)
-            try? FileManager.default.removeItem(at: destination)
-            try FileManager.default.moveItem(at: temp, to: destination)
-            return destination
+            do {
+                return try await DownloadQueue.shared.download(url: url, destination: destination, title: name,
+                    totalBytes: version.sizeBytes, sha1: version.sha1)
+            } catch let error as DownloadQueue.QueueError { throw modError(error.localizedDescription) }
         }
 
         /// Moves staged files in, turns disabled dependencies back on, and drops older files of the same projects.

@@ -126,6 +126,7 @@ public enum CofreLinks {
                     switch sheet {
                     case .newInstance: NewInstanceSheet(plan: store.newInstancePlan)
                     case .importPack: ImportPackSheet()
+                    case .downloads: CofreDownloadsSheet().environment(nav)
                     }
                 }
                 .environment(store).environment(nav)

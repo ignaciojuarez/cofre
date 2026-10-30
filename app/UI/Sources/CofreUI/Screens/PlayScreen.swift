@@ -30,6 +30,7 @@
             VStack(spacing: 0) {
                 ColumnHeader("Play") { AccountChip() }
                 PaneScroll {
+                    if store.libraryLoaded { CofreDownloadsStrip().environment(nav) }
                     if store.libraryLoaded && !store.accounts.contains(where: { $0.state == .ready }) { Banner("Sign in to play Java Edition", icon: .head, tone: .warn) { BlockButton("Accounts", size: .small) { nav.section = .settings; nav.settingsPane = .accounts } } }
                     if store.setupCompleted, store.setup.pairing.isFailed {
                         // Setup finished once: a live failure is a banner here, never the wizard again.

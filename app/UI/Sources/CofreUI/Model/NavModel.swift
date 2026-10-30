@@ -44,7 +44,7 @@
     }
 
     public enum ActiveSheet: String, Identifiable, Sendable {
-        case newInstance, importPack
+        case newInstance, importPack, downloads
         public var id: String { rawValue }
     }
 

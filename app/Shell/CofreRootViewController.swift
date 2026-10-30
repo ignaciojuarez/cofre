@@ -4,6 +4,11 @@ import UIKit
 
 @objc(CofreRootViewController)
 public final class CofreRootViewController: UIViewController {
+    /// Forward this from the application's UIApplicationDelegate when iOS wakes Cofre for a background session.
+    public static func handleEventsForBackgroundURLSession(identifier: String, completionHandler: @escaping () -> Void) {
+        guard identifier == "com.cofre.downloads" else { completionHandler(); return }
+        DownloadQueue.shared.handleBackgroundEvents(completion: completionHandler)
+    }
     private let bridge: any CofreAirBridging
     public init(bridge: any CofreAirBridging) { self.bridge = bridge; super.init(nibName: nil, bundle: nil) }
     @available(*, unavailable) required init?(coder: NSCoder) { fatalError("CofreRootViewController requires bridge") }

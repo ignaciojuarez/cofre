@@ -180,6 +180,7 @@
         @Environment(\.widthClass) private var width
         @State private var tab = 0
         @State private var exported: URL?
+        @State private var showingLoaderPicker = false
 
         public init(id: String) { self.id = id }
 
@@ -217,6 +218,11 @@
                 .task(id: id) {
                     if store.activeInstanceID != id { await store.selectInstance(id) }
                     await store.loadPreferences(for: id)
+                }
+                .sheet(isPresented: $showingLoaderPicker) {
+                    if let loader = store.instances.first(where: { $0.id == id })?.loader {
+                        VersionPickerSheet(loader: loader, selection: .constant(store.instances.first(where: { $0.id == id })?.loaderVersion ?? "")).environment(store)
+                    }
                 }
             } else {
                 DetailPlaceholder()
@@ -257,7 +263,9 @@
                     Task { await store.setInstanceMeta(inst.id, favorite: !inst.favorite) }
                 }.buttonStyle(RowButtonStyle())
                 if inst.loader != .vanilla {
-                    Row("Loader version", trailing: { Meta(inst.loaderVersion ?? "—") })
+                    Button { showingLoaderPicker = true } label: {
+                        ValueRow("Loader version", value: inst.loaderVersion ?? "—", accent: true)
+                    }.buttonStyle(RowButtonStyle())
                 }
                 Button {
                     nav.section = .settings
@@ -378,6 +386,7 @@
         @State private var ownFolder = true
         @State private var fabricAPI = true
         @State private var creating = false
+        @State private var showingVersionPicker = false
         /// From Mods: pre-fills the form, then makes the new instance the one Mods (and Play) works on.
         private let plan: NewInstancePlan?
 
@@ -404,7 +413,9 @@
                                 BlockButton("Try again", size: .small) { versionsAttempt += 1 }
                             }
                         } else {
-                            SelectButton("Version", selection: $version, options: versions.map { ($0.id, $0.id) })
+                            Button { showingVersionPicker = true } label: {
+                                ValueRow("Version", value: version.isEmpty ? "Choose a version" : version, accent: true)
+                            }.buttonStyle(RowButtonStyle())
                         }
                         Segmented(
                             "Version type", selection: $kind,
@@ -438,6 +449,7 @@
                             }
                             Row("Java", trailing: { Meta("Auto") })
                         }
+                        PreflightLine(downloadBytes: 412 * 1024 * 1024, freeBytes: 18_400 * 1024 * 1024)
                         if creating, loader != .vanilla, !loaderVersion.isEmpty {
                             Row("Installing \(loader.displayName) \(loaderVersion)…", leading: { Spinner() })
                         }
@@ -462,6 +474,9 @@
             .task(id: "\(loader.rawValue)-\(version)") {
                 loaderVersions = (try? await store.backend.loaderVersions(loader: loader, game: version)) ?? []
                 loaderVersion = loaderVersions.first ?? ""
+            }
+            .sheet(isPresented: $showingVersionPicker) {
+                VersionPickerSheet(loader: nil, selection: $version).environment(store)
             }
         }
 
