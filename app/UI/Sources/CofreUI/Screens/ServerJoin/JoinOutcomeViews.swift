@@ -137,6 +137,7 @@
             JoinPrimaryButton(title: LocalizedStringKey(ready.primaryButtonTitle), enabled: ready.isJITReady) {
                 send(.launch)
                 // The root starts the launch takeover once this sheet is gone.
+                store?.pendingJoinIntent = RejoinIntent(instanceID: ready.instanceID, kind: .server, target: ready.serverAddress, displayName: ready.serverName)
                 store?.pendingJoinLaunch = ready.instanceID
                 dismiss()
             }

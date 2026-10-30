@@ -33,6 +33,7 @@ targets:
       - path: ../../app/Glue/AirBridge/CofrePreferences.swift
       - path: ../../app/Glue/AirBridge/CofreBackendAdapter+Instances.swift
       - path: ../../app/Glue/AirBridge/CofreBackendAdapter+Mods.swift
+      - path: ../../app/Glue/AirBridge/CofreBackendAdapter+Servers.swift
       - path: ../../app/Glue/AirBridge/ServerJoinAdapter.swift
       - path: ../../app/Glue/AirBridge/CofreCoreEntry.swift
       - path: ../../app/Glue/AirBridge/CofreGameExit.swift

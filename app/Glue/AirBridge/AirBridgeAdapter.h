@@ -52,10 +52,6 @@ NS_ASSUME_NONNULL_BEGIN
 /// Returns the selected Air profile name.
 - (NSString *)selectedProfileName;
 /// Adds a server to a profile and reports an optional error.
-- (void)addServer:(NSString *)address
-             name:(NSString *)name
-       forProfile:(NSString *)profile
-       completion:(void (^)(NSError *_Nullable))completion;
 /// Scans installed mods for a profile.
 - (void)modsForProfile:(NSString *)profile
             completion:(void (^)(NSArray *))completion;
@@ -79,9 +75,9 @@ NS_ASSUME_NONNULL_BEGIN
 /// Applies Cofre's automatic memory default when needed.
 - (void)ensureAutomaticMemoryDefault;
 /// Starts a profile launch and reports progress labels.
-- (void)setServerIp:(NSString *)address forProfile:(NSString *)profile;
 - (void)launchProfile:(NSString *)profile
             accountID:(nullable NSString *)accountID
+        gameArguments:(NSArray<NSString *> *)gameArguments
              progress:(void (^)(CofreLaunchEvent, double, NSString *_Nullable))progress;
 - (void)hideCofreLaunchOverlay;
 /// Searches projects from the selected catalog.
@@ -95,9 +91,6 @@ NS_ASSUME_NONNULL_BEGIN
 /// Minecraft version and loader for mod compatibility.
 - (NSDictionary *)modContextForProfile:(NSString *)profile;
 /// Searches multiplayer servers.
-- (void)searchServers:(NSDictionary *)filters
-               source:(NSInteger)source
-           completion:(void (^)(NSArray *, NSError *_Nullable))completion;
 /// Imports a modpack into a profile.
 - (void)importPack:(NSURL *)url
            profile:(NSString *_Nullable)profile

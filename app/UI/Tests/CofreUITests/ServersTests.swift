@@ -49,7 +49,8 @@
         func testJoinRoutes() async throws {
             let (mock, store) = await started()
             let ironwood = try server(store, "Ironwood SMP")
-            XCTAssertEqual(store.route(ironwood), .card(ServerJoinRequest(server: ironwood.address)))
+            var cardRequest = ServerJoinRequest(server: ironwood.address); cardRequest.discoverCard = true
+            XCTAssertEqual(store.route(ironwood), .card(cardRequest))
             XCTAssertEqual(store.route(try server(store, "Emberfall Network")), .join(instanceID: "survival"))
             guard case .otherVersion(let c)? = store.route(try server(store, "Oakridge Towny")) else {
                 return XCTFail("Oakridge runs 1.20.4")

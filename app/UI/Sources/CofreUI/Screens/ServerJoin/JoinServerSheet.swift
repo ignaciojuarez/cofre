@@ -33,7 +33,9 @@
         public var body: some View {
             let card = (style ?? (sizeClass == .regular ? .card : .bottomSheet)) == .card
             Group {
-                if let model = fixed ?? request.flatMap({ store?.serverJoins[$0.id] }) {
+                if let request, request.card == nil, request.pin == nil, !request.discoverCard {
+                    PlainServerJoinView(request: request)
+                } else if let model = fixed ?? request.flatMap({ store?.serverJoins[$0.id] }) {
                     JoinSheetModelView(model: model, card: card)
                 } else {
                     let server = ServerSummary(
@@ -44,7 +46,7 @@
                 }
             }
             .task {
-                guard let request, let store, store.serverJoins[request.id] == nil else { return }
+                guard let request, request.card != nil || request.pin != nil || request.discoverCard, let store, store.serverJoins[request.id] == nil else { return }
                 unavailable = store.openServerJoin(request) == nil
             }
             .onDisappear { if let request { store?.closeServerJoin(request) } }
@@ -52,6 +54,35 @@
 
         /// The backend gave no model (it can't read this server's card here).
         static let unavailableState = ServerJoinState.error(.init(code: .hostNotFound, recoveryAction: .dismiss))
+    }
+
+    private struct PlainServerJoinView: View {
+        let request: ServerJoinRequest
+        @Environment(CofreStore.self) private var store
+        @Environment(NavModel.self) private var nav
+        @JoinDismiss private var dismiss
+        @State private var saving = false
+        var body: some View {
+            VStack(alignment: .leading, spacing: 20) {
+                Text("Join server").font(.title2.bold())
+                Text(request.server).textSelection(.enabled)
+                if let instance = store.activeInstance {
+                    Text("Add to \(instance.name) and join with Minecraft \(instance.gameVersion).")
+                    Button(saving ? "Adding…" : "Add + Join") {
+                        saving = true
+                        Task {
+                            if let server = await store.addServer(address: request.server, to: instance.id) {
+                                nav.afterServerSheet = { store.play(instance.id, server: server); nav.showingLaunch = true }
+                                dismiss()
+                            }
+                            saving = false
+                        }
+                    }.buttonStyle(.borderedProminent).disabled(saving)
+                    if let error = store.lastError { Text(error).foregroundStyle(.red) }
+                } else { Text("Create an instance first to join this server.") }
+                Button("Cancel") { dismiss() }
+            }.padding(24).background(Color.cofre.page)
+        }
     }
 
     /// Observes the model: reading `server` and `state` here is what re-renders the sheet.

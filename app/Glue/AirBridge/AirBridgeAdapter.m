@@ -10,8 +10,6 @@
 #import "ModpackImportService.h"
 #import "PLMirrorCenter.h"
 #import "PLProfiles.h"
-#import "ServerItem.h"
-#import "ServerService.h"
 #import "SurfaceViewController.h"
 #import "UIKit+hook.h"
 #import "WorldItem.h"
@@ -691,17 +689,7 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
 
 #pragma mark - End instances
 
-- (void)addServer:(NSString *)address
-             name:(NSString *)name
-       forProfile:(NSString *)profile
-       completion:(void (^)(NSError *_Nullable))completion {
-  NSError *error = nil;
-  [[ServerService sharedService] joinServer:address
-                                 forProfile:profile
-                                      error:&error];
-  if (completion)
-    completion(error);
-}
+
 - (void)modsForProfile:(NSString *)profile
             completion:(void (^)(NSArray *))completion {
   [[ModService sharedService]
@@ -852,15 +840,14 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
   }
   setPrefObject(key, value);
 }
-- (void)setServerIp:(NSString *)address forProfile:(NSString *)profile {
-  [self.profiles setServerIp:address forProfile:profile];
-}
+
 // Air's Play flow (LauncherNavigationController launchMinecraft:): download the
 // version's files, then hand the window to SurfaceViewController, which starts
 // the JVM on a background queue. Cofre has already turned on JIT. Progress is
 // download plus the real AmeLaunchProgress stages; completion waits for a frame.
 - (void)launchProfile:(NSString *)profile
             accountID:(NSString *)accountID
+        gameArguments:(NSArray<NSString *> *)gameArguments
              progress:(void (^)(CofreLaunchEvent, double, NSString *))progress {
   [_profiles setSelectedProfileName:profile];
   if (accountID.length &&
@@ -913,7 +900,15 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
       [self pickRendererForProfile:profile metadata:task.metadata];
       [self setGameLanguageForProfile:profile metadata:task.metadata];
       progress(CofreLaunchEventPreparing, 0, @"Starting Minecraft");
-      CofrePresentSurface(window, task.metadata);
+      // A JVM property belongs to this launch only; never persist it into a profile/version file.
+      NSMutableDictionary *metadata = [task.metadata mutableCopy];
+      NSMutableDictionary *arguments = [metadata[@"arguments"] mutableCopy] ?: [NSMutableDictionary dictionary];
+      NSMutableArray *jvm = [arguments[@"jvm_processed"] mutableCopy] ?: [NSMutableArray array];
+      NSData *json = [NSJSONSerialization dataWithJSONObject:gameArguments options:0 error:nil];
+      [jvm addObject:[@"-Dcofre.gameArguments=" stringByAppendingString:[json base64EncodedStringWithOptions:0]]];
+      arguments[@"jvm_processed"] = jvm;
+      metadata[@"arguments"] = arguments;
+      CofrePresentSurface(window, metadata);
     }];
   });
 }
@@ -1035,29 +1030,7 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
                       completion(rows, error);
                     }];
 }
-- (void)searchServers:(NSDictionary *)filters
-               source:(NSInteger)source
-           completion:(void (^)(NSArray *, NSError *))completion {
-  [[ServerService sharedService]
-      searchServersWithAPI:(source == 2 ? ServerDownloadAPICurseForge
-                                        : ServerDownloadAPIModrinth)
-                   filters:filters
-                completion:^(NSArray<ServerItem *> *items, NSError *error) {
-                  NSMutableArray *out = [NSMutableArray array];
-                  for (ServerItem *s in items)
-                    [out addObject:@{
-                      @"id" : s.serverID ?: @"",
-                      @"title" : s.title ?: @"",
-                      @"description" : s.serverDescription ?: @"",
-                      @"address" : s.serverAddress ?: @"",
-                      @"downloads" : s.downloads ?: @0,
-                      @"author" : s.author ?: @"",
-                      @"source" : @(s.apiSource)
-                    }];
-                  if (completion)
-                    completion(error ? nil : out, error);
-                }];
-}
+
 - (void)importPack:(NSURL *)url
            profile:(NSString *)profile
           progress:(void (^)(double, NSString *))progress

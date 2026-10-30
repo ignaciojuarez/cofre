@@ -21,6 +21,7 @@ public final class CofreRootViewController: UIViewController {
         let instances = ProcessInfo.processInfo.environment["POJAV_GAME_DIR"].flatMap { path in
             try? InstanceStore(root: URL(fileURLWithPath: path)) { id, _ in bridge.gameDirectory(forProfile: id) }
         }
+        backend.serverInstances = instances
         let services = CofreServices(backend: backend, instances: instances)
         let root = CofreUI.makeRootViewController(services: services)
         addChild(root); root.view.frame = view.bounds; root.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]

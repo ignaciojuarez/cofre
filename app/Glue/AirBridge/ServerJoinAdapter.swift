@@ -32,7 +32,7 @@ extension MrpackIndex {
             case .install, .update: Task { await backend?.installJoin(request: request, model: self) }
             case .resolveWarning(let id):
                 Task { await backend?.confirmJoin(request: request, warningID: id, model: self) }
-            case .launch: backend?.launchJoin(request: request)
+            case .launch: break // The root owns the single launch after dismissing the sheet.
             case .dismiss: break
             case .cancelInstall: break
             case .setAutoConnect, .setAutoUpdate, .setSelected: break
@@ -201,15 +201,5 @@ extension MrpackIndex {
                     serverAddress: request.server, instanceID: request.id, isJITReady: isJITEnabled))
         }
 
-        func launchJoin(request: ServerJoinRequest) {
-            let version = air.instances().first(where: { ($0["id"] as? String) == request.id })?["version"] as? String ?? ""
-            if let address = MinecraftServerAddress.parse(request.server) {
-                NSLog("[Cofre] server join instance=%@ version=%@ args=%@", request.id, version,
-                      MinecraftLaunchArguments.server(address, gameVersion: version).joined(separator: " "))
-            }
-            Task { try? await addServer(instanceID: request.id, name: request.server, address: request.server) }
-            air.setServerIp(request.server, forProfile: request.id)
-            _ = launch(instanceID: request.id, accountID: nil)
-        }
     }
 #endif

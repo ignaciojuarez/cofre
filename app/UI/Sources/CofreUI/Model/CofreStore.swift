@@ -91,6 +91,7 @@
         /// Live Join server models by `ServerJoinRequest.id`. An installing one stays after its sheet closes.
         public var serverJoins: [String: any ServerJoinViewModel] = [:]
         /// Set by the sheet's "Launch & Join"; the root starts the launch once the sheet is gone.
+        public var pendingJoinIntent: RejoinIntent?
         public var pendingJoinLaunch: String?
         /// A destructive action waiting for the one shared confirmation alert (root view).
         public var pendingConfirmation: Confirmation?

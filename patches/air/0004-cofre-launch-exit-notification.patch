@@ -60,3 +60,24 @@ index 98c31ee..bcc750d 100644
      // ★ [LAUNCH-PROGRESS] 首帧渲染 = 启动完成，先把阶段推到 Completed。
      AmeLaunchProgressSetStage(AmeLaunchStageCompleted);
      dispatch_async(dispatch_get_main_queue(), ^{
+
+diff --git a/JavaApp/src/launcher/net/kdt/pojavlaunch/Tools.java b/JavaApp/src/launcher/net/kdt/pojavlaunch/Tools.java
+--- a/JavaApp/src/launcher/net/kdt/pojavlaunch/Tools.java
++++ b/JavaApp/src/launcher/net/kdt/pojavlaunch/Tools.java
+@@ -186,7 +186,15 @@
+         // FCL 风格：启动后自动加入服务器。serverIp 为空时不追加任何参数，
+         // 行为与原启动流程完全一致。版本判定使用解析后的基础 MC 版本号
+         // （versionName 优先取 inheritsFrom，避免 modded 版本 id 干扰比较）
+-        argsFromJson = appendServerArgs(argsFromJson, serverIp, versionName);
++        String cofreArguments = System.getProperty("cofre.gameArguments");
++        if (cofreArguments != null) {
++            String json = new String(java.util.Base64.getDecoder().decode(cofreArguments), java.nio.charset.StandardCharsets.UTF_8);
++            List<String> once = new ArrayList<>(Arrays.asList(argsFromJson));
++            once.addAll(Arrays.asList(GLOBAL_GSON.fromJson(json, String[].class)));
++            argsFromJson = once.toArray(new String[0]);
++        } else {
++            argsFromJson = appendServerArgs(argsFromJson, serverIp, versionName);
++        }
+ 
+         // Tools.dialogOnUiThread(this, "Result args", Arrays.asList(argsFromJson).toString());
+         return argsFromJson;

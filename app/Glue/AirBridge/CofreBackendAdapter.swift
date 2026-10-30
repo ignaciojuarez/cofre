@@ -25,9 +25,11 @@
     @MainActor
     public final class CofreBackendAdapter: NSObject, CofreBackend {
         public var capabilities: BackendCapabilities {
-            [.addServer, .envVariables, .rendererTuning, .serverJoin, .instanceIcon]
+            [.addServer, .serverFiles, .pingServers, .quickPlay, .discoverServers, .envVariables, .rendererTuning, .serverJoin, .instanceIcon]
         }
         let air: any CofreAirBridging
+        var serverInstances: InstanceStore?
+        var launchingGameDirectory: URL?
         let modCatalog = CofreModCatalog()
         private lazy var accountStore: AccountStore = {
             // Air keeps accounts in $POJAV_HOME/accounts (Documents, or Caches when Documents isn't writable).
@@ -145,27 +147,6 @@
             if let url = URL(string: s), url.isFileURL { return try? Data(contentsOf: url) }
             return nil
         }
-        public func servers(instanceID: String) async throws -> [ServerSummary] {
-            guard let dir = air.gameDirectory(forProfile: instanceID) else { return [] }
-            let url = dir.appendingPathComponent("servers.dat")
-            guard let data = try? Data(contentsOf: url) else { return [] }
-            return try ServersDatCodec.decode(data).map { s in
-                ServerSummary(id: s.ip, name: s.name, address: s.ip, detail: nil,
-                              hasServerCard: UserDefaults.standard.bool(forKey: "cofre.server-card.\(s.ip)"))
-            }
-        }
-
-        public func discoverServers(query: String = "", limit: Int = 50) async throws -> [ServerSummary] {
-            try await callback { done in self.air.searchServers(["query": query, "limit": String(limit)], source: 1) { rows, error in done(error == nil ? (rows as [Any]) : []) } }.compactMap { d in
-                let x = d as? [String: Any] ?? [:]; guard let id = x["id"] as? String, !id.isEmpty else { return nil }
-                return ServerSummary(id: id, name: x["title"] as? String ?? id, address: x["address"] as? String ?? "", detail: x["description"] as? String)
-            }
-        }
-        public func addServer(instanceID: String, name: String, address: String) async throws -> ServerSummary {
-            guard let dir = air.gameDirectory(forProfile: instanceID) else { throw CofreBackendError.unavailable("game directory") }
-            try await CofreServersStore(gameDirectory: dir).add(CofreServerRecord(name: name, ip: address))
-            return ServerSummary(id: address, name: name, address: address)
-        }
         public func preferences(instanceID: String?) async throws -> GamePreferences {
             return preferenceStore.load(instanceID: instanceID)
         }
@@ -201,12 +182,19 @@
         public func removeAccount(id: String) async throws { _ = try accountStore.remove(id: id); air.removeAccountToken(id) }
 
         public func launch(instanceID: String, accountID: String?) -> AsyncThrowingStream<LaunchProgress, Error> {
+            return launch(instanceID: instanceID, accountID: accountID, gameArguments: [])
+        }
+        func launch(instanceID: String, accountID: String?, gameArguments: [String]) -> AsyncThrowingStream<LaunchProgress, Error> {
             UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "cofre.launch.started.\(instanceID)")
             if let dir = air.gameDirectory(forProfile: instanceID), let options = try? String(contentsOf: dir.appendingPathComponent("options.txt"), encoding: .utf8) {
                 UserDefaults.standard.set(options, forKey: "cofre.options.before.\(instanceID)")
             }
             CofreBreadcrumb.log("play", details: "instance=\(instanceID)")
             return AsyncThrowingStream { continuation in
+                guard self.launchingGameDirectory == nil else {
+                    continuation.finish(throwing: CofreServersStore.Failure.gameRunning); return
+                }
+                self.launchingGameDirectory = self.air.gameDirectory(forProfile: instanceID)
                 launchTask?.cancel()
                 let task = Task { @MainActor in
                     var finished = false
@@ -215,6 +203,7 @@
                     func finish(_ reason: String, error: Error? = nil) {
                         guard !finished else { return }
                         finished = true
+                        if reason != "inGame" { Task { @MainActor in self.launchingGameDirectory = nil } }
                         watchdog?.cancel()
                         NSLog("[Cofre] launch state=%@", reason)
                         Task { @MainActor in self.air.hideCofreLaunchOverlay() }
@@ -239,7 +228,7 @@
                         }
                         try Task.checkCancellation()
                         NSLog("[Cofre] launch JIT ready; starting Air")
-                        self.air.launchProfile(instanceID, accountID: accountID) { event, fraction, message in
+                        self.air.launchProfile(instanceID, accountID: accountID, gameArguments: gameArguments) { event, fraction, message in
                             switch event {
                             case .downloading:
                                 continuation.yield(LaunchProgress(stage: 2, of: 7, title: "Game files", fraction: min(max(fraction, 0), 0.999)))
@@ -259,6 +248,7 @@
                                 continuation.yield(LaunchProgress(stage: 7, of: 7, title: "In game", finished: true))
                                 finish("inGame")
                             case .failed, .cancelled, .exited:
+                                self.launchingGameDirectory = nil
                                 finish(event == .cancelled ? "cancelled" : "failed", error: NSError(domain: "CofreAir", code: 1, userInfo: [NSLocalizedDescriptionKey: message ?? "Minecraft couldn't start. Check the launcher log."]))
                             @unknown default: break
                             }
@@ -273,14 +263,10 @@
             }
         }
         public func rejoin(instanceID: String, kind: RejoinIntent.Kind, target: String, accountID: String?) -> AsyncThrowingStream<LaunchProgress, Error> {
-            if kind == .server { air.setServerIp(target, forProfile: instanceID) }
-            if kind == .world {
-                let version = air.instances().first(where: { ($0["id"] as? String) == instanceID })?["version"] as? String ?? ""
-                NSLog("[Cofre] world quick play instance=%@ folder=%@ args=%@", instanceID, target,
-                      MinecraftLaunchArguments.singleplayer(folder: target, gameVersion: version).joined(separator: " "))
-            }
-            CofreBreadcrumb.log("play", details: "instance=\(instanceID) rejoin=\(kind.rawValue)")
-            return launch(instanceID: instanceID, accountID: accountID)
+            if kind == .server { return joinServer(instanceID: instanceID, address: target, accountID: accountID) }
+            let version = (try? serverInstance(instanceID).gameVersion) ?? ""
+            return launch(instanceID: instanceID, accountID: accountID,
+                          gameArguments: MinecraftLaunchArguments.singleplayer(folder: target, gameVersion: version))
         }
         public func cancelLaunch() async {
             launchTask?.cancel()

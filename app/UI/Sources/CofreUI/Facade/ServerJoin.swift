@@ -56,6 +56,7 @@
         public var card: URL?
         /// Expected Ed25519 key fingerprint (hex or base64url) for pre-pinned trust.
         public var pin: String?
+        public var discoverCard: Bool = false
         public var id: String { server.lowercased() }
 
         public init(server: String, card: URL? = nil, pin: String? = nil) {

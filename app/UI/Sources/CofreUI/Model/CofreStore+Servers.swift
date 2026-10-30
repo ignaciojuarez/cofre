@@ -1,5 +1,6 @@
 #if canImport(UIKit)
     import Foundation
+    import CofreKit
 
     /// A row's live state: pinging, the reply, or no reply.
     public enum ServerPingState: Equatable, Sendable {
@@ -30,16 +31,12 @@
     public enum ServerAddress {
         /// Trimmed, with a leading `minecraft://` or `https://` dropped. `nil` when it can't be an address.
         public static func clean(_ raw: String) -> String? {
-            var a = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-            for scheme in ["minecraft://", "https://", "http://"] where a.lowercased().hasPrefix(scheme) {
-                a = String(a.dropFirst(scheme.count))
+            var value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            for scheme in ["minecraft://", "https://", "http://"] where value.lowercased().hasPrefix(scheme) {
+                value = String(value.dropFirst(scheme.count))
             }
-            if a.hasSuffix("/") { a.removeLast() }
-            guard !a.isEmpty, a.count <= 255, !a.contains(where: { $0.isWhitespace || $0 == "/" }) else { return nil }
-            if a.filter({ $0 == ":" }).count == 1, let colon = a.lastIndex(of: ":") {
-                guard let port = Int(a[a.index(after: colon)...]), (1...65535).contains(port) else { return nil }
-            }
-            return a
+            if value.hasSuffix("/") { value.removeLast() }
+            return MinecraftServerAddress.parse(value) == nil ? nil : value
         }
     }
 
@@ -60,15 +57,23 @@
         /// Pings every server not already answered. Rows show bars, MOTD and players as replies come in.
         public func pingServers(force: Bool = false) {
             guard can(.pingServers) else { return }
-            for s in servers {
-                let k = Self.key(s.address)
-                if !force, let state = serverPings[k], state != .offline { continue }
-                serverPings[k] = .pinging
-                Task {
-                    do {
-                        let p = try await backend.pingServer(address: s.address)
-                        serverPings[k] = .online(p)
-                    } catch { serverPings[k] = .offline }
+            let pending = servers.filter { server in
+                let state = serverPings[Self.key(server.address)]
+                return state != .pinging && (force || state == nil || state == .offline)
+            }
+            for server in pending { serverPings[Self.key(server.address)] = .pinging }
+            Task {
+                // Four workers; a long saved list cannot open hundreds of sockets at once.
+                await withTaskGroup(of: Void.self) { group in
+                    for worker in 0..<min(4, pending.count) {
+                        group.addTask { @MainActor in
+                            for index in stride(from: worker, to: pending.count, by: 4) {
+                                let server = pending[index], key = Self.key(pending[index].address)
+                                do { self.serverPings[key] = .online(try await self.backend.pingServer(address: server.address)) }
+                                catch { self.serverPings[key] = .offline }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -147,7 +152,10 @@
         // MARK: Join
 
         public func route(_ s: ServerSummary) -> ServerPlayRoute? {
-            if s.hasServerCard && can(.serverJoin) { return .card(ServerJoinRequest(server: s.address)) }
+            if s.hasServerCard && can(.serverJoin) {
+                var request = ServerJoinRequest(server: s.address); request.discoverCard = true
+                return .card(request)
+            }
             guard let inst = activeInstance else { return nil }
             let server = live(s)
             if case .needs(let v) = server.fit(inst) {

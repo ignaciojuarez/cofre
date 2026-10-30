@@ -58,10 +58,6 @@ typedef NS_ENUM(NSInteger, CofreLaunchEvent) {
                (void (^)(NSURL *_Nullable, NSError *_Nullable))completion;
 
 - (NSString *)selectedProfileName;
-- (void)addServer:(NSString *)address
-             name:(NSString *)name
-       forProfile:(NSString *)profile
-       completion:(void (^)(NSError *_Nullable))completion;
 - (void)modsForProfile:(NSString *)profile
             completion:(void (^)(NSArray *))completion;
 - (void)removeAccountToken:(NSString *)accountID;
@@ -74,9 +70,9 @@ typedef NS_ENUM(NSInteger, CofreLaunchEvent) {
                       value:(id)value
                     profile:(nullable NSString *)profile;
 - (void)ensureAutomaticMemoryDefault;
-- (void)setServerIp:(NSString *)address forProfile:(NSString *)profile;
 - (void)launchProfile:(NSString *)profile
             accountID:(nullable NSString *)accountID
+        gameArguments:(NSArray<NSString *> *)gameArguments
              progress:(void (^)(CofreLaunchEvent, double, NSString *_Nullable))progress;
 /// Hides Cofre's launch overlay. Java may continue if it already started.
 - (void)hideCofreLaunchOverlay;
@@ -90,9 +86,6 @@ typedef NS_ENUM(NSInteger, CofreLaunchEvent) {
              completion:(void (^)(NSArray *, NSError *_Nullable))completion;
 /// Minecraft version and loader for mod compatibility.
 - (NSDictionary *)modContextForProfile:(NSString *)profile;
-- (void)searchServers:(NSDictionary *)filters
-               source:(NSInteger)source
-           completion:(void (^)(NSArray *, NSError *_Nullable))completion;
 - (void)importPack:(NSURL *)url
            profile:(nullable NSString *)profile
           progress:(void (^)(double, NSString *))progress

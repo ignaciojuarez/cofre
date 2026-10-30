@@ -187,12 +187,15 @@ public enum CofreLinks {
 
         /// "Launch & Join" waits for the sheet to finish closing, so the launch takeover can present.
         private func startPendingJoinLaunch() {
+            afterServerSheet()
             guard let id = store.pendingJoinLaunch else { return }
             store.pendingJoinLaunch = nil
             // The install made or changed a profile, so reload instances first.
             Task {
                 await store.refreshLibrary()
-                startLaunch(store, nav, instanceID: id)
+                let intent = store.pendingJoinIntent
+                store.pendingJoinIntent = nil
+                startLaunch(store, nav, instanceID: id, rejoin: intent)
             }
         }
 
