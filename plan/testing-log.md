@@ -239,3 +239,16 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 ### Round 10 notes
 - Build/install/launch used only the requested iPad simulator; no physical device or credentials.
 - No source fixes were made.
+
+## Device (iPad mini) — physical pass (2026-10-30 · HEAD 98bd015)
+
+| Area | Test case | Result | Evidence |
+|---|---|---|---|
+| Build/install/launch | `scripts/run.sh --build --no-install`; install and launch `com.ignaciojuarez.cofre` on UDID `COFRE_DEVICE_UDID` | PASS; build/install/launch completed. Device log reports `[Cofre] app version=0.1 build=98bd015`, `[Cofre] UI root installed`, foreground/active, and attached JIT mode | `/tmp/cofre-ipad-build.log`, `/tmp/cofre-ipad-install.log`, `/tmp/cofre-ipad-launch.log`, `/tmp/cofre-ipad-logs/latestlog.txt` |
+| Physical UI control | agent-device session for the owner iPad mini | BLOCKED: `device_list` exposed simulators only and `device_open` rejected the requested physical UDID; CLI therefore refused to start without a device session | tool output in session; no non-Cofre screen captured |
+| Vanilla / loaders / versions / configurations / modpacks | requested launch matrix | BLOCKED pending physical agent-device session; no result claimed | — |
+
+### Physical pass notes
+- App process remained present after launch (filtered `devicectl` process list); no new crash was observed in the launch log.
+- The app-data log was copied from `Documents/latestlog.txt`; pairing/account files were not printed. Existing system crash index entries were only listed by filename and were not opened.
+- No source fix was made because no reproducible launch failure was reachable without the physical UI session.
