@@ -15,7 +15,7 @@
     struct FilesDraft: View {
         let state: String
         var body: some View {
-            PlayHomeDraft(state: "home").draftSheet(true) { IncomingFileSheet(kind: state.isEmpty ? "mrpack" : state) }
+                Text("Play").draftSheet(true) { IncomingFileSheet(kind: state.isEmpty ? "mrpack" : state) }
         }
     }
 

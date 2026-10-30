@@ -57,9 +57,9 @@
             case "content": Text("Content")
             case "worlds": EmptyState("Worlds moved to Play", message: "", icon: .grass)
             case "beforePlay": BeforePlayDraft(state: state)
-            case "versions": VersionsDraft(state: state)
+            case "versions": Text("Versions")
             case "accounts": Text("Accounts & data")
-            default: PlayHomeDraft(state: state)
+            default: Text("Play")
             }
         }
     }
