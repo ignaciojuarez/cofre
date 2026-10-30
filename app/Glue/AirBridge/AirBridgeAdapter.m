@@ -438,12 +438,6 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
                                completion:completion];
 }
 
-- (NSString *)modsFolderForProfile:(NSString *)profile {
-  if (!_profiles.profiles[profile])
-    return nil;
-  return [[ModService sharedService] ensureModsFolderForProfile:profile
-                                                           error:nil];
-}
 
 - (void)duplicateProfile:(NSString *)name
               completion:(void (^)(NSDictionary *, NSError *))completion {

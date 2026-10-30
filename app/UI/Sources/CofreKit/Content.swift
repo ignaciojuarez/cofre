@@ -2,7 +2,11 @@ import Foundation
 
 /// The files Minecraft uses for installed content in one instance.
 public final class ContentStore: @unchecked Sendable {
-    public enum Kind: String, CaseIterable, Codable, Sendable { case mods, resourcePacks, shaderpacks, datapacks }
+    public enum Kind: String, CaseIterable, Codable, Sendable {
+        case mods, resourcePacks, shaderpacks, datapacks
+        /// Minecraft's folder name. The case matters: iOS disks are case-sensitive.
+        public var folderName: String { self == .resourcePacks ? "resourcepacks" : rawValue }
+    }
     public struct Item: Identifiable, Hashable, Sendable {
         public let id: String, name: String, version: String, world: String?
         public let kind: Kind, enabled: Bool, inUse: Bool
@@ -21,7 +25,7 @@ public final class ContentStore: @unchecked Sendable {
                 guard (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else { return nil }
                 return ($0.appendingPathComponent("datapacks"), $0.lastPathComponent)
             } ?? []
-        } else { folders = [(gameDirectory.appendingPathComponent(kind.rawValue == "shaderpacks" ? "shaderpacks" : kind.rawValue), nil)] }
+        } else { folders = [(gameDirectory.appendingPathComponent(kind.folderName), nil)] }
         var out: [Item] = []
         for (folder, world) in folders {
             guard let names = try? fm.contentsOfDirectory(atPath: folder.path) else { continue }
@@ -54,7 +58,7 @@ public final class ContentStore: @unchecked Sendable {
 
     private func folder(for kind: Kind, world: String?) -> URL {
         if kind == .datapacks, let world { return gameDirectory.appendingPathComponent("saves").appendingPathComponent(world).appendingPathComponent("datapacks") }
-        return gameDirectory.appendingPathComponent(kind.rawValue)
+        return gameDirectory.appendingPathComponent(kind.folderName)
     }
     private func item(file: String, enabled: Bool, kind: Kind, world: String?, in folder: URL) -> Item {
         let base = (file as NSString).deletingPathExtension

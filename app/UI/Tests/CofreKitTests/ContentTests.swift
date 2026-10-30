@@ -5,11 +5,11 @@ final class ContentTests: XCTestCase {
     func testListToggleDeleteUndoAndInUse() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root.appendingPathComponent("mods"), withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: root.appendingPathComponent("resourcePacks"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("resourcepacks"), withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: root.appendingPathComponent("shaderpacks"), withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: root.appendingPathComponent("saves/world/datapacks"), withIntermediateDirectories: true)
         try Data().write(to: root.appendingPathComponent("mods/jei-19.1.jar")); try Data().write(to: root.appendingPathComponent("mods/old.jar.disabled"))
-        try Data().write(to: root.appendingPathComponent("resourcePacks/Faithful-32.zip")); try Data().write(to: root.appendingPathComponent("shaderpacks/BSL.zip"))
+        try Data().write(to: root.appendingPathComponent("resourcepacks/Faithful-32.zip")); try Data().write(to: root.appendingPathComponent("shaderpacks/BSL.zip"))
         try Data().write(to: root.appendingPathComponent("saves/world/datapacks/test.zip"))
         try "resourcePacks:[\"vanilla\",\"file/Faithful-32.zip\"]\n".write(to: root.appendingPathComponent("options.txt"), atomically: true, encoding: .utf8)
         try "shaderPack=BSL.zip\n".write(to: root.appendingPathComponent("iris.properties"), atomically: true, encoding: .utf8)

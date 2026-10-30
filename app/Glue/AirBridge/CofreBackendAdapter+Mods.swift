@@ -185,7 +185,11 @@ struct CofreModVersion {
             let resolver = ModResolver(
                 game: target.game, loader: target.loader, kind: kind, installed: have,
                 versions: { [weak self] id in try await self?.candidates(id, source: source) ?? [] })
-            return try await resolver.plan(projectID: projectID, versionID: versionID)
+            var plan = try await resolver.plan(projectID: projectID, versionID: versionID)
+            if kind == .dataPacks {
+                plan.blocked = "Data packs belong to a world. Cofre can't add them to the whole instance yet."
+            }
+            return plan
         }
 
         public func install(projectID: String, versionID: String, instanceID: String)
@@ -583,17 +587,16 @@ struct CofreModVersion {
         }
 
         /// The instance's folder for `kind`: Air's mods folder, and its siblings for shaders and resource packs.
+        /// The same folder `scan` lists, so an install sees what is already there.
         private func contentFolder(_ kind: ContentKind, instanceID: String, create: Bool) throws -> URL {
-            guard let mods = air.modsFolder(forProfile: instanceID) else {
+            // Data packs live inside each world (saves/<world>/datapacks); there is no instance-wide folder.
+            guard let storeKind = Self.storeKind(kind), storeKind != .datapacks else {
+                throw modError("Data packs belong to a world, so Cofre can't add them to the whole instance yet.")
+            }
+            guard let directory = air.gameDirectory(forProfile: instanceID) else {
                 throw modError("This instance's folder is missing.")
             }
-            let modsURL = URL(fileURLWithPath: mods)
-            let folder =
-                switch kind {
-                case .shaders: modsURL.deletingLastPathComponent().appendingPathComponent("shaderpacks")
-                case .resourcePacks: modsURL.deletingLastPathComponent().appendingPathComponent("resourcepacks")
-                default: modsURL
-                }
+            let folder = directory.appendingPathComponent(storeKind.folderName)
             if create { try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) }
             return folder
         }

@@ -44,7 +44,6 @@ typedef NS_ENUM(NSInteger, CofreLaunchEvent) {
                 completion:(void (^)(NSError *_Nullable))completion;
 /// The instance's mods folder (made if missing). Cofre lists, toggles and
 /// installs content there and in its sibling shaderpacks/resourcepacks.
-- (nullable NSString *)modsFolderForProfile:(NSString *)profile;
 - (void)duplicateProfile:(NSString *)profile
               completion:(void (^)(NSDictionary *_Nullable,
                                    NSError *_Nullable))completion;
