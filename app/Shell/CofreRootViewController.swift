@@ -10,7 +10,7 @@ public final class CofreRootViewController: UIViewController {
         super.viewDidLoad()
         CofreUIKitTheme.apply()
         let backend = CofreBackendAdapter(bridge: bridge)
-        let instancesRoot = bridge.instances().compactMap { profile in
+        let instancesRoot = bridge.instances().compactMap { profile -> URL? in
             guard let id = profile["id"] as? String,
                   let directory = bridge.gameDirectory(forProfile: id) else { return nil }
             return directory.deletingLastPathComponent()
