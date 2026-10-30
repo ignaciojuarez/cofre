@@ -49,6 +49,7 @@ Z's variations, recommended picks taken (Ignacio: "I like it all"):
   - `cofre://join` without a card offers Add + Join;
   - a world's Play uses quick play.
 - **CofreKit migration:** started in `c379b09`, with servers moved in first.
+- **Computed compatibility (BC)** ([compatibility](compatibility.md)): no hand-kept list. A renderer manifest is read from the Metallum jar we ship, mod jars are scanned for declared problems, desktop natives and direct OpenGL/Vulkan use, and shader packs are scanned too. This replaces AH's hand-written table. 💤 Later: dry-run preflight and a crash-learned feed (needs auto-triage).
 
 ## 🤔 Waiting on a decision
 
