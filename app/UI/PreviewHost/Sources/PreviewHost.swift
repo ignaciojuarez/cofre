@@ -26,7 +26,17 @@ import UIKit
 //   -snapshot name      File name for -canvas output
 //   -touch a|b|c|ipad|settings|sheet   Touch-controls design mock (-screen touch)
 //   -resolutionOpen YES Open the Resolution picker (-screen resolution). -native 2266x1488 sizes it for that screen
-//   -landscape YES      Turn the app to landscape (the iPhone's game orientation)
+//   -scrollY 420        Scroll the tallest scroll view down this far (points) after launch, for screenshots
+//   -landscape YES      Turn the app to landscape (the iPhone's game orientation). -portrait YES turns it upright
+//   Design review (DesignReview/, cleaner versions awaiting approval; the real screens are untouched):
+//   -review join|joinEmpty|rename|modWarning|data|resolution|controls|exit|loaderError|onboarding
+//                       Show the cleaner version of that surface (exit and loaderError read the two flags below)
+//   -rename survival    Open that instance and its Rename alert (⋯ → Edit)
+//   -metal YES          Renderer Auto, with 1.21.1, 1.21.11, 26.2 and 26.3 as Metal versions, and Iris not installed,
+//                       so Get iris warns that it won't run with Metal
+//   -kind data          Get mods on the Data chip
+//   -exitReason metalReload   A Metal crash after Mipmap levels changed in game
+//   -loaderError forge|pairing   New instance open after that loader install error
 
 @main
 final class AppDelegate: UIResponder, UIApplicationDelegate {}
@@ -40,6 +50,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         CofreUI.bootstrap()
 
         let screen = args.string(forKey: "screen") ?? "play"
+        if args.bool(forKey: "metal") { ModCompatibility.metalVersions = ["1.21.1", "1.21.11", "26.2", "26.3"] }
         let services = CofreServices.mock(setupComplete: screen != "setup")
         let nav = NavModel()
         switch screen {
@@ -87,7 +98,11 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
                 if mock.serverJoinScenario == .resolving { mock.stepDelay = 60 }
             }
             if let link = args.string(forKey: "joinURL").flatMap(URL.init(string:)) {
-                nav.open(link)
+                // After `-landscape` turns the window: turning it closes a sheet that's already up.
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(args.bool(forKey: "landscape") ? 1500 : 0))
+                    nav.open(link)
+                }
             } else {
                 nav.serverJoin = ServerJoinRequest(server: MockServerJoin.ironwood.address)
             }
@@ -155,15 +170,45 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
                 }
             }
         }
+        if args.bool(forKey: "metal"), let mock = services.backend as? MockBackend {
+            mock.prefs.renderer = "auto"
+            mock.mods.removeAll { $0.id == "iris" }
+        }
+        if args.string(forKey: "kind") == "data" { store.query.kind = .dataPacks }
+        if let id = args.string(forKey: "rename") {
+            nav.section = .instances
+            nav.instance = id
+            Task { @MainActor in
+                while !store.libraryLoaded { try? await Task.sleep(for: .milliseconds(100)) }
+                try? await Task.sleep(for: .milliseconds(800))
+                nav.instanceEdit = id
+            }
+        }
+        if let kind = args.string(forKey: "loaderError") {
+            nav.section = .instances
+            Task { @MainActor in
+                while !store.libraryLoaded { try? await Task.sleep(for: .milliseconds(100)) }
+                nav.sheet = .newInstance
+                try? await Task.sleep(for: .milliseconds(500))
+                store.lastError = DesignReview.loaderError(kind, clean: false)
+            }
+        }
         let setupStep = args.object(forKey: "setupStep") != nil ? args.integer(forKey: "setupStep") : nil
+        let exitReport =
+            args.string(forKey: "exitReason") == "metalReload"
+            ? DesignReview.metalReloadReport
+            : MockGameExit.report(
+                args.string(forKey: "exitReason").flatMap(GameExitReport.Reason.init) ?? .memory)
+        let review: UIViewController? = args.string(forKey: "review").map {
+            UIHostingController(rootView: DesignReview.view($0, store: store, nav: nav, setupStep: setupStep))
+        }
         let root: UIViewController =
-            screen == "touch"
+            review ?? (screen == "touch"
             ? UIHostingController(rootView: TouchControlsMockPage(args.string(forKey: "touch") ?? "sheet"))
             : screen == "gameExit"
             ? UIHostingController(
                 rootView: GameExitView(
-                    report: MockGameExit.report(
-                        args.string(forKey: "exitReason").flatMap(GameExitReport.Reason.init) ?? .memory),
+                    report: exitReport,
                     showDetails: args.bool(forKey: "exitDetails"), close: {}))
             : UIHostingController(
                 rootView: CofreRootView(store: store, nav: nav, setupStart: setupStep)
@@ -173,7 +218,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
                         \.screenPixels,
                         args.string(forKey: "native").flatMap(Self.size(from:)).map {
                             RenderResolution(width: Int($0.width), height: Int($0.height))
-                        }))
+                        })))
         root.view.backgroundColor = .cofre.page
         let window = UIWindow(windowScene: scene)
         // On the window, so presented sheets get it too.
@@ -192,6 +237,21 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window.makeKeyAndVisible()
         self.window = window
         if args.bool(forKey: "landscape") { scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight)) }
+        if args.bool(forKey: "portrait") { scene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait)) }
+        if args.object(forKey: "scrollY") != nil {
+            let y = CGFloat(args.double(forKey: "scrollY"))
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak window] in
+                guard let window,
+                    let scroll = Self.scrollViews(in: window).max(by: { $0.contentSize.height < $1.contentSize.height })
+                else { return }
+                let end = max(0, scroll.contentSize.height - scroll.bounds.height)
+                scroll.setContentOffset(CGPoint(x: 0, y: min(y, end)), animated: false)
+            }
+        }
+    }
+
+    static func scrollViews(in view: UIView) -> [UIScrollView] {
+        ((view as? UIScrollView).map { [$0] } ?? []) + view.subviews.flatMap(scrollViews(in:))
     }
 
     static func size(from s: String) -> CGSize? {
