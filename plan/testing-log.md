@@ -252,3 +252,17 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 - App process remained present after launch (filtered `devicectl` process list); no new crash was observed in the launch log.
 - The app-data log was copied from `Documents/latestlog.txt`; pairing/account files were not printed. Existing system crash index entries were only listed by filename and were not opened.
 - No source fix was made because no reproducible launch failure was reachable without the physical UI session.
+
+### Physical pass continuation (2026-10-30 · HEAD 98bd015)
+
+| Instance | Version / loader | Renderer | Configuration | Result | Evidence |
+|---|---|---|---|---|---|
+| Survival+ | Minecraft 1.21.1 / NeoForge 21.1.265 (22 mods) | Auto → MobileGlues | Balanced/Auto | PASS: launched through Cofre, reached Minecraft title screen, first frame rendered; relaunch returned to Cofre Play | `/tmp/cofre-ipad-neoforge-title.png`, `/tmp/cofre-ipad-logs3/latestlog.txt` |
+| Survival+ | Minecraft 1.21.1 / NeoForge 21.1.265 (22 mods) | MobileGlues | Full resolution, manual 1 GB | PASS: launched through Cofre and reached title screen; first-frame markers present; relaunch returned to Cofre Play | `/tmp/cofre-ipad-mobileglues-full-1gb-2.png`, `/tmp/cofre-ipad-logs3/latestlog.txt` |
+| Settings | Game settings | — | Renderer picker, Resolution picker, Auto RAM off/manual memory | PASS: Auto, Metal, MobileGlues and other renderer choices visible; Full 2266×1488 selected; Auto RAM off enabled manual slider | agent-device snapshots `s594128`–`s594145` |
+| Requested matrix | Vanilla 26.x/1.21.11/1.21.1/1.20.1/1.16.5; Fabric; Quilt; Forge; NeoForge; two packs | — | — | BLOCKED: creating additional instances and game-menu quit were not completed in this pass; no results claimed | — |
+
+### Physical continuation notes
+- The NeoForge title-screen launch produced `[Cofre] first-frame source=metal`, `[Cofre] first-frame source=gl/air`, `launch overlay dismissed after first frame`, and MobileGlues renderer markers.
+- The game log contains mod/Iris warnings and a `MetallumAgent` `NoSuchMethodException` flow snapshot, but no fatal launch error; this is not a Cofre fix candidate.
+- Cofre was relaunched and left on Play. Manual settings remain selected in the instance preferences.
