@@ -7,6 +7,7 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 | B-001 | 2026-10-30 | Onboarding | iPad background filled without enlarging the moon | S4 | fixed | a85dfba |
 | B-002 | 2026-10-30 | Modpacks | CurseForge imports create their staging mods directory | S2 | fixed | 28304b5 |
 | B-003 | 2026-10-30 | Launcher UX | Simulator launcher pass shows clear first-run states; no blocking UX defect found | UX | can't-repro | — |
+| B-009 | 2026-10-31 | Installed mods | Bountiful badge names Kotlin for Forge | S3 | fixed | bea1c8b |
 
 ### B-001 · Onboarding · iPad background filled without enlarging the moon
 - Date: 2026-10-30 · Device: iPad C51DB8A8… · Build: a85dfba
@@ -317,3 +318,57 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 | agent-device runner | FIXED: "certificate not trusted" came from a stale runner install. `devicectl device uninstall app` both runner bundles, `open` again (first try races SpringBoard registration: "Unknown application display identifier"), then `snapshot` works | `~/.agent-device/sessions/cofre-ipad/runner.log` |
 | Play `(Default)` vanilla latest (26.3) | PASS: Play screen said "JIT ready · Auto at launch" before Play. VPN came up with no prompt, JIT ✓, game files downloaded, `renderer resolved -> libmetallum.dylib`, JIT mapping 0x143fac000, `Setting user`, `first-frame source=metal`, Mojang screen | `/tmp/cofre-device/s1.png`, `/tmp/cofre-device/s2.png` |
 | `agent-device alert get` on the physical iPad | Not supported in this session (UNSUPPORTED_OPERATION); use `devicectl device capture screenshot` and AX snapshots | — |
+
+## Simulator overnight 2026-10-31
+
+- Start: 2026-10-31 · requested shared simulators iPhone 18 Pro `SIMULATOR_UDID` and iPad Pro 1 `SIMULATOR_UDID`.
+- Build/log: pending simulator build and UI pass.
+
+### B-009 · Installed mods · Bountiful missing dependency badge names Fabric API
+- Date: 2026-10-31 01:55 · Device: iPhone 18 Pro `4EC427DF…` · Build: c41c3f4 → bea1c8b · PreviewHost MockBackend
+- Steps: 1. Launch PreviewHost with `-screen installed`. 2. Inspect Bountiful row. 3. Relaunch the same screen and inspect again.
+- Expected: The Bountiful 8.0.0-beta.2 sample shows `Needs Kotlin for Forge · Get`.
+- Actual: Both runs showed `NEEDS FABRIC API` with a `Get` button.
+- Evidence: `/tmp/cofre-test/shots/overnight-iphone-installed-bountiful-1.png`, `/tmp/cofre-test/shots/overnight-iphone-installed-bountiful-2.png`; AX row `Bountiful` → `NEEDS FABRIC API`.
+- Severity: S3 · Status: fixed · Commit: bea1c8b
+- Retest: rebuilt PreviewHost and relaunched twice; AX now shows `NEEDS KOTLIN FOR FORGE` and `Get` ✅. iOS `CofreUITests` 145 tests / 1 skipped ✅
+- Follow-up evidence: `/tmp/cofre-test/shots/overnight-iphone-installed-kotlin-fixed.png`
+
+### iPhone overnight pass results (2026-10-31 · iPhone 18 Pro `4EC427DF…` · PreviewHost)
+| Area | Test | Result | Evidence |
+|---|---|---|---|
+| Mods | Scroll to end and repeat; inspect Filters sheet labels | PASS: next rows loaded without duplicates; sheet exposes Version, Loader, Side, Category, Sort with AX labels | `/tmp/cofre-test/shots/overnight-iphone-mods-initial.png`, `/tmp/cofre-test/shots/overnight-iphone-mod-filters.png` |
+| Mod page | About, Gallery 3, Versions/What's New, viewer swipe/pinch/double-tap, Share/Close/counter/caption, pinned Get | PASS; viewer advanced 1/2 → 2/2 and kept Share/Close/counter/caption; Get sheet showed dependency plan | `/tmp/cofre-test/shots/overnight-iphone-mod-gallery.png`, `/tmp/cofre-test/shots/overnight-iphone-mod-page-get.png` |
+| Installed | Mods/Shaders/Packs/Data tabs, Update 3, Bountiful dependency badge | PASS after B-009 fix; badge now `Needs Kotlin for Forge · Get` | `/tmp/cofre-test/shots/overnight-iphone-installed-kotlin-fixed.png` |
+| Touch controls | Quick menu preview order and labels | PASS: Pause first, Drop default; Hide HUD row present. Runtime HUD restore remains device/game-only | `/tmp/cofre-test/shots/overnight-iphone-touch-sheet.png` |
+| Settings | JIT indicator; Game pane | PASS: JIT ready/ON, TXM, VPN, pairing and disk image states visible; Game pane says VSync/Max Framerate are in-game (no FPS toggle) | `/tmp/cofre-test/shots/overnight-iphone-settings-game.png` |
+| Crash / Downloads | Mock crash Get Kotlin and Downloads waiting sheet | BLOCKED by PreviewHost fixtures: gameExit mock supplies no `GameExitFix`, and no launch argument creates pending installs; no product claim | `/tmp/cofre-test/shots/overnight-iphone-crash-kotlin.png` |
+| Build/checks | `scripts/sim.sh`, `swift test`, iOS `CofreUITests`, `scripts/lint.sh` | PASS; iOS suite 145 tests, 1 skipped | terminal output: `CofreBuild c41c3f4`; PreviewHost rebuilt at `/tmp/cofre-preview-iphone` |
+
+## iPad overnight 2026-10-31
+
+- Start: 2026-10-31 · physical iPad mini `COFRE_DEVICE_UDID` · session `cofre-ipad`.
+- Status: blocked at 02:19 after the iPad became unavailable; results below are final for this run.
+
+### Runner/UI blocker
+- 01:37–01:45: `agent-device open` reached Cofre, but every `snapshot -i` timed out after runner rebuild/restart. Recovery applied: uninstall both runner bundles, reopen; then `close` + `daemon stop` + reopen; one retry still timed out. Device screenshot showed the system “Enable UI Automation / Touch ID” sheet over SpringBoard, so no non-Cofre screenshot was retained as evidence. Headless testing continues where safe; no user interaction can be requested overnight.
+
+
+### Device recovery blocker
+- 02:03–02:19: headless scenario launch started Cofre (processes 7120/7128), but live app-container copies hung while the app was running; terminating both processes did not restore CoreDevice responsiveness. Recovery ladder step applied: `xcrun devicectl device reboot --device COFRE_DEVICE_UDID`. After 2 minutes, `devicectl list devices` still reports the iPad `unavailable`. Per the physical-device plan, testing is blocked and stopped; no iPhone access.
+
+### Matrix snapshot (2026-10-31 run)
+
+| # | Instance | Version / loader | Renderer | Mods | Result | First-frame | FPS | Crash cause | Evidence |
+|---:|---|---|---|---|---|---|---|---|---|
+| 1 | Default | 26.3 Vanilla | Metal | none | PASS (earlier same build/setup) | yes | not visible | none; later session blocked | `/tmp/cofre-device/overnight-2026-10-31/01-vanilla263-title-final.png`, `01-latestlog-final.txt` |
+| 2 | — | 26.2 Fabric | Metal | Sodium + Iris + light shader | BLOCKED | — | — | runner/UI then device unavailable | — |
+| 3 | — | 26.2 NeoForge | Metal → MobileGlues retry | EvilCraft + Cyclops Core | BLOCKED | — | — | runner/UI then device unavailable | — |
+| 4 | — | 1.21.11 Fabric | Auto then Metal | Sodium | BLOCKED | — | — | runner/UI then device unavailable | — |
+| 5 | — | 1.21.1 NeoForge | Auto | Bountiful + auto deps | BLOCKED | — | — | runner/UI then device unavailable | — |
+| 6 | — | 1.21.1 NeoForge | MobileGlues | RenderScale (world 50%, HUD 100%) | BLOCKED | — | — | runner/UI then device unavailable | — |
+| 7 | — | small Modrinth pack | configured | pack contents | BLOCKED | — | — | runner/UI then device unavailable | — |
+| 8 | Default | in-game controls | Metal | — | BLOCKED | — | — | runner/UI then device unavailable | — |
+| 9 | Default | launcher flows | — | — | BLOCKED | — | — | runner/UI then device unavailable | — |
+
+Vanilla evidence: `[Cofre] renderer resolved -> libmetallum.dylib`, `[Cofre] first-frame source=metal`, and `launch overlay dismissed after first frame`; FPS was not visible. No crash log was opened.
