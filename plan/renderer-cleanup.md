@@ -8,6 +8,10 @@ Status: in progress (2026-10-31). Owner: main thread; findings land in `plan/rev
 - Metal (Metallum) on vanilla is fast. The other engines may not be usable yet.
 - The picker lists about 13 renderers (Auto, Metal, MobileGlues, ANGLE, Zink, LTW, Vulkan/MoltenVK, MobileGL, MobileGL GLES, GL4ES, Krypton, SimpleFPEWrapper, VGPU). Most are untested and some are known broken.
 
+## North star
+
+Modded play needs Metal. Every OpenGL path translates on the CPU and was unplayable with fewer than 20 mods on an iPhone 17 Pro. So every test round should push at least one popular modded version onto Metal (first: Fabric 26.2 + MetalUniversal + Sodium; routes in `reviews/metal-mods.md`).
+
 ## Goals
 
 1. Find out per renderer × Minecraft version × loader: works / black screen / crashes / unplayable FPS. Use Air's and Amethyst's own notes, upstream docs, and our device runs.
