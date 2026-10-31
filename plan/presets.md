@@ -1,5 +1,12 @@
 # Ready-made Cofre presets
 
+## Decisions (user, 2026-10-31)
+
+- Ship Metal presets only: **Vanilla+ 26.3** and **Fabric Performance 26.2** first; add **Fabric Adventure 1.21.11** once the Graft port works. No OpenGL presets (NeoForge Starter and Classic Modded wait).
+- Controller: **Controlify** by default.
+- Inventory Profiles Next: **optional checkbox at creation**, off by default.
+
+
 **Snapshot:** 2026-10-31. Modrinth `/v2/project/<slug>/version` was queried with the exact game version and loader. A pin is not a shipping claim: a preset is shown as **Recommended** only after its scenario has a first frame, 60-second run, and no compatibility marker on the target device.
 
 **Safety labels:** ✅ no direct OpenGL/Vulkan calls found or expected; ⚠ renderer integration or device proof still required; ❌ GL-only/unknown and excluded from a Metal preset. Sodium is ✅ only as the tested MetalUniversal/Metallum pairing; stock Sodium is an OpenGL renderer.
