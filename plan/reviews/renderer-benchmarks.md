@@ -35,6 +35,8 @@ Measured results only: what launched, what rendered, frame rate, memory, limits.
 | 10-31 | 1.21.11 | Fabric 0.19.5 + **Graft iOS** (0077933), no Sodium | Metal (Graft) | ✅ | ✅ world | **~51 steady** (t≥280 s) / 43 avg incl. chunk load; 1%-low ~32 | 2149 | Title → world (`joined the game` at t≈150 s); thermal serious; Java 25; heap 1024 MB |
 | 10-31 | 26.3 | vanilla | MobileGlues requested | ✅ | — | — | 755 | Agent attached too; `Using graphics device: ANGLE … MobileGlues` this time |
 | 10-31 | 1.21.1 | NeoForge + JEI + Sodium + ModernFix | MobileGlues | ✅ | ✅ | ~30 (mod-warning screen) | 1236 | ModernFix warns FerriteCore missing |
+| 10-31 | 26.2 | NeoForge 26.2.0.93, no mods (Air agent route D) | Metal requested | ✅ | ❌ crash | — | — | Air skips its agent (`manifest has no support for neoforge-26.2.0.93`), falls back to ANGLE GL, clouds shaders fail to link → crash. Route D/noearly can't work without an Air change |
+| 10-31 | 26.2 | **NeoForge 26.2.0.93 + Sinytra Connector 3.1.0-beta.4 + Launchpad + FFAPI + MetalUniversal 1.0.4** (no Sodium) | Metal (MetalUniversal via Connector) | ✅ | ✅ world | ~20 first 30 s in world (chunk gen, server tick ~80 ms, thermal serious); steady value not measured yet | 2044 | `Using graphics backend Metal, using drivers: iOS 27.0`; F3 `Metal iOS 27.0`; first NeoForge on Metal |
 
 ## iPhone 17 Pro (A19 Pro, 12 GB)
 
