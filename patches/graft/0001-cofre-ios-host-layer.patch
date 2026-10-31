@@ -3,7 +3,7 @@ From: Cofre <cofre@example.invalid>
 Date: Sat, 31 Oct 2026 15:00:00 -0700
 Subject: [PATCH] [COFRE] Run Graft's 1.21.11 Metal renderer on iOS
 
-Reason: Graft v1.1.1 is macOS-only: it installs a CAMetalLayer on the GLFW Cocoa NSView, translates shaders for the macOS MSL platform, calls the macOS-only CAMetalLayer.displaySyncEnabled, and nests macOS shaderc/SPIRV-Cross natives. On iOS (Air) it must present through the launcher's published UIView CAMetalLayer with main-queue layer writes, target iOS MSL, and use the launcher's signed iOS shaderc/SPIRV-Cross.
+Reason: Graft v1.1.1 is macOS-only: it installs a CAMetalLayer on the GLFW Cocoa NSView, translates shaders for the macOS MSL platform, calls the macOS-only CAMetalLayer.displaySyncEnabled, and nests macOS shaderc/SPIRV-Cross natives. On iOS (Air) it must present through the launcher's published UIView CAMetalLayer with inline layer setup (an FFM upcall to reach the main queue SIGBUSes on iOS), target iOS MSL, and use the launcher's signed iOS shaderc/SPIRV-Cross.
 Drop when: Graft ships an iOS host-layer path (or a generic "external CAMetalLayer" hook) and an iOS MSL target upstream.
 ---
 diff --git a/COFRE-NOTICE.md b/COFRE-NOTICE.md
@@ -28,21 +28,17 @@ index 0000000..a82d22e
 +The exact changes and build recipe are in the Cofre repository: patches/graft/ and scripts/graft.sh.
 diff --git a/core/src/main/java/dev/graft/metal/IosHost.java b/core/src/main/java/dev/graft/metal/IosHost.java
 new file mode 100644
-index 0000000..3c19a6d
+index 0000000..abfc77a
 --- /dev/null
 +++ b/core/src/main/java/dev/graft/metal/IosHost.java
-@@ -0,0 +1,191 @@
+@@ -0,0 +1,126 @@
 +package dev.graft.metal;
 +
 +import java.lang.foreign.Arena;
 +import java.lang.foreign.FunctionDescriptor;
-+import java.lang.foreign.Linker;
 +import java.lang.foreign.MemoryLayout;
 +import java.lang.foreign.MemorySegment;
-+import java.lang.foreign.SymbolLookup;
 +import java.lang.invoke.MethodHandle;
-+import java.lang.invoke.MethodHandles;
-+import java.lang.invoke.MethodType;
 +import java.nio.file.Files;
 +import java.nio.file.Path;
 +import java.util.Locale;
@@ -53,19 +49,11 @@ index 0000000..3c19a6d
 +/**
 + * iOS host integration (Cofre/Air, Amethyst, PojavLauncher). There is no AppKit window: the launcher owns a UIView whose
 + * backing layer is a CAMetalLayer and publishes its address as {@code -Dmetallum.ios.view.pointer=0x...}. UIKit and
-+ * layer-tree writes run on the main queue; the render thread only acquires drawables and submits command buffers.
++ * layer configuration runs inline on the render thread (see onMain); Air has already attached the layer to the view.
 + */
 +public final class IosHost {
 +	/** -Dgraft.ios=true|false overrides detection. */
 +	public static final boolean ACTIVE = detect();
-+
-+	private static final SymbolLookup SYSTEM = ObjC.library("/usr/lib/libSystem.B.dylib");
-+	private static MethodHandle dispatchSync;
-+	private static MethodHandle pthreadMain;
-+	private static MemorySegment mainQueue;
-+	private static MemorySegment trampoline;
-+	private static Runnable pending;
-+	private static Throwable failure;
 +
 +	private IosHost() {
 +	}
@@ -84,66 +72,13 @@ index 0000000..3c19a6d
 +		return (os.contains("mac") || os.contains("darwin")) && ObjC.classOrZero("UIApplication") != 0L;
 +	}
 +
-+	private static synchronized void initDispatch() {
-+		if (trampoline != null) {
-+			return;
-+		}
-+		Linker linker = Linker.nativeLinker();
-+		dispatchSync = linker.downcallHandle(SYSTEM.find("dispatch_sync_f").orElseThrow(), FunctionDescriptor.ofVoid(ADDRESS, JAVA_LONG, ADDRESS));
-+		pthreadMain = linker.downcallHandle(SYSTEM.find("pthread_main_np").orElseThrow(), FunctionDescriptor.of(JAVA_INT));
-+		// dispatch_get_main_queue() is a macro for &_dispatch_main_q.
-+		mainQueue = SYSTEM.find("_dispatch_main_q").orElseThrow();
-+		try {
-+			MethodHandle target = MethodHandles.lookup().findStatic(IosHost.class, "runPending", MethodType.methodType(void.class, long.class));
-+			trampoline = linker.upcallStub(target, FunctionDescriptor.ofVoid(JAVA_LONG), Arena.global());
-+		} catch (ReflectiveOperationException e) {
-+			throw new IllegalStateException(e);
-+		}
-+	}
-+
-+	/** Upcall on the main queue. Must never throw: an exception escaping an upcall aborts the process. */
-+	private static void runPending(long context) {
-+		long pool = poolPush();
-+		try {
-+			pending.run();
-+		} catch (Throwable t) {
-+			failure = t;
-+		} finally {
-+			poolPop(pool);
-+		}
-+	}
-+
-+	private static boolean isMainThread() {
-+		try {
-+			return (int)pthreadMain.invokeExact() != 0;
-+		} catch (Throwable t) {
-+			throw rethrow(t);
-+		}
-+	}
-+
-+	/** Runs body synchronously on the main queue (inline if already there). */
++	/**
++	 * Runs body for "main-queue" layer work. Inline on purpose: dispatching to the main queue needs an FFM upcall stub,
++	 * and HotSpot's upcall-stub creation SIGBUSes on iOS (CodeBlob written into the read-execute code cache, iPad mini
++	 * iPadOS 27). Stock MetalUniversal configures the same Air-published CAMetalLayer from the render thread and works.
++	 */
 +	public static void onMain(Runnable body) {
-+		initDispatch();
-+		if (isMainThread()) {
-+			body.run();
-+			return;
-+		}
-+		synchronized (IosHost.class) {
-+			pending = body;
-+			failure = null;
-+			try {
-+				dispatchSync.invokeExact(mainQueue, 0L, trampoline);
-+			} catch (Throwable t) {
-+				throw rethrow(t);
-+			} finally {
-+				pending = null;
-+			}
-+			if (failure != null) {
-+				Throwable t = failure;
-+				failure = null;
-+				throw rethrow(t);
-+			}
-+		}
++		body.run();
 +	}
 +
 +	/** The launcher's game UIView: -Dgraft.ios.view.pointer, Air/Metallum's property, Pojav's, then +[SurfaceViewController surface]. */
