@@ -23,6 +23,7 @@ Measured results only: what launched, what rendered, frame rate, memory, limits.
 | 10-31 | 26.2 | Fabric, no mods | MobileGlues (after 097a82f) | ✅ | ✅ title | — | 1158 | Black screen fixed; title only (UI-automation sheet blocked taps) |
 | 10-31 | 26.2 | Fabric + Sodium + Iris | MobileGlues (after 097a82f) | ✅ | ⬛ black | — | 1149 | Still black with Sodium/Iris |
 | 10-31 | 26.2 | Fabric + **Metallum mod 1.0.4** + Sodium 0.9.0 | Metal (mod) | ✅ | ❓ screenshot black | **~57 / 55** (title) | 1104 | Run A: `Using graphics backend Metal`, steady 17.9 ms frames, thermal serious. Run B (same files): picked GlBackend → crash `no OpenGL context`. Flaky; investigating |
+| 10-31 | 26.2 | Fabric + **Metallum mod 1.0.4** + Sodium 0.9.0 | Metal (mod, canonical handoff) | ✅ | ⬛ black after first frame | **57.2 / 55** (t=60 s) | 1015 | Fresh process: `libmetallum.dylib`, `AMETHYST_METAL=1`, Metal/A15/CAMetalLayer; no GL crash. The screenshot stayed black despite Metal drawables, so visibility is still unresolved. |
 | 10-31 | 26.2 | Fabric + Metallum mod + Sodium + Iris | Metal (mod) | ❌ | — | — | 677 | Iris: `No GLCapabilities instance set` |
 | 10-31 | 1.21.11 | vanilla | Metal (Auto, after 12ee163) | ❌ | — | — | 1377 | `NoSuchMethodError SymbolLookup.findOrThrow`: agent needs Java 22+, game got Java 21. Fix in progress |
 | 10-31 | 1.21.11 | vanilla | MobileGlues requested | ✅ | ✅ title | — | — | Air attached the Metal agent anyway and Metal drew; picker choice ignored on manifest versions |

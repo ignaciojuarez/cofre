@@ -18,6 +18,7 @@ check() {
 
 check "smoke" "$ROOT/scripts/smoke.sh"
 check "lint" "$ROOT/scripts/lint.sh"
+check "renderer handoff" python3 "$ROOT/tests/renderer/check.py"
 check "server join" bash -c "cd '$ROOT/app/ServerJoin' && swift test"
 check "server-card" bash -c "cd '$ROOT/tools/server-card' && swift build"
 check "CofreUI (macOS)" bash -c "cd '$ROOT/app/UI' && swift test"
