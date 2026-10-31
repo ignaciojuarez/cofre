@@ -41,6 +41,8 @@
         public var query = ProjectQuery()
         public var results: [ProjectSummary] = []
         public var searching = false
+        /// The query `results` answer; returning from a mod page doesn't search (and scroll) again.
+        public private(set) var searchedQuery: ProjectQuery?
         /// A full first page came back, so there may be more; `loadMoreResults` fetches the next one.
         public var hasMoreResults = false
         public var loadingMoreResults = false
@@ -527,6 +529,7 @@
                 let hits = try await found
                 guard q == query, !Task.isCancelled else { return }
                 results = hits
+                searchedQuery = q
                 hasMoreResults = hits.count >= ProjectQuery.pageSize
                 searchError = nil
             } catch {
@@ -535,6 +538,7 @@
                 guard q == query, !Task.isCancelled, !cancelled else { return }
                 NSLog("[Cofre] search failed: %@", String(describing: error))
                 results = []
+                searchedQuery = nil
                 hasMoreResults = false
                 searchError = error.localizedDescription
             }

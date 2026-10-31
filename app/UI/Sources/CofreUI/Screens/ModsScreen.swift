@@ -164,6 +164,8 @@
             .scrollDismissesKeyboard(.immediately)
             .background { Color.clear.contentShape(Rectangle()).onTapGesture { endEditing() } }
             .task(id: store.query) {
+                // This also runs when the list comes back from a mod page; its results and scroll position stay.
+                guard store.searchedQuery != store.query else { return }
                 // Debounce: a keystroke cancels the wait, and the old text is never searched.
                 do { try await Task.sleep(for: .milliseconds(250)) } catch { return }
                 await store.search()

@@ -345,6 +345,15 @@
             XCTAssertFalse(mock.mods.contains { $0.id == "reeses" })  // optional, not picked
         }
 
+        /// Back from a mod page, the list keeps its results (and scroll position) unless the query changed.
+        func testResultsRememberTheirQuery() async {
+            let (s, _) = await store()
+            await s.search()
+            XCTAssertEqual(s.searchedQuery, s.query)
+            s.query.text = "sodium"
+            XCTAssertNotEqual(s.searchedQuery, s.query, "a new query searches again")
+        }
+
         func testScrollingFetchesTheNextPageWithoutRepeats() async {
             let (s, mock) = await store()
             func page(_ range: Range<Int>) -> [ProjectSummary] {
