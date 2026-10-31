@@ -41,6 +41,9 @@
         public var query = ProjectQuery()
         public var results: [ProjectSummary] = []
         public var searching = false
+        /// A full first page came back, so there may be more; `loadMoreResults` fetches the next one.
+        public var hasMoreResults = false
+        public var loadingMoreResults = false
         public var searchError: String?
         public var versions: [String: [ProjectVersion]] = [:]
         /// Why a project's versions didn't load, so M02 shows Try again instead of a spinner.
@@ -524,6 +527,7 @@
                 let hits = try await found
                 guard q == query, !Task.isCancelled else { return }
                 results = hits
+                hasMoreResults = hits.count >= ProjectQuery.pageSize
                 searchError = nil
             } catch {
                 // Cancelling also surfaces as URLError.cancelled from URLSession; neither is a failure.
@@ -531,8 +535,24 @@
                 guard q == query, !Task.isCancelled, !cancelled else { return }
                 NSLog("[Cofre] search failed: %@", String(describing: error))
                 results = []
+                hasMoreResults = false
                 searchError = error.localizedDescription
             }
+        }
+
+        /// The next page of the current search, appended without repeats. A new query drops a page that arrives late.
+        public func loadMoreResults() async {
+            guard hasMoreResults, !loadingMoreResults, !searching else { return }
+            let q = query, offset = results.count
+            loadingMoreResults = true
+            defer { loadingMoreResults = false }
+            guard let page = try? await backend.search(q, offset: offset), q == query, results.count == offset else {
+                return
+            }
+            let seen = Set(results.map(\.id))
+            results += page.filter { !seen.contains($0.id) }
+            hasMoreResults = page.count >= ProjectQuery.pageSize
+            NSLog("[Cofre] search page offset=%ld got=%ld total=%ld", offset, page.count, results.count)
         }
 
         public func loadProject(_ id: String) async {
@@ -575,14 +595,14 @@
         }
 
         /// Get: works out what installs, asks only when that's more than the project itself, then installs. Blocked
-        /// or failed Gets open the sheet with the reason.
-        public func get(_ projectID: String, versionID: String? = nil) {
+        /// or failed Gets open the sheet with the reason. `kind` defaults to the search tab's.
+        public func get(_ projectID: String, versionID: String? = nil, kind: ContentKind? = nil) {
             guard let inst = modsInstance?.id else { return }
             if let busy = modInstalls[projectID], !busy.isFinished {
                 if busy.phase != .planning { modInstallSheet = projectID }
                 return
             }
-            let kind = query.kind
+            let kind = kind ?? query.kind
             let title = results.first { $0.id == projectID }?.title ?? projectID
             modInstalls[projectID] = ModInstall(id: projectID, title: title, instanceID: inst)
             Task {

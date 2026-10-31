@@ -34,13 +34,17 @@
             running[key] = task
             let image = await task.value
             running[key] = nil
-            if let image, let cg = image.cgImage { cache.setObject(image, forKey: key, cost: cg.bytesPerRow * cg.height) }
+            if let image, let cg = image.cgImage {
+                cache.setObject(image, forKey: key, cost: cg.bytesPerRow * cg.height)
+            }
             return image
         }
 
         /// Decoded now, never larger than `maxPixels` on its long side; smaller images keep their size.
         nonisolated static func decode(_ data: Data, maxPixels: Int) -> UIImage? {
-            guard let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary)
+            guard
+                let source = CGImageSourceCreateWithData(
+                    data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary)
             else { return nil }
             let options: [CFString: Any] = [
                 kCGImageSourceCreateThumbnailFromImageAlways: true,
@@ -68,7 +72,9 @@
         var body: some View {
             let maxPixels = Int((maxPoints * scale).rounded(.up))
             Group {
-                if let image = loaded?.url == url ? loaded?.image : ImagePipeline.shared.cached(url, maxPixels: maxPixels) {
+                if let image = loaded?.url == url
+                    ? loaded?.image : ImagePipeline.shared.cached(url, maxPixels: maxPixels)
+                {
                     Image(uiImage: image).interpolation(pixelated ? .none : .high).resizable()
                         .aspectRatio(contentMode: contentMode)
                 } else {

@@ -17,7 +17,10 @@ public final class Modrinth {
         public var iconURL: URL? { Modrinth.url(icon) }
         /// Search hits carry no page link; it follows from the type and slug.
         public var pageURL: URL? { slug.flatMap { Modrinth.url("https://modrinth.com/\(projectType)/\($0)") } }
-        enum CodingKeys: String, CodingKey { case projectID = "project_id", slug, title, description, projectType = "project_type", categories, downloads, versions, icon = "icon_url" }
+        let dateModified: String?
+        /// When its newest file or page changed ("2026-10-27T17:15:43.902761+00:00").
+        public var updated: Date? { dateModified.flatMap(Modrinth.date) }
+        enum CodingKeys: String, CodingKey { case projectID = "project_id", slug, title, description, projectType = "project_type", categories, downloads, versions, icon = "icon_url", dateModified = "date_modified" }
     }
     public struct Project: Codable, Sendable {
         public let id: String; public let title: String; public let description: String?; let icon: String?; public let projectType: String
@@ -39,6 +42,12 @@ public final class Modrinth {
     private let session: URLSession
     private var cache: [String: (Date, Data)] = [:]
     private let lock = NSLock()
+    /// Modrinth dates, with or without fractional seconds.
+    static func date(_ text: String) -> Date? {
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return fractional.date(from: text) ?? ISO8601DateFormatter().date(from: text)
+    }
     private let decoder = JSONDecoder()
     public init(session: URLSession? = nil) {
         if let session { self.session = session } else {

@@ -83,8 +83,8 @@
         }
     }
 
-    /// The one place gallery pictures load: the thumbnail at once, the full image on top when there is one. Step 6
-    /// swaps `AsyncImage` for the shared cached image session here.
+    /// The one place gallery pictures load: the thumbnail at once, the full image on top when there is one, both
+    /// through the shared `RemoteImage` cache.
     struct GalleryImage: View {
         let thumb: URL
         var full: URL?

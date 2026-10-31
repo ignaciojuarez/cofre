@@ -53,7 +53,7 @@ extension ReportBundle.Context {
         let host = UIHostingController(rootView: GameExitView(report: report, intent: intent, reportURL: reportBundle, reportPreview: ReportPreviewData(fields: preview.fields.map { "\($0.name): \($0.value)" }, files: preview.files), close: AppExit.close, retry: { AppExit.close() },
             turnShadersOff: instanceURL.flatMap { dir in
                 ShaderSwitch.causedCrash((crashText ?? "") + logText, gameDirectory: dir) ? { try ShaderSwitch.turnOff(in: dir) } : nil
-            }))
+            }, fix: report.reason == .mods ? bridge.flatMap { missingModFix(crashText: crashText, log: logText, bridge: $0) } : nil))
         host.view.backgroundColor = .cofre.page
         host.overrideUserInterfaceStyle = .dark
         let w = UIWindow(windowScene: scene)
@@ -63,6 +63,18 @@ extension ReportBundle.Context {
         w.makeKeyAndVisible()
         UIView.animate(withDuration: 0.25) { w.alpha = 1 }
         window = w
+    }
+
+    /// "Get Kotlin for Forge" when the crash names a mod that isn't installed; nil when it names none, or before the
+    /// UI's backend is up.
+    private static func missingModFix(crashText: String?, log: String, bridge: any CofreAirBridging) -> GameExitFix? {
+        let id = bridge.selectedProfileName()
+        let needs = ModRequirements.fromCrash((crashText ?? "") + "\n" + log)
+        guard !id.isEmpty, !needs.isEmpty, let backend = CofreBackendAdapter.current else { return nil }
+        NSLog("[Cofre] crash fix offered mods=%@ instance=%@", needs.map(\.modID).joined(separator: ","), id)
+        return GameExitFix(name: needs.map(\.name).formatted()) {
+            try await backend.installRequirements(needs, instanceID: id)
+        }
     }
 
     private static func makeRejoinIntent(_ bridge: any CofreAirBridging) -> RejoinIntent? {

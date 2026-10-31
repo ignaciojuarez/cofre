@@ -153,8 +153,14 @@ import Foundation
 
     // MARK: GAP-05 · Project metadata (M01, M02)
     /// Replaces `searchModrinth/searchCurseForge -> [CofrePack]` with rich results, versions and dependencies.
+    extension ProjectCatalog {
+        /// The first page.
+        public func search(_ query: ProjectQuery) async throws -> [ProjectSummary] { try await search(query, offset: 0) }
+    }
+
     public protocol ProjectCatalog: AnyObject {
-        func search(_ query: ProjectQuery) async throws -> [ProjectSummary]
+        /// One page of results, starting `offset` results in.
+        func search(_ query: ProjectQuery, offset: Int) async throws -> [ProjectSummary]
         func versions(projectID: String, instanceID: String) async throws -> [ProjectVersion]
         /// Complete catalog used after the fast, instance-matched page has rendered.
         func allVersions(projectID: String, instanceID: String) async throws -> [ProjectVersion]

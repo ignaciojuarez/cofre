@@ -99,24 +99,27 @@ struct CofreModVersion {
     }
 
     extension CofreBackendAdapter {
-        public func search(_ query: ProjectQuery) async throws -> [ProjectSummary] {
+        public func search(_ query: ProjectQuery, offset: Int) async throws -> [ProjectSummary] {
             let source = query.source == .curseforge ? 2 : 1
             let projectType = Self.projectType(query.kind)
             let target = query.instanceID.map { modTarget($0) } ?? (game: "", loader: Loader.unknown)
             if source == 1 {
                 let facets = [["project_type:\(projectType)"]] + query.filters.facets(query.kind, game: target.game, loader: target.loader)
-                let hits = try await modCatalog.modrinth.search(query: query.text, facets: facets, index: query.filters.sort.rawValue)
+                let hits = try await modCatalog.modrinth.search(
+                    query: query.text, facets: facets, index: query.filters.sort.rawValue, offset: offset,
+                    limit: ProjectQuery.pageSize)
                 // The project_type facet already limits the type (data packs come back labelled "mod").
                 return hits.map { hit in
                     let id = hit.projectID
                     modCatalog.projects[id] = ["id": id, "title": hit.title, "description": hit.description, "imageUrl": hit.iconURL?.absoluteString ?? "", "url": hit.pageURL?.absoluteString ?? "", "downloads": hit.downloads, "projectType": projectType, "apiSource": 1]
                     let loaders = hit.categories.compactMap { Loader(rawValue: $0.lowercased()) }
                     let fits = target.game.isEmpty || hit.versions?.contains(target.game) != false
-                    return ProjectSummary(id: id, title: hit.title, author: "", summary: hit.description, iconURL: hit.iconURL, downloads: hit.downloads, loaders: loaders, fits: fits, source: query.source, pageURL: hit.pageURL)
+                    return ProjectSummary(id: id, title: hit.title, author: "", summary: hit.description, iconURL: hit.iconURL, downloads: hit.downloads, updated: hit.updated, loaders: loaders, fits: fits, source: query.source, pageURL: hit.pageURL)
                 }
             }
-            // CurseForge through Air maps only the game version and loader.
-            var filters = ["query": query.text, "limit": "50", "projectType": projectType]
+            // CurseForge through Air maps only the game version and loader, and has no further pages.
+            guard offset == 0 else { return [] }
+            var filters = ["query": query.text, "limit": "\(ProjectQuery.pageSize)", "projectType": projectType]
             filters["mcVersion"] = query.filters.gameVersion(target.game)
             filters["loader"] = query.filters.loader(query.kind, target.loader)?.rawValue
             let rows = try await modRows { done in air.searchProjects(filters, source: source, completion: done) }
@@ -274,6 +277,21 @@ struct CofreModVersion {
                             }
                             stages[i].state = .ready
                         }
+                        // A jar's own mods.toml can need more than Modrinth lists (a Kotlin mod needs Kotlin for Forge).
+                        var turnOn = files.filter(\.turnsOn)
+                        if plan.kind == .mods {
+                            for mod in await requiredByJars(staged.map(\.file), plan: plan, instanceID: instanceID) {
+                                stages.append(InstallProgress.Stage(title: mod.name, state: .checking))
+                                send()
+                                if mod.turnsOn {
+                                    turnOn.append(mod)
+                                } else if let version = modCatalog.versions[mod.versionID] {
+                                    let file = try await download(version, kind: .mods, name: mod.name, into: staging)
+                                    staged.append((mod, version, file))
+                                }
+                                stages[stages.count - 1].state = .ready
+                            }
+                        }
                         if plan.makesInstance {
                             guard let pack = staged.first?.file else { throw modError("The pack didn't download.") }
                             try await importWithAir(pack) { fraction, _ in
@@ -281,7 +299,7 @@ struct CofreModVersion {
                                     InstallProgress(title: plan.target.name, fraction: fraction, stages: stages))
                             }
                         } else {
-                            try await commit(staged, turningOn: files.filter(\.turnsOn), kind: plan.kind,
+                            try await commit(staged, turningOn: turnOn, kind: plan.kind,
                                 instanceID: instanceID, world: world, backup: staging.appendingPathComponent(".replaced"))
                         }
                         NSLog("[Cofre] mods installed instance=%@ files=%ld", instanceID, files.count)
@@ -366,7 +384,9 @@ struct CofreModVersion {
         // MARK: Installed content
 
         public func installed(_ kind: ContentKind, instanceID: String) async throws -> [InstalledItem] {
-            try await scan(kind, instanceID: instanceID, online: true)
+            var items = try await scan(kind, instanceID: instanceID, online: true)
+            if kind == .mods { await markRequirements(&items, instanceID: instanceID) }
+            return items
         }
 
         /// The files in the instance's folder for `kind`. Air reads mod names and versions out of each jar. `online`

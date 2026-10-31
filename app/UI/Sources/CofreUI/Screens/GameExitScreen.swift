@@ -17,13 +17,27 @@
         }
     }
 
+    /// The crash named a mod that isn't installed ("needs language provider kotlinforforge"): Get puts it in that
+    /// instance, then Play again.
+    public struct GameExitFix {
+        /// "Kotlin for Forge".
+        public let name: String
+        public let install: @MainActor () async throws -> Void
+        public init(name: String, install: @escaping @MainActor () async throws -> Void) {
+            self.name = name
+            self.install = install
+        }
+    }
+
     /// The whole screen for a hosting controller: measures its window like `CofreRootView`.
     public struct GameExitView: View {
         let report: GameExitReport, intent: RejoinIntent?, reportURL: URL?, reportPreview: ReportPreviewData?, close: () -> Void, retry: () -> Void, showDetails: Bool
         let turnShadersOff: (() throws -> Void)?
+        let fix: GameExitFix?
         /// `showDetails` opens Details right away (preview host). `turnShadersOff` is set when shaders likely caused the crash.
-        public init(report: GameExitReport, intent: RejoinIntent? = nil, reportURL: URL? = nil, reportPreview: ReportPreviewData? = nil, showDetails: Bool = false, close: @escaping () -> Void, retry: (() -> Void)? = nil, turnShadersOff: (() throws -> Void)? = nil) {
+        public init(report: GameExitReport, intent: RejoinIntent? = nil, reportURL: URL? = nil, reportPreview: ReportPreviewData? = nil, showDetails: Bool = false, close: @escaping () -> Void, retry: (() -> Void)? = nil, turnShadersOff: (() throws -> Void)? = nil, fix: GameExitFix? = nil) {
             self.turnShadersOff = turnShadersOff
+            self.fix = fix
             self.report = report
             self.intent = intent
             self.reportURL = reportURL
@@ -35,7 +49,7 @@
 
         public var body: some View {
             GeometryReader { g in
-                GameExitScreen(report: report, intent: intent, reportURL: reportURL, reportPreview: reportPreview, size: g.size, close: close, retry: retry, turnShadersOff: turnShadersOff, showDetails: showDetails).sizeClasses(
+                GameExitScreen(report: report, intent: intent, reportURL: reportURL, reportPreview: reportPreview, size: g.size, close: close, retry: retry, turnShadersOff: turnShadersOff, fix: fix, showDetails: showDetails).sizeClasses(
                     SizeClasses(g.size))
             }
             .preferredColorScheme(.dark)
@@ -46,10 +60,16 @@
     struct GameExitScreen: View {
         let report: GameExitReport, intent: RejoinIntent?, reportURL: URL?, reportPreview: ReportPreviewData?, size: CGSize, close: () -> Void, retry: () -> Void
         let turnShadersOff: (() throws -> Void)?
+        var fix: GameExitFix? = nil
         @State var showDetails = false
+        @State private var fixState = FixState.idle
         @State private var shadersOff = false
         @State private var copied = false
         @State private var showReportShare = false
+
+        enum FixState: Equatable { case idle, working, done, failed(String) }
+        /// Get comes first until the missing mod is in; then Play again does.
+        private var fixPending: Bool { fix != nil && fixState != .done }
 
         /// iPhone landscape: short and wide, so text and actions sit side by side.
         private var sideBySide: Bool { size.width >= 600 && size.height < 500 }
@@ -108,7 +128,7 @@
                 .fixedSize(horizontal: false, vertical: true)
             VStack(alignment: .leading, spacing: 6) {
                 SectionLabel("Next step")
-                Text(verbatim: report.nextStep).cofreFont(.body).foregroundStyle(Color.cofre.inkSoft)
+                Text(verbatim: fix.map { "Get \($0.name) for this instance, then play again." } ?? report.nextStep).cofreFont(.body).foregroundStyle(Color.cofre.inkSoft)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(12)
@@ -126,14 +146,29 @@
                     }
                 }
             }
+            if let fix {
+                switch fixState {
+                case .done:
+                    Banner("\(fix.name) is installed. Play again to load it.", icon: .check, tone: .success)
+                case .failed(let reason):
+                    Banner(reason, icon: .cross, tone: .danger)
+                    getButton(fix)
+                case .idle, .working:
+                    getButton(fix)
+                }
+            }
             if let intent {
-                BlockButton("Play again · \(intent.displayName)", role: .primary, size: .large) {
+                BlockButton("Play again · \(intent.displayName)", role: fixPending ? .secondary : .primary, size: .large) {
                     let content = UNMutableNotificationContent()
                     content.body = "Tap to jump back into \(intent.displayName)"
                     UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
                     UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "cofre.rejoin", content: content, trigger: nil))
                     retry()
                 }
+                BlockButton("Close Cofre", role: .ghost, size: .large, action: close)
+            } else if fix != nil {
+                // Play again closes Cofre too (Java runs once per launch); the name says what it's for.
+                BlockButton("Play again", role: fixPending ? .secondary : .primary, size: .large, action: retry)
                 BlockButton("Close Cofre", role: .ghost, size: .large, action: close)
             } else {
                 BlockButton("Close Cofre", role: .primary, size: .large, action: close)
@@ -151,6 +186,21 @@
                     ShareLink(items: report.files) { Text("Share log") }.buttonStyle(.block()).disabled(report.files.isEmpty)
                 }
                 BlockButton("Details") { showDetails = true }
+            }
+        }
+
+        private func getButton(_ fix: GameExitFix) -> some View {
+            BlockButton("Get \(fix.name)", icon: .chest, role: .primary, size: .large, isLoading: fixState == .working) {
+                guard fixState != .working else { return }
+                fixState = .working
+                Task {
+                    do {
+                        try await fix.install()
+                        fixState = .done
+                    } catch {
+                        fixState = .failed(error.localizedDescription)
+                    }
+                }
             }
         }
 

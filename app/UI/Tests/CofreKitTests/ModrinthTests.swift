@@ -36,6 +36,14 @@ final class ModrinthTests: XCTestCase {
         XCTAssertEqual(hits[1].pageURL?.absoluteString, "https://modrinth.com/mod/with-icon")
     }
 
+    /// The mod page's "Updated" comes from the hit; Modrinth sends microseconds and a +00:00 offset.
+    func testSearchHitCarriesItsUpdateDate() throws {
+        let json = #"[{"project_id":"a","title":"A","description":"d","project_type":"mod","categories":[],"downloads":1,"date_modified":"2026-10-27T17:15:43.902761+00:00"},{"project_id":"b","title":"B","description":"d","project_type":"mod","categories":[],"downloads":1}]"#
+        let hits = try JSONDecoder().decode([Modrinth.SearchResult].self, from: Data(json.utf8))
+        XCTAssertEqual(hits[0].updated?.timeIntervalSince1970 ?? 0, 1_793_121_343.902, accuracy: 0.01)
+        XCTAssertNil(hits[1].updated)
+    }
+
     /// Modrinth sends "" for a missing icon; one such hit used to fail the whole search.
     func testSearchHitWithEmptyIconDecodes() throws {
         let json = #"[{"project_id":"a","slug":"badoptimizations","title":"BadOptimizations","description":"d","project_type":"mod","categories":["fabric"],"downloads":1,"icon_url":""},{"project_id":"b","slug":"sodium","title":"Sodium","description":"d","project_type":"mod","categories":[],"downloads":2,"icon_url":"https://cdn.modrinth.com/i.png"}]"#

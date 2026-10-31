@@ -258,6 +258,8 @@
         public var updateTo: String?
         /// e.g. "Fabric API missing".
         public var issue: String?
+        /// Mods its jar needs that the instance lacks (Kotlin for Forge for a Kotlin mod), by Modrinth project.
+        public var needs: [ProjectDependency] = []
         /// The Modrinth or CurseForge project this file came from, when known. Search rows match on it.
         public var projectID: String?
         /// The exact version installed, when known, so M02 can mark it and offer to switch.
@@ -378,6 +380,8 @@
     }
 
     public struct ProjectQuery: Hashable, Sendable {
+        /// Results per search request; the list asks for the next page near its end.
+        public static let pageSize = 50
         /// Results fit `instanceID` (its game version, and its loader for mods). `nil` browses everything.
         public var text: String, source: ProjectSource, kind: ContentKind, instanceID: String?
         /// Each kind keeps its own filters; `filters` is the current kind's.

@@ -72,9 +72,13 @@
         @Environment(CofreStore.self) private var store
         var body: some View {
             ForEach(items) { item in
-                // Every kind turns on and off by its file; which pack is in use stays the game's choice.
-                Toggle(isOn: Binding(get: { item.enabled }, set: { store.setEnabled($0, item: item) })) { row(item) }
-                    .toggleStyle(.block)
+                VStack(spacing: 6) {
+                    // Every kind turns on and off by its file; which pack is in use stays the game's choice.
+                    Toggle(isOn: Binding(get: { item.enabled }, set: { store.setEnabled($0, item: item) })) { row(item) }
+                        .toggleStyle(.block)
+                    // Outside the toggle: its whole row is one button.
+                    if item.enabled, let need = item.needs.first { needs(need) }
+                }
                 .padding(.horizontal, 11).padding(.vertical, 6).frame(minHeight: 44).block(.panel).blockHover()
                 .opacity(item.enabled ? 1 : 0.6)
                 .contextMenu {
@@ -94,6 +98,17 @@
                 Spacer(minLength: 4)
                 if item.updateTo != nil { Badge("Update", tone: .warn) }
                 if item.kind != .mods && item.inUse { Badge("In use", tone: .success) }
+            }
+        }
+        /// "Needs Kotlin for Forge · Get": the jar declares it, Modrinth didn't, and the game won't load without it.
+        private func needs(_ need: ProjectDependency) -> some View {
+            HStack(spacing: 8) {
+                Badge("Needs \(need.name)", tone: .warn)
+                Spacer(minLength: 4)
+                BlockButton(
+                    "Get", role: .primary, size: .small, fullWidth: false,
+                    isLoading: store.modInstalls[need.id].map { !$0.isFinished } ?? false
+                ) { store.get(need.id, kind: .mods) }
             }
         }
         private func detail(_ item: InstalledItem) -> String {

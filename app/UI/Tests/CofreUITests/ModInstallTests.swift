@@ -1,4 +1,5 @@
 #if canImport(UIKit)
+    import CofreKit
     import XCTest
     @testable import CofreUI
 
@@ -209,7 +210,7 @@
                 ProjectVersion(
                     id: c.versionID, name: VersionLabel.clean(c.version), gameVersions: "", channel: c.channel,
                     fits: c.fits(game: "26.3", loader: .fabric), number: c.version, games: c.gameVersions,
-                    loaders: c.loaders.compactMap(Loader.init(rawValue:)))
+                    loaders: c.loaders)
             }
             let f = VersionFilter.defaults(for: inst)
             XCTAssertEqual(f.channels, [.release, .beta])
@@ -257,6 +258,15 @@
             XCTAssertNil(s.modInstallSheet)
             XCTAssertNil(s.modInstalls["appleskin"])
             XCTAssertTrue(mock.mods.contains { $0.id == "appleskin" })
+        }
+
+        func testNeedsGetInstallsTheMissingModWhateverTheSearchTab() async {
+            let (s, mock) = await store()
+            XCTAssertEqual(s.installed[.mods]?.first { $0.id == "bountiful" }?.needs.map(\.id), ["fabric-api"])
+            s.query.kind = .shaders
+            s.get("fabric-api", kind: .mods)
+            await until { mock.mods.contains { $0.id == "fabric-api" } }
+            XCTAssertEqual(s.modInstalls["fabric-api"]?.plan?.kind ?? .mods, .mods)
         }
 
         func testGetWithDependenciesConfirmsThenInstallsAll() async {
@@ -333,6 +343,23 @@
             await until { s.modInstalls["sodium-extra"]?.phase == .done }
             XCTAssertEqual(mock.mods.filter { $0.id == "fabric-api" }.count, 1)
             XCTAssertFalse(mock.mods.contains { $0.id == "reeses" })  // optional, not picked
+        }
+
+        func testScrollingFetchesTheNextPageWithoutRepeats() async {
+            let (s, mock) = await store()
+            func page(_ range: Range<Int>) -> [ProjectSummary] {
+                range.map { ProjectSummary(id: "p\($0)", title: "Project \($0)", author: "", summary: "", downloads: 0, loaders: [], fits: true) }
+            }
+            // A full page, then a short one that repeats the last result.
+            mock.searchPages = [page(0..<50), page(49..<60)]
+            await s.search()
+            XCTAssertEqual(s.results.count, 50)
+            XCTAssertTrue(s.hasMoreResults)
+            await s.loadMoreResults()
+            XCTAssertEqual(s.results.map(\.id), (0..<60).map { "p\($0)" })
+            XCTAssertFalse(s.hasMoreResults, "a short page is the last")
+            await s.loadMoreResults()
+            XCTAssertEqual(s.results.count, 60)
         }
 
         func testInstalledRowsMatchOffAndUpdatesAndRefresh() async {

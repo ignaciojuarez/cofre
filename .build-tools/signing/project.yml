@@ -36,6 +36,7 @@ targets:
       - path: ../../app/Glue/AirBridge/CofreScenarioRunner.swift
       - path: ../../app/Glue/AirBridge/CofreBackendAdapter+Servers.swift
       - path: ../../app/Glue/AirBridge/CofreBackendAdapter+Downloads.swift
+      - path: ../../app/Glue/AirBridge/CofreBackendAdapter+Requirements.swift
       - path: ../../app/Glue/AirBridge/ServerJoinAdapter.swift
       - path: ../../app/Glue/AirBridge/CofreCoreEntry.swift
       - path: ../../app/Glue/AirBridge/CofreGameExit.swift

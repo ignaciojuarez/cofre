@@ -88,6 +88,12 @@
                 InstalledItem(id: "jei", name: "JEI", version: "19.21.0", enabled: true, updateTo: "19.21.2"),
                 InstalledItem(
                     id: "glass", name: "Better Glass", version: "1.4", enabled: true, issue: "Fabric API missing"),
+                {
+                    // Its jar asks for a mod Modrinth didn't list: Installed shows "Needs Fabric API · Get".
+                    var item = InstalledItem(id: "bountiful", name: "Bountiful", version: "8.0.0-beta.2", enabled: true)
+                    item.needs = [ProjectDependency(id: "fabric-api", name: "Fabric API", installed: false)]
+                    return item
+                }(),
                 InstalledItem(id: "lithium", name: "Lithium", version: "0.14.3", enabled: true, updateTo: "0.14.4"),
                 InstalledItem(id: "modmenu", name: "Mod Menu", version: "11.0.3", enabled: true),
                 InstalledItem(id: "cloth-config", name: "Cloth Config", version: "15.0.140", enabled: false),
@@ -350,8 +356,15 @@
                 p("canvas", "Canvas", "Grondag", "Shader-based renderer", "lapis", 1_900_000),
             ]
         }()
-        public func search(_ query: ProjectQuery) async throws -> [ProjectSummary] {
+        /// Tests: fixed result pages, so paging is checked without 50 sample projects.
+        public var searchPages: [[ProjectSummary]]?
+        public func search(_ query: ProjectQuery, offset: Int) async throws -> [ProjectSummary] {
             if offline { throw URLError(.notConnectedToInternet) }
+            if let pages = searchPages {
+                let page = offset / ProjectQuery.pageSize
+                return page < pages.count ? pages[page] : []
+            }
+            guard offset == 0 else { return [] }
             let q = query.text.lowercased()
             let inst = instanceList.first { $0.id == query.instanceID }
             return Self.projects.filter { q.isEmpty || $0.title.lowercased().contains(q) }.compactMap {
