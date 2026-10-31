@@ -1,0 +1,32 @@
+{
+  "name": "neoforge-26.2-metal-release",
+  "version": "26.2",
+  "loader": "neoforge",
+  "loaderVersion": "26.2.0.93",
+  "files": [
+    {
+      "text": "earlyWindowControl = false\n",
+      "to": "config/fml.toml"
+    },
+    {
+      "url": "https://cdn.modrinth.com/data/u58R1TMW/versions/UTJVNLyr/connector-3.1.0-beta.4%2B26.2-full.jar",
+      "to": "mods/connector-3.1.0-beta.4+26.2-full.jar"
+    },
+    {
+      "url": "https://cdn.modrinth.com/data/voWgQoWV/versions/QMTIAZjK/launchpad-1.10.2%2B26.2-full.jar",
+      "to": "mods/launchpad-1.10.2+26.2-full.jar"
+    },
+    {
+      "url": "https://cdn.modrinth.com/data/Aqlf1Shp/versions/LfyblCbV/forgified-fabric-api-0.161.0%2B26.2%2B4.0.2.jar",
+      "to": "mods/forgified-fabric-api-0.161.0+26.2+4.0.2.jar"
+    },
+    {
+      "url": "https://github.com/EternityQwQ/MetalUniversal/releases/download/MetalUniversal_1.0.4/metallum-1.0.4.jar",
+      "to": "mods/metallum-1.0.4.jar"
+    }
+  ],
+  "renderer": "auto",
+  "resolution": 1.0,
+  "launch": true,
+  "fresh": true
+}

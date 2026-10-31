@@ -2,9 +2,10 @@ import CofreKit
 import XCTest
 
 final class PresetsTests: XCTestCase {
-    func testBundledCatalogHasTheTwoMetalPresets() throws {
+    func testBundledCatalogHasTheThreeMetalPresets() throws {
         XCTAssertEqual(
-            Set(PresetCatalog.presets.map(\.id)), ["vanilla-plus-metal-26.3", "fabric-performance-metal-26.2"])
+            Set(PresetCatalog.presets.map(\.id)),
+            ["vanilla-plus-metal-26.3", "fabric-performance-metal-26.2", "neoforge-metal-26.2"])
         try PresetCatalog.validate(.init(schema: 1, presets: PresetCatalog.presets))
         XCTAssertEqual(PresetCatalog.presets.first(where: { $0.loader == .vanilla })?.status, .recommended)
         let fabric = try XCTUnwrap(PresetCatalog.presets.first { $0.loader == .fabric })
@@ -19,6 +20,20 @@ final class PresetsTests: XCTestCase {
         XCTAssertEqual(sodium.version, "3QgJXuSK")
         XCTAssertEqual(sodium.file, "sodium-fabric-0.9.0+mc26.2.jar")
         XCTAssertTrue(MetalMod.supports(gameVersion: fabric.gameVersion, loader: fabric.loader))
+        let neo = try XCTUnwrap(PresetCatalog.presets.first { $0.loader == .neoforge })
+        XCTAssertEqual(neo.status, .experimental)
+        XCTAssertEqual(neo.loaderVersion, "26.2.0.93")
+        XCTAssertEqual(neo.pinnedMods.count, 9)
+        XCTAssertEqual(neo.pinnedMods.filter { $0.url != nil }, [MetalMod.pin])
+        XCTAssertEqual(
+            Set(neo.pinnedMods.map(\.slug)),
+            [
+                "metaluniversal", "connector", "forgified-fabric-api", "launchpad", "ferrite-core",
+                "lithium", "mouse-tweaks", "controlify", "jei",
+            ])
+        XCTAssertEqual(neo.options(forPhysicalMemoryMB: 4096).renderDistance, 5)
+        XCTAssertEqual(neo.options(forPhysicalMemoryMB: 4096).simulationDistance, 4)
+        XCTAssertTrue(MetalMod.supports(gameVersion: neo.gameVersion, loader: neo.loader))
     }
 
     func testURLPinsDecodeAndMustBeHTTPS() throws {

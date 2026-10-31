@@ -64,4 +64,11 @@ final class JavaRuntimePolicyTests: XCTestCase {
                 requiredJava: 8, selectedJava: nil, renderer: "libmetallum.dylib", bundledMajors: [8, 17, 21, 25]),
             .use(major: 25))
     }
+
+    func testNeoForgeMetalGetsJava25() {
+        XCTAssertEqual(
+            JavaRuntimePolicy.decision(
+                requiredJava: 8, selectedJava: nil, renderer: .metallum, bundledMajors: [21, 25]),
+            .use(major: 25))
+    }
 }

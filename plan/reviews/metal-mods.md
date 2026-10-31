@@ -1,12 +1,14 @@
 # Modded Minecraft Java on native Metal (Cofre)
 
-Research date: 2026-10-31. This is a source review, not an iOS validation run.
+Research date: 2026-10-31. Source review plus iPad mini validation for the 26.2 kits.
 
 ## Decision
 
 **Shipped (2026-10-31):** Fabric 26.2 runs Metal when MetalUniversal 1.0.4 is enabled in the instance's mods (detected by jar id `metallum`); Settings › Renderer installs the pinned jar in one tap, and the Fabric preset includes it with Sodium 0.9.0. Iris and shader packs stay flagged. Device-verified with the DEBUG override (4/4 runs on Metal, 57 FPS in world); the release path's check is `scripts/scenarios/fabric-26.2-metal-release.json`.
 
-**Ship the managed Fabric 26.2 Metal kit first.** It is the only released iOS-targeted mod backend that has rendered in Cofre. Stabilize its backend selection, pin its exact jars, and permit only a tested mod allowlist. In parallel, port **Graft** to the existing Cofre view for a 1.21.11 track and evaluate **Ciderlight** for NeoForge 26.3. Keep Air’s agent for vanilla; do not make it the first mod-loader bridge.
+**Shipped (2026-10-31):** NeoForge 26.2 runs Metal through Connector 3.1.0-beta.4, Forgified Fabric API 0.161.0+26.2+4.0.2, Launchpad 1.10.2+26.2 and MetalUniversal 1.0.4. Settings › Renderer installs the four pinned jars atomically; Iris/Oculus, Embeddium and Sodium-NeoForge stay flagged. Device-verified on the iPad mini: title + world, ~55 FPS steady after 200 s, ~2.8 GB peak on 4 GB; the release path's check is `scripts/scenarios/neoforge-26.2-metal-release.json`.
+
+**Ship the managed 26.2 Metal kits.** Stabilize their backend selection, pin the exact jars, and permit only a tested mod allowlist. In parallel, port **Graft** to the existing Cofre view for a 1.21.11 track and evaluate **Ciderlight** for NeoForge 26.3. Keep Air’s agent for vanilla.
 
 “Native Metal” here means a renderer that submits to Metal directly (Metallum/MetalUniversal, Graft, Ciderlight, or a Cofre port). Zink, VulkanMod/MoltenVK, ANGLE, MobileGlues, LTW and GL4ES are translation/fallback routes, not the product target.
 
@@ -14,7 +16,7 @@ Research date: 2026-10-31. This is a source review, not an iOS validation run.
 
 | Rank | Route | Versions / loader | Evidence today | Effort | Risk | Next proof |
 |---:|---|---|---|:---:|---|---|
-| 1 | **MetalUniversal + Sodium** as a Cofre-managed Fabric kit | 26.2 now; source track 26.3; later 1.21.11/26.1 if a build appears | MetalUniversal 1.0.4 is an iOS/macOS Fabric jar; local 26.2 rendered once at ~57 FPS. Identical second launch selected GlBackend and crashed; Iris fails with No GLCapabilities instance set. | M | Backend selection/native load is flaky; exact Sodium mappings matter | Three cold 26.2 launches; assert Using graphics backend Metal, capture first world frame and 60 s FPS; test no duplicate metallum jar |
+| 1 | **MetalUniversal kit** as a Cofre-managed Fabric/NeoForge 26.2 kit | 26.2 now; source track 26.3 | Fabric rendered ~57 FPS; NeoForge Connector kit renders title + world at ~55 FPS for 200 s on the iPad mini. Iris/Oculus and GL renderer mods stay out. | M | Backend selection/native load and exact loader pins | Keep three cold launches per kit; assert Using graphics backend Metal and no duplicate metallum jar |
 | 2 | **Port Graft** (and optional GraftShaders) to Cofre | 1.21.11 first; also 26.2/26.3; Fabric; legacy Forge later | Graft v1.1.1 publishes Metal jars for 1.21.5–1.21.11 and 26.2/26.3; GraftShaders publishes matching Iris fork jars. It is macOS-only: hard-coded Cocoa/NSView and MACOS shader platform. | L | iOS surface, shaderc/spvc and native packaging; LGPL obligations; upstream churn | Port one 1.21.11 surface to Cofre’s existing UIView/CAMetalLayer; run vanilla + Sodium + one GraftShaders pack |
 | 3 | **MetalUniversal 26.3 dev → release**, then target 26.3 | 26.3 Fabric, Java 25 | 26.3-fabric branch is an alias of 26.2; 26.3-fabric-dev is real source (MC 26.3/Fabric 0.19.5/Sodium 0.9.2), no release. Official Metallum v0.0.25 is macOS 26.3 Fabric. | M | RenderPearl/SDL API churn; no signed iOS 26.3 artifact | Build dev commit, verify native load and Metal first frame on iPad; pin commit if successful |
 | 4 | **Ciderlight** iOS port for NeoForge | 26.3 Fabric and NeoForge beta | v0.1.17 publishes both jars and a native Metal backend. It explicitly rejects Sodium/Iris/Sodium Extra; macOS-only source. | L | AppKit/Cocoa, macOS guard and MACOS shader target; no Sodium chunk renderer | Port native surface and NeoForge jar; launch a no-Sodium NeoForge content mod |
@@ -131,7 +133,7 @@ Open risks for the device run: Air's Metallum agent must keep skipping Fabric (i
 
 ## NeoForge 26.2
 
-Research date: 2026-10-31. Source and bytecode review plus prepared DEBUG scenarios; **no device run yet**.
+Research date: 2026-10-31. Source and bytecode review plus the iPad mini Connector-kit run.
 
 ### Facts that decide the route
 
@@ -149,11 +151,11 @@ Research date: 2026-10-31. Source and bytecode review plus prepared DEBUG scenar
 | Rank | Route | Works? | Effort | Risk | Test |
 |---:|---|---|:---:|---|---|
 | 1 | **D. Air's agent under NeoForge 26.2** (no mod) | ❓ untested; no blocker found in bytecode | **S** (zero code; done) | Early GL window vs Metal layer; JPMS unnamed→automatic module link; agent's bundled slf4j vs NeoForge's | `neoforge-26.2-metal-agent.json`, then `…-agent-noearly.json` |
-| 2 | **A. Connector + FFAPI + Launchpad + MetalUniversal** | ❓ untested | **S** (scenario only) | **Double backend**: Air's agent doesn't see Fabric under Connector, so it also injects its Metallum and patches `PreferredGraphicsApi`; Connector beta; MetalUniversal 1.0.4 is invisible until the patched jar lands | `neoforge-26.2-metal-connector.json` |
+| 2 | **A. Connector + FFAPI + Launchpad + MetalUniversal** | ✅ iPad mini title + world; ~55 FPS for 200 s | **S** | Connector beta and duplicate-agent risk remain; renderer mods are still GL-only | `neoforge-26.2-metal-connector.json`, `neoforge-26.2-metal-release.json` |
 | 3 | **B. Native NeoForge port of MetalUniversal** | Not built | **S–M**: replace 2 Fabric-facing classes (`@Mod` entrypoint, mixin plugin via `ModList`/`FMLPaths`), AW → `META-INF/accesstransformer.cfg` (3 `public` lines), `neoforge.mods.toml`; reuse the mixins unchanged (no remapping on 26.x) | Ordering: `ensureSpvcLibraryConfigured` must run before LWJGL `Spvc` init (call it from the mixin plugin's `onLoad`); same agent double-injection as A | Only if D fails and A conflicts; build on top of the patched MetalUniversal (`scripts/metaluniversal.sh`) |
 | 4 | **C. Backport Ciderlight NeoForge 26.3 → 26.2 + iOS** | No | **XL** | 26.3-only APIs (SDL), custom shader pipeline, AppKit surface, no Sodium | Not planned; 26.3 is not a target |
 
-**Pick: D first, A second.** D presents through Air's surface path, which already shows a picture on vanilla 26.x; A is blocked on visibility (patched MetalUniversal) and on the agent's double injection.
+**Pick: A for NeoForge 26.2.** The Connector kit is now device-validated; keep the direct NeoForge port and Air-agent route as later experiments.
 
 ### Prepared (DEBUG scenarios, NeoForge 26.2.0.93, renderer `metallum`, `fresh: false` so the post-install restart reuses the instance)
 
@@ -165,7 +167,7 @@ Research date: 2026-10-31. Source and bytecode review plus prepared DEBUG scenar
 
 Scenario `files` now also accept `{"text": …, "to": …}` (exactly one of `url`/`text`). Local copies for inspection (not in git): `/tmp/neoforge-metal/` (`mods/`, `nf/` installer/universal/FML jars, `agent/` disassembly). SHA-256: connector `201ef1c8…`, FFAPI `3c1d0f1f…`, launchpad `13923aac…`, metallum-1.0.4 `4f730d14…`, NeoForge installer `7618883b…`.
 
-### Test plan (iPad, when free)
+### Test plan (iPad)
 
 Run each with `COFRE_LAUNCH_ARGS="-cofrePerfLog 1" scripts/scenario.sh scripts/scenarios/<case>.json`. The first run installs NeoForge and ends `result=restart`; the script relaunches once.
 
@@ -173,8 +175,8 @@ Run each with `COFRE_LAUNCH_ARGS="-cofrePerfLog 1" scripts/scenario.sh scripts/s
    - `IllegalAccessError … SpvUniformBuffer` → record `MetalCrossShaderCompiler`'s loader and module next to Spv*'s (the instrumentation step above), then go to route B with an AT.
    - Black screen or a crash in `net.neoforged.fml.earlydisplay` / GLFW before the backend line → run step 2.
 2. **`neoforge-26.2-metal-agent-noearly`**: same pass lines, plus no `earlydisplay` window in the log.
-3. **`neoforge-26.2-metal-connector`**: pass lines `Connector`/`Launchpad` loading, `[Launchpad] PreLaunch`, `Invoking Fabric preLaunch entrypoint`, `Using graphics backend Metal`. Watch for duplicate Metallum (`define skipped (already defined here)`, `LinkageError … duplicate class definition`, two `MetalDevice` inits). Expect a black picture with 1.0.4; swap in the patched MetalUniversal jar URL when it exists.
-4. When one passes: add NeoForge Sodium (`sodium-neoforge-0.9.2+mc26.2`, note MetalUniversal #22) and one gameplay mod (JEI), then record results in `renderer-benchmarks.md`.
+3. **`neoforge-26.2-metal-connector`**: the iPad run passed `Connector`/`Launchpad`, `[Launchpad] PreLaunch`, `Invoking Fabric preLaunch entrypoint`, `Using graphics backend Metal`, title + world and ~55 FPS for 200 s. Keep the duplicate-backend markers as a regression check.
+4. Keep NeoForge Sodium out of the Metal preset; its GL renderer is flagged. JEI remains in the experimental preset and should be retested with each loader pin.
 
 ## Vanilla 1.21.11 and 26.2 on Air's agent (fixed off-device 2026-10-31, device run pending)
 
@@ -216,7 +218,7 @@ Not the cause: Java version (25 after 09fd2fa), agent args, or Air's committed v
 Pass, per run: `PASS in-game`; `bundled stubs queued = 4`; `DEFINE-OK summary` with **no** `defineClass incomplete … com/metallum/Metallum`; no `NoClassDefFoundError`/`IllegalAccessError`/`NoSuchFieldError`; `[Cofre] perf … renderer=libmetallum.dylib` with fps > 0; a title-screen screenshot. Then record both rows in `renderer-benchmarks.md`.
 If 1.21.11 still fails, the next suspect is another mismatch between `classes12111_1_21_11/` and the root `com/metallum/agent/` build; `scripts/repair-metallum-agent.py --check` covers classes and private access but not member signatures (Air's own rewrite leaves unused constant-pool entries, e.g. a dead `Metallum.LOGGER:Lorg/slf4j/Logger;`). If a version cannot be fixed, drop it from Cofre's Metal list so Auto picks MobileGlues.
 
-NeoForge 26.2 through the agent (route D above) should pick the same `classes262iris/` set (the Iris route depends only on the jar marker), so it too should now define `Metallum` in the game loader instead of falling back to the root copy; unverified.
+NeoForge 26.2 through the agent (route D above) remains an unverified alternate route; the shipped path is the Connector kit.
 
 ## NeoForge 1.21.11 on Metal (researched 2026-10-31): not now
 

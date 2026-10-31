@@ -232,7 +232,7 @@ final class RendererPolicyTests: XCTestCase {
         XCTAssertEqual(
             RendererPolicy.resolve(
                 setting: "metallum", gameVersion: "26.2", loader: .neoforge,
-                metalVersions: manifest, metalMod: true), "mobileglues")
+                metalVersions: manifest), "mobileglues")
         XCTAssertEqual(
             RendererPolicy.resolve(
                 setting: "auto", gameVersion: "26.2", loader: .quilt, metalVersions: manifest,
@@ -249,6 +249,21 @@ final class RendererPolicyTests: XCTestCase {
             .metallum)
         XCTAssertEqual(
             RendererPolicy.recommendedRenderer(gameVersion: "26.2", loader: .fabric, metalVersions: []), .mobileglues)
+    }
+
+    func testNeoForgeMetalNeedsTheFourModKit() {
+        XCTAssertEqual(
+            RendererPolicy.resolve(
+                setting: "auto", gameVersion: "26.2", loader: .neoforge, metalVersions: [], metalMod: true),
+            .metallum)
+        XCTAssertEqual(
+            RendererPolicy.resolve(
+                setting: "auto", gameVersion: "26.3", loader: .neoforge, metalVersions: [], metalMod: true),
+            .mobileglues)
+        XCTAssertTrue(
+            RendererPolicy.pickerRenderers(gameVersion: "26.2", loader: .neoforge, metalMod: true).contains(.metallum))
+        XCTAssertFalse(
+            RendererPolicy.pickerRenderers(gameVersion: "26.2", loader: .neoforge).contains(.metallum))
     }
 
     func testLaunchHandsAirTheMetalLibraryForAFabricFolderWithMetalUniversal() throws {

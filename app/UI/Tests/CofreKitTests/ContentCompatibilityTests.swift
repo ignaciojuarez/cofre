@@ -18,11 +18,14 @@ final class ContentCompatibilityTests: XCTestCase {
     private func write(_ path: String, _ text: String = "") throws {
         try text.write(to: root.appendingPathComponent(path), atomically: true, encoding: .utf8)
     }
-    private func issue(_ name: String, _ kind: ContentKind = .mods, _ game: String, _ renderer: String)
+    private func issue(
+        _ name: String, _ kind: ContentKind = .mods, _ game: String, _ renderer: String,
+        _ loader: Instance.Loader = .unknown
+    )
         -> CompatibilityIssue?
     {
         ContentCompatibility.issue(
-            id: name, name: name, kind: kind, gameVersion: game, renderer: renderer, manifest: manifest)
+            id: name, name: name, kind: kind, gameVersion: game, renderer: renderer, manifest: manifest, loader: loader)
     }
 
     func testMetalFlagsModsEvenOnManifestVersions() throws {
@@ -33,7 +36,7 @@ final class ContentCompatibilityTests: XCTestCase {
         XCTAssertNotNil(issue("Iris Shaders", .mods, "26.2", "metallum"))
         XCTAssertEqual(
             issue("Sodium", .mods, "1.21.11", "libmetallum.dylib")?.reason,
-            "Metal runs this mod only on Fabric 26.2 for now.")
+            "Metal runs this mod only in the validated 26.2 kit for now.")
         // MetalUniversal on Fabric 26.2 renders with Sodium (iPad mini, 57 FPS in world).
         XCTAssertNil(issue("sodium-fabric-0.9.0+mc26.2", .mods, "26.2", "libmetallum.dylib"))
         XCTAssertNil(issue("metallum-1.0.4", .mods, "26.2", "libmetallum.dylib"))
@@ -115,5 +118,17 @@ final class ContentCompatibilityTests: XCTestCase {
             gameDirectory: root, gameVersion: "26.2", renderer: "libmetallum.dylib", manifest: manifest)
         XCTAssertEqual(issues.map(\.modName), ["Iris"])
         XCTAssertEqual(issues.first?.file, "iris-fabric-1.10.0+mc26.2.jar")
+    }
+
+    func testNeoForgeMetalFlagsOnlyUnvalidatedGLRendererMods() throws {
+        XCTAssertNotNil(issue("iris-neoforge-1.8.0", .mods, "26.2", "metallum", .neoforge))
+        XCTAssertNotNil(issue("oculus", .mods, "26.2", "libmetallum.dylib", .neoforge))
+        XCTAssertNotNil(issue("embeddium", .mods, "26.2", "libmetallum.dylib", .neoforge))
+        XCTAssertNotNil(issue("sodium-neoforge-0.9.2+mc26.2", .mods, "26.2", "metallum", .neoforge))
+        XCTAssertNil(issue("JEI", .mods, "26.2", "metallum", .neoforge))
+        XCTAssertNil(issue("sodium-fabric-0.9.0+mc26.2", .mods, "26.2", "metallum", .fabric))
+        XCTAssertEqual(
+            issue("embeddium", .mods, "26.2", "metallum", .neoforge)?.reason,
+            ContentCompatibility.neoForgeMetalGL)
     }
 }

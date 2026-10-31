@@ -10,7 +10,7 @@ Status: in progress (2026-10-31). Owner: main thread; findings land in `plan/rev
 
 ## North star
 
-Modded play needs Metal. Every OpenGL path translates on the CPU and was unplayable with fewer than 20 mods on an iPhone 17 Pro. So every test round should push at least one popular modded version onto Metal (first: Fabric 26.2 + MetalUniversal + Sodium; routes in `reviews/metal-mods.md`).
+Modded play needs Metal. Every OpenGL path translates on the CPU and was unplayable with fewer than 20 mods on an iPhone 17 Pro. So every test round should push at least one popular modded version onto Metal (Fabric and NeoForge 26.2 use the validated MetalUniversal kit; routes in `reviews/metal-mods.md`).
 
 **Metal targets (popular modding versions only, decided 2026-10-31):** 1.21.11 Fabric (Graft port; 18k Fabric mods), 26.2 Fabric and NeoForge (MetalUniversal; 13.6k Fabric mods). 26.3 only if its numbers grow. 1.21.1 / 1.20.1 can't get Metal (older than Minecraft's 1.21.5 GPU-device layer); they stay on MobileGlues, labelled slower. Ready-made preset instances: `presets.md`.
 
@@ -32,6 +32,7 @@ Modded play needs Metal. Every OpenGL path translates on the CPU and was unplaya
 | Fabric 26.2 + Sodium + Iris | MobileGlues | Black screen (game running) |
 | Fabric 26.2 + Sodium + Iris | ANGLE (libtinygl4angle) | Black screen |
 | Fabric 26.2 + Sodium (± Iris) | Metal (Air's agent forced) | Crash: IllegalAccessError under Fabric's Knot loader; stock Iris needs GL |
+| NeoForge 26.2 + Connector + MetalUniversal kit | Metal | Title + world OK; ~55 FPS steady after 200 s; peak ~2.8 GB on the 4 GB iPad |
 | Fabric/NeoForge (<20 mods), iPhone 17 Pro | GL path | CPU ~100%, <20 FPS (user report) |
 
 ## Ideas to keep
@@ -45,11 +46,12 @@ Modded play needs Metal. Every OpenGL path translates on the CPU and was unplaya
 - Picker on Metal vanilla versions: Auto, Metal, MobileGlues only (Air's agent ignores other picks there).
 - Play warns and offers to turn Iris off on 26.x with MobileGlues or ANGLE (black screen on the iPad).
 - **Fabric 26.2 Metal shipped behind mod presence.** Auto picks Metal (and the picker marks it Recommended) when a Fabric instance on a `MetalMod.gameVersions` version (`["26.2"]`) has an enabled jar whose `fabric.mod.json` id is `metallum`. Air gets `libmetallum.dylib`; Java stays 25. Without the mod, Settings › Renderer offers "Use Metal (faster)", which downloads the pinned MetalUniversal 1.0.4 jar (SHA-512 checked) into `mods/`. Sodium isn't flagged there; Iris and shader packs are ("Iris needs OpenGL"). The Fabric preset ships the same jar + Sodium 0.9.0. Device check: `scripts/scenarios/fabric-26.2-metal-release.json`.
+- **NeoForge 26.2 Metal shipped behind the complete kit.** Auto picks Metal only when `metallum`, Connector, Forgified Fabric API and Launchpad are enabled (IDs from `fabric.mod.json`/`META-INF/neoforge.mods.toml`). Settings › Renderer installs the four pinned jars atomically; Iris/Oculus, Embeddium and Sodium-NeoForge remain flagged as OpenGL. The experimental preset starts at render 5 / simulation 4 on 4 GB. Device check: `scripts/scenarios/neoforge-26.2-metal-release.json`.
 
 ## Pending device results
 
 Keep these matrix rules provisional until the iPad benchmarks complete:
 
-- **Block:** Metal on Forge/NeoForge or outside its manifest; LTW on 26.x; Vulkan/MoltenVK; known Fabric 26.2 + Sodium/Iris on MobileGlues or ANGLE; shader packs on an unvalidated 26.x setup.
+- **Block:** Metal on Forge/NeoForge outside the validated 26.2 kit; LTW on 26.x; Vulkan/MoltenVK; known Fabric 26.2 + Sodium/Iris on MobileGlues or ANGLE; shader packs on an unvalidated 26.x setup.
 - **Warn and allow override:** MobileGlues on 26.x or mod-heavy packs; Zink; all advanced/debug renderers; Metal on 4 GB devices at high chunk distance.
 - **Re-measure before changing Auto:** Fabric 26.x with Sodium/Iris, Zink on iPad mini, LTW/Krypton on 1.21.x, and legacy SimpleFPEWrapper/VGPU against GL4ES.

@@ -25,7 +25,7 @@ final class ModCompatibilityTests: XCTestCase {
         XCTAssertNotNil(ModCompatibility.entry(for: "iris")?.issue(gameVersion: "26.3", renderer: "metallum"))
         XCTAssertEqual(
             ModCompatibility.entry(for: "sodium")?.issue(gameVersion: "1.21.11", renderer: "metallum")?.reason,
-            "Metal runs this mod only on Fabric 26.2 for now.")
+            "Metal runs this mod only in the validated 26.2 kit for now.")
     }
 
     func testLaunchDecisionWarnsOnlyEnabledIncompatibleMods() {

@@ -12,6 +12,19 @@ final class MetalModTests: XCTestCase {
         return try Data(contentsOf: url)
     }
 
+    static func neoForgeJar(id: String) throws -> Data {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".jar")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let toml = """
+            modLoader="javafml"
+            [[mods]]
+            modId="\(id)"
+            version="1.0"
+            """
+        try Zip.write([(path: "META-INF/neoforge.mods.toml", data: { Data(toml.utf8) })], to: url)
+        return try Data(contentsOf: url)
+    }
+
     func testDetectsTheEnabledJarByItsFabricID() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -32,6 +45,7 @@ final class MetalModTests: XCTestCase {
 
     func testOnlyFabricOnValidatedVersions() {
         XCTAssertTrue(MetalMod.supports(gameVersion: "26.2", loader: .fabric))
+        XCTAssertTrue(MetalMod.supports(gameVersion: "26.2", loader: .neoforge))
         XCTAssertFalse(MetalMod.supports(gameVersion: "26.3", loader: .fabric))
         XCTAssertFalse(MetalMod.supports(gameVersion: "26.2", loader: .quilt))
         XCTAssertFalse(MetalMod.supports(gameVersion: "26.2", loader: .vanilla))
@@ -43,5 +57,20 @@ final class MetalModTests: XCTestCase {
         XCTAssertEqual(
             MetalMod.pin.url,
             "https://github.com/EternityQwQ/MetalUniversal/releases/download/MetalUniversal_1.0.4/metallum-1.0.4.jar")
+    }
+
+    func testNeoForgeNeedsTheCompleteConnectorKit() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let mods = root.appendingPathComponent("mods")
+        try FileManager.default.createDirectory(at: mods, withIntermediateDirectories: true)
+        try Self.jar(id: "metallum").write(to: mods.appendingPathComponent("metallum.jar"))
+        for id in MetalMod.neoForgeKitIDs {
+            try Self.neoForgeJar(id: id).write(to: mods.appendingPathComponent("\(id).jar"))
+        }
+        XCTAssertTrue(MetalMod.isEnabled(in: root, loader: .neoforge))
+        try FileManager.default.removeItem(at: mods.appendingPathComponent("launchpad.jar"))
+        XCTAssertFalse(MetalMod.isEnabled(in: root, loader: .neoforge))
+        XCTAssertTrue(MetalMod.isEnabled(in: root))
     }
 }

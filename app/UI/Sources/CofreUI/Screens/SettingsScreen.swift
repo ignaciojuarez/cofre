@@ -170,7 +170,9 @@
                         }
                     } label: {
                         Row(installingMetal ? String(localized: "Installing Metal…") : String(localized: "Use Metal (faster)"),
-                            subtitle: String(localized: "Adds MetalUniversal \(MetalMod.pin.version) to this instance's mods. Sodium works; Iris and shader packs need OpenGL."),
+                            subtitle: instance.loader == .neoforge
+                                ? String(localized: "Adds the validated MetalUniversal, Connector, Forgified Fabric API and Launchpad kit. OpenGL renderer mods and shaders stay off.")
+                                : String(localized: "Adds MetalUniversal \(MetalMod.pin.version) to this instance's mods. Sodium works; Iris and shader packs need OpenGL."),
                             trailing: { Badge("Recommended", tone: .success) })
                     }
                     .buttonStyle(RowButtonStyle())
@@ -194,8 +196,8 @@
                         ? (context?.loader == .vanilla
                             ? "Metal is available only for vanilla versions in the shipped manifest."
                             : MetalMod.supports(gameVersion: context?.gameVersion ?? "", loader: context?.loader ?? .unknown)
-                                ? "Metal needs MetalUniversal: use Metal above."
-                                : "Metal runs mods only on Fabric 26.2 for now.")
+                                ? "Metal needs the validated 26.2 kit: use Metal above."
+                                : "Metal runs modded 26.2 only with its validated kit.")
                         : legacyUnavailable ? "This legacy renderer is only for Minecraft 1.16.5 and older." : nil
                     let detail = unavailableDetail ?? r.detail
                     Button {

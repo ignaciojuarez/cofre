@@ -2,7 +2,7 @@
 
 ## Decisions (user, 2026-10-31)
 
-- Ship Metal presets only: **Vanilla+ 26.3** and **Fabric Performance 26.2** first; add **Fabric Adventure 1.21.11** once the Graft port works. No OpenGL presets (NeoForge Starter and Classic Modded wait).
+- Ship Metal presets: **Vanilla+ 26.3**, **Fabric Performance 26.2**, and the experimental **NeoForge · Metal 26.2** Connector kit. No OpenGL-only presets.
 - Controller: **Controlify** by default.
 - Inventory Profiles Next: **optional checkbox at creation**, off by default.
 
@@ -35,10 +35,11 @@ These were queried too, but are **not** in the default fast kits until the rende
 | **Vanilla+ · Metal latest** | 26.3 · Vanilla | Metal (Air agent) | “The cleanest, fastest supported Minecraft.” | Shipped as Recommended; low-memory cards start at the Cofre distance tier. |
 | **Fabric Performance · Metal** | 26.2 · Fabric 0.20.1 | MetalUniversal/Metallum + Sodium | “A small, fast kit with the Metal path already selected.” | Shipped as Experimental; Metal renderer jar remains a named placeholder until the black-screen run is fixed. |
 | **Fabric Adventure · Graft Metal** | 1.21.11 · Fabric 0.20.1 | Graft 1.1.1 (external release) | “The biggest Fabric mod library on the native-Metal route.” | Port/validation gate; Graft is macOS-oriented and has no Modrinth project. |
-| **NeoForge Starter · experimental** | 26.2 · NeoForge 26.2.0.93 | MobileGlues fallback | “Start a NeoForge pack while the iOS Metal route is investigated.” | Warned, never default-recommended; Metal on NeoForge is blocked until Ciderlight or another route is device-proven. |
+| **NeoForge · Metal 26.2** | 26.2 · NeoForge 26.2.0.93 | MetalUniversal + Connector kit | “NeoForge with the device-validated Metal bridge kit.” | Experimental; device-verified at ~55 FPS, with GL renderer mods flagged. |
+| **NeoForge Starter · experimental** | 26.2 · NeoForge 26.2.0.93 | MobileGlues fallback | “Start a broad NeoForge pack when Metal compatibility is not available.” | Warned, never default-recommended. |
 | **Classic Modded · slow compatibility** | 1.21.1 · NeoForge 21.1.265 | MobileGlues (OpenGL translation) | “Broad older-mod coverage when speed is secondary.” | Warned; 1.21.1 cannot use Metal. The iPad mini run reached ~30 FPS on a small pack and OOMed at high distance. |
 
-All five are created by the same instance path; no `.mrpack` is required. The first two are the only cards eligible for a future fast-path badge, and only after their scenarios pass.
+All six are created by the same instance path; no `.mrpack` is required. The three Metal cards stay experimental or recommended according to their device evidence.
 
 ## Exact contents and why
 
@@ -90,14 +91,21 @@ The table is the canonical project/license record. “Metal-safe” means the ja
 - **Options:** 4 GB `renderDistance=6`, `simulationDistance=4`, `entityDistanceScaling=0.5`, `mipmapLevels=1`, blur `0`, touchscreen `false`, 60 FPS; 12 GB `12/8`, `0.75`, mipmap `2`, blur `0`, touchscreen `false`, 90 FPS.
 - **Memory/performance:** keep shaders off and start without maps; a Graft port must prove a first frame, touch menus, controller input and 60 seconds before the card loses its “port/validation” label.
 
-### Preset 4 — NeoForge Starter · 26.2 experimental
+### Preset 4 — NeoForge · Metal 26.2
 
-- **Loader:** NeoForge 26.2.0.93; **renderer:** MobileGlues. Metal is blocked for NeoForge by the renderer matrix, so this card is an honest compatibility starter, not a fast preset.
+- **Loader:** NeoForge 26.2.0.93; **renderer:** MetalUniversal 1.0.4 through Connector 3.1.0-beta.4, Forgified Fabric API 0.161.0+26.2+4.0.2 and Launchpad 1.10.2+26.2. The four bridge jars are pinned and installed as one staged set.
+- **Bundled mods:** MetalUniversal, Connector, Forgified Fabric API, Launchpad, FerriteCore 9.0.0, Lithium 0.25.3, Mouse Tweaks 2.31, Controlify 3.5.3 and JEI 30.48.0.244. Iris/Oculus, Embeddium and Sodium-NeoForge stay out because they use OpenGL.
+- **Options:** 4 GB `renderDistance=5`, `simulationDistance=4`; 12 GB `8/6`; `entityDistanceScaling=0.5` / `0.75`; mipmap `1` / `2`; blur `0`; `touchscreen=false`; 60 / 90 FPS; `enableVsync=true`.
+- **Memory/performance:** experimental on 4 GB: the validated run peaked around 2.8 GB. Keep the lower distance tier and show the memory caution.
+
+### Preset 5 — NeoForge Starter · 26.2 experimental
+
+- **Loader:** NeoForge 26.2.0.93; **renderer:** MobileGlues. This remains the broad compatibility starter for content outside the validated Metal kit.
 - **Bundled mods:** FerriteCore (RAM); Lithium (tick speed); Mouse Tweaks (touch inventory); Controlify (controller support); JEI (recipe search). Exclude Sodium (its renderer is GL), Entity Culling, shaders and maps. ModernFix/Krypton have no NeoForge 26.2 pin in the API snapshot.
 - **Options:** 4 GB `renderDistance=4`, `simulationDistance=4`, `entityDistanceScaling=0.5`, `mipmapLevels=1`, blur `0`, touchscreen `false`, 45–60 FPS; 12 GB `8/6`, `0.75`, mipmap `2`, blur `0`, touchscreen `false`, 60 FPS. Cofre’s MobileGlues FSR stays off (`mobileglues.fsr1_setting=0`).
 - **Memory/performance:** always show “OpenGL translation: high CPU / slower”; never put this card above a validated Metal card. The first world must be tested at low distance because the 4 GB iPad run OOMed at 8 chunks.
 
-### Preset 5 — Classic Modded · 1.21.1 slow compatibility
+### Preset 6 — Classic Modded · 1.21.1 slow compatibility
 
 - **Loader:** NeoForge 21.1.265; **renderer:** MobileGlues. This is the explicit warning path for packs that cannot use Metal.
 - **Bundled mods:** FerriteCore (RAM); ModernFix (startup/memory); Mouse Tweaks (touch inventory); Controlify (controller); JEI (recipes). RenderScale 2.0.0-beta.1 is an optional “sharp UI at low resolution” add-on, not default.
@@ -134,6 +142,10 @@ Each line is `project slug (project id): version id → primary filename; SHA-51
 
 ### NeoForge 26.2 and 1.21.1
 
+- 26.2 bridge `connector (u58R1TMW)`: `UTJVNLyr` → `connector-3.1.0-beta.4+26.2-full.jar`; `7377d33a588f2e0df22a3e2fd4bcbca778aa6aff3fa79cbe6f3d455e206da20b395c02259e41208869c73ff6625f1de9ff5eac365875c2d98735d9782ed1e2e3`
+- 26.2 bridge `forgified-fabric-api (Aqlf1Shp)`: `LfyblCbV` → `forgified-fabric-api-0.161.0+26.2+4.0.2.jar`; `0bdb87556418929aa88a1322c04e8993727580414b95b0410e58c358cb05697bde2a30840043f5a9922e7c751dbdaf1c20a0d7b44c0832ad9655aab5977c3672`
+- 26.2 bridge `launchpad (voWgQoWV)`: `QMTIAZjK` → `launchpad-1.10.2+26.2-full.jar`; `a15969ad4c4dd4ceba2346ac49352cf46d8d07c1a14525eca45c8dfa6f1553762176440eb80827a9cdece028cf71b4756aef06f78b94bed527af9ff1ab5e1c58`
+- 26.2 bridge `metaluniversal` (external): `1.0.4` → `metallum-1.0.4.jar`; `bcc248f19c4e6b5bc4041b38e68425d72595148cc67f7f740d3b2449323ea7fc47d662610d531e0eb847c98d41fcc44ff6f6ff0c64ce435ca80775a52f31340c`
 - 26.2 `ferrite-core (uXXizFIs)`: `LtVvw4uS` → `ferritecore-9.0.0-neoforge.jar`; `e96a99ac5539f56a1f4cd109d62b668ebd5283f0068491ede956f52e67023beba7abe2e40021499352ffc41ead950bebcabce7792352249a1b45c5dccb3cf99c`
 - 26.2 `lithium (gvQqBUqZ)`: `J9CowDXK` → `lithium-neoforge-0.25.3+mc26.2.jar`; `56f5299bc84084f2112abf61ea58bad101a7495cc8a1db3df0963494bce096e474c0bde0975831c30ec15c5c977451a31f82de90a09b769c94df91dbcb9b9286`
 - 26.2 `mouse-tweaks (aC3cM3Vq)`: `rokwij6O` → `MouseTweaks-neoforge-mc26.2-2.31.jar`; `2cc9fbf44a704bfcec9a6744ff1c8025c22c6675196e25fbeae213d4e30872478763ffc82e902f0b19cfb7fdd8c4295407dab57f22911e34f299df1b1ed20379`
@@ -163,7 +175,7 @@ Each line is `project slug (project id): version id → primary filename; SHA-51
 ### Warnings and compatibility
 
 - On a Metal preset, a Get/add attempt for a jar whose scan says direct OpenGL/Vulkan (or whose renderer manifest excludes Metal) opens a blocking sheet: **“This mod needs OpenGL and can make Metal black-screen or crash.”** Actions: `Cancel`, `Install and make a slower GL copy`, or `Install anyway (advanced)` with explicit confirmation. The original preset is never silently changed.
-- The Play preflight reuses `ContentCompatibility`: block known-bad 26.x Sodium/Iris/MobileGlues/ANGLE, Metal on NeoForge, Vulkan/MoltenVK, and unvalidated shaders; warn/allow override for MobileGlues, Zink, high mod counts, and 4 GB Metal distance.
+- The Play preflight reuses `ContentCompatibility`: block known-bad 26.x Sodium/Iris/MobileGlues/ANGLE, Metal outside the validated NeoForge kit, Vulkan/MoltenVK, and unvalidated shaders; warn/allow override for MobileGlues, Zink, high mod counts, and 4 GB Metal distance.
 - Touch kit copy: Cofre’s own menu gestures stay on; `touchscreen=false` is written because vanilla Touchscreen Mode fights simulated clicks. Mouse Tweaks is bundled; IPN is optional and license-gated. Controlify and MidnightControls are mutually exclusive choices.
 - QoL: Mod Menu is safe in the default kits. EMI/JEI and map mods are optional until their render paths are scanned; JourneyMap/Xaero are never a reason to recommend a Metal preset.
 
@@ -229,7 +241,7 @@ Run each with `COFRE_LAUNCH_ARGS="-cofrePerfLog 1"`; summarize with `scripts/per
 
 ## Open questions (max five)
 
-1. Should the first release ship only Vanilla+ and Fabric 26.2, leaving Graft/NeoForge cards behind an “experimental catalog” switch until device proof exists?
+1. Should the NeoForge 26.2 Metal card stay behind an “experimental catalog” switch while the 4 GB peak is close to the jetsam limit?
 2. Which exact iOS MetalUniversal artifact should Cofre bless: Modrinth Metallum 0.0.24/0.0.25 or the separately reviewed MetalUniversal 1.0.4 build?
 3. Is Controlify the default controller kit, with MidnightControls as the alternative, or should controller support remain opt-in on 4 GB devices?
 4. Should IPN be offered from the preset card with an AGPL acknowledgement, or only from the Mods screen after instance creation?

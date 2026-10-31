@@ -39,11 +39,14 @@ public struct ModCompatibility: Hashable, Sendable {
     /// Versions supported by the exact shipped Metallum manifest. No version family is inferred here.
     nonisolated(unsafe) public static var metalVersions: Set<String> = manifest.gameVersions
     /// A project or installed file with the renderer an instance runs.
-    public static func issue(id: String, name: String, kind: ContentKind, gameVersion: String, renderer: String) -> ModCompatibilityIssue? {
-        ContentCompatibility.issue(id: id, name: name, kind: kind, gameVersion: gameVersion, renderer: renderer, manifest: manifest)
+    public static func issue(id: String, name: String, kind: ContentKind, gameVersion: String, renderer: String,
+                             loader: Instance.Loader = .unknown) -> ModCompatibilityIssue? {
+        ContentCompatibility.issue(id: id, name: name, kind: kind, gameVersion: gameVersion, renderer: renderer,
+                                   manifest: manifest, loader: loader)
     }
-    public static func issue(id: String, name: String, kind: ContentKind, gameVersion: String, renderer: RendererID) -> ModCompatibilityIssue? {
-        issue(id: id, name: name, kind: kind, gameVersion: gameVersion, renderer: renderer.rawValue)
+    public static func issue(id: String, name: String, kind: ContentKind, gameVersion: String, renderer: RendererID,
+                             loader: Instance.Loader = .unknown) -> ModCompatibilityIssue? {
+        issue(id: id, name: name, kind: kind, gameVersion: gameVersion, renderer: renderer.rawValue, loader: loader)
     }
     public let id: String, name: String
     private let supportedMetalVersions: Set<String>?
@@ -62,20 +65,23 @@ public struct ModCompatibility: Hashable, Sendable {
         let label = name ?? id
         return .init(id: id, name: label, metalVersions: found.versions,
                      reason: found.name == "iris" ? ContentCompatibility.irisOnMetal
-                        : "Metal runs this mod only on Fabric 26.2 for now.", verified: true)
+                        : "Metal runs this mod only in the validated 26.2 kit for now.", verified: true)
     }
 }
 public enum ModLaunchDecision: Equatable, Sendable { case play, warn([ModCompatibilityIssue]) }
 #if canImport(UIKit)
 public enum ModCompatibilityChecker {
-    public static func decision(items: [InstalledItem], gameVersion: String, renderer: String) -> ModLaunchDecision {
+    public static func decision(items: [InstalledItem], gameVersion: String, renderer: String,
+                                loader: Instance.Loader = .unknown) -> ModLaunchDecision {
         let issues = items.filter { $0.enabled && ($0.kind == .mods || ($0.kind == .shaders && $0.inUse)) }.compactMap { item in
-            ModCompatibility.issue(id: item.projectID ?? item.id, name: item.name, kind: item.kind, gameVersion: gameVersion, renderer: renderer)
+            ModCompatibility.issue(id: item.projectID ?? item.id, name: item.name, kind: item.kind,
+                                   gameVersion: gameVersion, renderer: renderer, loader: loader)
         }
         return issues.isEmpty ? .play : .warn(issues)
     }
-    public static func decision(items: [InstalledItem], gameVersion: String, renderer: RendererID) -> ModLaunchDecision {
-        decision(items: items, gameVersion: gameVersion, renderer: renderer.rawValue)
+    public static func decision(items: [InstalledItem], gameVersion: String, renderer: RendererID,
+                                loader: Instance.Loader = .unknown) -> ModLaunchDecision {
+        decision(items: items, gameVersion: gameVersion, renderer: renderer.rawValue, loader: loader)
     }
 }
 #endif
