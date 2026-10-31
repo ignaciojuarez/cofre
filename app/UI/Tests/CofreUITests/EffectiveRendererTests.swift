@@ -26,10 +26,10 @@ final class EffectiveRendererTests: XCTestCase {
             iris.issue(gameVersion: game, renderer: ModCompatibility.renderer(instanceSetting: own, globalSetting: global, gameVersion: game, loader: "fabric"))
         }
         XCTAssertNil(issue("auto", "auto", "1.21.1"))
-        XCTAssertNotNil(issue("metallum", "auto", "1.21.1"))
+        XCTAssertNil(issue("metallum", "auto", "1.21.1"))
         XCTAssertNil(issue("angle", "metallum", "26.3"))
-        XCTAssertNotNil(issue("auto", "auto", "26.3"))
-        XCTAssertNotNil(issue("auto", "metallum", "1.21.1"))
+        XCTAssertNil(issue("auto", "auto", "26.3"))
+        XCTAssertNil(issue("auto", "metallum", "1.21.1"))
         XCTAssertEqual(ModCompatibility.renderer(instanceSetting: "auto", globalSetting: "auto", gameVersion: "1.21.1", loader: "neoforge"), "mobileglues")
         XCTAssertEqual(ModCompatibility.renderer(globalSetting: "auto", gameVersion: "26.3", loader: "fabric", javaVersion: 17), "mobileglues")
     }

@@ -1,5 +1,6 @@
 #if canImport(UIKit)
     import SwiftUI
+    import CofreKit
 
     // X00 index (Game · Controls · System) + panes X01–X07. On compact the index is the root list and each pane is
     // pushed (§3.5 #1); on regular the pane opens beside it in a readable column.
@@ -135,20 +136,27 @@
 
     struct RendererContent: View {
         @Environment(CofreStore.self) private var store
+        @Environment(NavModel.self) private var nav
         var body: some View {
-            let current = prefBinding(store, nil, \.renderer)
+            let instance = nav.instance.flatMap { id in store.instances.first { $0.id == id } }
+            let instanceID = instance?.id
+            let current = prefBinding(store, instanceID, \.renderer)
             ListSection(spacing: 4) {
                 ForEach(store.renderers) { r in
+                    let unavailable = instance.map { $0.loader != .vanilla && RendererPolicy.isMetal(r.id) } ?? false
                     Button {
                         current.wrappedValue = r.id
                     } label: {
-                        Row(r.name, subtitle: r.detail, isSelected: current.wrappedValue == r.id) {
+                        Row(r.name,
+                            subtitle: unavailable ? "Metal runs vanilla only for now" : r.detail,
+                            isSelected: current.wrappedValue == r.id) {
                             Radio(isOn: current.wrappedValue == r.id)
                         } trailing: {
                             if r.recommended { Badge("Best", tone: .success) }
                         }
                     }
                     .buttonStyle(RowButtonStyle())
+                    .disabled(unavailable)
                 }
             }
             if store.can(.rendererTuning) {

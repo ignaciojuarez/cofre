@@ -25,12 +25,13 @@ final class ContentCompatibilityTests: XCTestCase {
             id: name, name: name, kind: kind, gameVersion: game, renderer: renderer, manifest: manifest)
     }
 
-    func testMetalFlagsModsWithoutAShippedIntegration() throws {
+    func testMetalFlagsModsEvenOnManifestVersions() throws {
         let iris = try XCTUnwrap(issue("iris-fabric-1.8.0+mc26.3", .mods, "26.3", "metallum"))
         XCTAssertEqual(iris.badge, "Not on Metal · 26.3")
         XCTAssertEqual(iris.title, "Iris doesn't run here")
-        XCTAssertNil(issue("Iris Shaders", .mods, "26.2", "metallum"))
-        XCTAssertNil(issue("Sodium", .mods, "1.21.11", "libmetallum.dylib"))
+        XCTAssertEqual(iris.reason, "Metal runs vanilla only for now.")
+        XCTAssertNotNil(issue("Iris Shaders", .mods, "26.2", "metallum"))
+        XCTAssertNotNil(issue("Sodium", .mods, "1.21.11", "libmetallum.dylib"))
         // Metallum's own mixin package isn't a mod; an unknown mod has no evidence either way.
         XCTAssertNil(issue("MixinExtras", .mods, "26.3", "metallum"))
         XCTAssertNil(issue("JEI", .mods, "26.3", "metallum"))
@@ -43,11 +44,11 @@ final class ContentCompatibilityTests: XCTestCase {
         XCTAssertEqual(mg.badge, "Not on MobileGlues · 1.21.1")
         XCTAssertEqual(mg.title, "Shaders don't run here")
         XCTAssertNotNil(issue("BSL", .shaders, "26.3", "metallum"))
-        XCTAssertNil(issue("BSL", .shaders, "26.2", "metallum"))
+        XCTAssertNotNil(issue("BSL", .shaders, "26.2", "metallum"))
         XCTAssertNil(issue("BSL", .shaders, "1.21.1", "air"))
         XCTAssertNil(issue("Faithful", .resourcePacks, "26.3", "metallum"))
-        // No shipped manifest: no evidence, no warning.
-        XCTAssertNil(
+        // Shader packs are not a Metal path even without a manifest.
+        XCTAssertNotNil(
             ContentCompatibility.issue(
                 id: "BSL", name: "BSL", kind: .shaders, gameVersion: "26.3",
                 renderer: "metallum", manifest: RendererManifest()))

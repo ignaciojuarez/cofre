@@ -14,6 +14,10 @@ final class RendererPolicyTests: XCTestCase {
                 metalVersions: ["26.3"]), "mobileglues")
         XCTAssertEqual(
             RendererPolicy.resolve(
+                setting: "auto", globalSetting: "metallum", gameVersion: "26.3", loader: .fabric,
+                metalVersions: ["26.3"]), "mobileglues")
+        XCTAssertEqual(
+            RendererPolicy.resolve(
                 profile: ["lastVersionId": "26.3", "renderer": "metal"], metadata: ["id": "26.3"],
                 globalSetting: "mobileglues", metalVersions: []), "libmetallum.dylib")
         XCTAssertEqual(
@@ -62,29 +66,52 @@ final class RendererPolicyTests: XCTestCase {
         XCTAssertEqual(
             RendererPolicy.resolve(
                 profile: profile, metadata: metadata, globalSetting: "auto", metalVersions: ["26.3"]),
-            "libmetallum.dylib")
+            "libmobileglues.dylib")
         XCTAssertEqual(
             RendererPolicy.resolve(
                 profile: profile, metadata: metadata, globalSetting: "mobileglues", metalVersions: ["26.3"]),
             "libmobileglues.dylib")
     }
 
-    func testAutoMetalRequiresBothManifestSupportAndMinecraft26OrLater() {
+    func testAutoMetalIsVanillaOnlyAndModdedVersionsUseMobileGlues() {
         let manifest: Set<String> = ["1.21.11", "26.2", "26.3"]
         XCTAssertEqual(
             RendererPolicy.resolve(setting: "auto", gameVersion: "1.21.11", loader: .fabric, metalVersions: manifest),
             "mobileglues")
         XCTAssertEqual(
-            RendererPolicy.resolve(setting: "auto", gameVersion: "1.21.11", loader: .neoforge, metalVersions: manifest),
+            RendererPolicy.resolve(setting: "auto", gameVersion: "26.2", loader: .fabric, metalVersions: manifest),
             "mobileglues")
         XCTAssertEqual(
-            RendererPolicy.resolve(setting: "auto", gameVersion: "26.2", loader: .forge, metalVersions: manifest),
+            RendererPolicy.resolve(setting: "auto", gameVersion: "26.2", loader: .quilt, metalVersions: manifest),
+            "mobileglues")
+        XCTAssertEqual(
+            RendererPolicy.resolve(setting: "auto", gameVersion: "26.2", loader: .neoforge, metalVersions: manifest),
+            "mobileglues")
+        XCTAssertEqual(
+            RendererPolicy.resolve(setting: "auto", gameVersion: "26.2", loader: .vanilla, metalVersions: manifest),
             "metallum")
+        XCTAssertEqual(
+            RendererPolicy.resolve(setting: "auto", gameVersion: "1.21.11", loader: .vanilla, metalVersions: manifest),
+            "mobileglues")
         XCTAssertEqual(
             RendererPolicy.resolve(setting: "auto", gameVersion: "26.4", loader: .fabric, metalVersions: manifest),
             "mobileglues")
         XCTAssertEqual(
             RendererPolicy.resolve(setting: "auto", gameVersion: "26.4", loader: .forge, metalVersions: manifest),
             "mobileglues")
+    }
+
+    func testSavedMetalFallsBackForModdedInstances() {
+        XCTAssertEqual(
+            RendererPolicy.resolve(setting: "metallum", gameVersion: "26.2", loader: .fabric, metalVersions: ["26.2"]),
+            "mobileglues")
+        XCTAssertEqual(
+            RendererPolicy.resolve(
+                setting: "libmetallum.dylib", gameVersion: "1.21.1", loader: .neoforge,
+                metalVersions: ["1.21.1"]),
+            "mobileglues")
+        XCTAssertEqual(
+            RendererPolicy.resolve(setting: "metallum", gameVersion: "26.2", loader: .vanilla, metalVersions: ["26.2"]),
+            "metallum")
     }
 }

@@ -29,11 +29,21 @@ public enum RendererPolicy {
 
     public static func resolve(setting: RendererID, globalSetting: RendererID = .auto, gameVersion: String,
                                loader: Instance.Loader, metalVersions: Set<String>) -> RendererID {
-        if setting != .auto { return setting }
-        if globalSetting != .auto { return globalSetting }
+        let fallback = automatic(gameVersion: gameVersion, loader: loader)
+        // Metallum is attached by Air only for a vanilla version id. A loader's
+        // version id cannot use it, even when the base Minecraft version is in
+        // the Metal manifest.
+        if setting != .auto { return isMetal(setting) && loader != .vanilla ? fallback : setting }
+        if globalSetting != .auto { return isMetal(globalSetting) && loader != .vanilla ? fallback : globalSetting }
         // Air only attaches the bundled Metallum agent for Minecraft 26+.
         let major = Int(gameVersion.prefix(while: { $0.isNumber })) ?? 0
-        if major >= 26 && metalVersions.contains(gameVersion) { return .metallum }
+        if loader == .vanilla && major >= 26 && metalVersions.contains(gameVersion) { return .metallum }
+        return fallback
+    }
+
+    /// The GL renderer Cofre uses when Metal is unavailable or Auto has no
+    /// manifest-backed vanilla Metal choice.
+    private static func automatic(gameVersion: String, loader: Instance.Loader) -> RendererID {
         // Air's `auto` path is ANGLE. That is a poor default for current
         // Minecraft on iOS: it is the path that produced
         // GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT on the iPhone 17 Pro. Use the
@@ -44,6 +54,16 @@ public enum RendererPolicy {
             (numbers.count >= 3 && numbers[0] == 1 &&
                 (numbers[1] > 20 || (numbers[1] == 20 && numbers[2] >= 5)))
         return modern || loader == .forge || loader == .neoforge ? .mobileglues : .air
+    }
+
+    /// Renderer ids from old profiles may be Air library names rather than
+    /// the typed `metallum` value.
+    public static func isMetal(_ renderer: RendererID) -> Bool {
+        switch renderer {
+        case .metallum: true
+        case .custom(let value): value.lowercased().contains("metallum") || value.lowercased() == "metal"
+        default: false
+        }
     }
 
     public static func resolve(setting: String, globalSetting: String = "auto", gameVersion: String,
@@ -83,9 +103,10 @@ public struct CompatibilityIssue: Hashable, Sendable {
     public var badge: String { "Not on \(renderer) · \(gameVersion)" }
 }
 
-/// Which mods and shader packs can't run with an instance's renderer. Metal's limits come from the shipped
-/// `RendererManifest`; shader packs on MobileGlues fail at pipeline creation (ES 3.0 via ANGLE: "Draw buffers …
-/// Status: 36054"), though MobileGlues reports OpenGL 4.0 so Iris's own check passes.
+/// Which mods and shader packs can't run with an instance's renderer. Metal
+/// runs vanilla only for now; shader packs on MobileGlues fail at pipeline
+/// creation (ES 3.0 via ANGLE: "Draw buffers … Status: 36054"), though
+/// MobileGlues reports OpenGL 4.0 so Iris's own check passes.
 public enum ContentCompatibility {
     public static func rendererName(_ renderer: String) -> String? {
         let r = renderer.lowercased()
@@ -110,13 +131,11 @@ public enum ContentCompatibility {
         }
         switch (kind, shown) {
         case (.mods, "Metal"):
-            guard let found = integration(for: name, manifest) ?? integration(for: id, manifest),
-                !found.versions.contains(gameVersion) else { return nil }
+            guard let found = integration(for: name, manifest) ?? integration(for: id, manifest) else { return nil }
             // Named after the integration: a file name like "iris-fabric-1.8.0+mc26.3" reads badly in a title.
-            return make("Metal supports \(found.name.capitalized) only on \(versions(found.versions)).", as: found.name.capitalized)
+            return make("Metal runs vanilla only for now.", as: found.name.capitalized)
         case (.shaders, "Metal"):
-            guard let iris = manifest.integrations["iris"], !iris.contains(gameVersion) else { return nil }
-            return make("Metal runs shader packs through Iris only on \(versions(iris)).")
+            return make("Metal runs vanilla only for now.")
         case (.shaders, "MobileGlues"):
             return make("On MobileGlues, shader packs fail to start and Iris turns them off.")
         default: return nil
@@ -155,7 +174,4 @@ public enum ContentCompatibility {
     }
 
     private static func normalized(_ s: String) -> String { s.lowercased().filter { $0.isLetter || $0.isNumber } }
-    private static func versions(_ set: Set<String>) -> String {
-        set.isEmpty ? "no Minecraft version" : "Minecraft " + ListFormatter.localizedString(byJoining: set.sorted())
-    }
 }

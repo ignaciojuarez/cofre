@@ -11,10 +11,8 @@ public struct ModCompatibility: Hashable, Sendable {
         instanceSetting: RendererID? = nil, globalSetting: RendererID = .auto, gameVersion: String,
         loader: Instance.Loader, javaVersion: Int = 21
     ) -> RendererID {
-        if let instanceSetting, instanceSetting != .auto { return instanceSetting }
-        if globalSetting != .auto { return globalSetting }
         let metal = javaVersion >= 21 ? metalVersions : []
-        return RendererPolicy.resolve(setting: .auto, globalSetting: .auto, gameVersion: gameVersion,
+        return RendererPolicy.resolve(setting: instanceSetting ?? .auto, globalSetting: globalSetting, gameVersion: gameVersion,
             loader: loader, metalVersions: metal)
     }
 
@@ -54,7 +52,6 @@ public struct ModCompatibility: Hashable, Sendable {
     public init(id: String, name: String, metalVersions: Set<String>?, reason: String, verified: Bool) { self.id=id; self.name=name; supportedMetalVersions=metalVersions; self.reason=reason; isWarning = !verified }
     public func issue(gameVersion: String, renderer: String) -> ModCompatibilityIssue? {
         guard ContentCompatibility.rendererName(renderer) == "Metal" else { return nil }
-        if let versions = supportedMetalVersions, versions.contains(gameVersion) { return nil }
         return ModCompatibilityIssue(modID:id, modName:name, gameVersion:gameVersion, reason:reason)
     }
     public func issue(gameVersion: String, renderer: RendererID) -> ModCompatibilityIssue? {
@@ -63,8 +60,8 @@ public struct ModCompatibility: Hashable, Sendable {
     public static func entry(for id: String, name: String? = nil) -> ModCompatibility? {
         guard let found = ContentCompatibility.integration(for: name ?? id, manifest) else { return nil }
         let label = name ?? id
-        let reason = "\(label) has no shipped \(found.name.capitalized) integration for this Minecraft version."
-        return .init(id: id, name: label, metalVersions: found.versions, reason: reason, verified: true)
+        return .init(id: id, name: label, metalVersions: found.versions,
+                     reason: "Metal runs vanilla only for now.", verified: true)
     }
 }
 public enum ModLaunchDecision: Equatable, Sendable { case play, warn([ModCompatibilityIssue]) }
