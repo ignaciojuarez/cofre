@@ -261,7 +261,7 @@ public struct CompatibilityIssue: Hashable, Sendable {
 public enum ContentCompatibility {
     public static func rendererName(_ renderer: String) -> String? {
         let r = renderer.lowercased()
-        return r.contains("metal") ? "Metal" : r.contains("mobileglues") ? "MobileGlues" : nil
+        return r.contains("metal") ? "Metal" : r.contains("mobileglues") ? "MobileGlues" : r.contains("angle") ? "ANGLE" : nil
     }
 
     /// The Metallum integration a mod needs (`iris`, `sodium`) and the versions it ships for. `mixin` is
@@ -289,6 +289,11 @@ public enum ContentCompatibility {
             return make("Metal runs vanilla only for now.")
         case (.shaders, "MobileGlues"):
             return make("On MobileGlues, shader packs fail to start and Iris turns them off.")
+        case (.mods, "MobileGlues"), (.mods, "ANGLE"):
+            // iPad mini, Fabric 26.2 + Sodium + Iris: the game runs but the screen stays black on both GL paths.
+            guard (Int(gameVersion.split(separator: ".").first ?? "") ?? 0) >= 26,
+                  normalized(name).contains("iris") || normalized(id).contains("iris") else { return nil }
+            return make("On \(shown), Iris keeps Minecraft \(gameVersion) on a black screen.", as: "Iris")
         default: return nil
         }
     }

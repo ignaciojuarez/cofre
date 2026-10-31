@@ -36,7 +36,16 @@ final class ContentCompatibilityTests: XCTestCase {
         XCTAssertNil(issue("MixinExtras", .mods, "26.3", "metallum"))
         XCTAssertNil(issue("JEI", .mods, "26.3", "metallum"))
         // Off Metal the manifest says nothing about mods.
-        XCTAssertNil(issue("Iris", .mods, "26.3", "mobileglues"))
+        XCTAssertNil(issue("Sodium", .mods, "26.3", "mobileglues"))
+        XCTAssertNil(issue("Iris", .mods, "1.21.1", "mobileglues"))
+    }
+
+    func testIrisOn26xGLPathsIsFlaggedAsBlackScreen() throws {
+        let mg = try XCTUnwrap(issue("iris-fabric-1.10.0+mc26.2", .mods, "26.2", "libmobileglues.dylib"))
+        XCTAssertEqual(mg.title, "Iris doesn't run here")
+        XCTAssertEqual(mg.badge, "Not on MobileGlues · 26.2")
+        XCTAssertNotNil(issue("Iris Shaders", .mods, "26.3", "libtinygl4angle.dylib"))
+        XCTAssertNil(issue("Iris", .mods, "26.2", "zink"))
     }
 
     func testShaderPacksWarnOnMobileGluesAndOnMetalWithoutIris() throws {
