@@ -136,7 +136,8 @@
         public var activeInstance: InstanceSummary? { instances.first { $0.id == activeInstanceID } ?? instances.first }
         public var activeAccount: Account? { accounts.first { $0.isActive } ?? accounts.first }
         public var updateCount: Int { modsInstance?.updatesAvailable ?? 0 }
-        public var isJITReady: Bool { setup.jit.isReady }
+        /// JIT turns on by itself at Play, so it's ready once it can: a passed test, or a valid pairing with the VPN set up.
+        public var isJITReady: Bool { setup.jit.isReady || (setup.pairing.isReady && setup.vpn.isReady) }
         /// The wizard shows only for users who never finished it, once their state has loaded. It stays up through
         /// S08 Ready even when every check passes mid-flow; `finishSetup()` (Play) or a complete state at load ends it.
         public var showsSetup: Bool { setupLoaded && !setupCompleted }

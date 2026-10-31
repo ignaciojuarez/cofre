@@ -97,14 +97,9 @@
             }
         }
 
+        /// Thumbnails fill grid cells; the full image is drawn at most screen-sized.
         private func remote(_ url: URL) -> some View {
-            AsyncImage(url: url) { phase in
-                if let image = phase.image {
-                    image.resizable().aspectRatio(contentMode: contentMode)
-                } else {
-                    Color.clear
-                }
-            }
+            RemoteImage(url: url, maxPoints: url == thumb ? 400 : 1400, contentMode: contentMode) { Color.clear }
         }
     }
 
