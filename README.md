@@ -107,6 +107,21 @@ From then on, just tap Play. JIT and the VPN turn on by themselves.
 | **Modded servers.** Fabric, Quilt, Forge and NeoForge. Install the server's modpack or the same mods from Modrinth or CurseForge. | **PC-only mods.** Mods with desktop native code don't work, such as Simple Voice Chat, Plasmo Voice and Sound Physics Remastered. |
 | **Coming: one-tap Join.** Servers will be able to publish a card so Cofre installs the right mods and joins for you. | **iOS updates** can break JIT. Turn off automatic updates and wait for our OK. |
 
+## Best versions for mods
+
+Mods run fast only on Apple's native **Metal** graphics. Older versions fall back to OpenGL translation, which runs on the CPU and is much slower.
+
+| | Minecraft | Loader | Graphics | FPS in a world* |
+|---|---|---|---|---|
+| ⭐ | **26.2** | **Fabric** | Metal (MetalUniversal + Sodium) | ~57 |
+| ⭐ | **26.2** | **NeoForge** | Metal (through Sinytra Connector) | ~55 |
+| ⭐ | **1.21.11** | **Fabric** | Metal (Graft, coming soon) | ~51 |
+| ✅ | 26.3, 1.21.11 | Vanilla | Metal | 60 (screen limit) |
+| ⚠️ | 1.21.11 | NeoForge | OpenGL (MobileGlues) | ~11 on iPhone 17 Pro |
+| ⚠️ | 1.21.1, 1.20.1 | any | OpenGL (MobileGlues) | slow |
+
+\* iPad mini 6 (60 Hz screen) unless noted. Shaders don't work with Metal yet.
+
 ## Help
 
 <details><summary><b>JIT won't turn on</b></summary>
