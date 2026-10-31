@@ -40,6 +40,18 @@ final class GameExitTests: XCTestCase {
     }
 
     // The shader pack in System Details and an INFO log line must not turn a Java error into a renderer one.
+    func testShutdownCrashAfterStoppingIsAQuit() {
+        let log = [
+            "[16:16:02] [Render thread/INFO]: Stopping!",
+            "#  SIGSEGV (0xb) at pc=0x0000000100fffc4c, pid=4110, tid=67891",
+            "# C  [AngelAuraAmethyst+0x6fc4c]  gl_terminate+0x88",
+            "  #09 0x1012b6d3c  Cofre.app/AngelAuraAmethyst  pojavTerminate + 3304764",
+        ]
+        XCTAssertEqual(GameExitReport.diagnose(code: 1, crashReport: nil, logLines: log).0, .quit)
+        // The same trace while the game is running is still a crash.
+        XCTAssertNotEqual(GameExitReport.diagnose(code: 1, crashReport: nil, logLines: Array(log.dropFirst())).0, .quit)
+    }
+
     func testMetalDriverCrashIsTheRenderer() {
         let fatal = """
             [Render thread/INFO]: [metallum] createTexture 512x256 fmt=RGBA8_UNORM usage=0xf

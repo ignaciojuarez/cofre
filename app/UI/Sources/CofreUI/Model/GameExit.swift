@@ -90,6 +90,13 @@ public struct GameExitReport: Hashable, Sendable {
         let report = (crashReport ?? "").split(whereSeparator: \.isNewline).map(String.init)
             .prefix { !$0.hasPrefix("-- System Details --") }.map { $0 }
         let errors = logLines.filter(isError)
+        // On Metal, Air's GLFW shutdown (pojavTerminate → gl_terminate) crashes after Minecraft has saved and stopped.
+        // The player quit; nothing was lost.
+        if let stop = logLines.lastIndex(where: { $0.contains("]: Stopping!") }),
+            logLines[stop...].contains(where: { $0.contains("gl_terminate") || $0.contains("pojavTerminate") })
+        {
+            return (.quit, nil)
+        }
         // OpenGL-only mods find no GL context on the Metal renderer; name the one at the top of the stack.
         if (report + logLines).contains(where: { $0.contains("No GLCapabilities instance set") }),
             let name = (report + logLines).lazy.compactMap({ line in
