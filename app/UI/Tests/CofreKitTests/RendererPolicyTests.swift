@@ -124,6 +124,11 @@ final class RendererPolicyTests: XCTestCase {
                     setting: "metallum", gameVersion: "26.2", loader: .fabric,
                     metalVersions: ["26.2"]),
                 "metallum")
+            XCTAssertEqual(
+                RendererPolicy.resolve(
+                    setting: "metallum", gameVersion: "26.2", loader: .neoforge,
+                    metalVersions: ["26.2"]),
+                "metallum")
         #endif
     }
 

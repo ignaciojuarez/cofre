@@ -108,3 +108,50 @@ Popular pack evidence is version-specific only when a pack version exists: Fabul
 - [JVMS §5.3/§5.4.4](https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-5.html) · [Fabric access wideners](https://wiki.fabricmc.net/tutorial:accesswidening) · [NeoForge access transformers](https://docs.neoforged.net/docs/advanced/accesstransformers/)
 - [Modrinth API](https://api.modrinth.com/v2/search) (facets/counts queried 2026-10-31)
 
+
+## NeoForge 26.2
+
+Research date: 2026-10-31. Source and bytecode review plus prepared DEBUG scenarios; **no device run yet**.
+
+### Facts that decide the route
+
+- **NeoForge 26.2.0.93** (latest 26.2 on [maven.neoforged.net](https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml)): `mainClass net.neoforged.fml.startup.Client`, FancyModLoader 11.0.16. **No ModLauncher, no SecureJarHandler, no BootstrapLauncher**: FML 11 has its own `ModuleClassLoader`/`TransformingClassLoader` plus `ClassProcessor` services. Mixin is `net.fabricmc:sponge-mixin 0.17.4`.
+- **The NeoForge universal jar has zero references** to `org/lwjgl/opengl`, `com/mojang/blaze3d/opengl` or `PreferredGraphicsApi`. NeoForge 26.2 is backend-neutral, like vanilla (which already ships GL + Vulkan). The only GL owner is FML's **early loading window** (`earlydisplay`: GLFW + GL context), and it can be turned off with `config/fml.toml` → `earlyWindowControl = false`.
+- **Air already attaches its Metallum agent to NeoForge 26.x.** `JavaLauncher.m` adds `-javaagent:metallum_agent.jar` for any version id whose year-major is ≥ 26 (`neoforge-26.2.0.93` → 26), and sets `AMETHYST_METAL=1` when the renderer is `libmetallum.dylib`. Cofre's DEBUG `allowMetalForModdedScenario` override already applies to every non-vanilla loader, and `8cd573c` canonicalizes `metallum` → `libmetallum.dylib`. So route D needs **no new code**.
+- The agent (v16) only special-cases **Fabric** (`net.fabricmc.loader.api.FabricLoader` on the system loader → skip injection on 26.2) and **legacy Forge** (`cpw.mods.modlauncher.Launcher` + `net/minecraftforge/...` early-window/overlay patches). Under NeoForge 26.2 neither class exists, so it takes the **vanilla path**: when `net/minecraft/client/PreferredGraphicsApi` is loaded, it defines its `classes262` Metallum set into **that class's loader** (FML's game loader), applies its own access widener to `SpvUniformBuffer/SpvSampler/SpvVariable`, then patches `PreferredGraphicsApi`.
+- **IllegalAccessError analysis:** the Fabric crash is a run-time-package/visibility mismatch (JVMS §5.3/§5.4.4) between Metallum and the Spv* classes. Under FML 11 both are defined by the same game loader and the agent's `ClassFileTransformer` runs after FML's processors on every `defineClass`, so the widening should apply before linking. Remaining risk: Minecraft lives in a named automatic JPMS module while the agent's classes land in the loader's unnamed module (automatic modules read all unnamed modules, so this should link, but it is unproven).
+- **Sinytra Connector exists for 26.2**: `connector 3.1.0-beta.4+26.2` (2026-10-30, `neoforge [26.2,26.3)`), needs **Forgified Fabric API** `0.161.0+26.2+4.0.2` (release) and **Launchpad** `1.10.2+26.2` (the Fabric Loader shim; its mixin plugin runs `preLaunch` entrypoints early). 26.x is unobfuscated, so Connector does no remapping.
+- **MetalUniversal 1.0.4's loader surface is tiny**: one `preLaunch`+`main` entrypoint (`com.metallum.Metallum`: calls `MetalNativeBridge.ensureSpvcLibraryConfigured()`), one access widener (the same 3 Spv* classes), one vanilla mixin (`PreferredGraphicsApiMixin`), 3 Sodium mixins, and a mixin plugin that uses only `FabricLoader.isModLoaded("sodium")` and `getGameDir()`.
+- **Ciderlight** NeoForge is 26.3-only: 19 mixins including `SDLEventHandlerMixin` (26.3 moved input to SDL), its own Metal shader pipeline and an AppKit native (`ciderlight.m`). Not a 26.2 drop-in.
+
+### Ranked routes
+
+| Rank | Route | Works? | Effort | Risk | Test |
+|---:|---|---|:---:|---|---|
+| 1 | **D. Air's agent under NeoForge 26.2** (no mod) | ❓ untested; no blocker found in bytecode | **S** (zero code; done) | Early GL window vs Metal layer; JPMS unnamed→automatic module link; agent's bundled slf4j vs NeoForge's | `neoforge-26.2-metal-agent.json`, then `…-agent-noearly.json` |
+| 2 | **A. Connector + FFAPI + Launchpad + MetalUniversal** | ❓ untested | **S** (scenario only) | **Double backend**: Air's agent doesn't see Fabric under Connector, so it also injects its Metallum and patches `PreferredGraphicsApi`; Connector beta; MetalUniversal 1.0.4 is invisible until the patched jar lands | `neoforge-26.2-metal-connector.json` |
+| 3 | **B. Native NeoForge port of MetalUniversal** | Not built | **S–M**: replace 2 Fabric-facing classes (`@Mod` entrypoint, mixin plugin via `ModList`/`FMLPaths`), AW → `META-INF/accesstransformer.cfg` (3 `public` lines), `neoforge.mods.toml`; reuse the mixins unchanged (no remapping on 26.x) | Ordering: `ensureSpvcLibraryConfigured` must run before LWJGL `Spvc` init (call it from the mixin plugin's `onLoad`); same agent double-injection as A | Only if D fails and A conflicts; build on top of the patched MetalUniversal (`scripts/metaluniversal.sh`) |
+| 4 | **C. Backport Ciderlight NeoForge 26.3 → 26.2 + iOS** | No | **XL** | 26.3-only APIs (SDL), custom shader pipeline, AppKit surface, no Sodium | Not planned; 26.3 is not a target |
+
+**Pick: D first, A second.** D presents through Air's surface path, which already shows a picture on vanilla 26.x; A is blocked on visibility (patched MetalUniversal) and on the agent's double injection.
+
+### Prepared (DEBUG scenarios, NeoForge 26.2.0.93, renderer `metallum`, `fresh: false` so the post-install restart reuses the instance)
+
+| Scenario | Files |
+|---|---|
+| `scripts/scenarios/neoforge-26.2-metal-agent.json` | none |
+| `scripts/scenarios/neoforge-26.2-metal-agent-noearly.json` | `config/fml.toml` = `earlyWindowControl = false` (inline `text`, new) |
+| `scripts/scenarios/neoforge-26.2-metal-connector.json` | `fml.toml` as above; Connector 3.1.0-beta.4+26.2; Launchpad 1.10.2+26.2; FFAPI 0.161.0+26.2+4.0.2; MetalUniversal 1.0.4 |
+
+Scenario `files` now also accept `{"text": …, "to": …}` (exactly one of `url`/`text`). Local copies for inspection (not in git): `/tmp/neoforge-metal/` (`mods/`, `nf/` installer/universal/FML jars, `agent/` disassembly). SHA-256: connector `201ef1c8…`, FFAPI `3c1d0f1f…`, launchpad `13923aac…`, metallum-1.0.4 `4f730d14…`, NeoForge installer `7618883b…`.
+
+### Test plan (iPad, when free)
+
+Run each with `COFRE_LAUNCH_ARGS="-cofrePerfLog 1" scripts/scenario.sh scripts/scenarios/<case>.json`. The first run installs NeoForge and ends `result=restart`; the script relaunches once.
+
+1. **`neoforge-26.2-metal-agent`**. Pass lines, in order: `Metal renderer selected: AMETHYST_METAL=1`; `Metallum agent enabled … (mcVersion=neoforge-26.2.0.93)`; **no** `Fabric Loader detected` and **no** `FIX457 … ModLauncher`; `accesswidener applied: com/mojang/blaze3d/vulkan/glsl/Spv…` ×3; `injected net/minecraft/client/PreferredGraphicsApi`; `Using graphics backend Metal`; `launch state=inGame`. Then a screenshot of the title screen and 60 s FPS (`scripts/perf-summary.sh`).
+   - `IllegalAccessError … SpvUniformBuffer` → record `MetalCrossShaderCompiler`'s loader and module next to Spv*'s (the instrumentation step above), then go to route B with an AT.
+   - Black screen or a crash in `net.neoforged.fml.earlydisplay` / GLFW before the backend line → run step 2.
+2. **`neoforge-26.2-metal-agent-noearly`**: same pass lines, plus no `earlydisplay` window in the log.
+3. **`neoforge-26.2-metal-connector`**: pass lines `Connector`/`Launchpad` loading, `[Launchpad] PreLaunch`, `Invoking Fabric preLaunch entrypoint`, `Using graphics backend Metal`. Watch for duplicate Metallum (`define skipped (already defined here)`, `LinkageError … duplicate class definition`, two `MetalDevice` inits). Expect a black picture with 1.0.4; swap in the patched MetalUniversal jar URL when it exists.
+4. When one passes: add NeoForge Sodium (`sodium-neoforge-0.9.2+mc26.2`, note MetalUniversal #22) and one gameplay mod (JEI), then record results in `renderer-benchmarks.md`.

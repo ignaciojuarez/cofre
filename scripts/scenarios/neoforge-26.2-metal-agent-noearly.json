@@ -1,0 +1,16 @@
+{
+  "name": "neoforge-26.2-metal-agent-noearly",
+  "version": "26.2",
+  "loader": "neoforge",
+  "loaderVersion": "26.2.0.93",
+  "files": [
+    {
+      "text": "earlyWindowControl = false\n",
+      "to": "config/fml.toml"
+    }
+  ],
+  "renderer": "metallum",
+  "resolution": 1.0,
+  "launch": true,
+  "fresh": false
+}

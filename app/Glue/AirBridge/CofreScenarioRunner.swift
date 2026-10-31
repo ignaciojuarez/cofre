@@ -125,10 +125,16 @@ final class CofreScenarioRunner {
                     throw CofreBackendError.unavailable("instance folder")
                 }
                 for file in scenario.files {
-                    guard let url = URL(string: file.url) else { throw CofreBackendError.unavailable("scenario file URL") }
-                    let (data, response) = try await URLSession.shared.data(from: url)
-                    guard (response as? HTTPURLResponse)?.statusCode == 200 else {
-                        throw CofreBackendError.unavailable("scenario file download")
+                    let data: Data
+                    if let text = file.text {
+                        data = Data(text.utf8)
+                    } else {
+                        guard let url = URL(string: file.url ?? "") else { throw CofreBackendError.unavailable("scenario file URL") }
+                        let (body, response) = try await URLSession.shared.data(from: url)
+                        guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+                            throw CofreBackendError.unavailable("scenario file download")
+                        }
+                        data = body
                     }
                     let destination = directory.appendingPathComponent(file.to)
                     try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)

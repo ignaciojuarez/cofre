@@ -1,0 +1,10 @@
+{
+  "name": "neoforge-26.2-metal-agent",
+  "version": "26.2",
+  "loader": "neoforge",
+  "loaderVersion": "26.2.0.93",
+  "renderer": "metallum",
+  "resolution": 1.0,
+  "launch": true,
+  "fresh": false
+}

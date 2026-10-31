@@ -18,4 +18,13 @@ final class ScenarioTests: XCTestCase {
         let bad = CofreScenario(name: "metal", version: "26.2", files: [.init(url: "https://example.com/x.jar", to: "mods/../x.jar")])
         XCTAssertThrowsError(try bad.validate())
     }
+
+    func testInlineTextFileNeedsExactlyOneSource() throws {
+        let s = try CofreScenario.load(Data(#"{"name":"nf","version":"26.2","loader":"neoforge","files":[{"text":"earlyWindowControl = false\n","to":"config/fml.toml"}]}"#.utf8))
+        XCTAssertEqual(s.files.first?.text, "earlyWindowControl = false\n")
+        let both = CofreScenario(name: "nf", version: "26.2", files: [.init(url: "https://example.com/a", text: "x", to: "config/a")])
+        XCTAssertThrowsError(try both.validate())
+        let neither = CofreScenario(name: "nf", version: "26.2", files: [.init(to: "config/a")])
+        XCTAssertThrowsError(try neither.validate())
+    }
 }
