@@ -217,3 +217,10 @@ Pass, per run: `PASS in-game`; `bundled stubs queued = 4`; `DEFINE-OK summary` w
 If 1.21.11 still fails, the next suspect is another mismatch between `classes12111_1_21_11/` and the root `com/metallum/agent/` build; `scripts/repair-metallum-agent.py --check` covers classes and private access but not member signatures (Air's own rewrite leaves unused constant-pool entries, e.g. a dead `Metallum.LOGGER:Lorg/slf4j/Logger;`). If a version cannot be fixed, drop it from Cofre's Metal list so Auto picks MobileGlues.
 
 NeoForge 26.2 through the agent (route D above) should pick the same `classes262iris/` set (the Iris route depends only on the jar marker), so it too should now define `Metallum` in the game loader instead of falling back to the root copy; unverified.
+
+## NeoForge 1.21.11 on Metal (researched 2026-10-31): not now
+
+- Sinytra skipped 1.21.2–1.21.11: no Connector, Forgified Fabric API or Launchpad builds ([discussion #2136](https://github.com/Sinytra/Connector/discussions/2136)). Newest 1.21.x Connector is `2.0.0-beta.17+1.21.1`.
+- No NeoForge Metal renderer for 1.21.11: Graft and MetalUniversal are Fabric-only, Ciderlight is 26.3 only, MetalForge is 26.1.2 only.
+- NeoForge mods on Modrinth: 1.21.1 21,790 · 1.21.11 8,316 · 26.2 7,080. EvilCraft + Cyclops Core ship for 26.2 (`7z7VPzeq`, `bD7eR4iR`), so NeoForge players go to 26.2 + Connector + MetalUniversal.
+- Only routes left are high effort (port Graft to NeoForge 1.21.11, or a ModLauncher hook for Air's agent). Revisit only if users ask for NeoForge 1.21.11 specifically.
