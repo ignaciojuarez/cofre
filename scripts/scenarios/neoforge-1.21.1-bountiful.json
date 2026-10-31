@@ -1,0 +1,11 @@
+{
+  "name": "neoforge-1.21.1-bountiful",
+  "loader": "neoforge",
+  "mods": [
+    "bountiful"
+  ],
+  "renderer": "auto",
+  "resolution": 1.0,
+  "launch": true,
+  "version": "1.21.1"
+}

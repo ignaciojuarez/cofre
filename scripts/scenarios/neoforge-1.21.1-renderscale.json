@@ -1,0 +1,11 @@
+{
+  "name": "neoforge-1.21.1-renderscale",
+  "loader": "neoforge",
+  "mods": [
+    "renderscale"
+  ],
+  "renderer": "auto",
+  "resolution": 1.0,
+  "launch": true,
+  "version": "1.21.1"
+}

@@ -1,0 +1,9 @@
+{
+  "name": "fabric-1.21.1-plain-mobileglues",
+  "loader": "fabric",
+  "mods": [],
+  "renderer": "mobileglues",
+  "resolution": 1.0,
+  "launch": true,
+  "version": "1.21.1"
+}

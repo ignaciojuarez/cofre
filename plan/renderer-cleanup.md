@@ -1,0 +1,35 @@
+# Renderer cleanup: keep what's playable, warn or block the rest
+
+Status: in progress (2026-10-31). Owner: main thread; findings land in `plan/reviews/renderer-matrix.md`.
+
+## Why
+
+- iPhone 17 Pro, Fabric and NeoForge with fewer than 20 mods on the GL path: CPU near 100%, GPU nearly idle, under 20 FPS, ticks lagging. Unplayable.
+- Metal (Metallum) on vanilla is fast. The other engines may not be usable yet.
+- The picker lists about 13 renderers (Auto, Metal, MobileGlues, ANGLE, Zink, LTW, Vulkan/MoltenVK, MobileGL, MobileGL GLES, GL4ES, Krypton, SimpleFPEWrapper, VGPU). Most are untested and some are known broken.
+
+## Goals
+
+1. Find out per renderer × Minecraft version × loader: works / black screen / crashes / unplayable FPS. Use Air's and Amethyst's own notes, upstream docs, and our device runs.
+2. Remove or hide renderers that are broken or unplayable. Keep a short list.
+3. Show **Recommended** on the right pick and a one-line note on each option.
+4. Before a user creates or plays an instance that can only run on an unplayable renderer, warn them, or don't allow it.
+5. Measure: FPS, 1% low, footprint, thermal (`-cofrePerfLog 1`, `scripts/perf-summary.sh`).
+
+## Known so far (iPad mini 6, 4 GB, iPadOS 27)
+
+| Setup | Renderer | Result |
+|---|---|---|
+| Vanilla 26.3 | Metal | Title + world OK (2 chunks); OOM at 8 chunks; pause/blur spike +650 MB |
+| Vanilla 26.3 | Metal | Graphics preset change in game → SIGSEGV in AGXMetal (driver), engine bug |
+| NeoForge 1.21.1, no mods | MobileGlues | Title OK; OOM creating a world at 8 chunks |
+| Fabric 26.2 + Sodium + Iris | MobileGlues | Black screen (game running) |
+| Fabric 26.2 + Sodium + Iris | ANGLE (libtinygl4angle) | Black screen |
+| Fabric 26.2 + Sodium (± Iris) | Metal (Air's agent forced) | Crash: IllegalAccessError under Fabric's Knot loader; stock Iris needs GL |
+| Fabric/NeoForge (<20 mods), iPhone 17 Pro | GL path | CPU ~100%, <20 FPS (user report) |
+
+## Ideas to keep
+
+- **Metallum as a Fabric mod** where Air's bundled agent can't run (Fabric 26.x): install the real Metallum mod (+ its Sodium/Iris builds) into the instance. Experiment in progress (`scripts/scenarios/fabric-26.2-metallum-*.json`). If it works, offer it as the Metal path for Fabric on the versions Metallum supports.
+- If only Metal is truly playable, steer users to Metal-capable setups (vanilla or Fabric + Metallum on 26.x) and label the rest "experimental / slow".
+- **iPhone test kit:** build the app once on the iPhone 17 Pro with a ready-made set of instances (one per renderer × loader case) so the user only taps Play on each and reads FPS. Needs the user's go-ahead before installing on the iPhone.

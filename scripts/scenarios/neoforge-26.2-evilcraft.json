@@ -1,0 +1,12 @@
+{
+  "name": "neoforge-26.2-evilcraft",
+  "loader": "neoforge",
+  "mods": [
+    "evilcraft",
+    "cyclops-core"
+  ],
+  "renderer": "auto",
+  "resolution": 1.0,
+  "launch": true,
+  "version": "26.2"
+}
