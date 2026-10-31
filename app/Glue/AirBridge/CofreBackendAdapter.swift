@@ -206,6 +206,21 @@
             return (JavaHeap.clamp(requested, availableMB: available), requested, available)
         }
 
+        /// Writes playable view distances before Air fills in its own 2-chunk default. The first time Cofre sees an
+        /// instance it also replaces Air's defaults already saved there; after that the game owns the values.
+        private func seedViewDistances(_ instance: Instance, instanceID: String) {
+            let key = PreferenceKey.distancesSeeded(instanceID).rawValue
+            let firstTime = !UserDefaults.standard.bool(forKey: key)
+            do {
+                let changed = try GameOptions.seedDistances(in: instance.gameDirectory,
+                    physicalMB: Int(ProcessInfo.processInfo.physicalMemory >> 20), replacingEngineDefaults: firstTime)
+                UserDefaults.standard.set(true, forKey: key)
+                if changed { NSLog("[Cofre] view distances seeded instance=%@", instanceID) }
+            } catch {
+                NSLog("[Cofre] options.txt not updated: %@", error.localizedDescription)
+            }
+        }
+
         /// Air reads AMETHYST_MEM_MB for -Xmx; NO_CLAMP skips its own clamp, which caches a stale reading.
         private func applyJavaHeap(instanceID: String) {
             let size = javaHeap(instanceID: instanceID, prefs: preferenceStore.load(instanceID: instanceID))
@@ -310,6 +325,7 @@
                             }
                         }
                         self.repairLibraries()
+                        self.seedViewDistances(instance, instanceID: instanceID)
                         self.applyJavaHeap(instanceID: instanceID)
                         NSLog("[Cofre] launch JIT ready; starting Air")
                         self.air.launchProfile(instanceID, accountID: accountID, gameArguments: gameArguments) { event, fraction, message in

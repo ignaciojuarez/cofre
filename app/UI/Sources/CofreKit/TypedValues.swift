@@ -181,6 +181,7 @@ public enum PreferenceKey: Hashable, Sendable {
     case renderScale, resolutionDefaulted, memoryDefaultApplied, downloadSourceDefaulted
     case optionsBefore(String)
     case launchStarted(String)
+    case distancesSeeded(String)
     case serverCard(String)
     case modsIdentities
     case modsIndex(String)
@@ -200,6 +201,7 @@ public enum PreferenceKey: Hashable, Sendable {
         case .downloadSourceDefaulted: "cofre.download_source_defaulted"
         case .optionsBefore(let id): "cofre.options.before.\(id)"
         case .launchStarted(let id): "cofre.launch.started.\(id)"
+        case .distancesSeeded(let id): "cofre.options.distances-seeded.\(id)"
         case .serverCard(let host): "cofre.server-card.\(host)"
         case .modsIdentities: "cofre.mods.identities"
         case .modsIndex(let id): "cofre.mods.index.\(id)"
