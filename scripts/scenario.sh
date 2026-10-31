@@ -35,7 +35,7 @@ launch_scenario
 log="$out/latestlog.txt"; verdict="FAIL timeout"
 restarted=0
 for ((i=0; i<timeout; i++)); do
-  xcrun devicectl device copy from --device "$device" --domain-type appDataContainer --domain-identifier "$bundle" --source Documents/latestlog.txt --destination "$log" >/dev/null 2>&1 || true
+  timeout 20 xcrun devicectl device copy from --device "$device" --domain-type appDataContainer --domain-identifier "$bundle" --source Documents/latestlog.txt --destination "$log" >/dev/null 2>&1 || true
   first=$(grep -m1 -oE '^20[0-9]{2}-[0-9]{2}-[0-9]{2} [0-9:]{8}' "$log" 2>/dev/null || true)
   if [[ -s "$log" && ! "$first" < "$since" ]]; then
     clean=$(sed -E 's/(accessToken|uuid|xuid)([[:space:]]*[:=][[:space:]]*)[^,}]*/\1\2<redacted>/Ig' "$log")
