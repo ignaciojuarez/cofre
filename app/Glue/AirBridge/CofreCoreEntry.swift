@@ -6,6 +6,41 @@ import CofreKit
 public final class CofreCoreEntry: NSObject {
     private static var bridge: (any CofreAirBridging)?
     private static var root: UIViewController?
+
+    private static func javaMajor(_ value: Any?) -> Int? {
+        if let value = value as? NSNumber { return value.intValue > 0 ? value.intValue : nil }
+        if let value = value as? String, let major = Int(value), major > 0 { return major }
+        if let value = value as? [String: Any] { return javaMajor(value["majorVersion"]) }
+        return nil
+    }
+
+    private static func requiredJava(from metadata: [String: Any]) -> Int {
+        let java = metadata["javaVersion"] as? [String: Any]
+        return javaMajor(java?["majorVersion"] ?? java?["version"]) ?? 8
+    }
+
+    /// ObjC launch glue uses this without importing CofreKit's Swift types.
+    @objc(javaRuntimeDecisionForProfile:metadata:renderer:availableJavaMajors:)
+    @MainActor public static func javaRuntimeDecision(profile: [String: Any], metadata: [String: Any],
+                                                      renderer: String, availableJavaMajors: [NSNumber]) -> NSDictionary {
+        let required = requiredJava(from: metadata)
+        let selected = javaMajor(profile["javaVersion"])
+        let decision = JavaRuntimePolicy.decision(
+            requiredJava: required, selectedJava: selected,
+            renderer: RendererID(rawValue: renderer), bundledMajors: availableJavaMajors.map(\.intValue))
+        switch decision {
+        case .keep:
+            return ["action": "keep"]
+        case .use(let major):
+            return ["action": "use", "major": major, "required": required, "selected": selected ?? 0]
+        case .unsupportedSelection:
+            return ["action": "unsupportedSelection", "selected": selected ?? 0,
+                    "minimum": JavaRuntimePolicy.metalMinimumMajor]
+        case .unavailable:
+            return ["action": "unavailable", "required": required,
+                    "minimum": JavaRuntimePolicy.metalMinimumMajor]
+        }
+    }
     /// The ObjC engine applies this value; all renderer decisions stay in Swift.
     @objc(rendererForProfile:metadata:globalSetting:)
     @MainActor public static func renderer(forProfile profile: [String: Any], metadata: [String: Any],

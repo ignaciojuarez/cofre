@@ -46,6 +46,24 @@ extern NSMutableArray<NSDictionary *> *remoteVersionList;
 static UIWindow *cofreLaunchOverlayWindow;
 static NSString *const CofreRequestedLoaderKey = @"cofreRequestedLoader";
 
+static NSArray<NSNumber *> *CofreBundledJavaMajors(void) {
+  NSString *root = [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"java_runtimes"];
+  NSArray<NSString *> *entries = [NSFileManager.defaultManager contentsOfDirectoryAtPath:root error:nil];
+  NSMutableArray<NSNumber *> *majors = [NSMutableArray array];
+  NSRegularExpression *pattern = [NSRegularExpression regularExpressionWithPattern:@"^java-([0-9]+)-openjdk$"
+                                                                                options:0 error:nil];
+  for (NSString *entry in entries) {
+    NSTextCheckingResult *match = [pattern firstMatchInString:entry options:0 range:NSMakeRange(0, entry.length)];
+    if (!match) continue;
+    NSString *path = [root stringByAppendingPathComponent:entry];
+    BOOL directory = NO;
+    if (![NSFileManager.defaultManager fileExistsAtPath:path isDirectory:&directory] || !directory) continue;
+    NSInteger major = [[entry substringWithRange:[match rangeAtIndex:1]] integerValue];
+    if (major > 0) [majors addObject:@(major)];
+  }
+  return [majors sortedArrayUsingSelector:@selector(compare:)];
+}
+
 static void (^cofreLaunchEventHandler)(CofreLaunchEvent, double, NSString *);
 static atomic_bool cofreAwaitingFirstDrawable;
 static atomic_bool cofreLaunchFailurePending;
@@ -1146,11 +1164,11 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
         CofreLaunchFailed(@"Air couldn't read this version's files.");
         return;
       }
-      if (![self pickRendererForProfile:profile metadata:task.metadata]) return;
-      [self setGameLanguageForProfile:profile metadata:task.metadata];
+      NSMutableDictionary *metadata = [task.metadata mutableCopy];
+      if (![self pickRendererForProfile:profile metadata:metadata]) return;
+      [self setGameLanguageForProfile:profile metadata:metadata];
       progress(CofreLaunchEventPreparing, 0, @"Starting Minecraft");
       // A JVM property belongs to this launch only; never persist it into a profile/version file.
-      NSMutableDictionary *metadata = [task.metadata mutableCopy];
       NSMutableDictionary *arguments = [metadata[@"arguments"] mutableCopy] ?: [NSMutableDictionary dictionary];
       NSMutableArray *jvm = [arguments[@"jvm_processed"] mutableCopy] ?: [NSMutableArray array];
       NSData *json = [NSJSONSerialization dataWithJSONObject:gameArguments options:0 error:nil];
@@ -1162,7 +1180,7 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
   });
 }
 // Swift owns the renderer decision; ObjC only applies the Air preference.
-- (BOOL)pickRendererForProfile:(NSString *)name metadata:(NSDictionary *)metadata {
+- (BOOL)pickRendererForProfile:(NSString *)name metadata:(NSMutableDictionary *)metadata {
   NSMutableDictionary *profile = [_profiles.profiles[name] mutableCopy];
   Class entry = NSClassFromString(@"CofreCoreEntry");
   SEL resolve = NSSelectorFromString(@"rendererForProfile:metadata:globalSetting:");
@@ -1182,6 +1200,41 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
     NSLog(@"[Cofre] renderer unavailable: %@", library);
     CofreReportLaunchFailure(CofreLaunchEventRendererUnsupported, @"The selected renderer is not available in this build.");
     return NO;
+  }
+  SEL javaResolve = NSSelectorFromString(@"javaRuntimeDecisionForProfile:metadata:renderer:availableJavaMajors:");
+  if (![entry respondsToSelector:javaResolve]) {
+    CofreLaunchFailed(@"Cofre could not validate the Metal Java runtime. Reopen Cofre and try again.");
+    return NO;
+  }
+  NSDictionary *javaDecision = ((id (*)(id, SEL, id, id, id, id))objc_msgSend)(
+      entry, javaResolve, profile, metadata, pick, CofreBundledJavaMajors());
+  NSString *javaAction = javaDecision[@"action"];
+  if ([javaAction isEqualToString:@"unsupportedSelection"]) {
+    CofreLaunchFailed([NSString stringWithFormat:
+        @"Metal needs Java %@ or newer, but this instance selects Java %@. Choose Auto in its Java settings.",
+        javaDecision[@"minimum"], javaDecision[@"selected"]]);
+    return NO;
+  }
+  if ([javaAction isEqualToString:@"unavailable"]) {
+    NSNumber *minimum = javaDecision[@"minimum"] ?: @22;
+    CofreLaunchFailed([NSString stringWithFormat:
+        @"Metal needs Java %@ or newer, but this build has no bundled runtime that can start it.", minimum]);
+    return NO;
+  }
+  if ([javaAction isEqualToString:@"use"]) {
+    NSNumber *major = javaDecision[@"major"];
+    // SurfaceViewController reads this minimum when starting the JVM. Only
+    // change the launch copy; the version file and user's profile stay intact.
+    NSMutableDictionary *java = [metadata[@"javaVersion"] mutableCopy] ?: [NSMutableDictionary dictionary];
+    java[@"majorVersion"] = major;
+    metadata[@"javaVersion"] = java;
+    if ([javaDecision[@"selected"] integerValue] > 0) {
+      NSLog(@"[Cofre] Metal Java runtime: using selected Java %@ (game requires Java %@)",
+            major, javaDecision[@"required"]);
+    } else {
+      NSLog(@"[Cofre] Metal Java override: auto selected bundled Java %@ (game requires Java %@)",
+            major, javaDecision[@"required"]);
+    }
   }
   BOOL explicit = [profile[@"renderer"] isKindOfClass:NSString.class]
       && [profile[@"renderer"] length] && ![profile[@"renderer"] isEqual:@"auto"]
