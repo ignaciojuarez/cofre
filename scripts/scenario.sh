@@ -15,9 +15,15 @@ stop_app() {
     # A running JVM ignores SIGTERM.
     xcrun devicectl device process signal --device "$device" --pid "$pid" --signal SIGKILL >/dev/null 2>&1 || true
   done
+  # Launching before the killed process is gone fails with "process identifier could not be determined".
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    xcrun devicectl device info processes --device "$device" 2>/dev/null | grep -qE 'Cofre\.app/AngelAuraAmethyst[[:space:]]*$' || break
+    sleep 1
+  done
 }
 launch_scenario() {
-  xcrun devicectl device process launch --device "$device" "$bundle" -cofreScenario "$file" >/dev/null
+  xcrun devicectl device process launch --device "$device" "$bundle" -cofreScenario "$file" ${COFRE_LAUNCH_ARGS:-} >/dev/null \
+    || { sleep 3; xcrun devicectl device process launch --device "$device" "$bundle" -cofreScenario "$file" ${COFRE_LAUNCH_ARGS:-} >/dev/null; }
 }
 stop_app
 since=$(date -v-5S "+%Y-%m-%d %H:%M:%S")  # ignore the previous run's log until the app rotates it
