@@ -121,15 +121,20 @@ static BOOL CofrePerfLoggingRequested(void) {
 #else
   BOOL enabled = NO;
 #endif
+  // `-cofrePerfLog 1|0` from a scripted launch is remembered, so a tester's own taps on Play keep logging FPS.
+  // (Air compiles this file without DEBUG, so the default above is NO on device builds too.)
+  NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
   NSArray<NSString *> *arguments = NSProcessInfo.processInfo.arguments;
   for (NSUInteger i = 0; i < arguments.count; i++) {
     NSString *argument = arguments[i];
-    if ([argument isEqualToString:@"-cofrePerfLog=1"]) return YES;
-    if ([argument isEqualToString:@"-cofrePerfLog"] && i + 1 < arguments.count) {
-      return [arguments[i + 1] isEqualToString:@"1"];
+    BOOL on = [argument isEqualToString:@"-cofrePerfLog=1"];
+    if (!on && [argument isEqualToString:@"-cofrePerfLog"] && i + 1 < arguments.count) {
+      on = [arguments[i + 1] isEqualToString:@"1"];
+      if (!on) { [defaults removeObjectForKey:@"cofre.perfLog"]; return NO; }
     }
+    if (on) { [defaults setBool:YES forKey:@"cofre.perfLog"]; return YES; }
   }
-  return enabled;
+  return enabled || [defaults boolForKey:@"cofre.perfLog"];
 }
 
 static NSString *CofrePerfDocumentsLog(void) {
