@@ -487,30 +487,31 @@
                 airVersion: info["CFBundleShortVersionString"] as? String ?? "", sourceURL: CofreLinks.source)
         }
         public func renderers() async -> [RendererOption] {
-            let manifestURL = Bundle.main.url(forResource: "RendererManifest", withExtension: "json")
-            let metalDetail = (manifestURL.flatMap { try? RendererManifest.load(from: $0) }).map { "Manifest: \($0.gameVersions.sorted().joined(separator: ", "))" } ?? "Ship-derived renderer manifest"
-            let candidates: [(String, String, String, String?)] = [
-                ("auto", "Auto", "Picks per version", nil),
-                ("libmetallum.dylib", "Metal", metalDetail, "libmetallum.dylib"),
-                ("libmobileglues.dylib", "MobileGlues", "OpenGL 4 · modern packs", "libmobileglues.dylib"),
-                ("libtinygl4angle.dylib", "ANGLE", "OpenGL ES on Metal", "libtinygl4angle.dylib"),
-                ("libOSMesa.8.dylib", "Zink", "OpenGL on Vulkan", "libOSMesa.8.dylib"),
-                ("libltw.dylib", "LTW", "OpenGL 3 · light", "libltw.dylib"),
-                ("libMoltenVK.dylib", "Vulkan", "MoltenVK", "libMoltenVK.dylib"),
-                ("libMobileGL.dylib", "MobileGL", "Direct Vulkan", "libMobileGL.dylib"),
-                ("libMobileGL-gles.dylib", "MobileGL GLES", "Direct GLES", "libMobileGL-gles.dylib"),
-                ("libgl4es_114.dylib", "GL4ES", "Legacy · 1.16 and older", "libgl4es_114.dylib"),
-                ("libgl4eszl2.dylib", "Krypton", "OpenGL 3 · light", "libgl4eszl2.dylib"),
-                ("libSimpleFPEWrapper.dylib", "SimpleFPEWrapper", "Fixed-function compatibility", "libSimpleFPEWrapper.dylib"),
-                ("libvgpu.dylib", "VGPU", "Legacy OpenGL", "libvgpu.dylib"),
-                ("libOSMesaVirgl.dylib", "VirGL", "Mesa compatibility", "libOSMesaVirgl.dylib"),
-                ("libnggl4es.dylib", "NG-GL4ES", "Shader translation", "libnggl4es.dylib"),
+            let candidates: [(RendererID, String?)] = [
+                (.auto, nil),
+                (.metallum, "libmetallum.dylib"),
+                (.mobileglues, "libmobileglues.dylib"),
+                (.zink, "libOSMesa.8.dylib"),
+                (.gl4es, "libgl4es_114.dylib"),
+                (.simpleFPEWrapper, "libSimpleFPEWrapper.dylib"),
+                (.angle, "libtinygl4angle.dylib"),
+                (.ltw, "libltw.dylib"),
+                (RendererID(rawValue: "mobilegl"), "libMobileGL.dylib"),
+                (RendererID(rawValue: "mobilegles"), "libMobileGL-gles.dylib"),
+                (.krypton, "libgl4eszl2.dylib"),
+                (RendererID(rawValue: "vulkan"), "libMoltenVK.dylib"),
+                (RendererID(rawValue: "vgpu"), "libvgpu.dylib"),
+                (RendererID(rawValue: "virgl"), "libOSMesaVirgl.dylib"),
+                (RendererID(rawValue: "nggl4es"), "libnggl4es.dylib"),
             ]
-            let current = preferenceStore.stringValue(.renderer, profile: nil)
-            return candidates.compactMap { id, name, detail, file in
+            let current = preferenceStore.stringValue(.renderer, profile: nil).map(RendererID.init(rawValue:))
+            let allowed = RendererPolicy.pickerRenderers(current: current)
+            return candidates.compactMap { id, file in
+                guard allowed.contains(where: { RendererPolicy.sameRenderer($0, id) }) else { return nil }
                 let path = file.map { Bundle.main.bundleURL.appendingPathComponent("Frameworks").appendingPathComponent($0).path }
-                guard file == nil || (path.map { FileManager.default.fileExists(atPath: $0) } ?? false) || id == current else { return nil }
-                return RendererOption(id: id, name: name, detail: detail, recommended: id == "auto")
+                guard file == nil || (path.map { FileManager.default.fileExists(atPath: $0) } ?? false)
+                    || current.map({ RendererPolicy.sameRenderer($0, id) }) == true else { return nil }
+                return RendererOption(id: id, name: RendererPolicy.displayName(id), detail: RendererPolicy.detail(id))
             }
         }
         public func javaRuntimes() async -> [JavaRuntime] { [] }

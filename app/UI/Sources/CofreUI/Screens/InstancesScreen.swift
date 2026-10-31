@@ -333,7 +333,9 @@
                     nav.settingsPane = .renderer
                 } label: {
                     ValueRow(
-                        "Renderer", value: store.renderers.first { $0.id == prefs.renderer }?.name ?? prefs.renderer.rawValue,
+                        "Renderer",
+                        value: store.renderers.first { RendererPolicy.sameRenderer($0.id, prefs.renderer) }?.name
+                            ?? RendererPolicy.displayName(prefs.renderer),
                         accent: true)
                 }.buttonStyle(RowButtonStyle())
                 Button {

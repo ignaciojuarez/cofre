@@ -5,7 +5,7 @@ import Foundation
 public enum RendererID: Hashable, Codable, RawRepresentable, Sendable, Identifiable, CustomStringConvertible,
     ExpressibleByStringLiteral
 {
-    case auto, metallum, mobileglues, zink, ltw, krypton, angle, gl4es, air
+    case auto, metallum, mobileglues, zink, ltw, krypton, angle, gl4es, simpleFPEWrapper, air
     case custom(String)
 
     public init(stringLiteral value: String) { self.init(rawValue: value) }
@@ -19,6 +19,7 @@ public enum RendererID: Hashable, Codable, RawRepresentable, Sendable, Identifia
         case "krypton": self = .krypton
         case "angle": self = .angle
         case "gl4es": self = .gl4es
+        case "simplefpewrapper": self = .simpleFPEWrapper
         case "air": self = .air
         default: self = .custom(rawValue)
         }
@@ -33,6 +34,7 @@ public enum RendererID: Hashable, Codable, RawRepresentable, Sendable, Identifia
         case .krypton: "krypton"
         case .angle: "angle"
         case .gl4es: "gl4es"
+        case .simpleFPEWrapper: "simplefpewrapper"
         case .air: "air"
         case .custom(let value): value
         }
@@ -40,7 +42,7 @@ public enum RendererID: Hashable, Codable, RawRepresentable, Sendable, Identifia
     public var id: String { rawValue }
     public var description: String { rawValue }
     public static var allCases: [Self] {
-        [.auto, .metallum, .mobileglues, .zink, .ltw, .krypton, .angle, .gl4es, .air]
+        [.auto, .metallum, .mobileglues, .zink, .ltw, .krypton, .angle, .gl4es, .simpleFPEWrapper, .air]
     }
     public init(from decoder: Decoder) throws {
         self.init(rawValue: try decoder.singleValueContainer().decode(String.self))

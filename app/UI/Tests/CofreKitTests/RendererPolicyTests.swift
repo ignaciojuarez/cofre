@@ -92,7 +92,7 @@ final class RendererPolicyTests: XCTestCase {
             "metallum")
         XCTAssertEqual(
             RendererPolicy.resolve(setting: "auto", gameVersion: "1.21.11", loader: .vanilla, metalVersions: manifest),
-            "mobileglues")
+            "metallum")
         XCTAssertEqual(
             RendererPolicy.resolve(setting: "auto", gameVersion: "26.4", loader: .fabric, metalVersions: manifest),
             "mobileglues")
@@ -125,5 +125,69 @@ final class RendererPolicyTests: XCTestCase {
                     metalVersions: ["26.2"]),
                 "metallum")
         #endif
+    }
+
+    func testAirIdentifiersUseAirLibraryNames() {
+        let names: [(RendererID, String)] = [
+            (.angle, "libtinygl4angle.dylib"),
+            (.zink, "libOSMesa.8.dylib"),
+            (.gl4es, "libgl4es_114.dylib"),
+            (.simpleFPEWrapper, "libSimpleFPEWrapper.dylib"),
+            (.mobileglues, "libmobileglues.dylib"),
+            (.metallum, "libmetallum.dylib"),
+            (.ltw, "libltw.dylib"),
+            (.krypton, "libgl4eszl2.dylib"),
+            ("mobilegl", "libMobileGL.dylib"),
+            ("mobilegles", "libMobileGL-gles.dylib"),
+            ("vulkan", "libMoltenVK.dylib"),
+            ("vgpu", "libvgpu.dylib"),
+            ("virgl", "libOSMesaVirgl.dylib"),
+            ("nggl4es", "libnggl4es.dylib"),
+        ]
+        for (renderer, name) in names {
+            XCTAssertEqual(RendererPolicy.airIdentifier(renderer).rawValue, name, renderer.rawValue)
+        }
+        XCTAssertEqual(RendererPolicy.airIdentifier("angle"), "libtinygl4angle.dylib")
+        XCTAssertEqual(RendererPolicy.airIdentifier("libgl4es_114.dylib"), "libgl4es_114.dylib")
+    }
+
+    func testPickerHidesUnvalidatedRenderersButKeepsAHiddenSavedChoice() {
+        let normal = RendererPolicy.pickerRenderers()
+        XCTAssertEqual(
+            normal.map(\.rawValue),
+            ["auto", "metallum", "mobileglues", "zink", "gl4es", "simplefpewrapper", "angle"])
+        XCTAssertFalse(normal.contains { RendererPolicy.sameRenderer($0, "ltw") })
+        let saved = RendererPolicy.pickerRenderers(current: "libltw.dylib")
+        XCTAssertTrue(saved.contains { RendererPolicy.sameRenderer($0, "libltw.dylib") })
+        XCTAssertTrue(RendererPolicy.isHidden("libltw.dylib"))
+    }
+
+    func testPickerGatesLegacyAndMetalByInstance() {
+        let manifest: Set<String> = ["1.21.11", "26.3"]
+        let modern = RendererPolicy.pickerRenderers(
+            gameVersion: "26.3", loader: .vanilla, metalVersions: manifest)
+        XCTAssertTrue(modern.contains(.metallum))
+        XCTAssertFalse(modern.contains(.gl4es))
+        XCTAssertFalse(modern.contains(.simpleFPEWrapper))
+        let modded = RendererPolicy.pickerRenderers(
+            gameVersion: "26.3", loader: .fabric, metalVersions: manifest)
+        XCTAssertFalse(modded.contains(.metallum))
+        let legacy = RendererPolicy.pickerRenderers(
+            gameVersion: "1.16.5", loader: .vanilla, metalVersions: manifest)
+        XCTAssertTrue(legacy.contains(.gl4es))
+        XCTAssertTrue(legacy.contains(.simpleFPEWrapper))
+    }
+
+    func testRecommendedRendererFollowsAutoForVersionAndLoader() {
+        let manifest: Set<String> = ["1.21.11", "26.3"]
+        XCTAssertEqual(
+            RendererPolicy.recommendedRenderer(gameVersion: "1.21.11", loader: .vanilla, metalVersions: manifest),
+            .metallum)
+        XCTAssertEqual(
+            RendererPolicy.recommendedRenderer(gameVersion: "26.3", loader: .fabric, metalVersions: manifest),
+            .mobileglues)
+        XCTAssertEqual(
+            RendererPolicy.recommendedRenderer(gameVersion: "1.16.5", loader: .vanilla, metalVersions: manifest),
+            .gl4es)
     }
 }

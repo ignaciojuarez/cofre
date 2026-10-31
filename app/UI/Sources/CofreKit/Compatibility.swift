@@ -18,6 +18,12 @@ public enum RendererPolicy {
     public static var allowMetalForModdedScenario = false
 #endif
 
+    /// The production picker. Other IDs remain valid for old profiles, but are
+    /// only shown when one of them is already selected.
+    public static let normalPickerRenderers: [RendererID] = [
+        .auto, .metallum, .mobileglues, .zink, .gl4es, .simpleFPEWrapper, .angle,
+    ]
+
     public static func resolve(profile: [String: Any], metadata: [String: Any], globalSetting: String,
                                fallbackLoader: Instance.Loader? = nil, metalVersions: Set<String>) -> RendererID {
         let versionID = profile["lastVersionId"] as? String ?? metadata["id"] as? String ?? ""
@@ -50,9 +56,10 @@ public enum RendererPolicy {
 #endif
             return isMetal(globalSetting) && loader != .vanilla ? fallback : globalSetting
         }
-        // Air only attaches the bundled Metallum agent for Minecraft 26+.
-        let major = Int(gameVersion.prefix(while: { $0.isNumber })) ?? 0
-        if loader == .vanilla && major >= 26 && metalVersions.contains(gameVersion) { return .metallum }
+        // Air attaches the bundled Metallum agent for every vanilla version in
+        // the shipped manifest, including 1.21.11. A future validated Fabric
+        // + Metallum mod can be added here without changing picker callers.
+        if metalAvailable(gameVersion: gameVersion, loader: loader, metalVersions: metalVersions) { return .metallum }
         return fallback
     }
 
@@ -65,6 +72,7 @@ public enum RendererPolicy {
         // explicit MobileGlues path for modern 1.20.5+ releases (and for
         // Forge/NeoForge), so Auto actually selects the renderer Cofre tests.
         let numbers = gameVersion.split(separator: ".").compactMap { Int($0) }
+        if isLegacy(gameVersion) { return .gl4es }
         let modern = (numbers.first ?? 0) >= 26 ||
             (numbers.count >= 3 && numbers[0] == 1 &&
                 (numbers[1] > 20 || (numbers[1] == 20 && numbers[2] >= 5)))
@@ -81,6 +89,118 @@ public enum RendererPolicy {
         }
     }
 
+    public static func metalAvailable(gameVersion: String, loader: Instance.Loader,
+                                      metalVersions: Set<String>) -> Bool {
+        loader == .vanilla && metalVersions.contains(gameVersion)
+    }
+
+    public static func isLegacy(_ gameVersion: String) -> Bool {
+        let numbers = gameVersion.split(separator: ".").compactMap { Int($0) }
+        guard numbers.count >= 2, numbers[0] == 1 else { return false }
+        let patch = numbers.count > 2 ? numbers[2] : 0
+        return numbers[1] < 16 || (numbers[1] == 16 && patch <= 5)
+    }
+
+    /// IDs to render in Settings for this instance. `current` is retained so
+    /// a saved debug/legacy choice is visible instead of being changed.
+    public static func pickerRenderers(gameVersion: String? = nil, loader: Instance.Loader? = nil,
+                                       metalVersions: Set<String> = [], current: RendererID? = nil) -> [RendererID] {
+        var ids = normalPickerRenderers
+        if let gameVersion {
+            if !isLegacy(gameVersion) { ids.removeAll { $0 == .gl4es || $0 == .simpleFPEWrapper } }
+            if let loader, !metalAvailable(gameVersion: gameVersion, loader: loader, metalVersions: metalVersions) {
+                ids.removeAll { $0 == .metallum }
+            }
+        }
+        if let current, !ids.contains(where: { sameRenderer($0, current) }) { ids.append(current) }
+        return ids
+    }
+
+    public static func recommendedRenderer(gameVersion: String, loader: Instance.Loader,
+                                           metalVersions: Set<String>) -> RendererID {
+        let resolved = resolve(setting: .auto, gameVersion: gameVersion, loader: loader, metalVersions: metalVersions)
+        return resolved == .air ? .angle : canonical(resolved)
+    }
+
+    /// Compare canonical IDs so old profiles containing dylib names still
+    /// match the typed picker IDs.
+    public static func sameRenderer(_ lhs: RendererID, _ rhs: RendererID) -> Bool {
+        key(lhs) == key(rhs)
+    }
+
+    public static func canonical(_ renderer: RendererID) -> RendererID {
+        RendererID(rawValue: key(renderer))
+    }
+
+    public static func displayName(_ renderer: RendererID) -> String {
+        switch key(renderer) {
+        case "auto": "Auto"
+        case "metallum": "Metal"
+        case "mobileglues": "MobileGlues"
+        case "zink": "Zink"
+        case "gl4es": "GL4ES"
+        case "simplefpewrapper": "SimpleFPEWrapper"
+        case "angle": "ANGLE (fallback)"
+        case "ltw": "LTW"
+        case "mobilegl": "MobileGL"
+        case "mobilegles": "MobileGL GLES"
+        case "krypton": "Krypton"
+        case "vulkan": "Vulkan"
+        case "vgpu": "VGPU"
+        case "virgl": "VirGL"
+        case "nggl4es": "NG-GL4ES"
+        default: renderer.rawValue
+        }
+    }
+
+    public static func detail(_ renderer: RendererID) -> String {
+        switch key(renderer) {
+        case "auto": "Chooses a tested renderer for this version and loader."
+        case "metallum": "Native Metal; fastest on supported vanilla versions."
+        case "mobileglues": "OpenGL translated on the CPU; broad but slower."
+        case "zink": "Slower: OpenGL is translated through Vulkan; for advanced compatibility."
+        case "gl4es": "Legacy OpenGL path for Minecraft 1.16.5 and older."
+        case "simplefpewrapper": "Fixed-function compatibility for very old clients."
+        case "angle": "Fallback OpenGL translated on the CPU; use for debugging."
+        case "ltw": "Debug OpenGL wrapper; hidden until an iOS result is validated."
+        case "mobilegl": "Direct Vulkan OpenGL path; hidden until an iOS result is validated."
+        case "mobilegles": "Direct GLES OpenGL path; hidden until an iOS result is validated."
+        case "krypton": "Legacy shader translation; hidden until an iOS result is validated."
+        case "vulkan": "Direct Vulkan/MoltenVK path; hidden from the production picker."
+        case "vgpu": "Legacy shader path; hidden until an iOS result is validated."
+        case "virgl": "Mesa compatibility path; hidden until an iOS result is validated."
+        case "nggl4es": "Shader translation path; hidden until an iOS result is validated."
+        default: "Saved renderer; hidden from the normal picker."
+        }
+    }
+
+    public static func isHidden(_ renderer: RendererID) -> Bool {
+        !normalPickerRenderers.contains(where: { sameRenderer($0, renderer) })
+    }
+
+    private static func key(_ renderer: RendererID) -> String {
+        let raw = renderer.rawValue.lowercased()
+        switch raw {
+        case "", "auto": return "auto"
+        case "metal", "metallum", "libmetallum.dylib": return "metallum"
+        case "mobileglues", "libmobileglues.dylib": return "mobileglues"
+        case "zink", "libosmesa.8.dylib": return "zink"
+        case "ltw", "libltw.dylib": return "ltw"
+        case "krypton", "libgl4eszl2.dylib": return "krypton"
+        case "angle", "libtinygl4angle.dylib": return "angle"
+        case "gl4es", "libgl4es_114.dylib": return "gl4es"
+        case "simplefpewrapper", "libsimplefpewrapper.dylib": return "simplefpewrapper"
+        case "mobilegl", "libmobilegl.dylib": return "mobilegl"
+        case "mobilegles", "libmobilegl-gles.dylib": return "mobilegles"
+        case "vulkan", "moltenvk", "libmoltenvk.dylib": return "vulkan"
+        case "vgpu", "libvgpu.dylib": return "vgpu"
+        case "virgl", "libosmesavirgl.dylib": return "virgl"
+        case "nggl4es", "libnggl4es.dylib": return "nggl4es"
+        case "air": return "air"
+        default: return raw
+        }
+    }
+
     public static func resolve(setting: String, globalSetting: String = "auto", gameVersion: String,
                                loader: Instance.Loader, metalVersions: Set<String>) -> String {
         resolve(setting: RendererID(rawValue: setting), globalSetting: RendererID(rawValue: globalSetting),
@@ -88,10 +208,22 @@ public enum RendererPolicy {
     }
 
     public static func airIdentifier(_ renderer: RendererID) -> RendererID {
-        switch renderer {
-        case .metallum: .custom("libmetallum.dylib")
-        case .mobileglues: .custom("libmobileglues.dylib")
-        case .air, .auto: .auto
+        switch key(renderer) {
+        case "auto", "air": .auto
+        case "metallum": .custom("libmetallum.dylib")
+        case "mobileglues": .custom("libmobileglues.dylib")
+        case "zink": .custom("libOSMesa.8.dylib")
+        case "ltw": .custom("libltw.dylib")
+        case "krypton": .custom("libgl4eszl2.dylib")
+        case "angle": .custom("libtinygl4angle.dylib")
+        case "gl4es": .custom("libgl4es_114.dylib")
+        case "simplefpewrapper": .custom("libSimpleFPEWrapper.dylib")
+        case "mobilegl": .custom("libMobileGL.dylib")
+        case "mobilegles": .custom("libMobileGL-gles.dylib")
+        case "vulkan": .custom("libMoltenVK.dylib")
+        case "vgpu": .custom("libvgpu.dylib")
+        case "virgl": .custom("libOSMesaVirgl.dylib")
+        case "nggl4es": .custom("libnggl4es.dylib")
         default: renderer
         }
     }

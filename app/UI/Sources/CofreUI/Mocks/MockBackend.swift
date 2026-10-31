@@ -1,5 +1,6 @@
 #if canImport(UIKit)
     import UIKit
+    import CofreKit
 
     /// Sample data from the approved mockups. For previews, tests and the preview host only: no Air logic.
     public final class MockBackend: CofreBackend, @unchecked Sendable {
@@ -616,15 +617,9 @@
 
         // MARK: GAP-09 SystemCatalog
         public func renderers() async -> [RendererOption] {
-            [
-                RendererOption(id: "auto", name: "Auto", detail: "Picks per version", recommended: true),
-                RendererOption(id: "mobileglues", name: "MobileGlues", detail: "OpenGL 4 · modern packs"),
-                RendererOption(id: "zink", name: "Zink · MoltenVK", detail: "OpenGL on Vulkan"),
-                RendererOption(id: "ltw", name: "LTW", detail: "OpenGL 3 · light"),
-                RendererOption(id: "krypton", name: "Krypton", detail: "Fast · older packs"),
-                RendererOption(id: "angle", name: "ANGLE", detail: "OpenGL ES on Metal"),
-                RendererOption(id: "gl4es", name: "gl4es", detail: "Legacy · 1.16 and older"),
-            ]
+            RendererPolicy.normalPickerRenderers.map {
+                RendererOption(id: $0, name: RendererPolicy.displayName($0), detail: RendererPolicy.detail($0))
+            }
         }
         public func javaRuntimes() async -> [JavaRuntime] {
             [8, 17, 21, 25].map { JavaRuntime(id: "\($0)", major: $0, installed: true) }

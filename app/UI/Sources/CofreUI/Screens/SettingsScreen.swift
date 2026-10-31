@@ -118,7 +118,9 @@
                     nav.settingsPane = .renderer
                 } label: {
                     ValueRow(
-                        "Renderer", value: store.renderers.first { $0.id == p.renderer }?.name ?? p.renderer.rawValue,
+                        "Renderer",
+                        value: store.renderers.first { RendererPolicy.sameRenderer($0.id, p.renderer) }?.name
+                            ?? RendererPolicy.displayName(p.renderer),
                         accent: true)
                 }.buttonStyle(RowButtonStyle())
                 ResolutionRow(scale: prefBinding(store, instanceID, \.resolution))
@@ -139,20 +141,50 @@
         @Environment(NavModel.self) private var nav
         var body: some View {
             let instance = nav.instance.flatMap { id in store.instances.first { $0.id == id } }
+            let context = instance ?? store.activeInstance
             let instanceID = instance?.id
             let current = prefBinding(store, instanceID, \.renderer)
+            let visibleIDs = RendererPolicy.pickerRenderers(
+                gameVersion: context?.gameVersion, loader: context?.loader,
+                metalVersions: ModCompatibility.metalVersions, current: current.wrappedValue)
+            let options = visibleIDs.compactMap { id -> RendererOption? in
+                if let found = store.renderers.first(where: { RendererPolicy.sameRenderer($0.id, id) }) { return found }
+                guard RendererPolicy.sameRenderer(current.wrappedValue, id) else { return nil }
+                return RendererOption(id: id, name: RendererPolicy.displayName(id), detail: RendererPolicy.detail(id))
+            }
+            let recommended = context.map {
+                RendererPolicy.recommendedRenderer(
+                    gameVersion: $0.gameVersion, loader: $0.loader, metalVersions: ModCompatibility.metalVersions)
+            }
             ListSection(spacing: 4) {
-                ForEach(store.renderers) { r in
-                    let unavailable = instance.map { $0.loader != .vanilla && RendererPolicy.isMetal(r.id) } ?? false
+                ForEach(options) { r in
+                    let metalUnavailable = context.map {
+                        RendererPolicy.isMetal(r.id) && !RendererPolicy.metalAvailable(
+                            gameVersion: $0.gameVersion, loader: $0.loader, metalVersions: ModCompatibility.metalVersions)
+                    } ?? false
+                    let legacyUnavailable = context.map {
+                        (RendererPolicy.sameRenderer(r.id, .gl4es)
+                            || RendererPolicy.sameRenderer(r.id, .simpleFPEWrapper))
+                            && !RendererPolicy.isLegacy($0.gameVersion)
+                    } ?? false
+                    let unavailable = metalUnavailable || legacyUnavailable
+                    let unavailableDetail: String? = metalUnavailable
+                        ? (context?.loader == .vanilla
+                            ? "Metal is available only for vanilla versions in the shipped manifest."
+                            : "Metal runs vanilla only for now.")
+                        : legacyUnavailable ? "This legacy renderer is only for Minecraft 1.16.5 and older." : nil
+                    let detail = unavailableDetail ?? r.detail
                     Button {
                         current.wrappedValue = r.id
                     } label: {
                         Row(r.name,
-                            subtitle: unavailable ? "Metal runs vanilla only for now" : r.detail,
-                            isSelected: current.wrappedValue == r.id) {
-                            Radio(isOn: current.wrappedValue == r.id)
+                            subtitle: detail,
+                            isSelected: RendererPolicy.sameRenderer(current.wrappedValue, r.id)) {
+                            Radio(isOn: RendererPolicy.sameRenderer(current.wrappedValue, r.id))
                         } trailing: {
-                            if r.recommended { Badge("Best", tone: .success) }
+                            if recommended.map({ RendererPolicy.sameRenderer($0, r.id) }) == true {
+                                Badge("Recommended", tone: .success)
+                            }
                         }
                     }
                     .buttonStyle(RowButtonStyle())

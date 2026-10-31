@@ -33,3 +33,11 @@ Status: in progress (2026-10-31). Owner: main thread; findings land in `plan/rev
 - **Metallum as a Fabric mod** where Air's bundled agent can't run (Fabric 26.x): install the real Metallum mod (+ its Sodium/Iris builds) into the instance. Experiment in progress (`scripts/scenarios/fabric-26.2-metallum-*.json`). If it works, offer it as the Metal path for Fabric on the versions Metallum supports.
 - If only Metal is truly playable, steer users to Metal-capable setups (vanilla or Fabric + Metallum on 26.x) and label the rest "experimental / slow".
 - **iPhone test kit:** build the app once on the iPhone 17 Pro with a ready-made set of instances (one per renderer × loader case) so the user only taps Play on each and reads FPS. Needs the user's go-ahead before installing on the iPhone.
+
+## Pending device results
+
+Keep these matrix rules provisional until the iPad benchmarks complete:
+
+- **Block:** Metal on Forge/NeoForge or outside its manifest; LTW on 26.x; Vulkan/MoltenVK; known Fabric 26.2 + Sodium/Iris on MobileGlues or ANGLE; shader packs on an unvalidated 26.x setup.
+- **Warn and allow override:** MobileGlues on 26.x or mod-heavy packs; Zink; all advanced/debug renderers; Metal on 4 GB devices at high chunk distance.
+- **Re-measure before changing Auto:** Fabric 26.x with Sodium/Iris, Zink on iPad mini, LTW/Krypton on 1.21.x, and legacy SimpleFPEWrapper/VGPU against GL4ES.
