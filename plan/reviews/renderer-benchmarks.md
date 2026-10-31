@@ -50,6 +50,6 @@ Measured results only: what launched, what rendered, frame rate, memory, limits.
 | MC | Vanilla | Fabric | Forge / NeoForge | Notes |
 |---|---|---|---|---|
 | 26.3 / 26.4 / 26.1 | ✅ Air's agent | ❓ Metallum mod (testing) | ❌ | |
-| 26.2 | ⚠️ Air agent crashed 10-31 (slf4j) | ✅ MetalUniversal 1.0.4 + Sodium 0.9.0 | ❌ | Upstream Metallum lists Sodium + Iris for 26.2; Iris still fails |
+| 26.2 | ⚠️ Air agent crashed 10-31 (slf4j) | ✅ MetalUniversal 1.0.4 + Sodium 0.9.0 | ✅ NeoForge via Connector + MetalUniversal (10-31) | Upstream Metallum lists Sodium + Iris for 26.2; Iris still fails |
 | 1.21.11 | ❌ agent jar bug (fix in progress) | ✅ Graft iOS port (~51 FPS) | ❌ | |
 | 1.20.1 | ❌ | ❌ | ❌ | Older than Minecraft's GPU-device layer (1.21.5+) that Metallum plugs into; would need a new backend |
