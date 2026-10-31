@@ -9,5 +9,6 @@ each with `Reason:` and `Drop when:`.
 |---|---|
 | 0001 | Present through Air's published UIView/CAMetalLayer (main-queue layer writes), iOS MSL target, launcher's iOS shaderc/SPIRV-Cross, 1.21.11-only build |
 
-Device run (DEBUG build): `scripts/graft.sh`, then `scripts/graft.sh serve` (prints a scenario with this Mac's LAN
-address), then `scripts/scenario.sh /tmp/graft-build/fabric-1.21.11-graft.json` from another terminal.
+Device run (DEBUG build): `scripts/graft.sh`, then
+`COFRE_PUSH=/tmp/graft-build/graft-ios-1.21.11-1.1.1-cofre.1.jar scripts/scenario.sh scripts/scenarios/fabric-1.21.11-graft.json`
+(the jar is copied into the app's Documents; no network needed).

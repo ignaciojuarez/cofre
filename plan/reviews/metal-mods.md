@@ -89,7 +89,7 @@ Popular pack evidence is version-specific only when a pack version exists: Fabul
 
 ## Graft 1.21.11 iOS port (prepared 2026-10-31, not device-tested)
 
-Build: `scripts/graft.sh` → `/tmp/graft-build/graft-ios-1.21.11-1.1.1-cofre.1.jar` (reproducible SHA-256 in the `.sha256` next to it). Patch: `patches/graft/0001`. Test: `scripts/graft.sh serve`, then `scripts/scenario.sh /tmp/graft-build/fabric-1.21.11-graft.json` (DEBUG build).
+Build: `scripts/graft.sh` → `/tmp/graft-build/graft-ios-1.21.11-1.1.1-cofre.1.jar` (reproducible SHA-256 in the `.sha256` next to it). Patch: `patches/graft/0001`. Test: `COFRE_PUSH=/tmp/graft-build/graft-ios-1.21.11-1.1.1-cofre.1.jar scripts/scenario.sh scripts/scenarios/fabric-1.21.11-graft.json` (DEBUG build; the jar is copied into the app, no network).
 
 | macOS-only piece in v1.1.1 (`4386b98`) | iOS port |
 |---|---|

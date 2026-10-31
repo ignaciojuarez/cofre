@@ -8,6 +8,10 @@ while (($#)); do case "$1" in --device) device=$2; shift 2;; --timeout) timeout=
 name=$(basename "$scenario" .json); stamp=$(date +%Y%m%d-%H%M%S); out="/tmp/cofre-scenarios/$name-$stamp"; mkdir -p "$out"
 bundle=com.ignacio.cofre; file=$(basename "$scenario")
 xcrun devicectl device copy to --device "$device" --domain-type appDataContainer --domain-identifier "$bundle" --source "$scenario" --destination "Documents/$file" >/dev/null
+# COFRE_PUSH="a.jar b.jar": copy local files to Documents/<name> for scenario files with "from": "<name>".
+for extra in ${COFRE_PUSH:-}; do
+  xcrun devicectl device copy to --device "$device" --domain-type appDataContainer --domain-identifier "$bundle" --source "$extra" --destination "Documents/$(basename "$extra")" >/dev/null
+done
 # Stop only the app by PID: terminating by bundle ID also kills the VPN extension (com.ignacio.cofre.tunnel),
 # and the next launch then finds a dead tunnel.
 stop_app() {

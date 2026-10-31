@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build Cofre's iOS port of Graft (LGPL-3.0 Fabric Metal renderer) for Minecraft 1.21.11.
 #   scripts/graft.sh          clone/pin .work/graft, apply patches/graft, build, copy the jar to $GRAFT_OUT
-#   scripts/graft.sh serve    serve $GRAFT_OUT on this Mac's LAN address and write a device-ready scenario there
+# Device test: COFRE_PUSH=$GRAFT_OUT/<jar> scripts/scenario.sh scripts/scenarios/fabric-1.21.11-graft.json
 # The source and jar stay out of git; the patch is the reproducible Cofre change.
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.."; pwd)
@@ -12,16 +12,6 @@ REF=v1.1.1
 PIN=4386b98945178da071ba0ffe0b7a1e7e57eddb97  # v1.1.1 (same commit as v1.1.0 upstream)
 VERSION=1.1.1-cofre.1
 JAR="graft-ios-1.21.11-$VERSION.jar"
-
-if [[ "${1:-}" == serve ]]; then
-  port=${2:-8765}
-  host=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || true)
-  [[ -n "$host" && -f "$OUT/$JAR" ]] || { echo "need a LAN address and $OUT/$JAR (run scripts/graft.sh first)" >&2; exit 2; }
-  sed "s#http://GRAFT_HOST:8765#http://$host:$port#" "$ROOT/scripts/scenarios/fabric-1.21.11-graft.json" > "$OUT/fabric-1.21.11-graft.json"
-  echo "Scenario: $OUT/fabric-1.21.11-graft.json  (run: scripts/scenario.sh $OUT/fabric-1.21.11-graft.json)"
-  echo "Serving $OUT at http://$host:$port/ until Ctrl-C"
-  exec python3 -m http.server "$port" --bind "$host" --directory "$OUT"
-fi
 
 if [[ ! -d "$SRC/.git" ]]; then
   mkdir -p "${SRC%/*}"

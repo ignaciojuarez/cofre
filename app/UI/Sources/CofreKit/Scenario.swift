@@ -3,14 +3,17 @@ import Foundation
 /// A small, Codable description of a repeatable debug launch.
 public struct CofreScenario: Codable, Equatable, Sendable {
     /// A file written into the instance before launch: downloaded from `url`
-    /// (artifacts not in the Modrinth catalog) or, for small configs, `text`.
+    /// (artifacts not in the Modrinth catalog), copied `from` a path in the
+    /// app's Documents (pushed by `scripts/scenario.sh`, no network needed) or,
+    /// for small configs, `text`.
     public struct File: Codable, Equatable, Sendable {
         public let url: String?
+        public let from: String?
         public let text: String?
         public let to: String
 
-        public init(url: String? = nil, text: String? = nil, to: String) {
-            self.url = url; self.text = text; self.to = to
+        public init(url: String? = nil, from: String? = nil, text: String? = nil, to: String) {
+            self.url = url; self.from = from; self.text = text; self.to = to
         }
     }
 
@@ -72,15 +75,18 @@ public struct CofreScenario: Codable, Equatable, Sendable {
         guard memoryMB == nil || (memoryMB! >= 512 && memoryMB! <= 16384) else { throw ValidationError.invalid("memoryMB is out of range") }
         guard mods.allSatisfy({ !$0.isEmpty && !$0.contains("/") && !$0.contains("\\") }) else { throw ValidationError.invalid("invalid mod slug") }
         for file in files {
-            guard (file.url == nil) != (file.text == nil) else { throw ValidationError.invalid("file needs url or text") }
+            guard [file.url, file.from, file.text].compactMap({ $0 }).count == 1 else {
+                throw ValidationError.invalid("file needs one of url, from or text")
+            }
             if let value = file.url {
                 guard let url = URL(string: value), ["http", "https"].contains(url.scheme?.lowercased()) else {
                     throw ValidationError.invalid("file URL must use http or https")
                 }
             }
-            let path = file.to
-            guard !path.isEmpty, !path.hasPrefix("/"), !path.split(separator: "/").contains(".."),
-                  !path.split(separator: "\\").contains("..") else { throw ValidationError.invalid("invalid file path") }
+            for path in [file.to, file.from].compactMap({ $0 }) {
+                guard !path.isEmpty, !path.hasPrefix("/"), !path.split(separator: "/").contains(".."),
+                      !path.split(separator: "\\").contains("..") else { throw ValidationError.invalid("invalid file path") }
+            }
         }
     }
 

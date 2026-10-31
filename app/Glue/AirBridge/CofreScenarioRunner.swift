@@ -128,6 +128,9 @@ final class CofreScenarioRunner {
                     let data: Data
                     if let text = file.text {
                         data = Data(text.utf8)
+                    } else if let from = file.from {
+                        let documents = try FileManager.default.url(for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: false)
+                        data = try Data(contentsOf: documents.appendingPathComponent(from))
                     } else {
                         guard let url = URL(string: file.url ?? "") else { throw CofreBackendError.unavailable("scenario file URL") }
                         let (body, response) = try await URLSession.shared.data(from: url)

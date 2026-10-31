@@ -5,7 +5,7 @@
   "loaderVersion": "0.19.5",
   "files": [
     {
-      "url": "http://GRAFT_HOST:8765/graft-ios-1.21.11-1.1.1-cofre.1.jar",
+      "from": "graft-ios-1.21.11-1.1.1-cofre.1.jar",
       "to": "mods/graft-ios-1.21.11-1.1.1-cofre.1.jar"
     }
   ],
