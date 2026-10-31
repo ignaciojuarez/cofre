@@ -27,6 +27,8 @@
 #include <objc/runtime.h>
 #import <objc/message.h>
 #include <stdatomic.h>
+#include <mach/mach.h>
+#include <string.h>
 
 static NSError *CofreAirError(NSString *message) {
   return [NSError errorWithDomain:@"CofreAir"
@@ -47,6 +49,17 @@ static NSString *const CofreRequestedLoaderKey = @"cofreRequestedLoader";
 static void (^cofreLaunchEventHandler)(CofreLaunchEvent, double, NSString *);
 static atomic_bool cofreAwaitingFirstDrawable;
 static atomic_bool cofreLaunchFailurePending;
+static atomic_bool cofrePerfActive;
+static atomic_bool cofrePerfMetal;
+static atomic_uint_fast64_t cofrePerfMetalFrames;
+static dispatch_queue_t cofrePerfQueue;
+static dispatch_source_t cofrePerfTimer;
+static NSString *cofrePerfRenderer;
+static NSUInteger cofrePerfElapsedSeconds;
+static NSUInteger cofrePerfSampleCount;
+static NSUInteger cofrePerfFrameTotal;
+static double cofrePerfFrameTimes[5];
+static NSUInteger cofrePerfFrameCounts[5];
 // Where a launch is until its first frame; an engine error in that window becomes Cofre's launch error.
 typedef NS_ENUM(int, CofreLaunchPhase) { CofreLaunchPhaseIdle, CofreLaunchPhaseDownloading, CofreLaunchPhaseStarting };
 static atomic_int cofreLaunchPhase;
@@ -55,6 +68,7 @@ static id (*cofreOriginalNextDrawable)(id, SEL);
 
 extern BOOL CofreOwnsRootUI(void);
 extern void CofreShowOwnedFailure(NSString *detail);
+extern unsigned int pojavGetAndResetFps(void);
 BOOL CofreOwnsLaunchUI(void) { return CofreOwnsRootUI(); }
 void CofreLaunchSurfaceAttached(void) { if (cofreLaunchEventHandler) cofreLaunchEventHandler(CofreLaunchEventSurfaceShown, 0, nil); }
 static void CofreFirstFrame(NSString *source) {
@@ -64,22 +78,196 @@ static void CofreFirstFrame(NSString *source) {
 }
 void CofreLaunchFirstFramePresented(void) { CofreFirstFrame(@"gl/air"); }
 static id CofreNextDrawable(CAMetalLayer *layer, SEL cmd) {
+  id drawable = cofreOriginalNextDrawable(layer, cmd);
+  // Metallum owns its CAMetalLayer and bypasses Air's EGL swap counter.
+  // Keep this hook installed after the first-frame probe so its drawable
+  // acquisitions remain visible to the five-second logger.
+  if (atomic_load(&cofrePerfActive) && atomic_load(&cofrePerfMetal)) {
+    atomic_fetch_add(&cofrePerfMetalFrames, 1);
+  }
   if (atomic_exchange(&cofreAwaitingFirstDrawable, false)) {
-    method_setImplementation(class_getInstanceMethod(CAMetalLayer.class, @selector(nextDrawable)), (IMP)cofreOriginalNextDrawable);
     dispatch_async(dispatch_get_main_queue(), ^{ CofreFirstFrame(@"metal"); });
   }
-  return cofreOriginalNextDrawable(layer, cmd);
+  return drawable;
 }
 static void CofreArmFirstDrawable(void) {
   Method method = class_getInstanceMethod(CAMetalLayer.class, @selector(nextDrawable));
   IMP previous = method_setImplementation(method, (IMP)CofreNextDrawable);
-  if (previous != (IMP)CofreNextDrawable) cofreOriginalNextDrawable = (id (*)(id, SEL))previous;
+  if (previous != (IMP)CofreNextDrawable && previous != NULL) cofreOriginalNextDrawable = (id (*)(id, SEL))previous;
   atomic_store(&cofreAwaitingFirstDrawable, true);
 }
-void CofreLaunchGameExited(int code) { dispatch_async(dispatch_get_main_queue(), ^{ if (cofreLaunchEventHandler) cofreLaunchEventHandler(CofreLaunchEventExited, code, [NSString stringWithFormat:@"exit code %d", code]); }); }
+
+static BOOL CofrePerfLoggingRequested(void) {
+#if DEBUG
+  BOOL enabled = YES;
+#else
+  BOOL enabled = NO;
+#endif
+  NSArray<NSString *> *arguments = NSProcessInfo.processInfo.arguments;
+  for (NSUInteger i = 0; i < arguments.count; i++) {
+    NSString *argument = arguments[i];
+    if ([argument isEqualToString:@"-cofrePerfLog=1"]) return YES;
+    if ([argument isEqualToString:@"-cofrePerfLog"] && i + 1 < arguments.count) {
+      return [arguments[i + 1] isEqualToString:@"1"];
+    }
+  }
+  return enabled;
+}
+
+static NSString *CofrePerfDocumentsLog(void) {
+  NSString *documents = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+  return [documents stringByAppendingPathComponent:@"latestlog.txt"];
+}
+
+static void CofrePerfAppend(NSString *line) {
+  NSData *data = [[line stringByAppendingString:@"\n"] dataUsingEncoding:NSUTF8StringEncoding];
+  if (!data) return;
+  NSString *path = CofrePerfDocumentsLog();
+  NSFileHandle *handle = [NSFileHandle fileHandleForWritingAtPath:path];
+  if (!handle) {
+    [[NSFileManager defaultManager] createFileAtPath:path contents:nil attributes:nil];
+    handle = [NSFileHandle fileHandleForWritingAtPath:path];
+  }
+  if (!handle) return;
+  @try {
+    [handle seekToEndOfFile];
+    [handle writeData:data];
+    [handle closeFile];
+  } @catch (__unused NSException *exception) {
+    [handle closeFile];
+  }
+}
+
+static NSString *CofrePerfThermalState(void) {
+  switch (NSProcessInfo.processInfo.thermalState) {
+    case NSProcessInfoThermalStateNominal: return @"nominal";
+    case NSProcessInfoThermalStateFair: return @"fair";
+    case NSProcessInfoThermalStateSerious: return @"serious";
+    case NSProcessInfoThermalStateCritical: return @"critical";
+    default: return @"unknown";
+  }
+}
+
+static double CofrePerfFootprintMB(void) {
+  task_vm_info_data_t info;
+  mach_msg_type_number_t count = TASK_VM_INFO_COUNT;
+  if (task_info(mach_task_self(), TASK_VM_INFO, (task_info_t)&info, &count) != KERN_SUCCESS) return 0;
+  return (double)info.phys_footprint / (1024.0 * 1024.0);
+}
+
+static void CofrePerfDisableAirStatsTimer(SurfaceViewController *surface) {
+  @try {
+    NSTimer *timer = [surface valueForKey:@"statsTimer"];
+    [timer invalidate];
+    [surface setValue:nil forKey:@"statsTimer"];
+  } @catch (__unused NSException *exception) {
+    // Air's counter is still useful if a future SurfaceViewController hides this
+    // private timer; the logger remains best effort.
+  }
+}
+
+static void CofrePerfTick(void) {
+  if (!atomic_load(&cofrePerfActive)) return;
+  NSUInteger frames = atomic_load(&cofrePerfMetal)
+      ? (NSUInteger)atomic_exchange(&cofrePerfMetalFrames, 0)
+      : (NSUInteger)pojavGetAndResetFps();
+  NSUInteger index = cofrePerfSampleCount;
+  if (index < 5) {
+    cofrePerfFrameCounts[index] = frames;
+    cofrePerfFrameTimes[index] = frames ? 1000.0 / (double)frames : 0;
+    cofrePerfSampleCount++;
+  }
+  cofrePerfFrameTotal += frames;
+  cofrePerfElapsedSeconds++;
+  if (cofrePerfSampleCount < 5) return;
+
+  double sorted[5];
+  memcpy(sorted, cofrePerfFrameTimes, sizeof(sorted));
+  for (NSUInteger i = 1; i < 5; i++) {
+    double value = sorted[i];
+    NSUInteger j = i;
+    while (j > 0 && sorted[j - 1] > value) {
+      sorted[j] = sorted[j - 1];
+      j--;
+    }
+    sorted[j] = value;
+  }
+  NSUInteger minFrames = cofrePerfFrameCounts[0];
+  for (NSUInteger i = 1; i < 5; i++) minFrames = MIN(minFrames, cofrePerfFrameCounts[i]);
+  double fps = (double)cofrePerfFrameTotal / 5.0;
+  NSString *renderer = cofrePerfRenderer.length ? cofrePerfRenderer : @"unknown";
+  NSString *line = [NSString stringWithFormat:
+      @"[Cofre] perf t=%lus fps=%.1f min=%lu frameMs.p95=%.1f renderer=%@ footprintMB=%.0f thermal=%@",
+      (unsigned long)cofrePerfElapsedSeconds, fps, (unsigned long)minFrames, sorted[4], renderer,
+      CofrePerfFootprintMB(), CofrePerfThermalState()];
+  NSLog(@"%@", line);
+  CofrePerfAppend(line);
+  cofrePerfSampleCount = 0;
+  cofrePerfFrameTotal = 0;
+  memset(cofrePerfFrameCounts, 0, sizeof(cofrePerfFrameCounts));
+  memset(cofrePerfFrameTimes, 0, sizeof(cofrePerfFrameTimes));
+}
+
+static void CofrePerfLogStop(void) {
+  if (!cofrePerfQueue) return;
+  dispatch_sync(cofrePerfQueue, ^{
+    atomic_store(&cofrePerfActive, false);
+    if (cofrePerfTimer) {
+      dispatch_source_cancel(cofrePerfTimer);
+      cofrePerfTimer = nil;
+    }
+    cofrePerfRenderer = nil;
+    cofrePerfElapsedSeconds = 0;
+    cofrePerfSampleCount = 0;
+    cofrePerfFrameTotal = 0;
+    memset(cofrePerfFrameCounts, 0, sizeof(cofrePerfFrameCounts));
+    memset(cofrePerfFrameTimes, 0, sizeof(cofrePerfFrameTimes));
+    atomic_store(&cofrePerfMetalFrames, 0);
+  });
+}
+
+static void CofrePerfLogStart(SurfaceViewController *surface) {
+  if (!CofrePerfLoggingRequested()) return;
+  if (!cofrePerfQueue) cofrePerfQueue = dispatch_queue_create("com.ignacio.cofre.perf", DISPATCH_QUEUE_SERIAL);
+  // Air's HUD timer drains pojavGetAndResetFps(). Cofre owns that read while
+  // logging so GL (ANGLE/MobileGlues) and Air's Vulkan fallback are not lost.
+  CofrePerfDisableAirStatsTimer(surface);
+  NSString *renderer = [PLProfiles resolveKeyForCurrentProfile:@"renderer"];
+  NSString *environmentRenderer = NSProcessInfo.processInfo.environment[@"AMETHYST_RENDERER"];
+  if (environmentRenderer.length && ![environmentRenderer isEqualToString:@"auto"]) renderer = environmentRenderer;
+  BOOL metal = [renderer.lowercaseString containsString:@"metallum"] ||
+      [NSProcessInfo.processInfo.environment[@"AMETHYST_METAL"] isEqualToString:@"1"];
+  dispatch_sync(cofrePerfQueue, ^{
+    atomic_store(&cofrePerfActive, false);
+    if (cofrePerfTimer) {
+      dispatch_source_cancel(cofrePerfTimer);
+      cofrePerfTimer = nil;
+    }
+    cofrePerfRenderer = [renderer copy];
+    atomic_store(&cofrePerfMetal, metal);
+    atomic_store(&cofrePerfMetalFrames, 0);
+    cofrePerfElapsedSeconds = 0;
+    cofrePerfSampleCount = 0;
+    cofrePerfFrameTotal = 0;
+    memset(cofrePerfFrameCounts, 0, sizeof(cofrePerfFrameCounts));
+    memset(cofrePerfFrameTimes, 0, sizeof(cofrePerfFrameTimes));
+    (void)pojavGetAndResetFps();
+    cofrePerfTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, cofrePerfQueue);
+    dispatch_source_set_timer(cofrePerfTimer, dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC), NSEC_PER_SEC, 50 * NSEC_PER_MSEC);
+    dispatch_source_set_event_handler(cofrePerfTimer, ^{ CofrePerfTick(); });
+    dispatch_resume(cofrePerfTimer);
+    atomic_store(&cofrePerfActive, true);
+  });
+}
+
+void CofreLaunchGameExited(int code) {
+  CofrePerfLogStop();
+  dispatch_async(dispatch_get_main_queue(), ^{ if (cofreLaunchEventHandler) cofreLaunchEventHandler(CofreLaunchEventExited, code, [NSString stringWithFormat:@"exit code %d", code]); });
+}
 // Air's UIKit_returnToSplitView (patch 0002) lands here: put Cofre's root back from the launch overlay instead of
 // Air's split view. Air only returns before the JVM starts, while the overlay still holds Cofre's root.
 void CofreReturnToLauncher(void) {
+  CofrePerfLogStop();
   dispatch_async(dispatch_get_main_queue(), ^{
     UIWindow *overlay = cofreLaunchOverlayWindow;
     UIViewController *root = overlay.rootViewController;
@@ -157,6 +345,7 @@ static void CofrePresentSurface(UIWindow *window, NSDictionary *metadata) {
       window.rootViewController = surface;
       [window makeKeyAndVisible];
       [UIView animateWithDuration:0.2 animations:^{ window.alpha = 1; }];
+      CofrePerfLogStart(surface);
 
       NSLog(@"[Cofre] launch surface presented with Cofre overlay");
     });
