@@ -90,12 +90,6 @@ public struct GameExitReport: Hashable, Sendable {
         let report = (crashReport ?? "").split(whereSeparator: \.isNewline).map(String.init)
             .prefix { !$0.hasPrefix("-- System Details --") }.map { $0 }
         let errors = logLines.filter(isError)
-        // A crash inside Apple's GPU driver names AGXMetal in the fatal trace but has no error word on that line.
-        // Metallum's per-draw logging can push the reload line out of the tail, so a setting changed in game counts too.
-        if logLines.contains(where: { $0.contains("AGXMetal") }) {
-            let reloading = settingsChanged || logLines.contains { $0.contains("Reloading ResourceManager") }
-            return (.renderer, reloading ? metalReload : "Metal crashed in the GPU driver.")
-        }
         // OpenGL-only mods find no GL context on the Metal renderer; name the one at the top of the stack.
         if (report + logLines).contains(where: { $0.contains("No GLCapabilities instance set") }),
             let name = (report + logLines).lazy.compactMap({ line in
@@ -114,14 +108,18 @@ public struct GameExitReport: Hashable, Sendable {
                 return (.mods, clean(String(line[range.upperBound...])))
             }
         }
-        for source in [report, errors] {
-            for (reason, keys) in signs {
-                // The last match: the root cause in a stack trace, the newest line in a log.
-                if let line = source.last(where: { line in keys.contains { line.lowercased().contains($0) } }) {
-                    return (reason, clean(line))
-                }
-            }
+        // Keep memory, mod, and missing-library diagnoses ahead of a native renderer trace. A generic renderer sign
+        // is allowed to be refined by the fatal trace below.
+        let signed = diagnoseSigns(report: report, errors: errors)
+        if let signed, [.memory, .mods, .missingLibrary].contains(signed.0) { return signed }
+        // A JVM fatal signal plus a renderer library in the following frame/trace is a native renderer crash. The
+        // renderer marker must follow the signal so an ordinary startup line cannot trigger this diagnosis.
+        if let renderer = nativeRenderer(in: report + logLines) {
+            let reloading = renderer == "Metal"
+                && (settingsChanged || logLines.contains { $0.localizedCaseInsensitiveContains("Reloading ResourceManager") })
+            return (.renderer, reloading ? metalReload : nativeRendererCrash(renderer))
         }
+        if let signed { return signed }
         // A crash report or a Java stack trace without a known sign.
         let java =
             (report + errors).first { $0.contains("Exception") || $0.contains("java.lang.") }
@@ -129,6 +127,38 @@ public struct GameExitReport: Hashable, Sendable {
         if let java { return (.java, clean(java)) }
         if !report.isEmpty { return (.java, nil) }
         return (code == 0 ? .quit : .unknown, errors.last.map(clean))
+    }
+
+    private static func diagnoseSigns(report: [String], errors: [String]) -> (Reason, String?)? {
+        for source in [report, errors] {
+            for (reason, keys) in signs {
+                if let line = source.last(where: { line in keys.contains { line.lowercased().contains($0) } }) {
+                    return (reason, clean(line))
+                }
+            }
+        }
+        return nil
+    }
+
+    private static let nativeRendererMarkers: [(marker: String, name: String)] = [
+        ("agxmetal", "Metal"),
+        ("libmetallum", "Metal"),
+        ("metaluniversal", "Metal"),
+        ("libspvc", "Metal"),
+        ("libmobileglues", "MobileGlues"),
+        ("libtinygl4angle", "ANGLE"),
+        ("angle", "ANGLE"),
+    ]
+
+    private static func nativeRenderer(in lines: [String]) -> String? {
+        let lower = lines.map { $0.lowercased() }
+        guard let signal = lower.firstIndex(where: { $0.contains("sigsegv") || $0.contains("sigbus") }) else { return nil }
+        let fatal = lower[signal...]
+        return nativeRendererMarkers.first { marker in fatal.contains { $0.contains(marker.marker) } }?.name
+    }
+
+    private static func nativeRendererCrash(_ renderer: String) -> String {
+        "The \(renderer) renderer crashed."
     }
 
     /// Package attribution is derived from the installed archives. The cache is per mods directory.
@@ -194,6 +224,7 @@ public struct GameExitReport: Hashable, Sendable {
     public var explanation: String {
         switch reason {
         case .renderer where clue == Self.metalReload: "Metal crashed while reloading graphics."
+        case .renderer where clue?.hasSuffix(" renderer crashed.") == true: clue!
         case .memory: "It ran out of memory."
         case .renderer: "The graphics renderer failed."
         case .missingLibrary: "A game file is missing or didn't load."
@@ -212,6 +243,8 @@ public struct GameExitReport: Hashable, Sendable {
                 + "For now, change graphics and resource packs before joining a world, not in one."
         case .renderer where clue == Self.metalReload:
             "Play again. For now, change graphics and resource packs before joining a world, not in one."
+        case .renderer where clue?.hasSuffix(" renderer crashed.") == true:
+            "Play again. If it happens when you change video settings, change them less often or switch the renderer in the instance settings."
         case .renderer: "Turn off shader packs, or pick another renderer in Settings › Renderer."
         case .missingLibrary:
             "Play again to recheck the game files. If it happens again, this version may not run on iOS yet."

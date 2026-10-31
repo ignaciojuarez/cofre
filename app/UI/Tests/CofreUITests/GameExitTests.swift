@@ -41,18 +41,65 @@ final class GameExitTests: XCTestCase {
 
     // The shader pack in System Details and an INFO log line must not turn a Java error into a renderer one.
     func testMetalDriverCrashIsTheRenderer() {
-        let fatal = "#  SIGSEGV (0xb)\n  #19 0x262d24730  /System/Library/Extensions/AGXMetalG18P.bundle/AGXMetalG18P"
+        let fatal = """
+            [Render thread/INFO]: [metallum] createTexture 512x256 fmt=RGBA8_UNORM usage=0xf
+            # A fatal error has been detected by the Java Runtime Environment:
+            #  SIGSEGV (0xb)
+            # Problematic frame:
+            # C  [libobjc.A.dylib+0x127c]  objc_retain+0x10
+            ===== [Amethyst fatal trace] ... reason: abort() called
+              #08 0x2565688ec  /System/Library/Extensions/AGXMetalG14.bundle/AGXMetalG14
+            """
         let midGame = diagnose(134, log: "[17:03:20] [Render thread/INFO]: Reloading ResourceManager: vanilla\n" + fatal)
         XCTAssertEqual(midGame.reason, .renderer)
         XCTAssertEqual(midGame.clue, GameExitReport.metalReload)
         XCTAssertEqual(midGame.explanation, "Metal crashed while reloading graphics.")
         XCTAssertTrue(midGame.nextStep.contains("before joining a world"))
-        XCTAssertEqual(diagnose(134, log: fatal).clue, "Metal crashed in the GPU driver.")
+        let native = diagnose(134, log: fatal)
+        XCTAssertEqual(native.clue, "The Metal renderer crashed.")
+        XCTAssertEqual(native.explanation, "The Metal renderer crashed.")
+        XCTAssertTrue(native.nextStep.contains("switch the renderer in the instance settings"))
 
         // Metallum's logging pushed the reload line out of the tail; the changed setting still tells, and is named.
         let named = GameExitReport(code: 134, crashReport: nil, log: fatal, changedSettings: ["Mipmap levels"])
         XCTAssertEqual(named.clue, GameExitReport.metalReload)
         XCTAssertTrue(named.nextStep.hasPrefix("Your change to Mipmap levels is saved for next time."))
+    }
+
+    func testNativeMobileGluesCrashIsNamed() {
+        let fatal = """
+            # A fatal error has been detected by the Java Runtime Environment:
+            #  SIGBUS (0x7)
+            # Problematic frame:
+            # C  [libmobileglues.dylib+0x1234]  glDrawElements+0x10
+            """
+        let r = diagnose(134, log: fatal)
+        XCTAssertEqual(r.reason, .renderer)
+        XCTAssertEqual(r.explanation, "The MobileGlues renderer crashed.")
+    }
+
+    func testNativeRendererMarkersCoverShippedBackends() {
+        let cases = [
+            ("libmetallum.dylib", "The Metal renderer crashed."),
+            ("MetalUniversal-1.0.4.jar", "The Metal renderer crashed."),
+            ("libspvc.dylib", "The Metal renderer crashed."),
+            ("ANGLE", "The ANGLE renderer crashed."),
+            ("libtinygl4angle.dylib", "The ANGLE renderer crashed."),
+        ]
+        for (marker, explanation) in cases {
+            let r = diagnose(log: "# SIGSEGV (0xb)\n#08 \(marker)")
+            XCTAssertEqual(r.reason, .renderer, marker)
+            XCTAssertEqual(r.explanation, explanation, marker)
+        }
+        XCTAssertNotEqual(diagnose(log: "#08 AGXMetalG14.bundle").reason, .renderer)
+    }
+
+    func testNativeRendererDoesNotHideLoaderOrMemoryFailure() {
+        let native = "# SIGSEGV (0xb)\n#08 /System/Library/Extensions/AGXMetalG14.bundle/AGXMetalG14"
+        let loader = diagnose(log: "Error during pre-loading phase: Mod File mods/bountiful.jar needs language provider kotlinforforge:4 or above to load\n" + native)
+        XCTAssertEqual(loader.reason, .mods)
+        let memory = diagnose(report: "java.lang.OutOfMemoryError: Java heap space", log: native)
+        XCTAssertEqual(memory.reason, .memory)
     }
 
     func testGLOnlyModOnMetalNamesTheMod() {
