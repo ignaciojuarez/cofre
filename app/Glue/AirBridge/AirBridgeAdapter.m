@@ -338,6 +338,21 @@ BOOL CofreConsumeLaunchFailure(void) {
 
 static void CofreFinishSurface(UIWindow *window);
 
+// Air sizes Minecraft's window and lays out its game view from the surface's first layout. Built while an iPhone is
+// still turning from portrait, the game starts at 1206x2622 and Air's rotation handler later moves its root view to
+// the lower left. Wait up to 2 s for the landscape turn.
+static void CofreAfterLandscape(UIWindow *window, int waitedMs, dispatch_block_t then) {
+  CGSize size = window.windowScene.coordinateSpace.bounds.size;
+  if (size.width >= size.height || waitedMs >= 2000) {
+    NSLog(@"[Cofre] launch surface size=%.0fx%.0f waitedMs=%d", size.width, size.height, waitedMs);
+    then();
+    return;
+  }
+  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 50 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
+    CofreAfterLandscape(window, waitedMs + 50, then);
+  });
+}
+
 static void CofrePresentSurface(UIWindow *window, NSDictionary *metadata) {
   // As UIKit_launchMinecraftSurfaceVC does: remember who played last.
   BaseAuthenticator *account = BaseAuthenticator.current;
@@ -355,7 +370,7 @@ static void CofrePresentSurface(UIWindow *window, NSDictionary *metadata) {
     // Minecraft sizes its window from the surface's first layout, so turn to
     // landscape first, as Air's own Play button does.
     AmeGameLandscapeLockEnter();
-    dispatch_async(dispatch_get_main_queue(), ^{
+    CofreAfterLandscape(window, 0, ^{
       SurfaceViewController *surface = [[SurfaceViewController alloc] initWithMetadata:metadata];
       CofreArmFirstDrawable();
       [CofreGameOverlayHost installOnSurface:surface];

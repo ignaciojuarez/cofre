@@ -146,12 +146,31 @@ void CofreSDLTextInputStateChanged(BOOL active, const char *reason) {
 }
 
 @interface CofreGameOverlayView : UIView
+@property(nonatomic, weak) SurfaceViewController *game;
 @end
+
+// Air's rotation handler resizes its root view by bounds only, so after a portrait-to-landscape turn the game picture
+// keeps the portrait center and sits in the lower left. Pin it back to the top left.
+static void CofreAnchorGameRoot(SurfaceViewController *game) {
+    UIView *root = game.rootView;
+    CGPoint anchored = CGPointMake(CGRectGetMidX(root.bounds), CGRectGetMidY(root.bounds));
+    if (!root || CGPointEqualToPoint(root.center, anchored)) return;
+    NSLog(@"[Cofre] game root re-anchored from=%@ size=%@", NSStringFromCGPoint(root.frame.origin),
+          NSStringFromCGSize(root.bounds.size));
+    root.center = anchored;
+}
 
 @implementation CofreGameOverlayView
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
     UIView *hit = [super hitTest:point withEvent:event];
     return hit == self ? nil : hit;
+}
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    SurfaceViewController *game = self.game;
+    CofreAnchorGameRoot(game);
+    // Air's rotation block may set the bounds after this layout pass.
+    dispatch_async(dispatch_get_main_queue(), ^{ CofreAnchorGameRoot(game); });
 }
 @end
 
@@ -179,6 +198,7 @@ void CofreSDLTextInputStateChanged(BOOL active, const char *reason) {
         }
 
         CofreGameOverlayView *overlay = [[CofreGameOverlayView alloc] initWithFrame:container.bounds];
+        overlay.game = game;
         overlay.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
         overlay.userInteractionEnabled = YES;
         overlay.backgroundColor = UIColor.clearColor;
