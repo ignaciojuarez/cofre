@@ -76,9 +76,10 @@ targets:
     type: app-extension
     platform: iOS
     sources:
+      - path: ../../app/UI/Sources/CofreKit/JITProtocol.swift
       - path: ../../app/Glue/CofreConstants.swift
       - path: ../../extensions/PacketTunnel
-      - path: ../../upstream/stikjit/Sources
+      - path: ../../.work/stikjit/Sources
       - path: ../../upstream/stikjit/Resources
         buildPhase: resources
       - path: ../../extensions/PacketTunnel/CofreTXM.js

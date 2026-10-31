@@ -93,6 +93,7 @@ if (( BUILD )); then
   python3 "$ROOT/scripts/generate-renderer-manifest.py" "$AIR/JavaApp/libs/others/metallum_agent.jar" "$APP/RendererManifest.json"
   bt_step "Build CofreCore framework"
   SIGNING="$ROOT/.build-tools/signing"
+  "$ROOT/scripts/stikjit-sources.sh" || bt_die "could not prepare StikJIT sources"
   (cd "$SIGNING" && xcodegen generate --spec project.yml --quiet) || bt_die "could not generate the signing project"
   xcodebuild -project "$SIGNING/CofreSigning.xcodeproj" -scheme CofreSigning -configuration Debug \
     -destination 'generic/platform=iOS' -derivedDataPath "$SIGNING/build" \

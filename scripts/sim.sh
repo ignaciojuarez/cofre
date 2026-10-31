@@ -17,6 +17,7 @@ echo "Output $OUT"
 cp -R "$ROOT/artifacts/Payload/Cofre.app" "$APP"
 rm -rf "$APP/PlugIns"
 python3 "$ROOT/scripts/update-info-plist.py" "$APP/Info.plist"
+"$ROOT/scripts/stikjit-sources.sh"
 (cd "$SIGNING" && xcodegen generate --spec project.yml --quiet)
 xcodebuild -project "$SIGNING/CofreSigning.xcodeproj" -scheme CofreSigning -configuration Debug -destination 'generic/platform=iOS' -derivedDataPath "$OUT/derived" CODE_SIGNING_ALLOWED=NO build >/dev/null
 CORE="$OUT/derived/Build/Products/Debug-iphoneos/CofreCore.framework"
