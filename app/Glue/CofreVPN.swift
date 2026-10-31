@@ -8,11 +8,13 @@ enum CofreVPN {
         let errorDescription: String?
     }
 
+    /// Older builds could leave a second, disabled configuration behind; use the enabled one.
     static func manager() async throws -> NETunnelProviderManager? {
-        try await NETunnelProviderManager.loadAllFromPreferences().first {
+        let ours = try await NETunnelProviderManager.loadAllFromPreferences().filter {
             ($0.protocolConfiguration as? NETunnelProviderProtocol)?.providerBundleIdentifier
                 == CofreConstants.tunnelBundleID
         }
+        return ours.first { $0.isEnabled } ?? ours.first
     }
 
     static func isAllowed() async -> Bool { (try? await manager())?.isEnabled == true }

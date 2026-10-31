@@ -8,9 +8,13 @@ while (($#)); do case "$1" in --device) device=$2; shift 2;; --timeout) timeout=
 name=$(basename "$scenario" .json); stamp=$(date +%Y%m%d-%H%M%S); out="/tmp/cofre-scenarios/$name-$stamp"; mkdir -p "$out"
 bundle=com.ignacio.cofre; file=$(basename "$scenario")
 xcrun devicectl device copy to --device "$device" --domain-type appDataContainer --domain-identifier "$bundle" --source "$scenario" --destination "Documents/$file" >/dev/null
-xcrun devicectl device process terminate --device "$device" "$bundle" >/dev/null 2>&1 || true
+# Stop only the app by PID: terminating by bundle ID also kills the VPN extension (com.ignacio.cofre.tunnel),
+# and the next launch then finds a dead tunnel.
+for pid in $(xcrun devicectl device info processes --device "$device" 2>/dev/null | awk '/Cofre\.app\/AngelAuraAmethyst[[:space:]]*$/ {print $1}'); do
+  xcrun devicectl device process terminate --device "$device" --pid "$pid" >/dev/null 2>&1 || true
+done
 since=$(date -v-5S "+%Y-%m-%d %H:%M:%S")  # ignore the previous run's log until the app rotates it
-xcrun devicectl device process launch --device "$device" --terminate-existing "$bundle" -cofreScenario "$file" >/dev/null
+xcrun devicectl device process launch --device "$device" "$bundle" -cofreScenario "$file" >/dev/null
 log="$out/latestlog.txt"; verdict="FAIL timeout"
 for ((i=0; i<timeout; i++)); do
   xcrun devicectl device copy from --device "$device" --domain-type appDataContainer --domain-identifier "$bundle" --source Documents/latestlog.txt --destination "$log" >/dev/null 2>&1 || true

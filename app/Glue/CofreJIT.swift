@@ -21,8 +21,21 @@ public final class CofreJIT: @unchecked Sendable {
         self.tunnel = tunnel
         self.pairingURL = pairingURL
     }
+    static let noReply = "The VPN extension didn't enable JIT."
+
+    /// A tunnel iOS killed (memory limit, reinstall, a debugger terminating the app) can still read as connected and
+    /// drops the message without a reply. Restart it once and ask again.
     public static func enable(pid: Int32, pairingURL: @escaping () -> URL) async -> CofreJITStatus {
-        let session: NETunnelProviderSession
+        var session: NETunnelProviderSession
+        do { session = try await CofreVPN.connect() } catch { return .failed(error.localizedDescription) }
+        let first = await CofreJIT(tunnel: { session }, pairingURL: pairingURL).enable(pid: pid)
+        guard first == .failed(noReply) else { return first }
+        NSLog("[Cofre] JIT got no reply; restarting the VPN")
+        session.stopVPNTunnel()
+        let deadline = Date().addingTimeInterval(5)
+        while session.status != .disconnected, session.status != .invalid, Date() < deadline {
+            try? await Task.sleep(for: .milliseconds(100))
+        }
         do { session = try await CofreVPN.connect() } catch { return .failed(error.localizedDescription) }
         return await CofreJIT(tunnel: { session }, pairingURL: pairingURL).enable(pid: pid)
     }
@@ -49,8 +62,7 @@ public final class CofreJIT: @unchecked Sendable {
                 status = .enabled(mode)
                 return status
             }
-            status = .failed(
-                message?.reason ?? "The VPN extension didn't enable JIT.", step: message?.step)
+            status = .failed(message?.reason ?? Self.noReply, step: message?.step)
             return status
         } catch {
             status = .failed(error.localizedDescription)
