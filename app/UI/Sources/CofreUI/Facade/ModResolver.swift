@@ -1,5 +1,6 @@
 #if canImport(UIKit)
     import Foundation
+    import CofreKit
 
     // One dependency resolver for every backend, so the rules are tested once (CofreUITests). A backend hands it each
     // project's versions, newest first; it returns an `ModInstallPlan`. Modrinth and CurseForge differ only in how the

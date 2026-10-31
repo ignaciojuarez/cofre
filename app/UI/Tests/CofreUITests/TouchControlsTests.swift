@@ -155,6 +155,18 @@ final class TouchControlsTests: XCTestCase {
         XCTAssertEqual(TouchLayout.stickZone(size: phone, leftHanded: false, fraction: 0.9).width, phone.width * 0.6)
     }
 
+    func testLookZoneNeverOverlapsStickZone() {
+        let stick = TouchLayout.stickZone(size: phone, leftHanded: false, fraction: 0.4)
+        let look = TouchLayout.lookZone(size: phone, leftHanded: false, fraction: 0.4)
+        XCTAssertEqual(look, CGRect(x: stick.maxX, y: 0, width: phone.width - stick.maxX, height: phone.height))
+        XCTAssertFalse(look.intersects(stick))
+
+        let leftStick = TouchLayout.stickZone(size: phone, leftHanded: true, fraction: 0.4)
+        let leftLook = TouchLayout.lookZone(size: phone, leftHanded: true, fraction: 0.4)
+        XCTAssertEqual(leftLook, CGRect(x: 0, y: 0, width: leftStick.minX, height: phone.height))
+        XCTAssertFalse(leftLook.intersects(leftStick))
+    }
+
     // Settings saved before a setting existed keep their values; the new one takes its default.
     func testOlderSavedSettingsKeepTheirValues() throws {
         let old = #"{"style":"minimal","buttonScale":1.2,"opacity":0.5,"fadeWhenIdle":false,"leftHanded":true,"haptics":false,"lookSensitivity":2,"invertY":true}"#
@@ -291,6 +303,51 @@ final class TouchControlsTests: XCTestCase {
         m.setMode(.controller)
         XCTAssertEqual(spy.events.last, "-SPACE")
         XCTAssertTrue(m.controls.isEmpty)
+    }
+
+    func testQuickTrayDefaultsAndCodableRoundTrip() throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "TouchTrayTests"))
+        defaults.removePersistentDomain(forName: "TouchTrayTests")
+        let tray = QuickTraySettings()
+        XCTAssertEqual(tray.slots.compactMap { $0?.id }, ["view", "players", "swap", "hud", "debug", "keyboard"])
+        var edited = tray
+        edited.slots[0] = QuickTrayAction(id: "custom-slot", label: "Map", keys: [.f3], mode: .toggle)
+        edited.custom = [QuickTrayAction(id: "mine", label: "Mining", keys: [.f3, .g])]
+        edited.save(defaults)
+        XCTAssertEqual(QuickTraySettings.load(defaults), edited)
+        defaults.set(try JSONEncoder().encode(["view", "debug"]), forKey: QuickTraySettings.key)
+        XCTAssertEqual(QuickTraySettings.load(defaults).slots[0]?.id, "view")
+        XCTAssertEqual(QuickTraySettings.load(defaults).slots[1]?.id, "debug")
+    }
+
+    @MainActor
+    func testQuickTrayChordReleasesInReverseOrder() {
+        let spy = SpyInput()
+        let m = TouchOverlayModel(input: spy, settings: TouchControlSettings())
+        let action = QuickTrayAction(id: "chunks", label: "Chunks", keys: [.f3, .g], mode: .hold)
+        m.trayActionDown(action)
+        m.trayActionUp(action)
+        XCTAssertEqual(spy.events, ["touch", "+F3", "+G", "-G", "-F3"])
+    }
+
+    @MainActor
+    func testQuickTrayToggleAutoReleasesWhenOverlayStops() {
+        let spy = SpyInput()
+        let m = TouchOverlayModel(input: spy, settings: TouchControlSettings())
+        let action = QuickTrayAction(id: "map", label: "Map", keys: [.f3], mode: .toggle)
+        m.trayActionDown(action)
+        XCTAssertEqual(m.latchedTrayActions["map"]?.id, "map")
+        m.releaseAll()
+        XCTAssertTrue(m.latchedTrayActions.isEmpty)
+        XCTAssertEqual(spy.events.suffix(1), ["-F3"])
+    }
+
+    func testQuickTrayResetKeepsCustomKeys() {
+        var tray = QuickTraySettings(custom: [QuickTrayAction(id: "mine", label: "Mine", keys: [.f3])])
+        tray.slots[0] = nil
+        tray.reset()
+        XCTAssertEqual(tray.custom.map(\.id), ["mine"])
+        XCTAssertEqual(tray.slots[0]?.id, "view")
     }
 }
 

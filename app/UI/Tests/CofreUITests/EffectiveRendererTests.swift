@@ -31,6 +31,6 @@ final class EffectiveRendererTests: XCTestCase {
         XCTAssertNotNil(issue("auto", "auto", "26.3"))
         XCTAssertNotNil(issue("auto", "metallum", "1.21.1"))
         XCTAssertEqual(ModCompatibility.renderer(instanceSetting: "auto", globalSetting: "auto", gameVersion: "1.21.1", loader: "neoforge"), "mobileglues")
-        XCTAssertEqual(ModCompatibility.renderer(globalSetting: "auto", gameVersion: "26.3", loader: "fabric", javaVersion: 17), "air")
+        XCTAssertEqual(ModCompatibility.renderer(globalSetting: "auto", gameVersion: "26.3", loader: "fabric", javaVersion: 17), "mobileglues")
     }
 }

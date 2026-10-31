@@ -10,13 +10,18 @@ import Foundation
         }
     }
 
-    public enum CofreInputKey: String, CaseIterable, Sendable {
+    public enum CofreInputKey: String, CaseIterable, Codable, Sendable {
         case w = "W", a = "A", s = "S", d = "D", jump = "SPACE", sneak = "SHIFT", sprint = "CTRL"
-        case inventory = "E", chat = "T", drop = "Q", escape = "ESC", f5 = "F5"
+        case inventory = "E", chat = "T", drop = "Q", escape = "ESC", f2 = "F2", f3 = "F3", f5 = "F5", g = "G"
         /// Hide HUD, player list (held), swap hands.
         case f1 = "F1", tab = "TAB", swapHands = "F"
         case hotbar1 = "1", hotbar2 = "2", hotbar3 = "3", hotbar4 = "4", hotbar5 = "5"
         case hotbar6 = "6", hotbar7 = "7", hotbar8 = "8", hotbar9 = "9"
+        /// The rest of the keyboard, for custom quick-tray keys (mods bind anything).
+        case b = "B", c = "C", h = "H", i = "I", j = "J", k = "K", l = "L", m = "M", n = "N", o = "O", p = "P"
+        case r = "R", u = "U", v = "V", x = "X", y = "Y", z = "Z", key0 = "0"
+        case f4 = "F4", f6 = "F6", f7 = "F7", f8 = "F8", f9 = "F9", f10 = "F10", f11 = "F11", f12 = "F12"
+        case alt = "ALT", enter = "ENTER", backspace = "BACKSPACE", up = "UP", down = "DOWN", left = "LEFT", right = "RIGHT"
     }
 
     public enum CofreMouseButton: Int, Sendable { case left = 0, right = 1, middle = 2 }
@@ -151,11 +156,20 @@ import Foundation
     public protocol ProjectCatalog: AnyObject {
         func search(_ query: ProjectQuery) async throws -> [ProjectSummary]
         func versions(projectID: String, instanceID: String) async throws -> [ProjectVersion]
+        /// Complete catalog used after the fast, instance-matched page has rendered.
+        func allVersions(projectID: String, instanceID: String) async throws -> [ProjectVersion]
         func dependencies(versionID: String, instanceID: String) async throws -> [ProjectDependency]
         /// What Get installs for `projectID` of `kind`: required dependencies, optional ones, or why it can't
         /// (`ModResolver` does the work). `versionID == nil` picks the newest fitting version.
         func installPlan(projectID: String, versionID: String?, kind: ContentKind, instanceID: String) async throws
             -> ModInstallPlan
+    }
+
+    extension ProjectCatalog {
+        /// Existing backends can opt into the fast path without a second implementation.
+        public func allVersions(projectID: String, instanceID: String) async throws -> [ProjectVersion] {
+            try await versions(projectID: projectID, instanceID: instanceID)
+        }
     }
 
     extension ProjectCatalog {
@@ -248,8 +262,6 @@ import Foundation
         public static let controllerNavigation = BackendCapabilities(rawValue: 1 << 6)
         /// GAP-14 Join server sheet: "Modded" badges and Join buttons on server rows, and `cofre://join` links.
         public static let serverJoin = BackendCapabilities(rawValue: 1 << 10)
-        /// I02 Options icon grid → `setIcon(_:instanceID:)`.
-        public static let instanceIcon = BackendCapabilities(rawValue: 1 << 11)
         /// Servers (`ServerService`): "Copy to" and "Delete" in a server row's menu.
         public static let serverFiles = BackendCapabilities(rawValue: 1 << 12)
         /// MOTD, players and ping bars on server rows → `pingServer`.
@@ -265,8 +277,6 @@ import Foundation
         func addServer(instanceID: String, name: String, address: String) async throws -> ServerSummary
         func createInstance(name: String, version: String, loader: Loader, ownFolder: Bool, fabricAPI: Bool)
             async throws -> InstanceSummary
-        /// The user's icon pick; `nil` goes back to `InstanceIcon.automatic`.
-        func setIcon(_ glyph: PixelGlyph?, instanceID: String) async throws
     }
 
     public struct UnsupportedAction: LocalizedError {
@@ -283,9 +293,6 @@ import Foundation
             async throws -> InstanceSummary
         {
             throw UnsupportedAction(name: "Creating instances")
-        }
-        public func setIcon(_ glyph: PixelGlyph?, instanceID: String) async throws {
-            throw UnsupportedAction(name: "Instance icons")
         }
     }
 

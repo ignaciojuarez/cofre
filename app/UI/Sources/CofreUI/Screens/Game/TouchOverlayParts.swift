@@ -4,7 +4,7 @@ import SwiftUI
 
 enum OverlayGlyph {
     case jump, sneak, flyUp, flyDown, swimUp, swimDown, chat, pause, dots, menu, close, keyboard, dismount, eye,
-        players, drop, swap, hide
+        players, drop, swap, hide, edit
 
     init(_ g: TouchGlyph) {
         switch g {
@@ -38,6 +38,7 @@ enum OverlayGlyph {
         case .drop: ["..WWW..", "..WWW..", "WWWWWWW", ".WWWWW.", "..WWW..", "...W...", "WWWWWWW"]
         case .swap: ["..W....", ".WWWWWW", "..W...W", ".......", "W...W..", "WWWWWW.", "....W.."]
         case .hide: ["W.....W", ".WWWWW.", "W.W.W.W", "W.WWW.W", "W.W.W.W", ".WWWWW.", "W.....W"]
+        case .edit: [".......", "....WW.", "...WWW.", "..WWW..", ".WWW...", "WW.....", "W......"]
         }
     }
 }
@@ -142,26 +143,29 @@ enum TrayItem: CaseIterable {
 
 /// Quick tray: a grid of rarer actions under the pause (or ≡) button.
 struct QuickTray: View {
-    let items: [TrayItem], k: CGFloat
-    var on: Set<TrayItem> = []
-    let select: (TrayItem) -> Void
+    let items: [QuickTrayAction?], k: CGFloat
+    var on: Set<String> = []
+    let down: (QuickTrayAction) -> Void
+    let up: (QuickTrayAction) -> Void
+    let edit: () -> Void
+
+    private var cells: [QuickTrayAction] {
+        let pause = QuickTrayAction(id: "pause", label: "Pause", keys: [.escape])
+        let editAction = QuickTrayAction(id: "edit", label: "Edit", keys: [])
+        let slots = items.enumerated().map { pair in
+            pair.element ?? QuickTrayAction(id: "empty-\(pair.offset)", label: "", keys: [])
+        }
+        return [pause] + slots + [editAction]
+    }
 
     var body: some View {
-        let rows = stride(from: 0, to: items.count, by: 3).map { Array(items[$0..<min($0 + 3, items.count)]) }
         VStack(spacing: 8) {
-            ForEach(rows.indices, id: \.self) { r in
+            ForEach(0..<2, id: \.self) { r in
                 HStack(spacing: 6) {
-                    ForEach(rows[r], id: \.self) { item in
-                        Button { select(item) } label: {
-                            VStack(spacing: 3) {
-                                OverlayButton(glyph: item.glyph, size: 40 * k, on: on.contains(item))
-                                Text(verbatim: item.title).font(.cofre(.label)).foregroundStyle(Color.cofre.ink)
-                                    .fixedSize()
-                            }
-                            .frame(width: 64 * k)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(Text(verbatim: item.title))
+                    ForEach(0..<4, id: \.self) { c in
+                        QuickTrayTile(
+                            item: cells[(r * 4) + c], k: k, on: on,
+                            down: down, up: up, edit: edit)
                     }
                 }
             }
@@ -169,5 +173,38 @@ struct QuickTray: View {
         .padding(10)
         .background(Color.black.opacity(0.6))
         .overlay { Rectangle().strokeBorder(Color.white.opacity(0.35), lineWidth: 2) }
+    }
+
+}
+
+private struct QuickTrayTile: View {
+    let item: QuickTrayAction, k: CGFloat, on: Set<String>
+    let down: (QuickTrayAction) -> Void, up: (QuickTrayAction) -> Void, edit: () -> Void
+    @State private var active = false
+
+    var body: some View {
+        let gesture = DragGesture(minimumDistance: 0)
+            .onChanged { _ in
+                guard !item.id.hasPrefix("empty-") else { return }
+                guard !active else { return }
+                active = true
+                if item.id != "edit" { down(item) }
+            }
+            .onEnded { _ in
+                guard !item.id.hasPrefix("empty-") else { return }
+                if item.id == "edit" { edit() } else { up(item) }
+                active = false
+            }
+        return VStack(spacing: 3) {
+            OverlayButton(
+                glyph: item.id == "edit" ? .edit : item.glyph,
+                size: 40 * k, on: on.contains(item.id) || item.id == "pause" || item.id == "edit")
+            Text(verbatim: item.label).font(.cofre(.label)).foregroundStyle(Color.cofre.ink).fixedSize()
+        }
+        .frame(width: 64 * k)
+        .contentShape(Rectangle())
+        .opacity(item.id.hasPrefix("empty-") ? 0.4 : 1)
+        .accessibilityLabel(Text(verbatim: item.label))
+        .gesture(gesture)
     }
 }

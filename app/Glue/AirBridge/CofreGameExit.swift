@@ -3,8 +3,9 @@ import CofreKit
 import SwiftUI
 import UIKit
 
-/// Cofre's crash screen over a stopped game, in place of Air's PLCrashView. Patch 0004 asks `CofreHandleGameExit`
-/// (CofreStartup.m), which calls `handle` on the main queue while the JVM thread waits for the process to end.
+/// Cofre's recovery screen over a stopped game. Patch 0004 asks
+/// `CofreHandleGameExit` (CofreStartup.m), which calls `handle` on the main
+/// queue while the JVM thread waits for the process to end.
 @MainActor enum CofreGameExit {
     private static var window: UIWindow?
 
@@ -70,7 +71,7 @@ import UIKit
         let instance = ProcessInfo.processInfo.environment["POJAV_GAME_DIR"].flatMap {
             try? InstanceStore(root: URL(fileURLWithPath: $0)).list().first { $0.id == name }
         }
-        let loader = instance.flatMap { Loader(rawValue: $0.loader.rawValue) }.flatMap { $0 == .vanilla ? nil : $0.displayName }
+        let loader = instance.map(\.loader).flatMap { $0 == .vanilla ? nil : $0.displayName }
         let version = [loader, instance?.gameVersion].compactMap { $0 }.joined(separator: " ")
         return version.isEmpty ? name : "\(name) · \(version)"
     }

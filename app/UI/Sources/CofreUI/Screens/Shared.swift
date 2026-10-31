@@ -72,16 +72,13 @@
         @Environment(CofreStore.self) private var store
         var body: some View {
             ForEach(items) { item in
-                Group {
-                    if item.kind == .mods {
-                        Toggle(isOn: Binding(get: { item.enabled }, set: { store.setEnabled($0, item: item) })) { row(item) }
-                            .toggleStyle(.block)
-                    } else { row(item) }
-                }
+                // Every kind turns on and off by its file; which pack is in use stays the game's choice.
+                Toggle(isOn: Binding(get: { item.enabled }, set: { store.setEnabled($0, item: item) })) { row(item) }
+                    .toggleStyle(.block)
                 .padding(.horizontal, 11).padding(.vertical, 6).frame(minHeight: 44).block(.panel).blockHover()
                 .opacity(item.enabled ? 1 : 0.6)
                 .contextMenu {
-                    if item.kind == .mods { Button(item.enabled ? "Turn off" : "Turn on") { store.setEnabled(!item.enabled, item: item) } }
+                    Button(item.enabled ? "Turn off" : "Turn on") { store.setEnabled(!item.enabled, item: item) }
                     Button("Delete", role: .destructive) { store.deleteItem(item) }
                 }
             }
@@ -90,13 +87,21 @@
             HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(verbatim: item.name).cofreFont(.rowTitle).foregroundStyle(Color.cofre.ink).lineLimit(1)
-                    if store.compatibilityIssue(for: item) != nil { Badge("Won't run", tone: .warn) }
-                    Text(verbatim: item.kind == .mods ? (item.enabled ? VersionLabel.clean(item.version) : String(localized: "Off")) : (item.inUse ? "In use" : "Change in game"))
+                    if let issue = store.compatibilityIssue(for: item) { Badge(issue.badge, tone: .warn) }
+                    Text(verbatim: detail(item))
                         .cofreFont(.caption).foregroundStyle(Color.cofre.muted).lineLimit(1)
                 }
                 Spacer(minLength: 4)
                 if item.updateTo != nil { Badge("Update", tone: .warn) }
                 if item.kind != .mods && item.inUse { Badge("In use", tone: .success) }
+            }
+        }
+        private func detail(_ item: InstalledItem) -> String {
+            if !item.enabled { return String(localized: "Off") }
+            switch item.kind {
+            case .mods: return VersionLabel.clean(item.version)
+            case .dataPacks: return item.world ?? ""
+            default: return item.inUse ? String(localized: "Change in game") : String(localized: "Pick it in game")
             }
         }
     }

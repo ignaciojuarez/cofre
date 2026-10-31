@@ -50,3 +50,75 @@ final class WorldsTests: XCTestCase {
         XCTAssertEqual(worlds.first { $0.folder == "garbage" }?.displayName, "garbage", "unreadable worlds show their folder")
     }
 }
+
+extension WorldsTests {
+    private func makeWorld(_ folder: String, in gameDirectory: URL, file: String = "level.dat") throws {
+        let dir = gameDirectory.appendingPathComponent("saves/\(folder)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try levelDat(name: folder.uppercased()).write(to: dir.appendingPathComponent(file))
+    }
+
+    /// Air's resolver decides each profile's folder; worlds and servers follow it, isolated or shared.
+    @MainActor func testIsolatedAndSharedRootsFollowTheEngineResolver() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let profiles = #"{"profiles":{"iso":{"name":"Iso","lastVersionId":"1.21.1","gameDir":"./ignored"},"a":{"name":"A","lastVersionId":"1.21.1"},"b":{"name":"B","lastVersionId":"1.20.1"}}}"#
+        try Data(profiles.utf8).write(to: root.appendingPathComponent("launcher_profiles.json"))
+        let isolated = root.appendingPathComponent("instances/iso")
+        let store = try InstanceStore(root: root) { id, _ in id == "iso" ? isolated : nil }
+        let all = Dictionary(uniqueKeysWithValues: try store.list().map { ($0.id, $0) })
+        XCTAssertEqual(all["iso"]?.gameDirectory, isolated, "the resolver's output wins over gameDir")
+        XCTAssertEqual(all["a"]?.gameDirectory, root)
+        XCTAssertEqual(all["b"]?.gameDirectory, root)
+
+        try makeWorld("Shared", in: root)
+        try makeWorld("Mine", in: isolated)
+        let worlds = { (id: String) in try WorldStore(instance: XCTUnwrap(all[id])).list().map(\.id) }
+        XCTAssertEqual(try worlds("iso"), ["Mine"])
+        XCTAssertEqual(try worlds("a"), ["Shared"])
+        XCTAssertEqual(try worlds("b"), ["Shared"], "shared profiles see the same saves")
+
+        let a = CofreServersStore(gameDirectory: try XCTUnwrap(all["a"]).gameDirectory)
+        let iso = CofreServersStore(gameDirectory: isolated)
+        try a.add(.init(name: "x", ip: "x.net"))
+        XCTAssertEqual(try CofreServersStore(gameDirectory: try XCTUnwrap(all["b"]).gameDirectory).list().map(\.ip), ["x.net"])
+        XCTAssertTrue(try iso.list().isEmpty)
+    }
+
+    func testOnlyFoldersWithLevelDatAreWorldsWithStableIDs() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try makeWorld("Main", in: root)
+        try makeWorld("Recovered", in: root, file: "level.dat_old")
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("saves/screenshots-not-a-world"), withIntermediateDirectories: true)
+        try Data("x".utf8).write(to: root.appendingPathComponent("saves/stray.txt"))
+        let store = WorldStore(instance: Instance(id: "i", name: "i", gameDirectory: root, gameVersion: "1.21.1"))
+        let worlds = try store.list()
+        XCTAssertEqual(Set(worlds.map(\.id)), ["Main", "Recovered"])
+        XCTAssertEqual(worlds.first { $0.id == "Recovered" }?.displayName, "RECOVERED", "level.dat_old is read when level.dat is gone")
+        XCTAssertEqual(try store.list().map(\.id), worlds.map(\.id), "IDs are folder names, stable across reads")
+        XCTAssertTrue(worlds.allSatisfy { $0.id == $0.folder })
+    }
+
+    func testDeleteNeverLeavesSavesAndRefusesWhileRunning() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try makeWorld("Keep", in: root)
+        let instance = Instance(id: "i", name: "i", gameDirectory: root, gameVersion: "1.21.1")
+        let store = WorldStore(instance: instance)
+        for name in ["", ".", "..", "../saves", "Keep/region", "Keep\0"] {
+            XCTAssertThrowsError(try store.delete(name), name)
+            XCTAssertThrowsError(try store.export(name), name)
+            XCTAssertThrowsError(try store.backUp(name), name)
+        }
+        XCTAssertEqual(try store.list().map(\.id), ["Keep"])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("saves").path))
+        XCTAssertThrowsError(try WorldStore(instance: instance, isGameRunning: { true }).delete("Keep"))
+        XCTAssertEqual(try store.list().map(\.id), ["Keep"])
+        let token = try store.delete("Keep")
+        XCTAssertTrue(try store.list().isEmpty)
+        try store.undo(token)
+        XCTAssertEqual(try store.list().map(\.id), ["Keep"])
+    }
+}

@@ -10,10 +10,10 @@
         public var accountList = [Account(id: "steve", name: "Steve_42", kind: "Microsoft", isActive: true)]
         /// Seconds between simulated launch/test steps. 0 makes streams finish immediately.
         public var stepDelay: Double
-        /// GAP-13. `.serverJoin` (GAP-14), `.instanceIcon` and the server flags, so screenshots show what ships plus the
-        /// Join server sheet and Servers. Tests turn flags on.
+        /// GAP-13. `.serverJoin` (GAP-14) and the server flags, so screenshots show what ships plus the Join server
+        /// sheet and Servers. Tests turn flags on.
         public var capabilities: BackendCapabilities = [
-            .serverJoin, .instanceIcon, .addServer, .serverFiles, .pingServers, .quickPlay, .discoverServers,
+            .serverJoin, .addServer, .serverFiles, .pingServers, .quickPlay, .discoverServers,
         ]
         /// GAP-14. Where the Join server sheet starts; `nil` reads the card (resolving, then first visit, or ready once installed).
         public var serverJoinScenario: MockServerJoin.Scenario?
@@ -126,11 +126,6 @@
             return i
         }
         public func installLoader(instanceID: String, loader: Loader, version: String) async throws {}
-        public func setIcon(_ glyph: PixelGlyph?, instanceID: String) async throws {
-            guard let i = instanceList.firstIndex(where: { $0.id == instanceID }) else { return }
-            instanceList[i].icon =
-                glyph.map { .init(glyph: $0) } ?? .automatic(id: instanceID, loader: instanceList[i].loader)
-        }
         public func worlds(instanceID: String) async throws -> [WorldSummary] {
             if let list = worldList[instanceID] { return list }
             let now = Date()
@@ -173,15 +168,30 @@
             mods.removeAll { $0.id == item.id }
             content[item.kind]?.removeAll { $0.id == item.id }
         }
-        public func updateAll(instanceID: String) async throws {
+        public func updateAll(kind: ContentKind, instanceID: String) async throws {
             await pause(2)
-            for i in mods.indices {
-                if let v = mods[i].updateTo {
-                    mods[i].version = v
-                    mods[i].updateTo = nil
+            if kind == .mods {
+                for i in mods.indices {
+                    if let v = mods[i].updateTo {
+                        mods[i].version = v
+                        mods[i].updateTo = nil
+                    }
+                }
+            } else {
+                if var items = content[kind] {
+                    for i in items.indices {
+                        if let v = items[i].updateTo {
+                            items[i].version = v
+                            items[i].updateTo = nil
+                        }
+                    }
+                    content[kind] = items
                 }
             }
-            if let i = instanceList.firstIndex(where: { $0.id == instanceID }) { instanceList[i].updatesAvailable = 0 }
+            if let i = instanceList.firstIndex(where: { $0.id == instanceID }) {
+                instanceList[i].updatesAvailable = mods.filter { $0.updateTo != nil }.count
+                    + content.values.flatMap { $0 }.filter { $0.updateTo != nil }.count
+            }
         }
 
         // MARK: AccountService
@@ -288,6 +298,7 @@
         public func loaderVersions(loader: Loader, game: String) async throws -> [String] {
             switch loader {
             case .vanilla: []
+            case .unknown: []
             case .fabric: ["0.16.14", "0.16.10", "0.15.11"]
             case .quilt: ["0.26.4", "0.26.3"]
             case .forge: ["52.0.31", "47.3.0"]
@@ -346,13 +357,14 @@
             return Self.projects.filter { q.isEmpty || $0.title.lowercased().contains(q) }.compactMap {
                 var p = $0
                 p.source = query.source
-                // Like Modrinth's loader facet: only mods for the instance's loader.
-                if let inst, query.kind == .mods {
-                    p.fits = p.loaders.contains(inst.loader)
+                // Like Modrinth's loader facet: only mods for the instance's loader, unless the filter allows any.
+                if let inst, query.kind == .mods, let loader = query.filters.loader(query.kind, inst.loader) {
+                    p.fits = p.loaders.contains(loader)
                     if !p.fits { return nil }
                 }
                 return p
             }
+            .sorted { query.filters.sort == .downloads && $0.downloads > $1.downloads }
         }
         public func versions(projectID: String, instanceID: String) async throws -> [ProjectVersion] {
             if failVersions { throw URLError(.timedOut) }

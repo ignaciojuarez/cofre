@@ -7,8 +7,9 @@ typedef NS_ENUM(NSInteger, CofreLaunchEvent) {
     CofreLaunchEventSurfaceShown,
     CofreLaunchEventFirstFrame,
     CofreLaunchEventFailed,
-    CofreLaunchEventCancelled,
     CofreLaunchEventExited,
+    CofreLaunchEventRendererUnsupported,
+    CofreLaunchEventDownloadFailed,
 };
 @protocol CofreAirBridging <NSObject>
 - (NSArray<NSDictionary *> *)instances;
@@ -48,9 +49,6 @@ typedef NS_ENUM(NSInteger, CofreLaunchEvent) {
               completion:(void (^)(NSDictionary *_Nullable,
                                    NSError *_Nullable))completion;
 - (BOOL)deleteProfile:(NSString *)profile error:(NSError **)error;
-/// Saves the user's icon pick (a CofreUI glyph name) as the profile's
-/// cofreIcon; nil removes it.
-- (void)setCofreIcon:(nullable NSString *)icon forProfile:(NSString *)profile;
 - (void)exportProfile:(NSString *)profile
                format:(NSString *)format
            completion:
@@ -59,6 +57,8 @@ typedef NS_ENUM(NSInteger, CofreLaunchEvent) {
 - (NSString *)selectedProfileName;
 /// Re-reads launcher_profiles.json after Cofre (CofreKit's InstanceStore) wrote it.
 - (void)reloadProfiles;
+/// The JVM can only be started once in this process (game or installer).
+- (BOOL)jvmUsedInProcess;
 - (void)removeAccountToken:(NSString *)accountID;
 - (void)signInMicrosoftWithProgress:(void (^)(NSString *))progress
                          completion:
@@ -83,7 +83,6 @@ typedef NS_ENUM(NSInteger, CofreLaunchEvent) {
              completion:(void (^)(NSArray *, NSError *_Nullable))completion;
 /// Minecraft version and loader for mod compatibility.
 - (void)importPack:(NSURL *)url
-           profile:(nullable NSString *)profile
           progress:(void (^)(double, NSString *))progress
         completion:(void (^)(NSError *_Nullable))completion;
 // Game input for CofreGameInput.swift, sent through Air's callback bridge. Only

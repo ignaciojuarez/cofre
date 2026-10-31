@@ -1,39 +1,57 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Cofre <cofre@example.invalid>
 Date: Thu, 29 Oct 2026 12:00:00 -0700
-Subject: [PATCH 3/3] Keep JIT enabling inside Cofre
+Subject: [PATCH 3/5] Keep JIT enabling inside Cofre
 
-Reason: Cofre enables JIT through its VPN before launch; Air must not open external enablers or show missing-tool prompts when Cofre owns the root UI.
+Reason: Cofre enables JIT through its VPN before launch; Air must not open external enablers or show missing-tool prompts, and a missing JIT region becomes a Cofre launch error.
 Drop when: Air exposes an embedded JIT-provider integration point.
 ---
-diff --git a/Natives/utils.h b/Natives/utils.h
---- a/Natives/utils.h
-+++ b/Natives/utils.h
-@@ -1,6 +1,9 @@
- #pragma once
- 
- #import <UIKit/UIKit.h>
-+
-+// Cofre owns JIT only after its root UI was installed.
-+BOOL CofreOwnsJIT(void);
- 
- #include <stdbool.h>
- #include <string.h>
+  Natives/JavaLauncher.m | 21 ++++++++++++++++++---
+  Natives/utils.h        |  4 ++++
+  2 files changed, 22 insertions(+), 3 deletions(-)
+
 diff --git a/Natives/JavaLauncher.m b/Natives/JavaLauncher.m
+index c1fe678..f659d7b 100644
 --- a/Natives/JavaLauncher.m
 +++ b/Natives/JavaLauncher.m
-@@ -1263,6 +1263,10 @@
+@@ -1263,6 +1263,11 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
          static void *result;
          if(!result) result = JIT26CreateRegionLegacySafe(getpagesize());
          if (result == NULL) {
 +            if (CofreOwnsJIT()) {
 +                NSLog(@"[Cofre] JIT region unavailable; refusing external enablers");
++                CofreLaunchFailed(@"JIT isn't ready. Return to Cofre and tap Play to enable JIT.");
 +                return 1;
 +            }
              NSLog(@"[JIT26] JIT26CreateRegionLegacy returned NULL -- JIT26 debugger not servicing brk; requesting JIT and waiting before aborting launch");
              // ★ [JIT-ENABLE-ACTION] 原来是死胡同:只弹一句"请确认已用带 UniversalJIT26 脚本的方式
              //   启用 JIT"就 return。但无 TrollStore 的普通侧载设备(iPadOS 26:no-sandbox=NO、
-@@ -2770,6 +2774,10 @@
+@@ -2115,7 +2120,13 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
+             metallumMcVersionId = (NSString *)launchTarget;
+         }
+         NSInteger metallumMcMajor = ame98_mcMajorFromVersionId(metallumMcVersionId);
+-        if (metallumMcMajor >= 26) {
++        NSData *manifestData = [NSData dataWithContentsOfURL:[NSBundle.mainBundle URLForResource:@"RendererManifest" withExtension:@"json"]];
++        NSDictionary *manifest = manifestData ? [NSJSONSerialization JSONObjectWithData:manifestData options:0 error:nil] : nil;
++        NSArray *supportedVersions = [manifest isKindOfClass:NSDictionary.class] ? manifest[@"gameVersions"] : nil;
++        BOOL manifestSupportsVersion = [supportedVersions containsObject:metallumMcVersionId];
++        NSInteger sessionJava = [PLProfiles resolveKeyForCurrentProfile:@"javaVersion"].integerValue;
++        if (sessionJava <= 0) sessionJava = 21;
++        if (manifestSupportsVersion && sessionJava >= 21) {
+             PUSH_MARGV_FORMAT(@"-javaagent:%@/metallum_agent.jar=", librariesPath);
+             // 把实例的 MC 版本 id 传给 agent（按版本选 metallum 类映射）
+             if (metallumMcVersionId.length > 0) {
+@@ -2124,8 +2135,7 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
+             NSLog(@"[JavaLauncher] Metallum agent enabled: -javaagent:metallum_agent.jar (mcVersion=%@)",
+                   metallumMcVersionId);
+         } else {
+-            NSLog(@"[JavaLauncher] Metallum agent skipped: MC major %ld < 26 (agent needs Java 21+ class files, this session runs Java 8)",
+-                  (long)metallumMcMajor);
++            NSLog(@"[JavaLauncher] Metallum agent skipped: manifest has no support for %@ or Java session is below 21", metallumMcVersionId);
+         }
+     }
+     if(getPrefBool(@"general.cosmetica")) {
+@@ -2770,6 +2780,10 @@ static BOOL ameJITSchemeCanBeProbed(NSString *scheme) {
  //   事实;③ 等待框只在确实调起(或 manual)时显示;④ 调起失败立刻弹「未检测到 JIT 使能工具」
  //   + 按当前 debug.jit_enabler 给对应安装项,并让调用方跳过等待。
  static BOOL ame139_requestJIT(BOOL forceStikJIT) {
@@ -44,7 +62,7 @@ diff --git a/Natives/JavaLauncher.m b/Natives/JavaLauncher.m
      __block NSString *chosenEnabler = nil;
      __block BOOL hasURL = NO;         // 选中了非空 URL
      __block BOOL precheckFailed = NO; // canOpenURL 明确说打不开(工具没装)
-@@ -3004,6 +3012,7 @@
+@@ -3004,6 +3018,7 @@ int launchHeadlessJVM(NSString *mainClass, NSArray<NSString *> *args, int minJav
      if (DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM) &&
          !JIT26IsLikelyDebuggerKeepAttached() &&
          !getPrefBool(@"debug.jit26_script_disable")) {
@@ -52,108 +70,18 @@ diff --git a/Natives/JavaLauncher.m b/Natives/JavaLauncher.m
          NSLog(@"[JIT] [Headless] Task139: CS_DEBUGGED set but no live JIT26 debugger — re-attaching script via stikjit://");
          ame139_requestJIT(YES);
          ame169_waitForJITCondition(^BOOL{ return JIT26IsLikelyDebuggerKeepAttached(); }, 120.0, @"Headless JIT26 reattach");
-diff --git a/Natives/LauncherRightPanelViewController.m b/Natives/LauncherRightPanelViewController.m
---- a/Natives/LauncherRightPanelViewController.m
-+++ b/Natives/LauncherRightPanelViewController.m
-@@ -1417,6 +1417,11 @@
- }
+diff --git a/Natives/utils.h b/Natives/utils.h
+index baacb43..8962f2d 100644
+--- a/Natives/utils.h
++++ b/Natives/utils.h
+@@ -2,6 +2,10 @@
  
- - (void)invokeAfterJITEnabled:(void(^)(void))handler {
-+    if (CofreOwnsJIT()) {
-+        if (isJITEnabled(NO)) handler();
-+        else showDialog(@"JIT isn't ready", @"Return to Cofre and tap Play to enable JIT.");
-+        return;
-+    }
-     // ★ [JIT-FLOW] 原为 getEntitlementValue(@"jb.pmap_cs.custom_trust")：侧载模板
-     //   预写了该 entitlement，导致【每个侧载包】都判成 TrollStore 机，被送进
-     //   下面 apple-magnifier:// 那条 completionHandler:nil 的静默失败分支。
-@@ -1589,6 +1594,10 @@
- // JIT26 调试器重挂统一助手：stikjit://（附 UniversalJIT26.js）+ 前台等待 +
- // 后台断言 + 有界等调试器存活，超时走重试弹窗。
- - (void)jit_reattachJIT26ThenLaunch:(void(^)(void))handler {
-+    if (CofreOwnsJIT()) {
-+        [self invokeAfterJITEnabled:handler];
-+        return;
-+    }
-     self.progressLabel.text = localize(@"i18n_str_436", nil);
-     UIAlertController *alert = [UIAlertController alertControllerWithTitle:localize(@"i18n_str_437", nil)
-                                                                    message:localize(@"i18n_str_439", nil)
-diff --git a/Natives/LauncherNavigationController.m b/Natives/LauncherNavigationController.m
---- a/Natives/LauncherNavigationController.m
-+++ b/Natives/LauncherNavigationController.m
-@@ -663,6 +663,11 @@
- }
+ #import <UIKit/UIKit.h>
  
- - (void)invokeAfterJITEnabled:(void(^)(void))handler {
-+    if (CofreOwnsJIT()) {
-+        if (isJITEnabled(NO)) handler();
-+        else showDialog(@"JIT isn't ready", @"Return to Cofre and tap Play to enable JIT.");
-+        return;
-+    }
-     // 注意：不要在此清空 localVersionList/remoteVersionList
-     // 该方法既被 JAR 执行调用，也被正常启动游戏调用；清空会导致用户返回后版本列表为空、
-     // buttonInstall 短暂不可用。版本列表的生命周期应由 reloadProfileList 统一管理。
-@@ -833,6 +838,10 @@
- // JIT26 调试器重挂统一助手：stikjit://（附 UniversalJIT26.js）+ 前台等待 +
- // 后台断言 + 有界等调试器存活，超时走重试弹窗。
- - (void)jit_reattachJIT26ThenLaunch:(void(^)(void))handler {
-+    if (CofreOwnsJIT()) {
-+        [self invokeAfterJITEnabled:handler];
-+        return;
-+    }
-     UIAlertController* alert = [UIAlertController alertControllerWithTitle:localize(@"launcher.wait_jit.title", nil)
-         message:localize(@"launcher.wait_jit.message", nil)
-         preferredStyle:UIAlertControllerStyleAlert];
-diff --git a/Natives/DownloadViewController.m b/Natives/DownloadViewController.m
---- a/Natives/DownloadViewController.m
-+++ b/Natives/DownloadViewController.m
-@@ -3828,6 +3828,11 @@
- }
- 
- - (void)invokeAfterJITEnabled:(void(^)(void))handler {
-+    if (CofreOwnsJIT()) {
-+        if (isJITEnabled(NO)) handler();
-+        else showDialog(@"JIT isn't ready", @"Return to Cofre and tap Play to enable JIT.");
-+        return;
-+    }
-     // ★ [JIT-FLOW] 原为 getEntitlementValue(@"jb.pmap_cs.custom_trust")：侧载模板
-     //   预写了该 entitlement，会导致每个侧载包都走 apple-magnifier:// 静默失败分支。
-     BOOL hasTrollStoreJIT = isTrollStoreInstall();
-@@ -3986,6 +3991,10 @@
- 
- // JIT26 调试器重挂统一助手（内容区 InlineMessageView 提示 + 有界等存活）。
- - (void)jit_reattachJIT26ThenLaunch:(void(^)(void))handler {
-+    if (CofreOwnsJIT()) {
-+        [self invokeAfterJITEnabled:handler];
-+        return;
-+    }
-     InlineMessageView *jitAlert = [InlineMessageView showInViewController:self
-                                                                     title:localize(@"launcher.wait_jit.title", nil)
-                                                                   message:localize(@"launcher.wait_jit.message", nil)
---- a/Natives/JavaLauncher.m
-+++ b/Natives/JavaLauncher.m
-@@ -2115,7 +2115,13 @@
-             metallumMcVersionId = (NSString *)launchTarget;
-         }
-         NSInteger metallumMcMajor = ame98_mcMajorFromVersionId(metallumMcVersionId);
--        if (metallumMcMajor >= 26) {
-+        NSData *manifestData = [NSData dataWithContentsOfURL:[NSBundle.mainBundle URLForResource:@"RendererManifest" withExtension:@"json"]];
-+        NSDictionary *manifest = manifestData ? [NSJSONSerialization JSONObjectWithData:manifestData options:0 error:nil] : nil;
-+        NSArray *supportedVersions = [manifest isKindOfClass:NSDictionary.class] ? manifest[@"gameVersions"] : nil;
-+        BOOL manifestSupportsVersion = [supportedVersions containsObject:metallumMcVersionId];
-+        NSInteger sessionJava = [PLProfiles resolveKeyForCurrentProfile:@"javaVersion"].intValue;
-+        if (sessionJava <= 0) sessionJava = 21;
-+        if (manifestSupportsVersion && sessionJava >= 21) {
-             PUSH_MARGV_FORMAT(@"-javaagent:%@/metallum_agent.jar=", librariesPath);
-             // 把实例的 MC 版本 id 传给 agent（按版本选 metallum 类映射）
-             if (metallumMcVersionId.length > 0) {
-@@ -2124,8 +2130,7 @@
-             NSLog(@"[JavaLauncher] Metallum agent enabled: -javaagent:metallum_agent.jar (mcVersion=%@)",
-                   metallumMcVersionId);
-         } else {
--            NSLog(@"[JavaLauncher] Metallum agent skipped: MC major %ld < 26 (agent needs Java 21+ class files, this session runs Java 8)",
--                  (long)metallumMcMajor);
-+            NSLog(@"[JavaLauncher] Metallum agent skipped: manifest has no support for %@ or Java session is below 21", metallumMcVersionId);
-         }
-     }
-     if(getPrefBool(@"general.cosmetica")) {
++// Cofre owns JIT only after its root UI was installed.
++BOOL CofreOwnsJIT(void);
++void CofreLaunchFailed(NSString *message);
++
+ #include <stdbool.h>
+ #include <string.h>
+ #include "environ.h"

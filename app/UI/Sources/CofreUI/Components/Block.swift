@@ -77,8 +77,6 @@ extension View {
         #endif
     }
 
-    /// Visual can be smaller than 44 pt; the hit area never is (§1.3).
-    public func minimumHitArea(_ size: CGFloat = 44) -> some View { modifier(HitArea(size: size)) }
 }
 
 struct BlockHover: ViewModifier {
@@ -106,18 +104,6 @@ struct FocusRing: ViewModifier {
     }
 }
 
-struct HitArea: ViewModifier {
-    let size: CGFloat
-    func body(content: Content) -> some View {
-        content.background {
-            GeometryReader { g in
-                let dx = max(0, (size - g.size.width) / 2)
-                let dy = max(0, (size - g.size.height) / 2)
-                Color.clear.contentShape(Rectangle().inset(by: -max(dx, dy)))
-            }
-        }
-    }
-}
 
 // MARK: - Page background (stone texture)
 

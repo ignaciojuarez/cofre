@@ -176,6 +176,13 @@
             XCTAssertFalse(done.showsSetup, "live checks failing after setup don't bring the wizard back")
         }
 
+        func testSetupAdvanceAfterFinishIsIdempotent() {
+            let ready = SetupState(
+                devMode: .ready, trust: .ready, pairing: .ready, vpn: .ready, jit: .ready, account: .ready)
+            XCTAssertEqual(SetupFlow.nextStep(6, setup: ready), 7)
+            XCTAssertEqual(SetupFlow.nextStep(7, setup: ready), 7)
+        }
+
         func testCompleteBackendSkipsWizard() async {
             let store = CofreStore(services: .mock(), defaults: freshDefaults())
             await store.start()
@@ -257,6 +264,32 @@
             again.instances.removeAll { $0.loader != .vanilla }
             XCTAssertNil(again.modsInstance)
             XCTAssertNil(again.query.instanceID)
+        }
+
+        // Each kind keeps its filters; a new instance resets version and loader but keeps categories and sort.
+        func testModsFiltersPerKindAndResetOnInstanceSwitch() async {
+            let store = CofreStore(services: CofreServices(backend: MockBackend(stepDelay: 0)), defaults: freshDefaults())
+            await store.start()
+            store.query.filters.version = .any
+            store.query.filters.categories = ["magic"]
+            store.query.filters.sort = .downloads
+            store.query.kind = .shaders
+            XCTAssertEqual(store.query.filters, ProjectFilters())
+            store.query.kind = .mods
+            XCTAssertEqual(store.query.filters.version, .any)
+
+            // With any loader, Forge-only Create shows on the Fabric instance.
+            store.query.filters.categories = []
+            store.query.filters.loader = .any
+            await store.search()
+            XCTAssertTrue(store.results.contains { $0.id == "create" })
+
+            store.query.filters.categories = ["magic"]
+            await store.selectInstance("cobblemon")
+            XCTAssertEqual(store.query.filters.version, .instance)
+            XCTAssertEqual(store.query.filters.loader, .instance)
+            XCTAssertEqual(store.query.filters.categories, ["magic"])
+            XCTAssertEqual(store.query.filters.sort, .downloads)
         }
 
         func testNewInstancePlanFromMods() async {

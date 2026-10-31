@@ -63,11 +63,6 @@ extension MrpackIndex {
         private static let trustStore = FileTrustStore(
             url: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
                 .appendingPathComponent("Cofre/server-trust.json"))
-        private var joinCacheURL: URL {
-            FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent(
-                "Cofre/server-cards.json")
-        }
-
         public func serverJoin(_ request: ServerJoinRequest) -> (any ServerJoinViewModel)? {
             LiveServerJoinModel(request: request, backend: self)
         }
@@ -75,7 +70,8 @@ extension MrpackIndex {
         func resolveJoin(_ request: ServerJoinRequest) async throws -> JoinResolution {
             let host = request.server.split(separator: ":", maxSplits: 1).first.map(String.init) ?? request.server
             let url = request.card ?? Discovery.wellKnown(host: host)
-            let result = try CardDecoder.decodeEnvelope(try await URLSessionCardFetcher().fetch(url))
+            let fetched = try await Discovery.fetchEnvelope(from: url, using: URLSessionCardFetcher())
+            let result = (card: fetched.0, envelope: fetched.1)
             let cardHosts = result.card.server.addresses.map { URLPolicy.canonicalHost($0.host) ?? $0.host }
             guard let requestedHost = URLPolicy.canonicalHost(host), cardHosts.contains(requestedHost) else {
                 throw ServerJoinError.invalidDeepLink
@@ -101,7 +97,7 @@ extension MrpackIndex {
             let address = card.server.addresses.first.map { "\($0.host):\($0.port)" } ?? request.server
             let mapped = ServerJoinRequirementsState(
                 serverID: card.id, serverName: card.server.name, serverAddress: address, iconURL: card.server.icon,
-                gameVersion: card.game.version, loader: Loader(rawValue: card.loader.type.rawValue) ?? .vanilla,
+                gameVersion: card.game.version, loader: Loader(rawValue: card.loader.type.rawValue) ?? .unknown,
                 loaderVersion: card.loader.version, javaMajorVersion: card.game.javaVersion, packName: card.id,
                 packVersion: card.pack.version, totalDownloadSizeBytes: plan.totalDownloadSize,
                 formattedDownloadSize: ByteCountFormatter.string(
@@ -177,28 +173,26 @@ extension MrpackIndex {
                 .appendingPathComponent("Cofre/PackHashCache")
             try await InstallEngine(cache: FileHashCache(root: cacheURL)).verify(
                 fileURL: staged.fileURL, card: resolution.card)
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                air.importPack(
-                    staged.fileURL, profile: request.id,
-                    progress: { fraction, stage in
-                        Task { @MainActor in
-                            model.state = .installing(
-                                ServerJoinInstallingState(
-                                    title: stage, progressFraction: fraction,
-                                    formattedProgress: "\(Int(fraction * 100))%", stages: [], currentStageIndex: 0,
-                                    canCancel: true))
-                        }
-                    },
-                    completion: { error in
-                        if let error { continuation.resume(throwing: error) } else { continuation.resume() }
-                    })
+            // The same import as Import pack: a new instance, rolled back if the pack or its loader fails.
+            let instanceID = try await importWithAir(staged.fileURL) { fraction, stage in
+                model.state = .installing(
+                    ServerJoinInstallingState(
+                        title: stage ?? "Installing", progressFraction: fraction,
+                        formattedProgress: "\(Int(fraction * 100))%", stages: [], currentStageIndex: 0,
+                        canCancel: true))
             }
+            NSLog("[Cofre] pack import done instance=%@ server=%@", instanceID, request.server)
             UserDefaults.standard.set(
                 true, forKey: "cofre.server-card.\(resolution.card.server.addresses.first?.host ?? request.server)")
+            // So the server shows under My servers for the new instance.
+            if let store = try? serverStore(instanceID),
+               (try? store.add(CofreServerRecord(name: resolution.card.server.name, ip: request.server))) != nil {
+                NSLog("[Cofre] server saved profile=%@ address=%@", instanceID, request.server)
+            }
             model.state = .ready(
                 ServerJoinReadyState(
                     serverID: resolution.card.id, serverName: resolution.card.server.name,
-                    serverAddress: request.server, instanceID: request.id, isJITReady: isJITEnabled))
+                    serverAddress: request.server, instanceID: instanceID, isJITReady: isJITEnabled))
         }
 
     }

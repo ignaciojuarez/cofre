@@ -202,6 +202,15 @@ public enum TouchLayout {
         return CGRect(x: leftHanded ? size.width - w : 0, y: 0, width: w, height: size.height)
     }
 
+    /// The look region is a sibling of the stick region, so the first drag
+    /// event can never move the camera before the floating stick owns it.
+    public static func lookZone(size: CGSize, leftHanded: Bool, fraction: Double = 0.4) -> CGRect {
+        let stick = stickZone(size: size, leftHanded: leftHanded, fraction: fraction)
+        return leftHanded
+            ? CGRect(x: 0, y: 0, width: stick.minX, height: size.height)
+            : CGRect(x: stick.maxX, y: 0, width: size.width - stick.maxX, height: size.height)
+    }
+
     /// Rule U5: every target gets at least 44×44 pt.
     public static func hitRect(_ r: CGRect) -> CGRect {
         r.insetBy(dx: min(0, (r.width - 44) / 2), dy: min(0, (r.height - 44) / 2))

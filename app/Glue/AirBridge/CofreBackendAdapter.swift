@@ -2,6 +2,7 @@
     import Foundation
     import UIKit
     import NetworkExtension
+    import os
     import CofreUI
     import CofreKit
 
@@ -25,11 +26,12 @@
     @MainActor
     public final class CofreBackendAdapter: NSObject, CofreBackend {
         public var capabilities: BackendCapabilities {
-            [.addServer, .serverFiles, .pingServers, .quickPlay, .discoverServers, .envVariables, .rendererTuning, .serverJoin, .instanceIcon]
+            [.addServer, .serverFiles, .pingServers, .quickPlay, .discoverServers, .envVariables, .rendererTuning, .serverJoin]
         }
         let air: any CofreAirBridging
         var instances: InstanceStore?
         var launchingGameDirectory: URL?
+        var loaderInstallInProgress = false
         let modCatalog = CofreModCatalog()
         private lazy var accountStore: AccountStore = {
             // Air keeps accounts in $POJAV_HOME/accounts (Documents, or Caches when Documents isn't writable).
@@ -43,7 +45,17 @@
             super.init()
             CofreGameInput.shared.bridge = bridge
             if let packs = Self.modpackDirectory { ModpackImport.cleanupAbandonedImport(in: packs) }
+            ModpackImport.cleanupAbandonedStaging(in: FileManager.default.temporaryDirectory)
+            vpnStatusObserver = NotificationCenter.default.addObserver(
+                forName: .NEVPNStatusDidChange, object: nil, queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor in await self?.refreshVPNStatus() }
+            }
+            Task { @MainActor in await self.refreshVPNStatus() }
             loadPersistedSetup()
+        }
+        deinit {
+            if let vpnStatusObserver { NotificationCenter.default.removeObserver(vpnStatusObserver) }
         }
         private var launchTask: Task<Void, Never>?
         /// Where Air's importer builds each modpack instance (`<POJAV_GAME_DIR>/custom_gamedir/<id>`), so an interrupted
@@ -84,12 +96,14 @@
             // iOS opens a development build only with Developer Mode on and its signer trusted.
             setup.devMode = ProvisioningProfile.current?.isDevelopment == true ? .ready : .blocked
             setup.trust = .ready
-            setup.pairing = hasPairing() ? .ready : (setup.pairing.isReady ? .unknown : setup.pairing)
+            let pairingReady = hasPairing()
+            setup.pairing = pairingReady ? .ready : (setup.pairing.isReady ? .unknown : setup.pairing)
+            await refreshVPNStatus()
             if await CofreVPN.isAllowed() { setup.vpn = .ready } else if setup.vpn.isReady { setup.vpn = .unknown }
-            if isJITEnabled {
+            if pairingReady && isJITEnabled {
                 setup.jit = .ready
-            } else if !hasPairing(), setup.jit.isReady {
-                // A remembered JIT test means nothing once the pairing key is gone: launches would fail.
+            } else if setup.jit.isReady {
+                // A remembered JIT test means nothing without a complete pairing key: launches would fail.
                 UserDefaults.standard.removeObject(forKey: "cofre.setup.jit"); setup.jit = .unknown
             }
             let accountReady = accountStore.list().contains { $0.state == .ready }
@@ -106,7 +120,10 @@
             open(0)
         }
         public func hasPairing() -> Bool {
-            guard let data = try? Data(contentsOf: pairingURL) else { return false }
+            guard let attributes = try? FileManager.default.attributesOfItem(atPath: pairingURL.path),
+                  let size = attributes[.size] as? NSNumber,
+                  size.uint64Value <= UInt64(PairingFileValidator.maxFileSize),
+                  let data = try? Data(contentsOf: pairingURL) else { return false }
             return (try? PairingFileValidator.validate(data)) != nil
         }
         public func importPairing(_ data: Data) throws {
@@ -116,12 +133,17 @@
             publishSetup()
         }
         public func deletePairing() throws { if hasPairing() { try FileManager.default.removeItem(at: pairingURL) } }
-        public private(set) var isVPNRunning = false
+        private var vpnStatus: NEVPNStatus = .disconnected
+        private var vpnStatusObserver: NSObjectProtocol?
+        public var isVPNRunning: Bool { vpnStatus == .connected }
         public func startVPN() async throws {
             try await CofreVPN.connect()
-            isVPNRunning = true
+            await refreshVPNStatus()
             setup.vpn = .ready
             publishSetup()
+        }
+        private func refreshVPNStatus() async {
+            vpnStatus = (try? await CofreVPN.manager())?.connection.status ?? .disconnected
         }
         /// True once a debugger has attached to Cofre (CS_DEBUGGED), which is what turning on JIT does.
         public var isJITEnabled: Bool {
@@ -132,7 +154,7 @@
         public func instances() async throws -> [InstanceSummary] {
             var list: [InstanceSummary] = air.instances().compactMap { d in
                 guard let id = d["id"] as? String else { return nil }
-                let loader = Loader(rawValue: (d["loader"] as? String ?? "vanilla").lowercased()) ?? .vanilla
+                let loader = Loader(rawValue: (d["loader"] as? String ?? "vanilla").lowercased()) ?? .unknown
                 return InstanceSummary(
                     id: id, name: d["name"] as? String ?? id, loader: loader,
                     gameVersion: d["version"] as? String ?? "",
@@ -145,11 +167,15 @@
             for i in list.indices where list[i].loader != .vanilla {
                 list[i].modCount = try? await scan(.mods, instanceID: list[i].id, online: false, identify: false).count
             }
+            for i in list.indices { list[i].restartRequired = air.jvmUsedInProcess() }
             return list
         }
-        public func setIcon(_ glyph: PixelGlyph?, instanceID: String) async throws {
-            air.setCofreIcon(glyph?.rawValue, forProfile: instanceID)
-            NSLog("[Cofre] instance icon instance=%@ icon=%@", instanceID, glyph?.rawValue ?? "auto")
+        /// Persist only when Air confirms a JVM actually started. Its runtime flag is the launch guard.
+        func recordJVMUse() {
+            guard air.jvmUsedInProcess() else { return }
+            do { try instances?.markJVMUsed() }
+            catch { NSLog("[Cofre] JVM session marker write failed: %@", error.localizedDescription) }
+            NSLog("[Cofre] restartRequired scope=process")
         }
         /// A pack's own icon: Air stores a data URL or a file URL in the profile. Web URLs fall back to our icons.
         private func packIcon(_ s: String?) -> Data? {
@@ -161,7 +187,28 @@
             return nil
         }
         public func preferences(instanceID: String?) async throws -> GamePreferences {
-            return preferenceStore.load(instanceID: instanceID)
+            var p = preferenceStore.load(instanceID: instanceID)
+            if p.autoRAM { p.ramMB = javaHeap(instanceID: instanceID, prefs: p).heap }
+            return p
+        }
+
+        /// -Xmx for the next launch, sized with the headroom iOS gives this process right now.
+        func javaHeap(instanceID: String?, prefs: GamePreferences) -> (heap: Int, requested: Int, available: Int) {
+            let instance = instanceID.flatMap { try? storedInstance($0) }
+            let physical = Int(ProcessInfo.processInfo.physicalMemory >> 20)
+            let mods = instance.flatMap { try? ContentStore(gameDirectory: $0.gameDirectory).list(.mods).count } ?? 0
+            let requested = prefs.autoRAM
+                ? JavaHeap.autoMB(loader: instance?.loader ?? .vanilla, modCount: mods, physicalMB: physical) : prefs.ramMB
+            let available = Int(os_proc_available_memory() >> 20)
+            return (JavaHeap.clamp(requested, availableMB: available), requested, available)
+        }
+
+        /// Air reads AMETHYST_MEM_MB for -Xmx; NO_CLAMP skips its own clamp, which caches a stale reading.
+        private func applyJavaHeap(instanceID: String) {
+            let size = javaHeap(instanceID: instanceID, prefs: preferenceStore.load(instanceID: instanceID))
+            setenv("AMETHYST_MEM_MB", String(size.heap), 1)
+            setenv("AMETHYST_MEM_NO_CLAMP", "1", 1)
+            NSLog("[Cofre] memory heap=%ldMB requested=%ldMB available=%ldMB", size.heap, size.requested, size.available)
         }
         public func setPreferences(_ preferences: GamePreferences, instanceID: String?) async throws {
             preferenceStore.save(preferences, instanceID: instanceID)
@@ -194,6 +241,10 @@
         }
         public func removeAccount(id: String) async throws { _ = try accountStore.remove(id: id); air.removeAccountToken(id) }
 
+        func repairLibraries() {
+            for file in instances?.repairLibraries() ?? [] { NSLog("[Cofre] libraries repaired: removed empty %@", file.path) }
+        }
+
         public func launch(instanceID: String, accountID: String?) -> AsyncThrowingStream<LaunchProgress, Error> {
             return launch(instanceID: instanceID, accountID: accountID, gameArguments: [])
         }
@@ -204,7 +255,7 @@
             }
             CofreBreadcrumb.log("play", details: "instance=\(instanceID)")
             return AsyncThrowingStream { continuation in
-                guard self.launchingGameDirectory == nil else {
+                guard self.launchingGameDirectory == nil, !self.loaderInstallInProgress else {
                     continuation.finish(throwing: CofreServersStore.Failure.gameRunning); return
                 }
                 self.launchingGameDirectory = self.air.gameDirectory(forProfile: instanceID)
@@ -219,23 +270,47 @@
                         if reason != "inGame" { Task { @MainActor in self.launchingGameDirectory = nil } }
                         watchdog?.cancel()
                         NSLog("[Cofre] launch state=%@", reason)
-                        Task { @MainActor in self.air.hideCofreLaunchOverlay() }
+                        if reason == "inGame" { Task { @MainActor in self.air.hideCofreLaunchOverlay() } }
                         if let error { continuation.finish(throwing: error) } else { continuation.finish() }
                     }
                     do {
                         try Task.checkCancellation()
+                        guard !self.air.jvmUsedInProcess() else { throw LaunchFailure.restartRequired }
+                        guard let store = self.instances else { throw LaunchFailure.profileMissing }
+                        let instance: Instance
+                        do { instance = try self.storedInstance(instanceID) }
+                        catch { throw LaunchFailure.profileMissing }
+                        guard !instance.restartRequired else { throw LaunchFailure.restartRequired }
+                        guard instance.loader != .unknown else { throw LaunchFailure.unknownLoader }
+                        if instance.loader == .vanilla,
+                           let mods = try? ContentStore(gameDirectory: instance.gameDirectory).list(.mods),
+                           !mods.isEmpty {
+                            NSLog("[Cofre] refusing vanilla launch with %ld installed mods", mods.count)
+                            throw LaunchFailure.modsNeedLoader
+                        }
+                        guard instance.loader.isInstalled(in: instance.versionID, root: store.root,
+                            minecraftVersion: instance.gameVersion) else { throw LaunchFailure.loaderMissing }
+                        try await self.checkDiskBeforeLaunch(instance, root: store.root)
                         if !self.isJITEnabled {
                             continuation.yield(LaunchProgress(stage: 1, of: 7, title: "JIT", detail: "Enabling JIT"))
-                            try await self.ensureJIT()
+                            do { try await self.ensureJIT() }
+                            catch is CancellationError { throw CancellationError() }
+                            catch {
+                                NSLog("[Cofre] launch JIT failed: %@", error.localizedDescription)
+                                throw LaunchFailure.jitUnavailable
+                            }
                         }
                         try Task.checkCancellation()
-                        if let instance = try? self.storedInstance(instanceID), instance.loader == .forge || instance.loader == .neoforge {
+                        if instance.loader == .forge || instance.loader == .neoforge {
                             do { try FMLConfig.disableEarlyWindow(in: instance.gameDirectory) } catch {
                                 NSLog("[Cofre] fml.toml not updated: %@", error.localizedDescription)
                             }
                         }
+                        self.repairLibraries()
+                        self.applyJavaHeap(instanceID: instanceID)
                         NSLog("[Cofre] launch JIT ready; starting Air")
                         self.air.launchProfile(instanceID, accountID: accountID, gameArguments: gameArguments) { event, fraction, message in
+                            Task { @MainActor in
                             switch event {
                             case .downloading:
                                 continuation.yield(LaunchProgress(stage: 2, of: 7, title: "Game files", fraction: min(max(fraction, 0), 0.999)))
@@ -247,21 +322,33 @@
                                 watchdog = Task { @MainActor in
                                     try? await Task.sleep(for: .seconds(60))
                                     guard !Task.isCancelled, awaitingFirstFrame else { return }
-                                    finish("failed reason=launchTimeout", error: CofreBackendError.unavailable("Minecraft took too long to show its first frame"))
+                                    self.recordJVMUse()
+                                    finish("failed reason=launchTimeout", error: LaunchFailure.unknown("Minecraft took too long to show its first frame"))
                                 }
                             case .firstFrame:
                                 guard awaitingFirstFrame else { return }
+                                self.recordJVMUse()
                                 awaitingFirstFrame = false
                                 continuation.yield(LaunchProgress(stage: 7, of: 7, title: "In game", finished: true))
                                 finish("inGame")
-                            case .failed, .cancelled, .exited:
+                            case .rendererUnsupported:
+                                finish("failed", error: LaunchFailure.rendererUnsupported)
+                            case .downloadFailed:
+                                finish("failed", error: LaunchFailure.downloadFailed(message ?? "Check your connection and the launcher log."))
+                            case .exited:
+                                self.recordJVMUse()
                                 self.launchingGameDirectory = nil
-                                finish(event == .cancelled ? "cancelled" : "failed", error: NSError(domain: "CofreAir", code: 1, userInfo: [NSLocalizedDescriptionKey: message ?? "Minecraft couldn't start. Check the launcher log."]))
+                                finish("failed", error: LaunchFailure.jvmExit(Int(fraction)))
+                            case .failed:
+                                self.recordJVMUse()
+                                finish("failed", error: LaunchFailure.unknown(message ?? "Minecraft couldn't start. Check the launcher log."))
                             @unknown default: break
+                            }
                             }
                         }
 
                     } catch {
+                        self.recordJVMUse()
                         finish("failed", error: error)
                     }
                 }
@@ -315,9 +402,6 @@
         public func reportPreview() async -> ReportPreviewData {
             let p = ReportBundle(store: logStore(), context: .init()).preview()
             return ReportPreviewData(fields: p.fields.map { "\($0.name): \($0.value)" }, files: p.files)
-        }
-        public func importPack(_ url: URL, instanceID: String?) -> AsyncThrowingStream<InstallProgress, Error> {
-            unavailableStream("pack import")
         }
         /// Turns on JIT through the built-in VPN, as the game and the Forge/NeoForge installers need it.
         func ensureJIT() async throws {
@@ -440,19 +524,5 @@
             setupContinuations.values.forEach { $0.yield(setup) }
         }
         private func unavailable(_ name: String) -> CofreBackendError { .unavailable(name) }
-        private func unavailableStream<T>(_ name: String) -> AsyncThrowingStream<T, Error> {
-            AsyncThrowingStream { continuation in continuation.finish(throwing: unavailable(name)) }
-        }
-        private func callback(_ body: (@escaping ([Any]) -> Void) -> Void) async throws -> [Any] {
-            await withCheckedContinuation { c in body { c.resume(returning: $0) } }
-        }
     }
-#endif
-
-#if canImport(UIKit)
-import CofreUI
-
-extension CofreBackendAdapter: GameEngine {
-    public var input: any GameInputService { CofreGameInput.shared }
-}
 #endif

@@ -1,5 +1,6 @@
 #if canImport(UIKit)
     import Foundation
+    import CofreKit
 
     // Value types the screens render. Plain Swift, no Air or ObjC. The adapter maps CofreBackendAdapter/AirBridge types onto these.
 
@@ -28,21 +29,17 @@
         public var readyCount: Int { all.filter(\.isReady).count }
     }
 
-    public enum Loader: String, CaseIterable, Codable, Sendable, Identifiable {
-        case vanilla, fabric, quilt, forge, neoforge
-        public var id: String { rawValue }
-        public var displayName: String {
+    /// CofreKit owns loader identity and persistence. CofreUI only adds its visual mapping below.
+    public typealias Loader = Instance.Loader
+    /// CofreKit owns search kinds, sources and filters, so their facets test on the Mac.
+    public typealias ContentKind = CofreKit.ContentKind
+    public typealias ProjectSource = CofreKit.ProjectSource
+    public typealias ProjectFilters = CofreKit.ProjectFilters
+
+    public extension Instance.Loader {
+        var tone: Tone {
             switch self {
-            case .vanilla: "Vanilla"
-            case .fabric: "Fabric"
-            case .quilt: "Quilt"
-            case .forge: "Forge"
-            case .neoforge: "NeoForge"
-            }
-        }
-        public var tone: Tone {
-            switch self {
-            case .vanilla: .neutral
+            case .vanilla, .unknown: .neutral
             case .fabric: .fabric
             case .quilt: .quilt
             case .forge: .forge
@@ -50,13 +47,14 @@
             }
         }
         /// Its icon: grass for vanilla, else the loader's mark.
-        public var glyph: PixelGlyph {
+        var glyph: PixelGlyph {
             switch self {
             case .vanilla: .grass
             case .fabric: .fabric
             case .quilt: .quilt
             case .forge: .forge
             case .neoforge: .neoforge
+            case .unknown: .cross
             }
         }
     }
@@ -112,12 +110,15 @@
         public var favorite: Bool
         public var group: String?
         public var notes: String
+        /// Forge/NeoForge installs use a second JVM; Cofre must be relaunched before Play.
+        public var restartRequired: Bool
 
         public init(
             id: String, name: String, loader: Loader, gameVersion: String, loaderVersion: String? = nil,
             modCount: Int? = nil,
             sizeBytes: Int64? = nil, lastPlayed: Date? = nil, updatesAvailable: Int = 0, javaVersion: String? = nil,
-            ownFolder: Bool = true, icon: InstanceIcon? = nil, favorite: Bool = false, group: String? = nil, notes: String = ""
+            ownFolder: Bool = true, icon: InstanceIcon? = nil, favorite: Bool = false, group: String? = nil, notes: String = "",
+            restartRequired: Bool = false
         ) {
             self.id = id
             self.name = name
@@ -131,7 +132,7 @@
             self.javaVersion = javaVersion
             self.ownFolder = ownFolder
             self.icon = icon ?? .automatic(id: id, loader: loader)
-            self.favorite = favorite; self.group = group; self.notes = notes
+            self.favorite = favorite; self.group = group; self.notes = notes; self.restartRequired = restartRequired
         }
 
         public var loaderLabel: String {
@@ -248,10 +249,6 @@
         }
     }
 
-    public enum ContentKind: String, CaseIterable, Codable, Sendable {
-        case mods, shaders, resourcePacks, dataPacks, modpacks
-    }
-
     public struct InstalledItem: Identifiable, Hashable, Sendable {
         public let id: String
         public var name: String, version: String, enabled: Bool
@@ -349,6 +346,8 @@
         }
     }
 
+    public typealias LaunchFailure = CofreKit.LaunchFailure
+
     public enum LogKind: String, CaseIterable, Sendable { case latest, crash, launcher }
 
     public struct ReportPreviewData: Sendable { public let fields: [String]; public let files: [String]; public init(fields: [String], files: [String]) { self.fields = fields; self.files = files } }
@@ -378,14 +377,15 @@
         }
     }
 
-    public enum ProjectSource: String, CaseIterable, Sendable {
-        case modrinth, curseforge
-        public var displayName: String { self == .modrinth ? "Modrinth" : "CurseForge" }
-    }
-
     public struct ProjectQuery: Hashable, Sendable {
         /// Results fit `instanceID` (its game version, and its loader for mods). `nil` browses everything.
         public var text: String, source: ProjectSource, kind: ContentKind, instanceID: String?
+        /// Each kind keeps its own filters; `filters` is the current kind's.
+        public var filtersByKind: [ContentKind: ProjectFilters] = [:]
+        public var filters: ProjectFilters {
+            get { filtersByKind[kind] ?? ProjectFilters() }
+            set { filtersByKind[kind] = newValue }
+        }
         public init(
             text: String = "", source: ProjectSource = .modrinth, kind: ContentKind = .mods, instanceID: String? = nil
         ) {

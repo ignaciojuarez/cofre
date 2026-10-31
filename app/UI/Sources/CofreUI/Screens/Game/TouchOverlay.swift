@@ -7,6 +7,7 @@ import SwiftUI
 @MainActor @Observable
 public final class TouchOverlayModel {
     public var settings: TouchControlSettings
+    public var traySettings: QuickTraySettings
     public var screen = GameScreenState.world
     public var mode = CofreInputMode.touch
     /// Glyph context; stays `.walking` until a player-state source exists.
@@ -41,10 +42,13 @@ public final class TouchOverlayModel {
     @ObservationIgnored private var trayOpenedByHold = false
     @ObservationIgnored private var settingsObserver: NSObjectProtocol?
     @ObservationIgnored private var keyboardObservers: [NSObjectProtocol] = []
+    @ObservationIgnored private var trayTapTasks: [String: Task<Void, Never>] = [:]
+    var latchedTrayActions: [String: QuickTrayAction] = [:]
 
     public init(input: (any GameInputService)?, settings: TouchControlSettings = .load()) {
         self.input = input
         self.settings = settings
+        self.traySettings = .load()
     }
 
     public func start() {
@@ -62,6 +66,8 @@ public final class TouchOverlayModel {
                 guard let self else { return }
                 let fresh = TouchControlSettings.load()
                 if fresh != self.settings { self.settings = fresh }
+                let tray = QuickTraySettings.load()
+                if tray != self.traySettings { self.traySettings = tray }
             }
         }
         #if canImport(UIKit)
@@ -165,9 +171,48 @@ public final class TouchOverlayModel {
         release(key)
     }
 
+    func pressChord(_ keys: [CofreInputKey]) { keys.forEach(press) }
+    func releaseChord(_ keys: [CofreInputKey]) { keys.reversed().forEach(release) }
+
+    func trayActionDown(_ action: QuickTrayAction) {
+        touched()
+        if action.id == "keyboard" { toggleKeyboard(); return }
+        switch action.mode {
+        case .tap:
+            pressChord(action.keys)
+            trayTapTasks[action.id]?.cancel()
+            trayTapTasks[action.id] = Task { [weak self] in
+                try? await Task.sleep(for: .milliseconds(50))
+                guard !Task.isCancelled, let self else { return }
+                self.releaseChord(action.keys)
+                self.trayTapTasks[action.id] = nil
+            }
+        case .hold:
+            guard latchedTrayActions[action.id] == nil else { return }
+            pressChord(action.keys)
+            latchedTrayActions[action.id] = action
+        case .toggle:
+            if let old = latchedTrayActions.removeValue(forKey: action.id) { releaseChord(old.keys) }
+            else { pressChord(action.keys); latchedTrayActions[action.id] = action }
+        }
+    }
+
+    func trayActionUp(_ action: QuickTrayAction) {
+        guard action.mode == .hold, let old = latchedTrayActions.removeValue(forKey: action.id) else { return }
+        releaseChord(old.keys)
+    }
+
+    func releaseLatchedTrayActions() {
+        trayTapTasks.values.forEach { $0.cancel() }
+        trayTapTasks.removeAll()
+        latchedTrayActions.values.forEach { releaseChord($0.keys) }
+        latchedTrayActions.removeAll()
+    }
+
     private func buzz() { if settings.haptics { hapticTick += 1 } }
 
     func releaseAll() {
+        releaseLatchedTrayActions()
         down.forEach { input?.release($0) }
         down = []
         if world?.attacking == true { input?.mouseButton(.left, down: false) }
@@ -197,7 +242,7 @@ public final class TouchOverlayModel {
         case .pause:
             trayOpenedByHold = false
             holdTask = Task { [weak self] in
-                try? await Task.sleep(for: .milliseconds(400))
+                try? await Task.sleep(for: .milliseconds(300))
                 guard !Task.isCancelled, let self else { return }
                 self.trayOpenedByHold = true
                 self.trayOpen = true
@@ -253,6 +298,11 @@ public final class TouchOverlayModel {
             hudHidden.toggle()
         case .keyboard: toggleKeyboard()
         }
+    }
+
+    func editTray() {
+        releaseLatchedTrayActions()
+        trayOpen = false
     }
 
     func toggleKeyboard() {
@@ -361,6 +411,7 @@ public final class TouchOverlayModel {
 
 public struct TouchOverlayView: View {
     @Bindable var model: TouchOverlayModel
+    @State private var showQuickMenu = false
     @Environment(\.displayScale) private var displayScale
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -381,8 +432,18 @@ public struct TouchOverlayView: View {
                 if model.trayOpen, let anchor = f[model.settings.style == .minimal ? .menu : .pause] {
                     tray(anchor: anchor, size: size, k: k)
                 }
+                if !model.latchedTrayActions.isEmpty, let anchor = f[model.settings.style == .minimal ? .menu : .pause] {
+                    Button("Release") { model.releaseLatchedTrayActions() }
+                        .font(.cofre(.chip)).foregroundStyle(Color.cofre.ink)
+                        .padding(.horizontal, 7).padding(.vertical, 4)
+                        .background(Color.black.opacity(0.7))
+                        .overlay { Rectangle().strokeBorder(Color.cofre.accent, lineWidth: 2) }
+                        .position(x: anchor.midX, y: anchor.maxY + 30)
+                        .accessibilityLabel("Release quick actions")
+                }
             }
             .frame(width: size.width, height: size.height, alignment: .topLeading)
+            .coordinateSpace(name: "cofreOverlay")
             .opacity(model.opacity)
             .animation(
                 reduceMotion ? nil : .easeOut(duration: model.idle ? 0.4 : TouchControlSettings.restoreDuration),
@@ -391,12 +452,17 @@ public struct TouchOverlayView: View {
         .ignoresSafeArea()
         .onAppear { model.pixelsPerPoint = displayScale }
         .sensoryFeedback(.impact(weight: .light, intensity: 0.7), trigger: model.hapticTick)
+        .sheet(isPresented: $showQuickMenu) { QuickTrayEditorView() }
     }
 
     private func lookSurface(size: CGSize) -> some View {
-        Color.clear.contentShape(Rectangle())
+        let zone = TouchLayout.lookZone(
+            size: size, leftHanded: model.settings.leftHanded, fraction: model.settings.stickArea)
+        return Color.clear
+            .frame(width: zone.width, height: zone.height)
+            .contentShape(Rectangle())
             .gesture(
-                DragGesture(minimumDistance: 0)
+                DragGesture(minimumDistance: 0, coordinateSpace: .named("cofreOverlay"))
                     .onChanged { v in
                         if model.world == nil && !model.touchOnHotbar && v.translation == .zero {
                             model.worldBegan(at: v.startLocation, size: size)
@@ -405,6 +471,7 @@ public struct TouchOverlayView: View {
                     }
                     .onEnded { _ in model.worldEnded() }
             )
+            .position(x: zone.midX, y: zone.midY)
             .accessibilityHidden(true)
     }
 
@@ -504,15 +571,26 @@ public struct TouchOverlayView: View {
             model.buttonDown(c)
             model.buttonUp(c)
         }
+        .accessibilityAction(named: Text("Quick actions")) {
+            if c == .menu || c == .pause { model.trayOpen = true }
+        }
         .position(x: hit.midX, y: hit.midY)
     }
 
     private func tray(anchor: CGRect, size: CGSize, k: CGFloat) -> some View {
         let left = model.settings.leftHanded
         return QuickTray(
-            items: TrayItem.items(for: model.settings.style), k: k,
-            on: Set([model.tabHeld ? TrayItem.players : nil, model.keyboardUp ? .keyboard : nil].compactMap { $0 }),
-            select: model.select
+            items: model.traySettings.slots, k: k,
+            on: Set(model.latchedTrayActions.keys),
+            down: { action in model.trayActionDown(action) },
+            up: { action in
+                model.trayActionUp(action)
+                model.trayOpen = false
+            },
+            edit: {
+                model.editTray()
+                showQuickMenu = true
+            }
         )
         .fixedSize()
         .padding(.top, anchor.maxY + 8)

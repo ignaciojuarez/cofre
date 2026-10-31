@@ -18,7 +18,7 @@ let package = Package(
             dependencies: ["CofreKit"],
             resources: [.copy("Resources/Fonts"), .copy("Resources/Images")]
         ),
-        .testTarget(name: "CofreKitTests", dependencies: ["CofreKit"]),
+        .testTarget(name: "CofreKitTests", dependencies: ["CofreKit"], resources: [.copy("Fixtures")]),
         .testTarget(name: "CofreUITests", dependencies: ["CofreUI"]),
     ]
 )

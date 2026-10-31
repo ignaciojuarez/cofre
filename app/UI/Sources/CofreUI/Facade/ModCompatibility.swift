@@ -1,22 +1,32 @@
 import Foundation
 import CofreKit
 
-/// Compatibility is computed by CofreKit. This small value keeps existing UI call sites source-compatible.
+public typealias ModCompatibilityIssue = CompatibilityIssue
+
+/// Compatibility is computed by CofreKit (`ContentCompatibility`). This small value keeps existing UI call sites
+/// source-compatible.
 public struct ModCompatibility: Hashable, Sendable {
-    /// The renderer an instance runs, decided like the launch does (AirBridgeAdapter pickRendererForProfile): Auto is
-    /// Metal where the bundled Metallum supports the version and Java 21+, MobileGlues for Forge/NeoForge elsewhere, else Air's GL.
+    /// The renderer an instance runs, using the same policy as the launch path.
     public static func renderer(instanceSetting: String? = nil, globalSetting: String, gameVersion: String, loader: String, javaVersion: Int = 21) -> String {
-        let setting = instanceSetting.flatMap { $0.isEmpty || $0 == "auto" ? nil : $0 } ?? globalSetting
-        guard setting.isEmpty || setting == "auto" else { return setting }
-        if (javaVersion <= 0 || javaVersion >= 21) && metalVersions.contains(gameVersion) { return "metallum" }
-        return loader == "forge" || loader == "neoforge" ? "mobileglues" : "air"
+        let setting = instanceSetting ?? "auto"
+        if !setting.isEmpty && setting.lowercased() != "auto" { return setting }
+        if !globalSetting.isEmpty && globalSetting.lowercased() != "auto" { return globalSetting }
+        let metal = javaVersion >= 21 ? metalVersions : []
+        return RendererPolicy.resolve(setting: "auto", globalSetting: "auto", gameVersion: gameVersion,
+            loader: Instance.Loader(rawValue: loader.lowercased()) ?? .unknown, metalVersions: metal)
     }
-    /// Versions supported by the exact shipped Metallum manifest. No version family is inferred here.
-    nonisolated(unsafe) public static var metalVersions: Set<String> =
-        ((Bundle.main.url(forResource: "RendererManifest", withExtension: "json")
-            .flatMap { try? RendererManifest.load(from: $0) })?.gameVersions ?? [])
-    public static var manifest: RendererManifest {
+    /// Compatibility overload for callers that only have one setting.
+    public static func renderer(setting: String, gameVersion: String, loader: String) -> String {
+        renderer(instanceSetting: setting, globalSetting: "auto", gameVersion: gameVersion, loader: loader)
+    }
+    /// The exact shipped Metallum manifest, read once. Previews and tests may replace it.
+    nonisolated(unsafe) public static var manifest: RendererManifest =
         (Bundle.main.url(forResource: "RendererManifest", withExtension: "json").flatMap { try? RendererManifest.load(from: $0) }) ?? RendererManifest()
+    /// Versions supported by the exact shipped Metallum manifest. No version family is inferred here.
+    nonisolated(unsafe) public static var metalVersions: Set<String> = manifest.gameVersions
+    /// A project or installed file with the renderer an instance runs.
+    public static func issue(id: String, name: String, kind: ContentKind, gameVersion: String, renderer: String) -> ModCompatibilityIssue? {
+        ContentCompatibility.issue(id: id, name: name, kind: kind, gameVersion: gameVersion, renderer: renderer, manifest: manifest)
     }
     public let id: String, name: String
     private let supportedMetalVersions: Set<String>?
@@ -24,30 +34,24 @@ public struct ModCompatibility: Hashable, Sendable {
     private let isWarning: Bool
     public init(id: String, name: String, metalVersions: Set<String>?, reason: String, verified: Bool) { self.id=id; self.name=name; supportedMetalVersions=metalVersions; self.reason=reason; isWarning = !verified }
     public func issue(gameVersion: String, renderer: String) -> ModCompatibilityIssue? {
-        guard renderer.lowercased().contains("metal") || renderer.lowercased().contains("metallum") else { return nil }
+        guard ContentCompatibility.rendererName(renderer) == "Metal" else { return nil }
         if let versions = supportedMetalVersions, versions.contains(gameVersion) { return nil }
         return ModCompatibilityIssue(modID:id, modName:name, gameVersion:gameVersion, reason:reason)
     }
     public static func entry(for id: String, name: String? = nil) -> ModCompatibility? {
-        let key = (name ?? id).lowercased().filter { $0.isLetter || $0.isNumber }
-        let integrations = manifest.integrations
-        guard let integration = integrations.keys.first(where: { key.contains($0.filter { $0.isLetter || $0.isNumber }) || $0.contains(key) }) else { return nil }
-        let versions = integrations[integration] ?? []
+        guard let found = ContentCompatibility.integration(for: name ?? id, manifest) else { return nil }
         let label = name ?? id
-        let reason = "\(label) has no shipped \(integration.capitalized) integration for this Minecraft version."
-        return .init(id: id, name: label, metalVersions: versions, reason: reason, verified: true)
+        let reason = "\(label) has no shipped \(found.name.capitalized) integration for this Minecraft version."
+        return .init(id: id, name: label, metalVersions: found.versions, reason: reason, verified: true)
     }
-}
-public struct ModCompatibilityIssue: Hashable, Sendable {
-    public let modID: String, modName: String, gameVersion: String, reason: String
-    public var title: String { "\(modName) won't run on \(gameVersion) with Metal" }
-    public var badge: String { "Not supported · Metal · \(gameVersion)" }
 }
 public enum ModLaunchDecision: Equatable, Sendable { case play, warn([ModCompatibilityIssue]) }
 #if canImport(UIKit)
 public enum ModCompatibilityChecker {
     public static func decision(items: [InstalledItem], gameVersion: String, renderer: String) -> ModLaunchDecision {
-        let issues = items.filter { $0.enabled && $0.kind == .mods }.compactMap { item in ModCompatibility.entry(for:item.projectID ?? item.id,name:item.name)?.issue(gameVersion:gameVersion,renderer:renderer) }
+        let issues = items.filter { $0.enabled && ($0.kind == .mods || ($0.kind == .shaders && $0.inUse)) }.compactMap { item in
+            ModCompatibility.issue(id: item.projectID ?? item.id, name: item.name, kind: item.kind, gameVersion: gameVersion, renderer: renderer)
+        }
         return issues.isEmpty ? .play : .warn(issues)
     }
 }

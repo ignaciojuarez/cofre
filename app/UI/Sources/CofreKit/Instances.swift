@@ -2,7 +2,26 @@ import Foundation
 
 /// Air's launcher profile plus Cofre-owned metadata for one game directory.
 public struct Instance: Identifiable, Codable, Hashable, Sendable {
-    public enum Loader: String, Codable, Sendable { case vanilla, fabric, forge, neoforge, quilt, unknown }
+    public enum Loader: String, Codable, CaseIterable, Identifiable, Sendable {
+        case vanilla, fabric, forge, neoforge, quilt, unknown
+
+        public var id: String { rawValue }
+        public static let allCases: [Self] = [.vanilla, .fabric, .quilt, .forge, .neoforge]
+        public var displayName: String {
+            switch self {
+            case .vanilla: "Vanilla"
+            case .fabric: "Fabric"
+            case .quilt: "Quilt"
+            case .forge: "Forge"
+            case .neoforge: "NeoForge"
+            case .unknown: "Unknown"
+            }
+        }
+
+        /// The one profile field Cofre owns for the requested loader. Air's
+        /// `loader` field is kept as a migration fallback only.
+        public static let requestedProfileKey = "cofreRequestedLoader"
+    }
     public let id: String
     public var name: String
     public var gameDirectory: URL
@@ -19,6 +38,10 @@ public struct Instance: Identifiable, Codable, Hashable, Sendable {
     public var group: String?
     public var favorite: Bool
     public var icon: String?
+    /// A JVM can only run once per process. Old session markers expire on relaunch.
+    public static let currentSession = UUID().uuidString
+    public var restartSession: String?
+    public var restartRequired: Bool { restartSession == Self.currentSession }
     /// Air's real `lastVersionId` (e.g. `fabric-loader-0.16.9-1.21.1`, `1.20.1-forge-47.2.0`, `neoforge-21.1.77`).
     public var renderer: String?
     public var versionID: String?
@@ -28,12 +51,66 @@ public struct Instance: Identifiable, Codable, Hashable, Sendable {
                 javaPath: String? = nil, javaVersion: Int? = nil, memoryMB: Int? = nil,
                 autoMemory: Bool = true, jvmArguments: String? = nil,
                 lastGoodJVMArguments: String? = nil, notes: String = "", group: String? = nil,
-                favorite: Bool = false, icon: String? = nil) {
+                favorite: Bool = false, icon: String? = nil, restartSession: String? = nil) {
         self.id = id; self.name = name; self.gameDirectory = gameDirectory; self.gameVersion = gameVersion
         self.loader = loader; self.loaderVersion = loaderVersion; self.javaPath = javaPath
         self.javaVersion = javaVersion; self.memoryMB = memoryMB; self.autoMemory = autoMemory
         self.jvmArguments = jvmArguments; self.lastGoodJVMArguments = lastGoodJVMArguments
         self.notes = notes; self.group = group; self.favorite = favorite; self.icon = icon
+        self.restartSession = restartSession
+    }
+}
+
+public extension Instance.Loader {
+    /// Normalize at the profile boundary. Unknown explicit values fail closed;
+    /// old Air profiles are identified by their libraries, then their version id.
+    static func resolve(requested: String?, legacy: String? = nil, versionID: String,
+                        libraries: [String] = [], fallback: Self? = nil) -> Self {
+        if let raw = requested ?? legacy {
+            return Self(rawValue: raw.lowercased()) ?? .unknown
+        }
+        for loader in [Self.neoforge, .forge, .quilt, .fabric] where loader.matches(libraries: libraries) { return loader }
+        if let fallback, fallback != .vanilla { return fallback }
+        let id = versionID.lowercased()
+        if id.hasPrefix("fabric-loader-") { return .fabric }
+        if id.hasPrefix("quilt-loader-") { return .quilt }
+        if id.hasPrefix("neoforge-") { return .neoforge }
+        if id.contains("-forge-") { return .forge }
+        return .vanilla
+    }
+
+    func matches(libraries: [String]) -> Bool {
+        let artifacts: [String] = switch self {
+        case .fabric: ["net.fabricmc:fabric-loader"]
+        case .quilt: ["org.quiltmc:quilt-loader"]
+        case .forge: ["net.minecraftforge:forge", "net.minecraftforge:fmlloader"]
+        // The first NeoForge releases used the artifact net.neoforged:forge.
+        case .neoforge: ["net.neoforged:neoforge", "net.neoforged:forge", "net.neoforged.fancymodloader:loader"]
+        case .vanilla, .unknown: []
+        }
+        return libraries.contains { name in artifacts.contains { name.lowercased().hasPrefix($0 + ":") } }
+    }
+
+    /// A loader-looking id alone is insufficient: inspect the installed profile.
+    /// Base Minecraft files may still be downloaded by Air at launch.
+    func isInstalled(in versionID: String?, root: URL, minecraftVersion: String) -> Bool {
+        if self == .vanilla { return true }
+        guard self != .unknown, let profile = Self.versionProfile(versionID, root: root),
+              profile["id"] as? String == versionID,
+              (profile["inheritsFrom"] as? String ?? profile["jar"] as? String) == minecraftVersion,
+              let mainClass = profile["mainClass"] as? String, !mainClass.isEmpty,
+              let libraries = profile["libraries"] as? [[String: Any]]
+        else { return false }
+        return matches(libraries: libraries.compactMap { $0["name"] as? String })
+    }
+
+    static func versionProfile(_ versionID: String?, root: URL) -> [String: Any]? {
+        guard let versionID, !versionID.isEmpty, versionID != ".", versionID != "..",
+              versionID.range(of: #"^[A-Za-z0-9._+\-]+$"#, options: .regularExpression) != nil else { return nil }
+        let file = root.appendingPathComponent("versions").appendingPathComponent(versionID)
+            .appendingPathComponent("\(versionID).json")
+        guard let data = try? Data(contentsOf: file) else { return nil }
+        return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
     }
 }
 
@@ -80,7 +157,15 @@ public final class InstanceStore: @unchecked Sendable {
         let id = uniqueID(for: name); let dir = gameDirectory ?? root.appendingPathComponent(id)
         try fm.createDirectory(at: dir, withIntermediateDirectories: true)
         // The plain game version: the engine's loader installer writes the real version id (fabric-loader-…, …-forge-…).
-        var p: [String: Any] = ["name": name, "lastVersionId": version, "gameDir": gameDirValue(dir)]
+        var p: [String: Any] = [
+            "name": name,
+            "lastVersionId": version,
+            "gameDir": gameDirValue(dir),
+            // Keep the requested loader beside Air's profile so the ObjC launch
+            // bridge can make the same decision as Cofre before the installer
+            // has written the final version id.
+            Instance.Loader.requestedProfileKey: loader.rawValue,
+        ]
         if let loaderVersion { p["loaderVersion"] = loaderVersion }
         profiles[id] = p; try saveProfiles()
         var i = makeInstance(id: id, profile: p)!
@@ -206,7 +291,29 @@ public final class InstanceStore: @unchecked Sendable {
         if let loaderVersion { p["loaderVersion"] = loaderVersion }; profiles[id] = p; try saveProfiles(); let i = makeInstance(id: id, profile: p)!; try saveMeta(i); return i
     }
 
-    public func rollbackJVMArguments(_ id: String) throws -> Instance { guard var p = profiles[id], let old = p["lastGoodJavaArgs"] else { throw StoreError.missingProfile }; p["javaArgs"] = old; profiles[id] = p; try saveProfiles(); return try refresh(id) }
+    /// Persist the engine's JVM boundary for this process, including failed installs.
+    /// It applies to every instance; a different process session automatically clears it.
+    public func markJVMUsed() throws {
+        try loadProfiles()
+        document["cofreJVMUseSession"] = Instance.currentSession
+        try saveProfiles()
+    }
+
+    /// A failed engine install can leave an empty file where a Maven folder belongs (`libraries/net`),
+    /// which blocks every later download beneath it. Library files always have an extension.
+    @discardableResult public func repairLibraries() -> [URL] {
+        let libraries = root.appendingPathComponent("libraries")
+        let keys: [URLResourceKey] = [.isRegularFileKey, .fileSizeKey]
+        guard let items = fm.enumerator(at: libraries, includingPropertiesForKeys: keys) else { return [] }
+        var removed: [URL] = []
+        for case let file as URL in items where file.pathExtension.isEmpty {
+            guard let values = try? file.resourceValues(forKeys: Set(keys)), values.isRegularFile == true,
+                  values.fileSize == 0, (try? fm.removeItem(at: file)) != nil else { continue }
+            removed.append(file)
+        }
+        return removed
+    }
+
     /// Removes an instance and its files. Used to roll back staged imports.
     public func remove(_ id: String) throws {
         guard let instance = makeInstance(id: id, profile: profiles[id] ?? [:]) else { throw StoreError.missingProfile }
@@ -214,18 +321,43 @@ public final class InstanceStore: @unchecked Sendable {
         profiles.removeValue(forKey: id)
         try saveProfiles()
     }
-    public func setMetadata(_ id: String, notes: String? = nil, group: String?? = nil, favorite: Bool? = nil, icon: String?? = nil) throws -> Instance {
-        guard var i = makeInstance(id: id, profile: profiles[id] ?? [:]) else { throw StoreError.missingProfile }; if let notes { i.notes = notes }; if let group { i.group = group }; if let favorite { i.favorite = favorite }; if let icon { i.icon = icon }; try saveMeta(i); return i
+    public func setMetadata(_ id: String, notes: String? = nil, group: String?? = nil, favorite: Bool? = nil) throws -> Instance {
+        guard var i = makeInstance(id: id, profile: profiles[id] ?? [:]) else { throw StoreError.missingProfile }; if let notes { i.notes = notes }; if let group { i.group = group }; if let favorite { i.favorite = favorite }; try saveMeta(i); return i
     }
 
     private func loadProfiles() throws { guard fm.fileExists(atPath: profilesURL.path) else { profiles = [:]; document = [:]; return }; let d = try Data(contentsOf: profilesURL); let obj = try JSONSerialization.jsonObject(with: d) as? [String: Any] ?? [:]; document = obj; profiles = (obj["profiles"] as? [String: [String: Any]]) ?? [:] }
     private func saveProfiles() throws {
+        for (id, var profile) in profiles where profile["loader"] != nil {
+            if profile[Instance.Loader.requestedProfileKey] == nil {
+                profile[Instance.Loader.requestedProfileKey] = profile["loader"]
+            }
+            profile.removeValue(forKey: "loader")
+            profiles[id] = profile
+        }
         document["profiles"] = profiles
         let d = try JSONSerialization.data(withJSONObject: document, options: [.prettyPrinted, .sortedKeys])
         try d.write(to: profilesURL, options: .atomic)
         didWriteProfiles?()
     }
-    private func makeInstance(id: String, profile p: [String: Any]) -> Instance? { guard let name = p["name"] as? String, let version = p["lastVersionId"] as? String else { return nil }; let dir = resolveGameDirectory?(id, p) ?? (p["gameDir"] as? String).map(resolveGameDir) ?? root; let parsed = parseVersion(version); let meta = try? readMeta(at: dir); var instance = Instance(id: id, name: name, gameDirectory: dir, gameVersion: meta?.gameVersion ?? parsed.version, loader: meta?.loader ?? parsed.loader, loaderVersion: (p["loaderVersion"] as? String) ?? meta?.loaderVersion, javaPath: p["javaPath"] as? String, javaVersion: p["javaVersion"] as? Int, memoryMB: p["memory"] as? Int, autoMemory: (p["autoMemory"] as? Bool) ?? true, jvmArguments: p["javaArgs"] as? String, lastGoodJVMArguments: p["lastGoodJavaArgs"] as? String, notes: meta?.notes ?? "", group: meta?.group, favorite: meta?.favorite ?? false, icon: meta?.icon); instance.versionID = version; instance.renderer = (p["cofreRendererPicked"] as? Bool) == true ? "auto" : p["renderer"] as? String; return instance }
+    private func makeInstance(id: String, profile p: [String: Any]) -> Instance? {
+        guard let name = p["name"] as? String, let version = p["lastVersionId"] as? String else { return nil }
+        let dir = resolveGameDirectory?(id, p) ?? (p["gameDir"] as? String).map(resolveGameDir) ?? root
+        let parsed = parseVersion(version), meta = try? readMeta(at: dir)
+        let versionProfile = Instance.Loader.versionProfile(version, root: root)
+        let libraries = (versionProfile?["libraries"] as? [[String: Any]] ?? []).compactMap { $0["name"] as? String }
+        let loader = Instance.Loader.resolve(requested: p[Instance.Loader.requestedProfileKey] as? String,
+            legacy: p["loader"] as? String, versionID: version, libraries: libraries, fallback: meta?.loader)
+        var instance = Instance(id: id, name: name, gameDirectory: dir,
+            gameVersion: versionProfile?["inheritsFrom"] as? String ?? p["cofreGameVersion"] as? String ?? meta?.gameVersion ?? parsed.version,
+            loader: loader, loaderVersion: (p["loaderVersion"] as? String) ?? meta?.loaderVersion,
+            javaPath: p["javaPath"] as? String, javaVersion: p["javaVersion"] as? Int, memoryMB: p["memory"] as? Int,
+            autoMemory: (p["autoMemory"] as? Bool) ?? true, jvmArguments: p["javaArgs"] as? String,
+            lastGoodJVMArguments: p["lastGoodJavaArgs"] as? String, notes: meta?.notes ?? "", group: meta?.group,
+            favorite: meta?.favorite ?? false, icon: meta?.icon, restartSession: document["cofreJVMUseSession"] as? String)
+        instance.versionID = version
+        instance.renderer = (p["cofreRendererPicked"] as? Bool) == true ? "auto" : p["renderer"] as? String
+        return instance
+    }
     private func refresh(_ id: String) throws -> Instance { try loadProfiles(); guard let i = makeInstance(id: id, profile: profiles[id] ?? [:]) else { throw StoreError.missingProfile }; return i }
     private func saveMeta(_ i: Instance) throws { try JSONEncoder().encode(i).write(to: i.gameDirectory.appendingPathComponent("cofre.json"), options: .atomic) }
     private func readMeta(at dir: URL) throws -> Instance { try JSONDecoder().decode(Instance.self, from: Data(contentsOf: dir.appendingPathComponent("cofre.json"))) }
@@ -234,6 +366,7 @@ public final class InstanceStore: @unchecked Sendable {
         guard [.fabric, .quilt].contains(i.loader), let lv = i.loaderVersion, !lv.isEmpty else { return i.gameVersion }
         return "\(i.loader.rawValue)-loader-\(lv)-\(i.gameVersion)"
     }
+
     /// Profiles keep folders inside the game folder relative ("./…"), as Air does, so they survive container moves.
     private func gameDirValue(_ dir: URL) -> String {
         let base = root.standardizedFileURL.path + "/", path = dir.standardizedFileURL.path

@@ -62,14 +62,11 @@
         @ViewBuilder private func confirm(_ job: ModInstall, _ plan: ModInstallPlan) -> some View {
             let target = store.instances.first { $0.id == job.instanceID }
             let issue = target.flatMap {
-                ModCompatibility.entry(for: plan.target.id, name: plan.target.name)?.issue(
-                    gameVersion: $0.gameVersion,
-                    renderer: ModCompatibility.renderer(
-                        instanceSetting: store.instancePreferences[$0.id]?.renderer ?? $0.renderer, globalSetting: store.preferences.renderer, gameVersion: $0.gameVersion, loader: $0.loader.rawValue, javaVersion: $0.javaVersion.flatMap(Int.init) ?? 21))
+                store.compatibilityIssue(id: plan.target.id, name: plan.target.name, kind: plan.kind, instance: $0)
             }
             // The warning leads, in one line.
             if let issue {
-                Banner("Won't run on \(issue.gameVersion) with Metal", icon: .ore, tone: .warn)
+                Banner(issue.badge, icon: .ore, tone: .warn)
                 Text(verbatim: issue.reason).cofreFont(.secondary).foregroundStyle(Color.cofre.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }

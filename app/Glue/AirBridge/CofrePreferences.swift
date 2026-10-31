@@ -4,12 +4,11 @@ import CofreUI
 /// Typed owner for the preferences exposed by CofreUI.
 ///
 /// The backing closures are the only Air seam. Keys, defaults, NSNumber
-/// conversion, profile fallback, and Air's memory calculation stay here.
+/// conversion and profile fallback stay here.
 public struct CofrePreferenceStore {
     public enum Key: String, CaseIterable {
         case autoRAM = "java.auto_ram"
         case ramAllocation = "java.allocated_memory"
-        case ramCeiling = "java.ram_ceiling"
         case renderer = "video.renderer"
         case resolution = "video.resolution"
         case graphicsAPI = "video.graphics_api"
@@ -64,9 +63,8 @@ public struct CofrePreferenceStore {
         applyFirstResolution()
         var p = GamePreferences()
         p.autoRAM = bool(.autoRAM, instanceID, default: p.autoRAM)
-        p.ramMB = p.autoRAM
-            ? integer(.ramCeiling, instanceID, default: p.ramMB)
-            : integer(.ramAllocation, instanceID, default: p.ramMB)
+        // With Auto on, the backend fills in the launch-time size (CofreBackendAdapter.javaHeap).
+        p.ramMB = integer(.ramAllocation, instanceID, default: p.ramMB)
         p.deviceRAMMB = Int(ProcessInfo.processInfo.physicalMemory / 1_048_576)
         p.renderer = string(.renderer, instanceID, default: p.renderer)
         // Cofre keeps the picked size; the launch writes it to Air (AirBridgeAdapter applyResolution).
@@ -85,7 +83,7 @@ public struct CofrePreferenceStore {
         p.buttonScale = double(.buttonScale, instanceID, default: p.buttonScale * 100) / 100
         p.controllerLayout = string(.controllerLayout, instanceID, default: p.controllerLayout)
         p.touchLayout = string(.touchLayout, instanceID, default: p.touchLayout)
-        p.downloadSource = string(.downloadSource, instanceID, default: "bmclapi") == "official" ? .official : .mirror
+        p.downloadSource = string(.downloadSource, instanceID, default: "official") == "bmclapi" ? .mirror : .official
         p.verifyFiles = bool(.verifyFiles, instanceID, default: p.verifyFiles)
         p.envVariables = Self.parseEnv(string(.envVariables, instanceID, default: ""))
         p.shaderCacheMB = integer(.shaderCacheMB, instanceID, default: 128)

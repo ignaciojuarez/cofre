@@ -10,12 +10,14 @@ public final class Modrinth {
         public let projectType: String
         public let categories: [String]
         public let downloads: Int
+        /// Game versions it has files for.
+        public let versions: [String]?
         /// Kept as text: Modrinth sends "" for projects without an icon, which isn't a valid URL to decode.
         let icon: String?
         public var iconURL: URL? { Modrinth.url(icon) }
         /// Search hits carry no page link; it follows from the type and slug.
         public var pageURL: URL? { slug.flatMap { Modrinth.url("https://modrinth.com/\(projectType)/\($0)") } }
-        enum CodingKeys: String, CodingKey { case projectID = "project_id", slug, title, description, projectType = "project_type", categories, downloads, icon = "icon_url" }
+        enum CodingKeys: String, CodingKey { case projectID = "project_id", slug, title, description, projectType = "project_type", categories, downloads, versions, icon = "icon_url" }
     }
     public struct Project: Codable, Sendable {
         public let id: String; public let title: String; public let description: String?; let icon: String?; public let projectType: String
@@ -25,6 +27,13 @@ public final class Modrinth {
     public struct Version: Codable, Sendable { public let id: String; public let projectID: String; public let name: String; public let versionNumber: String; public let gameVersions: [String]; public let loaders: [String]; public let versionType: String; public let dependencies: [Dependency]; public let files: [File]; enum CodingKeys: String, CodingKey { case id, projectID = "project_id", name, versionNumber = "version_number", gameVersions = "game_versions", loaders, versionType = "version_type", dependencies, files } }
     public struct Dependency: Codable, Sendable { public let versionID: String?; public let projectID: String?; public let dependencyType: String; enum CodingKeys: String, CodingKey { case versionID = "version_id", projectID = "project_id", dependencyType = "dependency_type" } }
     public struct File: Codable, Sendable { public let hashes: [String: String]; public let url: URL?; public let filename: String; public let size: Int64; public let primary: Bool }
+
+    /// The filtered response is the fast path. Keep it at the front when the complete response arrives so the
+    /// versions that fit the selected instance never jump below older builds.
+    public static func mergeVersions(matching: [Version], all: [Version]) -> [Version] {
+        var seen = Set<String>()
+        return (matching + all).filter { seen.insert($0.id).inserted }
+    }
 
     private let session: URLSession
     private var cache: [String: (Date, Data)] = [:]
@@ -46,10 +55,17 @@ public final class Modrinth {
     }
     public func project(id: String) async throws -> Project { try await get("project/\(id)", as: Project.self) }
     public func versions(projectID: String, loaders: [String] = [], gameVersions: [String] = []) async throws -> [Version] {
-        var q: [URLQueryItem] = []
-        if !loaders.isEmpty { q.append(.init(name: "loaders", value: try json(loaders))) }
-        if !gameVersions.isEmpty { q.append(.init(name: "game_versions", value: try json(gameVersions))) }
-        return try await get("project/\(projectID)/version", query: q, as: [Version].self)
+        return try await getURL(Self.versionsURL(projectID: projectID, loaders: loaders, gameVersions: gameVersions), as: [Version].self)
+    }
+
+    /// URL construction stays separate so the API contract is testable without a network request.
+    public static func versionsURL(projectID: String, loaders: [String] = [], gameVersions: [String] = []) -> URL {
+        var components = URLComponents(string: "https://api.modrinth.com/v2/project/\(projectID)/version")!
+        var query: [URLQueryItem] = []
+        if !loaders.isEmpty { query.append(.init(name: "loaders", value: try! jsonValue(loaders))) }
+        if !gameVersions.isEmpty { query.append(.init(name: "game_versions", value: try! jsonValue(gameVersions))) }
+        components.queryItems = query.isEmpty ? nil : query
+        return components.url!
     }
     public func versionFiles(hashes: [String]) async throws -> [String: Version] {
         let body = try JSONSerialization.data(withJSONObject: ["hashes": hashes, "algorithm": "sha1"])
@@ -59,12 +75,16 @@ public final class Modrinth {
         try await post("projects", body: try JSONSerialization.data(withJSONObject: ["ids": ids]), as: [Project].self)
     }
     static func url(_ text: String?) -> URL? { text.flatMap { $0.isEmpty ? nil : URL(string: $0) } }
-    private func json(_ value: [String]) throws -> String { String(data: try JSONEncoder().encode(value), encoding: .utf8)! }
+    private static func jsonValue(_ value: [String]) throws -> String { String(data: try JSONEncoder().encode(value), encoding: .utf8)! }
     private func get<T: Decodable>(_ path: String, query: [URLQueryItem] = [], as type: T.Type) async throws -> T { try await request(path, query: query, method: "GET", body: nil, as: type) }
+    private func getURL<T: Decodable>(_ url: URL, as type: T.Type) async throws -> T { try await request(url: url, method: "GET", body: nil, as: type) }
     private func post<T: Decodable>(_ path: String, body: Data, as type: T.Type) async throws -> T { try await request(path, query: [], method: "POST", body: body, as: type) }
     private func request<T: Decodable>(_ path: String, query: [URLQueryItem], method: String, body: Data?, as type: T.Type) async throws -> T {
         var components = URLComponents(string: "https://api.modrinth.com/v2/\(path)")!; components.queryItems = query.isEmpty ? nil : query
-        var request = URLRequest(url: components.url!); request.httpMethod = method; request.timeoutInterval = 15; request.setValue("ignaciojuarez/cofre (github.com/ignaciojuarez/cofre)", forHTTPHeaderField: "User-Agent")
+        return try await request(url: components.url!, method: method, body: body, as: type)
+    }
+    private func request<T: Decodable>(url: URL, method: String, body: Data?, as type: T.Type) async throws -> T {
+        var request = URLRequest(url: url); request.httpMethod = method; request.timeoutInterval = 15; request.setValue("ignaciojuarez/cofre (github.com/ignaciojuarez/cofre)", forHTTPHeaderField: "User-Agent")
         if let body { request.httpBody = body; request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
         let key = request.url!.absoluteString + method + (body.map { String(decoding: $0, as: UTF8.self) } ?? "")
         if method == "GET", let hit = lock.withLock({ cache[key].flatMap { Date().timeIntervalSince($0.0) < 30 ? $0.1 : nil } }) { return try decoder.decode(T.self, from: hit) }

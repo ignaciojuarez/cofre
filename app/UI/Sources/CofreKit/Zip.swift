@@ -62,12 +62,17 @@ public enum Zip {
         guard archive.count >= 22, let end = (0...(archive.count - 22)).reversed().prefix(65_557)
             .first(where: { archive.u32($0) == 0x0605_4b50 })
         else { throw Failure.notAZip }
-        let total = Int(archive.u16(end + 10)), start = Int(archive.u32(end + 16))
+        let total = Int(archive.u16(end + 10)), start = Int(archive.u32(end + 16)), centralSize = Int(archive.u32(end + 12))
+        guard start <= archive.count, centralSize <= archive.count - start else { throw Failure.corrupt("central directory") }
         var entries: [Entry] = [], at = start
         for _ in 0..<total {
+            guard at <= archive.count - 46 else { throw Failure.corrupt("central directory") }
             guard archive.u32(at) == 0x0201_4b50 else { throw Failure.corrupt("central directory") }
             let nameLength = Int(archive.u16(at + 28)), extra = Int(archive.u16(at + 30)), comment = Int(archive.u16(at + 32))
-            let path = String(decoding: archive[archive.startIndex + at + 46 ..< archive.startIndex + at + 46 + nameLength], as: UTF8.self)
+            let recordLength = 46 + nameLength + extra + comment
+            guard recordLength <= archive.count - at, nameLength <= archive.count - at - 46 else { throw Failure.corrupt("central directory") }
+            let nameStart = archive.startIndex + at + 46
+            let path = String(decoding: archive[nameStart ..< nameStart + nameLength], as: UTF8.self)
             entries.append(Entry(
                 path: path, method: archive.u16(at + 10), crc: archive.u32(at + 16),
                 compressedSize: Int(archive.u32(at + 20)), size: Int(archive.u32(at + 24)),
@@ -80,8 +85,11 @@ public enum Zip {
     /// One entry's contents.
     public static func data(of entry: Entry, in archive: Data) throws -> Data {
         let h = entry.headerOffset
+        guard h >= 0, h <= archive.count - 30 else { throw Failure.corrupt(entry.path) }
         guard archive.u32(h) == 0x0403_4b50 else { throw Failure.corrupt(entry.path) }
         let start = archive.startIndex + h + 30 + Int(archive.u16(h + 26)) + Int(archive.u16(h + 28))
+        guard start >= archive.startIndex, start <= archive.endIndex,
+              entry.compressedSize >= 0, entry.compressedSize <= archive.endIndex - start else { throw Failure.corrupt(entry.path) }
         let body = archive[start ..< start + entry.compressedSize]
         switch entry.method {
         case 0: return Data(body)
@@ -124,8 +132,12 @@ public enum Zip {
         return out.prefix(n)
     }
 
+    /// The header's size is untrusted: DEFLATE can't expand more than ~1032×, and no game file needs 1 GiB in memory.
+    static let maxEntrySize = 1 << 30
+
     static func inflate(_ body: Data, size: Int) -> Data? {
         guard size > 0 else { return Data() }
+        guard size <= min(body.count &* 1032 &+ 1024, maxEntrySize) else { return nil }
         var out = Data(count: size)
         let n = out.withUnsafeMutableBytes { dst in
             body.withUnsafeBytes { src in

@@ -102,23 +102,23 @@ struct CofreModVersion {
         public func search(_ query: ProjectQuery) async throws -> [ProjectSummary] {
             let source = query.source == .curseforge ? 2 : 1
             let projectType = Self.projectType(query.kind)
-            var filters = ["query": query.text, "limit": "50", "projectType": projectType]
-            if let instanceID = query.instanceID {
-                let target = modTarget(instanceID)
-                if !target.game.isEmpty { filters["mcVersion"] = target.game }
-                if query.kind == .mods, target.loader != .vanilla { filters["loader"] = target.loader.rawValue }
-            }
+            let target = query.instanceID.map { modTarget($0) } ?? (game: "", loader: Loader.unknown)
             if source == 1 {
-                let facets = [["project_type:\(projectType)"]] + (filters["mcVersion"].flatMap { [["versions:\($0)"]] } ?? []) + (filters["loader"].flatMap { [["categories:\($0)"]] } ?? [])
-                let hits = try await modCatalog.modrinth.search(query: query.text, facets: facets)
+                let facets = [["project_type:\(projectType)"]] + query.filters.facets(query.kind, game: target.game, loader: target.loader)
+                let hits = try await modCatalog.modrinth.search(query: query.text, facets: facets, index: query.filters.sort.rawValue)
                 // The project_type facet already limits the type (data packs come back labelled "mod").
                 return hits.map { hit in
                     let id = hit.projectID
                     modCatalog.projects[id] = ["id": id, "title": hit.title, "description": hit.description, "imageUrl": hit.iconURL?.absoluteString ?? "", "url": hit.pageURL?.absoluteString ?? "", "downloads": hit.downloads, "projectType": projectType, "apiSource": 1]
                     let loaders = hit.categories.compactMap { Loader(rawValue: $0.lowercased()) }
-                    return ProjectSummary(id: id, title: hit.title, author: "", summary: hit.description, iconURL: hit.iconURL, downloads: hit.downloads, loaders: loaders, fits: true, source: query.source, pageURL: hit.pageURL)
+                    let fits = target.game.isEmpty || hit.versions?.contains(target.game) != false
+                    return ProjectSummary(id: id, title: hit.title, author: "", summary: hit.description, iconURL: hit.iconURL, downloads: hit.downloads, loaders: loaders, fits: fits, source: query.source, pageURL: hit.pageURL)
                 }
             }
+            // CurseForge through Air maps only the game version and loader.
+            var filters = ["query": query.text, "limit": "50", "projectType": projectType]
+            filters["mcVersion"] = query.filters.gameVersion(target.game)
+            filters["loader"] = query.filters.loader(query.kind, target.loader)?.rawValue
             let rows = try await modRows { done in air.searchProjects(filters, source: source, completion: done) }
             return rows.compactMap { row in
                 guard let id = row["id"] as? String, !id.isEmpty else { return nil }
@@ -142,9 +142,26 @@ struct CofreModVersion {
             let target = modTarget(instanceID)
             let kind = Self.kind(modCatalog.projects[projectID]?["projectType"] as? String)
             let source = source(of: projectID)
-            let versions = try await loadModVersions(projectID: projectID, source: source, loaders: source == 1 ? [target.loader.rawValue] : [], gameVersions: source == 1 ? [target.game] : [])
-            if source == 1 { Task { _ = try? await self.loadModVersions(projectID: projectID, source: source) } }
-            return versions.map { version in
+            let loaders = source == 1 && target.loader != .vanilla && target.loader != .unknown ? [target.loader.rawValue] : []
+            let games = source == 1 && !target.game.isEmpty ? [target.game] : []
+            let versions = try await loadModVersions(projectID: projectID, source: source, loaders: loaders, gameVersions: games)
+            return Self.projectVersions(versions, target: target, kind: kind)
+        }
+
+        /// Fetches the complete Modrinth catalog after the page's filtered response. Air is not involved in this path.
+        public func allVersions(projectID: String, instanceID: String) async throws -> [ProjectVersion] {
+            let target = modTarget(instanceID)
+            let kind = Self.kind(modCatalog.projects[projectID]?["projectType"] as? String)
+            let source = source(of: projectID)
+            guard source == 1 else { return try await versions(projectID: projectID, instanceID: instanceID) }
+            let versions = try await loadModVersions(projectID: projectID, source: source)
+            return Self.projectVersions(versions, target: target, kind: kind)
+        }
+
+        private static func projectVersions(
+            _ versions: [CofreModVersion], target: (game: String, loader: Loader), kind: ContentKind
+        ) -> [ProjectVersion] {
+            versions.map { version in
                 let number = version.data["version"] as? String ?? version.name
                 // CurseForge's "number" is a file ID; its name is the file name, which cleans up better.
                 let raw = version.source == 2 ? version.name : number
@@ -215,6 +232,13 @@ struct CofreModVersion {
         public func install(_ plan: ModInstallPlan, picking optionalIDs: Set<String>, instanceID: String)
             -> AsyncThrowingStream<InstallProgress, Error>
         {
+            install(plan, picking: optionalIDs, instanceID: instanceID, world: nil)
+        }
+
+        /// `world`: a data pack update goes back into the world it came from.
+        private func install(_ plan: ModInstallPlan, picking optionalIDs: Set<String>, instanceID: String, world: String?)
+            -> AsyncThrowingStream<InstallProgress, Error>
+        {
             AsyncThrowingStream { continuation in
                 Task { @MainActor in
                     let fm = FileManager.default
@@ -249,15 +273,13 @@ struct CofreModVersion {
                         }
                         if plan.makesInstance {
                             guard let pack = staged.first?.file else { throw modError("The pack didn't download.") }
-                            guard let packs = Self.modpackDirectory else { throw modError("The game folder is unavailable.") }
-                            try FileManager.default.createDirectory(at: packs, withIntermediateDirectories: true)
-                            try await importDownloadedPack(pack, in: packs) { fraction in
+                            try await importWithAir(pack) { fraction, _ in
                                 continuation.yield(
                                     InstallProgress(title: plan.target.name, fraction: fraction, stages: stages))
                             }
                         } else {
                             try await commit(staged, turningOn: files.filter(\.turnsOn), kind: plan.kind,
-                                instanceID: instanceID, backup: staging.appendingPathComponent(".replaced"))
+                                instanceID: instanceID, world: world, backup: staging.appendingPathComponent(".replaced"))
                         }
                         NSLog("[Cofre] mods installed instance=%@ files=%ld", instanceID, files.count)
                         continuation.yield(InstallProgress(title: plan.target.name, fraction: 1, stages: stages))
@@ -294,12 +316,14 @@ struct CofreModVersion {
         /// Moves staged files in, turns disabled dependencies back on, and drops older files of the same projects.
         private func commit(
             _ staged: [(mod: PlannedMod, version: CofreModVersion, file: URL)], turningOn: [PlannedMod],
-            kind: ContentKind, instanceID: String, backup: URL
+            kind: ContentKind, instanceID: String, world: String?, backup: URL
         ) async throws {
             let fm = FileManager.default
-            let folder = try contentFolder(kind, instanceID: instanceID, create: true)
+            let folder = try contentFolder(kind, instanceID: instanceID, create: true, world: world)
             try fm.createDirectory(at: backup, withIntermediateDirectories: true)
-            let have = try await scan(kind, instanceID: instanceID, online: false)
+            let have = try await scan(kind, instanceID: instanceID, online: false).filter { $0.world == world }
+            // Data pack IDs are "<world>/<file>"; the file is the last part.
+            func file(_ item: InstalledItem) -> String { (item.id as NSString).lastPathComponent }
             var undo: [() -> Void] = []
             func move(_ from: URL, _ to: URL) throws {
                 try fm.moveItem(at: from, to: to)
@@ -311,40 +335,28 @@ struct CofreModVersion {
                         continue
                     }
                     try move(
-                        folder.appendingPathComponent(item.id + ".disabled"), folder.appendingPathComponent(item.id))
+                        folder.appendingPathComponent(file(item) + ".disabled"), folder.appendingPathComponent(file(item)))
                 }
                 var index = modIndex(instanceID)
-                for (mod, version, file) in staged {
+                for (mod, version, downloaded) in staged {
                     // Older files of this project (an update), and a same-named file, step aside first.
-                    let name = file.lastPathComponent
-                    let old = have.filter { $0.projectID == mod.id || $0.id == name }
+                    let fresh = downloaded.lastPathComponent
+                    let old = have.filter { $0.projectID == mod.id || file($0) == fresh }
                     for item in old {
-                        let path = folder.appendingPathComponent(item.enabled ? item.id : item.id + ".disabled")
+                        let path = folder.appendingPathComponent(item.enabled ? file(item) : file(item) + ".disabled")
                         try move(path, backup.appendingPathComponent(path.lastPathComponent))
                         index[item.id] = nil
                     }
-                    try move(file, folder.appendingPathComponent(name))
-                    index[name] = "\(version.source)|\(mod.id)|\(version.id)"
+                    // A pack in use keeps its file name, so the game's own choice (options.txt, the shader mod's
+                    // config) still finds it; Cofre never writes those.
+                    let name = kind == .mods ? fresh : old.first(where: \.inUse).map(file) ?? fresh
+                    try move(downloaded, folder.appendingPathComponent(name))
+                    index[world.map { "\($0)/\(name)" } ?? name] = "\(version.source)|\(mod.id)|\(version.id)"
                 }
                 UserDefaults.standard.set(index, forKey: Self.indexKey(instanceID))
             } catch {
                 undo.reversed().forEach { $0() }
                 throw error
-            }
-        }
-
-        private func importDownloadedPack(_ url: URL, in gameDirectory: URL, progress: @escaping (Double) -> Void) async throws {
-            try ModpackImport.cleanupAbandonedImport(in: gameDirectory)
-            try ModpackImport.markImportStarted(in: gameDirectory)
-            try await withCheckedThrowingContinuation { (done: CheckedContinuation<Void, Error>) in
-                air.importPack(
-                    url, profile: nil,
-                    progress: { fraction, _ in Task { @MainActor in progress(min(max(fraction, 0), 0.99)) } },
-                    completion: { error in
-                        // A failed import is rolled back now; a crash is rolled back at the next launch.
-                        if error != nil { ModpackImport.cleanupAbandonedImport(in: gameDirectory) } else { ModpackImport.markImportFinished(in: gameDirectory) }
-                        if let error { done.resume(throwing: error) } else { done.resume() }
-                    })
             }
         }
 
@@ -359,26 +371,30 @@ struct CofreModVersion {
         func scan(_ kind: ContentKind, instanceID: String, online: Bool, identify: Bool = true) async throws
             -> [InstalledItem]
         {
-            guard let fileKind = Self.storeKind(kind), let directory = air.gameDirectory(forProfile: instanceID) else { return [] }
-            var items = try ContentStore(gameDirectory: directory).list(fileKind).map { file in
-                InstalledItem(id: file.id, name: file.name, version: file.version, enabled: file.enabled, kind: kind)
+            guard kind.folderName != nil, let directory = air.gameDirectory(forProfile: instanceID) else { return [] }
+            let store = ContentStore(gameDirectory: directory)
+            let files = try store.list(kind)
+            var items = files.map { file in
+                var item = InstalledItem(id: file.id, name: file.name, version: file.version, enabled: file.enabled, kind: kind)
+                item.inUse = file.inUse
+                item.world = file.world
+                return item
             }
-            if identify { try? await self.identify(&items, kind: kind, instanceID: instanceID, online: online) }
+            let paths = Dictionary(files.map { ($0.id, store.url(of: $0)) }) { a, _ in a }
+            if identify { await self.identify(&items, kind: kind, paths: paths, instanceID: instanceID, online: online) }
             return items
         }
 
         /// Fills `projectID` (and `updateTo` for mods): Cofre's own install index first, then each file's SHA-1
         /// through Modrinth's version_files, which also knows files installed by Air or copied in by hand.
-        private func identify(_ items: inout [InstalledItem], kind: ContentKind, instanceID: String, online: Bool)
-            async throws
-        {
+        private func identify(
+            _ items: inout [InstalledItem], kind: ContentKind, paths: [String: URL], instanceID: String, online: Bool
+        ) async {
             guard !items.isEmpty else { return }
             let index = modIndex(instanceID)
-            let folder = try contentFolder(kind, instanceID: instanceID, create: false)
             var hashOf: [String: String] = [:]
             for item in items {
-                let path = folder.appendingPathComponent(item.enabled ? item.id : item.id + ".disabled")
-                if let sha = try? await cachedSHA1(path) { hashOf[item.id] = sha }
+                if let path = paths[item.id], let sha = try? await cachedSHA1(path) { hashOf[item.id] = sha }
             }
             let unknown = Set(hashOf.values).filter { modCatalog.identities[$0] == nil }
             if online, !unknown.isEmpty, let found = try? await modCatalog.modrinth.versionFiles(hashes: Array(unknown)) {
@@ -399,7 +415,7 @@ struct CofreModVersion {
                     items[i].versionID = id.version
                 }
             }
-            if kind == .mods { await markUpdates(&items, hashOf: hashOf, instanceID: instanceID, online: online) }
+            await markUpdates(&items, kind: kind, hashOf: hashOf, instanceID: instanceID, online: online)
         }
 
         /// What Modrinth said a file is: project, version, channel. Entries saved before channels read as release,
@@ -414,15 +430,16 @@ struct CofreModVersion {
         /// Newer builds for this game and loader, never on a less stable channel than the installed one
         /// (`VersionChannel.allowsUpdate`): one request per channel group, then a check of what came back.
         private func markUpdates(
-            _ items: inout [InstalledItem], hashOf: [String: String], instanceID: String, online: Bool
+            _ items: inout [InstalledItem], kind: ContentKind, hashOf: [String: String], instanceID: String, online: Bool
         ) async {
             let known = hashOf.compactMapValues { sha in identity(sha).map { (sha, $0) } }
-            let cached = modCatalog.updates[instanceID]
+            let cacheKey = "\(instanceID)|\(kind.rawValue)"
+            let cached = modCatalog.updates[cacheKey]
             var latest = cached?.latest ?? [:]
             let stale = cached.map { Date().timeIntervalSince($0.asked) > 1800 } ?? true
             let target = modTarget(instanceID)
             if online, !known.isEmpty, stale || known.values.contains(where: { latest[$0.0] == nil }) {
-                let loaders = target.loader == .quilt ? ["quilt", "fabric"] : [target.loader.rawValue]
+                let loaders = kind.updateLoaders(target.loader)
                 var found: [String: [String: Any]] = [:]
                 for (channel, group) in Dictionary(grouping: known.values, by: { $0.1.channel }) {
                     if let answer = try? await modrinthJSON(
@@ -436,7 +453,7 @@ struct CofreModVersion {
                     }
                 }
                 latest = found
-                modCatalog.updates[instanceID] = (Date(), found)
+                modCatalog.updates[cacheKey] = (Date(), found)
                 modCatalog.allowedUpdates = modCatalog.allowedUpdates.filter { !$0.key.hasPrefix("\(instanceID)|") }
             }
             for i in items.indices {
@@ -455,7 +472,7 @@ struct CofreModVersion {
                         let all = (try? await loadModVersions(projectID: current.project, source: 1)) ?? []
                         modCatalog.allowedUpdates[key] =
                             all.prefix { $0.id != current.version }.first {
-                                $0.fits(gameVersion: target.game, loader: target.loader.rawValue)
+                                $0.candidate(title: "").fits(game: target.game, loader: target.loader, kind: kind)
                                     && current.channel.allowsUpdate(to: VersionChannel($0.data["channel"] as? String))
                             }?.id ?? ""
                     }
@@ -479,48 +496,46 @@ struct CofreModVersion {
             ])
         }
 
-        static func storeKind(_ kind: ContentKind) -> ContentStore.Kind? {
-            switch kind {
-            case .mods: .mods
-            case .resourcePacks: .resourcePacks
-            case .shaders: .shaderpacks
-            case .dataPacks: .datapacks
-            case .modpacks: nil
-            }
-        }
-
         /// The instance's content folder and the file behind `item`.
         private func contentFile(_ item: InstalledItem, instanceID: String) throws -> (ContentStore, ContentStore.Item)? {
-            guard let kind = Self.storeKind(item.kind), let directory = air.gameDirectory(forProfile: instanceID) else { return nil }
+            guard item.kind.folderName != nil, let directory = air.gameDirectory(forProfile: instanceID) else { return nil }
             let store = ContentStore(gameDirectory: directory)
-            return try store.list(kind).first { $0.id == item.id }.map { (store, $0) }
+            return try store.list(item.kind).first { $0.id == item.id }.map { (store, $0) }
         }
 
         public func setEnabled(_ enabled: Bool, item: InstalledItem, instanceID: String) async throws {
             guard let (store, file) = try contentFile(item, instanceID: instanceID) else { return }
             try store.setEnabled(enabled, file)
+            NSLog("[Cofre] content %@ kind=%@ inUse=%d", enabled ? "on" : "off", item.kind.rawValue, file.inUse ? 1 : 0)
         }
 
         public func delete(_ item: InstalledItem, instanceID: String) async throws {
             guard let (store, file) = try contentFile(item, instanceID: instanceID) else { return }
             _ = try store.trash(file)
+            NSLog("[Cofre] content deleted kind=%@", item.kind.rawValue)
             var index = modIndex(instanceID)
             index[item.id] = nil
             UserDefaults.standard.set(index, forKey: Self.indexKey(instanceID))
         }
 
         /// Each update is its own plan and install, so new dependencies come along and a failure stops only it.
-        public func updateAll(instanceID: String) async throws {
+        /// Mods, shaders, resource packs and data packs; a data pack goes back into its own world.
+        public func updateAll(kind: ContentKind, instanceID: String) async throws {
             var failed: [String] = []
-            for item in try await scan(.mods, instanceID: instanceID, online: true) where item.updateTo != nil {
+            var updated = 0
+            guard kind.folderName != nil else { return }
+            for item in try await scan(kind, instanceID: instanceID, online: true) where item.updateTo != nil {
                 guard let id = item.projectID, let next = item.updateVersionID else { continue }
                 do {
-                    let plan = try await installPlan(projectID: id, versionID: next, kind: .mods, instanceID: instanceID)
+                    var plan = try await installPlan(projectID: id, versionID: next, kind: kind, instanceID: instanceID)
+                    if kind == .dataPacks, item.world != nil { plan.blocked = nil }
                     if let reason = plan.blocked { throw modError(reason) }
-                    for try await _ in install(plan, picking: [], instanceID: instanceID) {}
+                    for try await _ in install(plan, picking: [], instanceID: instanceID, world: item.world) {}
+                    updated += 1
                 } catch { failed.append(item.name) }
             }
-            modCatalog.updates[instanceID] = nil
+            NSLog("[Cofre] content updated instance=%@ updated=%ld failed=%ld", instanceID, updated, failed.count)
+            modCatalog.updates = modCatalog.updates.filter { !$0.key.hasPrefix("\(instanceID)|") }
             if !failed.isEmpty {
                 throw modError("Couldn't update \(ListFormatter.localizedString(byJoining: failed)).")
             }
@@ -594,15 +609,15 @@ struct CofreModVersion {
 
         /// The instance's folder for `kind`: Air's mods folder, and its siblings for shaders and resource packs.
         /// The same folder `scan` lists, so an install sees what is already there.
-        private func contentFolder(_ kind: ContentKind, instanceID: String, create: Bool) throws -> URL {
+        private func contentFolder(_ kind: ContentKind, instanceID: String, create: Bool, world: String? = nil) throws -> URL {
             // Data packs live inside each world (saves/<world>/datapacks); there is no instance-wide folder.
-            guard let storeKind = Self.storeKind(kind), storeKind != .datapacks else {
+            guard kind.isInstallable || (kind == .dataPacks && world != nil) else {
                 throw modError("Data packs belong to a world, so Cofre can't add them to the whole instance yet.")
             }
             guard let directory = air.gameDirectory(forProfile: instanceID) else {
                 throw modError("This instance's folder is missing.")
             }
-            let folder = directory.appendingPathComponent(storeKind.folderName)
+            let folder = ContentStore(gameDirectory: directory).folder(for: kind, world: world)
             if create { try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) }
             return folder
         }
@@ -612,15 +627,12 @@ struct CofreModVersion {
             UserDefaults.standard.dictionary(forKey: Self.indexKey(instanceID)) as? [String: String] ?? [:]
         }
         private static func indexKey(_ instanceID: String) -> String { "cofre.mods.index.\(instanceID)" }
-        private static func enabledName(_ file: String) -> String {
-            file.hasSuffix(".disabled") ? String(file.dropLast(".disabled".count)) : file
-        }
         private static let userAgent = "ignaciojuarez/cofre (github.com/ignaciojuarez/cofre)"
 
         /// The instance's Minecraft version and loader, read by CofreKit from launcher_profiles.json.
         private func modTarget(_ instanceID: String) -> (game: String, loader: Loader) {
-            guard let instance = try? storedInstance(instanceID) else { return ("", .vanilla) }
-            return (instance.gameVersion, Loader(rawValue: instance.loader.rawValue) ?? .vanilla)
+            guard let instance = try? storedInstance(instanceID) else { return ("", .unknown) }
+            return (instance.gameVersion, instance.loader)
         }
 
         private func source(of projectID: String) -> Int {
@@ -676,5 +688,3 @@ struct CofreModVersion {
         }
     }
 #endif
-
-private extension InstalledItem { func withContentState(inUse: Bool, world: String?) -> InstalledItem { var x = self; x.inUse = inUse; x.world = world; return x } }

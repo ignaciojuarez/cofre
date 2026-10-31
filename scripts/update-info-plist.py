@@ -7,9 +7,16 @@ import sys
 path = Path(sys.argv[1])
 info = plistlib.loads(path.read_bytes())
 info["CFBundleURLTypes"] = [{"CFBundleURLSchemes": ["cofre"]}]
+# "Open in Cofre" from Files and the share sheet. URLs arrive through the scene (CofreStartup.m) and NavModel.open.
 info["CFBundleDocumentTypes"] = [{
-    "CFBundleTypeName": "iPhone Pairing File",
-    "LSItemContentTypes": ["com.apple.mobiledevicepairing", "com.apple.property-list", "com.cofre.mrpack", "public.zip-archive", "com.cofre.mcworld"],
+    "CFBundleTypeName": "iPhone Pairing File", "CFBundleTypeRole": "Viewer", "LSHandlerRank": "Alternate",
+    "LSItemContentTypes": ["com.apple.mobiledevicepairing", "com.apple.property-list"],
+}, {
+    "CFBundleTypeName": "Modrinth Modpack", "CFBundleTypeRole": "Viewer", "LSHandlerRank": "Default",
+    "LSItemContentTypes": ["com.cofre.mrpack"],
+}, {
+    "CFBundleTypeName": "Modpack ZIP", "CFBundleTypeRole": "Viewer", "LSHandlerRank": "Alternate",
+    "LSItemContentTypes": ["public.zip-archive", "com.cofre.mcworld"],
 }]
 info["UTImportedTypeDeclarations"] = [{
     "UTTypeIdentifier": "com.apple.mobiledevicepairing",

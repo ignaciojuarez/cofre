@@ -41,25 +41,6 @@
             XCTAssertEqual(InstanceIcon.resolve(png: nil, picked: nil, id: "a", loader: .forge).glyph, .forge)
         }
 
-        func testPickingAnIconAndGoingBackToAuto() async {
-            let store = CofreStore(
-                services: CofreServices(backend: MockBackend(stepDelay: 0)), defaults: freshDefaults())
-            await store.start()
-            await store.setIcon(.bricks, for: "survival")
-            XCTAssertEqual(store.instances.first { $0.id == "survival" }?.icon.glyph, .bricks)
-            await store.refreshLibrary()
-            XCTAssertEqual(store.instances.first { $0.id == "survival" }?.icon.glyph, .bricks, "the pick is saved")
-            await store.setIcon(nil, for: "survival")
-            XCTAssertEqual(store.instances.first { $0.id == "survival" }?.icon.glyph, .fabric)
-            await store.refreshLibrary()
-            XCTAssertEqual(store.instances.first { $0.id == "survival" }?.icon.glyph, .fabric)
-        }
-
-        private func freshDefaults() -> UserDefaults {
-            let name = "cofre.tests.\(UUID().uuidString)"
-            return UserDefaults(suiteName: name)!
-        }
-
         // Every pixel letter in the new art has a color, and loader marks stay square.
         func testIconArtHasColors() {
             for g in InstanceIcon.choices {

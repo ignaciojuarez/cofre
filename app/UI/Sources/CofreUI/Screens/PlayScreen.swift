@@ -78,10 +78,6 @@
                 }
             }
             .task {
-                let number = Int(Bundle.main.object(forInfoDictionaryKey: "CofreBuildNumber") as? String ?? "0")
-                availableUpdate = await UpdateChecker(installedBuildNumber: number).check()
-            }
-            .task {
                 let number = Int(Bundle.main.object(forInfoDictionaryKey: "CofreBuildNumber") as? String ?? "0") ?? 0
                 availableUpdate = await UpdateChecker(installedBuildNumber: number).check()
             }
@@ -107,6 +103,7 @@
                             HStack(spacing: 4) {
                                 Badge(loader: inst.loader, version: inst.gameVersion)
                                 if let n = inst.modCount { Badge("\(n) mods") }
+                                if inst.restartRequired { Badge("Reopen Cofre", tone: .warn) }
                                 Badge(
                                     store.isJITReady ? "Ready" : "JIT off", tone: store.isJITReady ? .success : .danger)
                             }

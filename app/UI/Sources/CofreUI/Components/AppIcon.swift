@@ -1,7 +1,7 @@
 import ImageIO
 import SwiftUI
 
-/// §2 #17 AppIcon: placeholder chest (`cofre-design/icons/01-vanilla.png`). Decorative.
+/// §2 #17 AppIcon: amethyst pixel block (`design/icons/02-amethyst-classic.png`). Decorative.
 public struct AppIcon: View {
     let size: CGFloat
     public init(size: CGFloat = 30) { self.size = size }

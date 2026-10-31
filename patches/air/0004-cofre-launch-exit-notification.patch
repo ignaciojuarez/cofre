@@ -1,81 +1,27 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Cofre <cofre@example.invalid>
 Date: Thu, 29 Oct 2026 14:00:00 -0700
-Subject: [PATCH 4/4] Let Cofre own Air launch and game exit
+Subject: [PATCH 4/5] Let Cofre own Air launch and game exit
 
-Reason: Cofre owns launch completion, first-frame handoff, and crash screens.
+Reason: Cofre owns launch completion, first-frame handoff, launch failures and crash screens.
 Restore Forge/NeoForge LWJGL module visibility now that Air strips split packages.
-Drop when: Air exposes equivalent supported launch and game-exit callbacks,
-and stops excluding its LWJGL jar from BootstrapLauncher module discovery.
+Keep Forge installs writing mappings and libraries under the libraries folder.
+Drop when: Air exposes equivalent supported launch, launch-failure and game-exit callbacks,
+stops excluding its LWJGL jar from BootstrapLauncher module discovery, and fixes those installer paths.
 ---
-diff --git a/Natives/PLLogOutputView.m b/Natives/PLLogOutputView.m
-index 1283697..f74b8d0 100644
---- a/Natives/PLLogOutputView.m
-+++ b/Natives/PLLogOutputView.m
-@@ -3,6 +3,10 @@
- #import "SurfaceViewController.h"
- #import "utils.h"
-
-+// Cofre owns launch completion and receives the JVM exit boundary.
-+BOOL CofreHandleGameExit(int code);
-+void CofreLaunchGameExited(int code);
-+
- @interface PLLogOutputView()<UITableViewDataSource, UITableViewDelegate>
- @property(nonatomic) UITableView* logTableView;
- @property(nonatomic) UINavigationBar* navigationBar;
-@@ -186,6 +190,8 @@ + (void)appendToLog:(NSString *)string {
- }
- 
- + (void)handleExitCode:(int)code {
-+    CofreLaunchGameExited(code);
-+    if (CofreHandleGameExit(code)) return;
-     if (!current) return;
-     
-     // 如果有错误，显示新的崩溃界面
-diff --git a/Natives/SurfaceViewController.m b/Natives/SurfaceViewController.m
-index 98c31ee..bcc750d 100644
---- a/Natives/SurfaceViewController.m
-+++ b/Natives/SurfaceViewController.m
-@@ -24,6 +24,10 @@
- #import "ios_uikit_bridge.h"
- #import "LanPortDetector.h"
- #import "BackgroundManager.h"
-+
-+extern BOOL CofreOwnsLaunchUI(void);
-+extern void CofreLaunchSurfaceAttached(void);
-+extern void CofreLaunchFirstFramePresented(void);
- // ★ [LAUNCH-PROGRESS] 启动阶段上报 API(遮罩订阅 AmeLaunchProgressChangedNotification)
- #import "AmeLaunchProgress.h"
-
-@@ -1686,6 +1690,12 @@ - (void)launchMinecraft {
- ///   │        [ 取消启动 ]              │
- ///   └─────────────────────────────────┘
- - (void)setupLaunchOverlay {
-+    if (CofreOwnsLaunchUI()) {
-+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onFirstFrameRendered) name:@"PojavFirstFrameRendered" object:nil];
-+        CofreLaunchSurfaceAttached();
-+        NSLog(@"[Cofre] Air launch UI disabled; Cofre owns launch surface");
-+        return;
-+    }
-     // ============================================================
-     // FCL 风格启动界面：中间转圈圈 + 显示自定义启动器背景
-     // ============================================================
-@@ -2045,6 +2055,10 @@ - (void)updateLaunchProgressUI {
-
- /// 首帧渲染通知回调：淡出并移除启动遮罩层
- - (void)onFirstFrameRendered {
-+    if (CofreOwnsLaunchUI()) {
-+        CofreLaunchFirstFramePresented();
-+        return;
-+    }
-     // ★ [LAUNCH-PROGRESS] 首帧渲染 = 启动完成，先把阶段推到 Completed。
-     AmeLaunchProgressSetStage(AmeLaunchStageCompleted);
-     dispatch_async(dispatch_get_main_queue(), ^{
+  .../src/launcher/net/kdt/pojavlaunch/Tools.java    | 10 ++-
+  Natives/MinecraftResourceUtils.m                   | 97 +++++-----------------
+  Natives/PLLogOutputView.m                          |  6 ++
+  Natives/SurfaceViewController.m                    | 17 ++++
+  Natives/installer/ForgeDirectInstaller.m           | 41 +++++----
+  Natives/installer/ForgeProcessorExecutor.m         | 12 +++
+  6 files changed, 92 insertions(+), 91 deletions(-)
 
 diff --git a/JavaApp/src/launcher/net/kdt/pojavlaunch/Tools.java b/JavaApp/src/launcher/net/kdt/pojavlaunch/Tools.java
+index 7743fe4..58c55f1 100644
 --- a/JavaApp/src/launcher/net/kdt/pojavlaunch/Tools.java
 +++ b/JavaApp/src/launcher/net/kdt/pojavlaunch/Tools.java
-@@ -186,7 +186,15 @@
+@@ -186,7 +186,15 @@ public final class Tools {
          // FCL 风格：启动后自动加入服务器。serverIp 为空时不追加任何参数，
          // 行为与原启动流程完全一致。版本判定使用解析后的基础 MC 版本号
          // （versionName 优先取 inheritsFrom，避免 modded 版本 id 干扰比较）
@@ -93,11 +39,13 @@ diff --git a/JavaApp/src/launcher/net/kdt/pojavlaunch/Tools.java b/JavaApp/src/l
          // Tools.dialogOnUiThread(this, "Result args", Arrays.asList(argsFromJson).toString());
          return argsFromJson;
 diff --git a/Natives/MinecraftResourceUtils.m b/Natives/MinecraftResourceUtils.m
+index 281b574..06bfc3e 100644
 --- a/Natives/MinecraftResourceUtils.m
 +++ b/Natives/MinecraftResourceUtils.m
-@@ -12,23 +12,7 @@
+@@ -11,88 +11,37 @@
+ 
  @implementation MinecraftResourceUtils
-
+ 
 -#pragma mark - Forge/NeoForge 启动修复（参照 ZL2 Install.ForgeLike.progressIgnoreList）
 -
 -/// 判断点分版本号 a 是否 >= b（仅用于 bootstraplauncher 版本判断）
@@ -113,16 +61,16 @@ diff --git a/Natives/MinecraftResourceUtils.m b/Natives/MinecraftResourceUtils.m
 -    return YES;
 -}
 +#pragma mark - Forge/NeoForge bootstrap libraries
-
+ 
  + (void)applyBootstrapLauncherIgnoreListFix:(NSMutableDictionary *)json {
 -    NSArray *libraries = json[@"libraries"];
 -    if (![libraries isKindOfClass:[NSArray class]]) libraries = @[];
 -
      NSDictionary *arguments = json[@"arguments"];
      if (![arguments isKindOfClass:[NSDictionary class]]) return;
-@@ -36,62 +20,27 @@
+     NSArray *jvm = arguments[@"jvm"];
      if (![jvm isKindOfClass:[NSArray class]]) return;
-
+ 
 -    // -DignoreList= 只出现在 Forge/NeoForge 的 bootstrap 版本 JSON 里，
 -    // 找不到就没有 bootstraplauncher 的 JPMS 构建步骤，无需处理。
 -    NSInteger ignoreListIndex = NSNotFound;
@@ -180,13 +128,6 @@ diff --git a/Natives/MinecraftResourceUtils.m b/Natives/MinecraftResourceUtils.m
 -        updatedArg = [updatedArg stringByAppendingString:@",lwjgl"];
 -    } else {
 -        return;
--    }
--
--    mutableJvm[(NSUInteger)ignoreListIndex] = updatedArg;
--    NSMutableDictionary *mutableArguments = [arguments mutableCopy];
--    mutableArguments[@"jvm"] = mutableJvm;
--    json[@"arguments"] = mutableArguments;
--    NSLog(@"[MCDL] Forge/NeoForge: 已向 -DignoreList 追加 lwjgl（消除 launcher/lwjgl 重复导出 com.apple.ios.audio 导致的 JPMS ResolutionException）");
 +        id arg = jvm[i];
 +        if (![arg isKindOfClass:[NSString class]] || ![arg hasPrefix:@"-DignoreList="]) continue;
 +        NSMutableArray *ignores = [[[arg substringFromIndex:13] componentsSeparatedByString:@","] mutableCopy];
@@ -197,18 +138,179 @@ diff --git a/Natives/MinecraftResourceUtils.m b/Natives/MinecraftResourceUtils.m
 +        if (ignores.count == 0) [updatedJvm removeObjectAtIndex:i];
 +        else updatedJvm[i] = [@"-DignoreList=" stringByAppendingString:[ignores componentsJoinedByString:@","]];
 +        changed = YES;
-+    }
+     }
+-
+-    mutableJvm[(NSUInteger)ignoreListIndex] = updatedArg;
+-    NSMutableDictionary *mutableArguments = [arguments mutableCopy];
+-    mutableArguments[@"jvm"] = mutableJvm;
+-    json[@"arguments"] = mutableArguments;
+-    NSLog(@"[MCDL] Forge/NeoForge: 已向 -DignoreList 追加 lwjgl（消除 launcher/lwjgl 重复导出 com.apple.ios.audio 导致的 JPMS ResolutionException）");
 +    if (!changed) return;
 +    NSMutableDictionary *updatedArguments = [arguments mutableCopy];
 +    updatedArguments[@"jvm"] = updatedJvm;
 +    json[@"arguments"] = updatedArguments;
 +    NSLog(@"[Cofre] Forge/NeoForge: restored LWJGL bootstrap module visibility");
  }
-
-@@ -381,5 +330,5 @@
+ 
+ #pragma mark - OptiFine launchwrapper（参照 ZL2 Install.OptiFine.checkOFLaunchWrapper）
+@@ -380,7 +329,7 @@ + (void)tweakVersionJson:(NSMutableDictionary *)json {
+     client[@"name"] = [NSString stringWithFormat:@"%@.jar", json[@"id"]];
      [json[@"libraries"] addObject:client];
-
+ 
 -    // Forge/NeoForge：把 lwjgl 追加进 -DignoreList。
 +    // Repair the obsolete LWJGL exclusion before constructing jvm_processed.
      // 必须在 jvm_processed 构建之前执行，否则改的是 arguments.jvm 而实际生效的是 jvm_processed。
      [self applyBootstrapLauncherIgnoreListFix:json];
+ 
+diff --git a/Natives/PLLogOutputView.m b/Natives/PLLogOutputView.m
+index 1283697..f9fa86a 100644
+--- a/Natives/PLLogOutputView.m
++++ b/Natives/PLLogOutputView.m
+@@ -3,6 +3,10 @@
+ #import "SurfaceViewController.h"
+ #import "utils.h"
+ 
++// Cofre owns launch completion and receives the JVM exit boundary.
++BOOL CofreHandleGameExit(int code);
++void CofreLaunchGameExited(int code);
++
+ @interface PLLogOutputView()<UITableViewDataSource, UITableViewDelegate>
+ @property(nonatomic) UITableView* logTableView;
+ @property(nonatomic) UINavigationBar* navigationBar;
+@@ -186,6 +190,8 @@ + (void)appendToLog:(NSString *)string {
+ }
+ 
+ + (void)handleExitCode:(int)code {
++    CofreLaunchGameExited(code);
++    if (CofreHandleGameExit(code)) return;
+     if (!current) return;
+     
+     // 如果有错误，显示新的崩溃界面
+diff --git a/Natives/SurfaceViewController.m b/Natives/SurfaceViewController.m
+index 98c31ee..8388a86 100644
+--- a/Natives/SurfaceViewController.m
++++ b/Natives/SurfaceViewController.m
+@@ -24,6 +24,11 @@
+ #import "ios_uikit_bridge.h"
+ #import "LanPortDetector.h"
+ #import "BackgroundManager.h"
++
++extern BOOL CofreOwnsLaunchUI(void);
++extern void CofreLaunchSurfaceAttached(void);
++extern void CofreLaunchFirstFramePresented(void);
++extern void CofreLaunchFailed(NSString *message);
+ // ★ [LAUNCH-PROGRESS] 启动阶段上报 API(遮罩订阅 AmeLaunchProgressChangedNotification)
+ #import "AmeLaunchProgress.h"
+ 
+@@ -1654,6 +1659,8 @@ - (void)launchMinecraft {
+         // launchJVM 内部失败时会调用 showDialog 显示错误，此处仅负责清理遮罩层
+         if (launchResult != 0) {
+             NSLog(@"[SurfaceViewController] JVM launch failed with code %d", launchResult);
++            // No-op when Air already reported why (its showDialog goes to Cofre too).
++            CofreLaunchFailed([NSString stringWithFormat:@"Java couldn't start Minecraft (code %d). Check the launcher log.", launchResult]);
+             dispatch_async(dispatch_get_main_queue(), ^{
+                 [self dismissLaunchOverlayOnError];
+             });
+@@ -1686,6 +1693,12 @@ - (void)launchMinecraft {
+ ///   │        [ 取消启动 ]              │
+ ///   └─────────────────────────────────┘
+ - (void)setupLaunchOverlay {
++    if (CofreOwnsLaunchUI()) {
++        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onFirstFrameRendered) name:@"PojavFirstFrameRendered" object:nil];
++        CofreLaunchSurfaceAttached();
++        NSLog(@"[Cofre] Air launch UI disabled; Cofre owns launch surface");
++        return;
++    }
+     // ============================================================
+     // FCL 风格启动界面：中间转圈圈 + 显示自定义启动器背景
+     // ============================================================
+@@ -2045,6 +2058,10 @@ - (void)updateLaunchProgressUI {
+ 
+ /// 首帧渲染通知回调：淡出并移除启动遮罩层
+ - (void)onFirstFrameRendered {
++    if (CofreOwnsLaunchUI()) {
++        CofreLaunchFirstFramePresented();
++        return;
++    }
+     // ★ [LAUNCH-PROGRESS] 首帧渲染 = 启动完成，先把阶段推到 Completed。
+     AmeLaunchProgressSetStage(AmeLaunchStageCompleted);
+     dispatch_async(dispatch_get_main_queue(), ^{
+diff --git a/Natives/installer/ForgeDirectInstaller.m b/Natives/installer/ForgeDirectInstaller.m
+index 8d55d4e..d5c886c 100644
+--- a/Natives/installer/ForgeDirectInstaller.m
++++ b/Natives/installer/ForgeDirectInstaller.m
+@@ -1086,26 +1086,35 @@ + (NSString *)buildFallbackURLForLibrary:(NSString *)name relativePath:(NSString
+ // APFS 不允许同名文件和目录共存，直接 createDirectoryAtPath 会失败。
+ + (BOOL)ensureDirectoryExists:(NSString *)path error:(NSError **)error {
+     NSFileManager *fm = NSFileManager.defaultManager;
+-    BOOL isDir = NO;
+-    if ([fm fileExistsAtPath:path isDirectory:&isDir]) {
+-        if (isDir) return YES; // 目录已存在
+-        // 存在同名普通文件，删除它
+-        NSError *removeError = nil;
+-        if (![fm removeItemAtPath:path error:&removeError]) {
+-            if (error) {
+-                *error = [NSError errorWithDomain:ForgeDirectInstallerErrorDomain
+-                                             code:ForgeDirectInstallerErrorWriteFailed
+-                                         userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:localize(@"i18n_str_1128", nil), path, removeError.localizedDescription]}];
++    NSString *normalized = [path stringByStandardizingPath];
++    NSArray<NSString *> *components = [normalized pathComponents];
++    if (components.count == 0) return YES;
++
++    // Walk every component. A failed install can leave `libraries/net` as a
++    // regular file; createDirectoryAtPath:withIntermediateDirectories: then
++    // fails at that parent even though the requested leaf does not exist.
++    NSString *current = components.firstObject;
++    for (NSUInteger i = 1; i < components.count; i++) {
++        current = [current stringByAppendingPathComponent:components[i]];
++        BOOL isDir = NO;
++        if ([fm fileExistsAtPath:current isDirectory:&isDir]) {
++            if (isDir) continue;
++            NSError *removeError = nil;
++            if (![fm removeItemAtPath:current error:&removeError]) {
++                if (error) {
++                    *error = [NSError errorWithDomain:ForgeDirectInstallerErrorDomain
++                                                 code:ForgeDirectInstallerErrorWriteFailed
++                                             userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:localize(@"i18n_str_1128", nil), current, removeError.localizedDescription]}];
++                }
++                return NO;
+             }
++        }
++        NSError *createError = nil;
++        if (![fm createDirectoryAtPath:current withIntermediateDirectories:NO attributes:nil error:&createError]) {
++            if (error) *error = createError;
+             return NO;
+         }
+     }
+-    NSError *createError = nil;
+-    [fm createDirectoryAtPath:path withIntermediateDirectories:YES attributes:nil error:&createError];
+-    if (createError) {
+-        if (error) *error = createError;
+-        return NO;
+-    }
+     return YES;
+ }
+ 
+diff --git a/Natives/installer/ForgeProcessorExecutor.m b/Natives/installer/ForgeProcessorExecutor.m
+index bcf7d6e..c867cf2 100644
+--- a/Natives/installer/ForgeProcessorExecutor.m
++++ b/Natives/installer/ForgeProcessorExecutor.m
+@@ -640,6 +640,18 @@ + (BOOL)preDownloadMojmaps:(NSArray *)processors
+     }
+     if (!mojmapsVersion) mojmapsVersion = @"";
+ 
++    // Forge install profiles use both absolute `{MOJMAPS}` paths and older
++    // relative `libraries/...` paths. Normalize the latter before writing.
++    // Without this, NSData writes a relative `net/...` path from the process
++    // working directory and iOS reports: “net” could not be saved in “libraries”.
++    if (![mojmapsOutput isAbsolutePath]) {
++        NSString *relative = [mojmapsOutput stringByStandardizingPath];
++        if ([relative hasPrefix:@"libraries/"]) {
++            relative = [relative substringFromIndex:@"libraries/".length];
++        }
++        mojmapsOutput = [librariesDir stringByAppendingPathComponent:relative];
++    }
++
+     if (progress) progress(0.0, localize(@"i18n_str_1327", nil));
+     NSLog(@"[ForgeProcExec] Pre-downloading client mappings: version=%@ output=%@", mojmapsVersion, mojmapsOutput);
+ 

@@ -10,7 +10,7 @@ extension CofreBackendAdapter {
         }
         return instance
     }
-    private func serverStore(_ id: String) throws -> CofreServersStore {
+    func serverStore(_ id: String) throws -> CofreServersStore {
         let directory = try storedInstance(id).gameDirectory.standardizedFileURL
         return CofreServersStore(gameDirectory: directory) { [weak self] in
             self?.launchingGameDirectory?.standardizedFileURL == directory
@@ -32,6 +32,7 @@ extension CofreBackendAdapter {
         guard MinecraftServerAddress.parse(address) != nil else { throw MinecraftServerPingError.invalidAddress }
         let store = try serverStore(instanceID)
         let index = try store.add(CofreServerRecord(name: name, ip: address))
+        NSLog("[Cofre] server saved profile=%@ address=%@", instanceID, address)
         return summary(try store.list()[index], index: index, instanceID: instanceID)
     }
     public func removeServer(_ server: ServerSummary) async throws {
@@ -42,6 +43,7 @@ extension CofreBackendAdapter {
         guard let id = server.instanceID else { throw CofreServersStore.Failure.staleRecord }
         let destination = try serverStore(instanceID)
         let index = try serverStore(id).copy(id: server.id, to: destination)
+        NSLog("[Cofre] server saved profile=%@ address=%@", instanceID, server.address)
         return summary(try destination.list()[index], index: index, instanceID: instanceID)
     }
     public func pingServer(address: String) async throws -> ServerPing {
@@ -54,20 +56,28 @@ extension CofreBackendAdapter {
     }
     public func discoverServers(instanceID: String) async throws -> [ServerSummary] {
         let instance = try storedInstance(instanceID)
-        let saved = Set(try serverStore(instanceID).list().map(\.ip))
+        let saved = Set(((try? serverStore(instanceID).list()) ?? []).map(\.ip))
         return try await ServerDirectory.recommended(version: instance.gameVersion, loader: instance.loader.rawValue, saved: saved).map {
             ServerSummary(id: $0.id, name: $0.name, address: $0.address, detail: $0.summary,
                           motd: $0.summary, playersOnline: $0.online, playersMax: $0.max, gameVersions: $0.versions)
         }
     }
     public func joinServer(instanceID: String, address: String, accountID: String?) -> AsyncThrowingStream<LaunchProgress, Error> {
-        do {
-            guard let parsed = MinecraftServerAddress.parse(address) else { throw MinecraftServerPingError.invalidAddress }
-            let instance = try storedInstance(instanceID)
-            let args = MinecraftLaunchArguments.server(parsed, gameVersion: instance.gameVersion)
-            NSLog("[Cofre] server quick play instance=%@ args=%@", instanceID, args.joined(separator: " "))
-            return launch(instanceID: instanceID, accountID: accountID, gameArguments: args)
-        } catch { return AsyncThrowingStream { $0.finish(throwing: error) } }
+        AsyncThrowingStream { continuation in
+            let task = Task { @MainActor in
+                do {
+                    guard let parsed = MinecraftServerAddress.parse(address) else { throw MinecraftServerPingError.invalidAddress }
+                    let instance = try storedInstance(instanceID)
+                    let args = await MinecraftLaunchArguments.resolvedServer(parsed, gameVersion: instance.gameVersion)
+                    NSLog("[Cofre] server quick play instance=%@ args=%@", instanceID, args.joined(separator: " "))
+                    for try await progress in launch(instanceID: instanceID, accountID: accountID, gameArguments: args) {
+                        continuation.yield(progress)
+                    }
+                    continuation.finish()
+                } catch { continuation.finish(throwing: error) }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
     }
 }
 #endif

@@ -22,6 +22,7 @@ public final class WorldsModel {
             store = found.map { WorldStore(instance: $0) }
             worlds = try store?.list() ?? []
             error = nil
+            NSLog("[Cofre] worlds profile=%@ count=%ld", found?.id ?? "-", worlds.count)
         } catch let e { error = e.localizedDescription }
     }
 

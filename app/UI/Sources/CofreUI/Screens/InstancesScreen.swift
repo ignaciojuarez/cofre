@@ -79,7 +79,7 @@
                                 ForEach(store.recentlyDeleted) { deleted in
                                     Row(
                                         deleted.name,
-                                        subtitle: [Loader(rawValue: deleted.loader.rawValue)?.displayName, deleted.gameVersion]
+                                        subtitle: [deleted.loader.displayName, deleted.gameVersion]
                                             .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " "),
                                         trailing: {
                                             BlockButton("Restore", size: .small, fullWidth: false) {
@@ -102,10 +102,8 @@
                                 url.lastPathComponent)
                             try? FileManager.default.removeItem(at: copy)
                             try? FileManager.default.copyItem(at: url, to: copy)
-                            Task { @MainActor in
-                                if store.instanceStore != nil { await store.importInstance(copy) }
-                                else { store.importPack(copy); nav.sheet = .importPack }
-                            }
+                            // The import reads the file and routes Cofre's own instance exports itself.
+                            Task { @MainActor in store.importPack(copy); nav.sheet = .importPack }
                         }
                     }
                     return true
@@ -119,10 +117,7 @@
                 }
             }
             .fileImporter(isPresented: $pickingPack, allowedContentTypes: [.mrpack, .zip]) { r in
-                if case .success(let url) = r {
-                    if store.instanceStore != nil { Task { await store.importInstance(url) } }
-                    else { store.importPack(url); nav.sheet = .importPack }
-                }
+                if case .success(let url) = r { store.importPack(url); nav.sheet = .importPack }
             }
         }
 
@@ -205,6 +200,8 @@
         @State private var tab = 0
         @State private var exported: URL?
         @State private var showingLoaderPicker = false
+        /// The loader version being installed from the picker.
+        @State private var installingLoader: String?
         @State private var showingRename = false
         @State private var rename = ""
 
@@ -246,8 +243,17 @@
                     await store.loadPreferences(for: id)
                 }
                 .blockSheet(isPresented: $showingLoaderPicker) {
-                    if let loader = store.instances.first(where: { $0.id == id })?.loader {
-                        VersionPickerSheet(loader: loader, selection: .constant(store.instances.first(where: { $0.id == id })?.loaderVersion ?? "")).environment(store)
+                    if let inst = store.instances.first(where: { $0.id == id }) {
+                        VersionPickerSheet(loader: inst.loader, game: inst.gameVersion, selection: Binding(
+                            get: { installingLoader ?? inst.loaderVersion ?? "" },
+                            set: { version in
+                                guard version != inst.loaderVersion, installingLoader == nil else { return }
+                                installingLoader = version
+                                Task {
+                                    await store.changeLoaderVersion(inst.id, to: version)
+                                    installingLoader = nil
+                                }
+                            })).environment(store)
                     }
                 }
                 .alert("Rename", isPresented: $showingRename) {
@@ -313,9 +319,13 @@
                     Task { await store.setInstanceMeta(inst.id, favorite: !inst.favorite) }
                 }.buttonStyle(RowButtonStyle())
                 if inst.loader != .vanilla {
-                    Button { showingLoaderPicker = true } label: {
-                        ValueRow("Loader version", value: inst.loaderVersion ?? "—", accent: true)
-                    }.buttonStyle(RowButtonStyle())
+                    if let installingLoader {
+                        Row("Installing \(inst.loader.displayName) \(installingLoader)…", leading: { Spinner() })
+                    } else {
+                        Button { showingLoaderPicker = true } label: {
+                            ValueRow("Loader version", value: inst.loaderVersion ?? "—", accent: true)
+                        }.buttonStyle(RowButtonStyle())
+                    }
                 }
                 Button {
                     nav.section = .settings
@@ -356,6 +366,7 @@
         @ViewBuilder private var badges: some View {
             Badge(loader: inst.loader, version: inst.gameVersion)
             if let v = inst.loaderVersion { Badge("Loader \(v)") }
+            if inst.restartRequired { Badge("Reopen Cofre", tone: .warn) }
             if let j = inst.javaVersion { Badge("Java \(j)") }
             if inst.ownFolder { Badge("Own folder") }
         }
@@ -366,58 +377,6 @@
         var stableSeed: UInt32 { InstanceIcon.stableHash(id) % 50 }
     }
 
-    /// I02 Options: Auto (the loader's icon, or this instance's block for vanilla), then every block and loader icon.
-    /// Hidden when the pack has its own PNG, which always wins.
-    private struct InstanceIconGrid: View {
-        let inst: InstanceSummary
-        @Environment(CofreStore.self) private var store
-
-        var body: some View {
-            let auto = InstanceIcon.automatic(id: inst.id, loader: inst.loader)
-            ListSection("Icon") {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 52), spacing: 6)], spacing: 6) {
-                    cell(auto.glyph, title: "Auto", on: inst.icon == auto) { set(nil) }
-                    ForEach(InstanceIcon.choices, id: \.self) { g in
-                        cell(g, title: nil, on: inst.icon != auto && inst.icon.glyph == g) { set(g) }
-                    }
-                }
-            }
-        }
-
-        private func set(_ glyph: PixelGlyph?) { Task { await store.setIcon(glyph, for: inst.id) } }
-
-        private func cell(_ glyph: PixelGlyph, title: LocalizedStringKey?, on: Bool, action: @escaping () -> Void)
-            -> some View
-        {
-            Button(action: action) {
-                VStack(spacing: 2) {
-                    PixelIcon(glyph, size: title == nil ? 28 : 20)
-                    if let title { Text(title).cofreFont(.badge).foregroundStyle(Color.cofre.ink) }
-                }
-                .frame(maxWidth: .infinity, minHeight: 52)
-                .block(on ? .raised : .panel, selected: on)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(RowButtonStyle())
-            .blockHover()
-            .accessibilityLabel(title.map { Text($0) } ?? Text(verbatim: glyph.iconName))
-            .accessibilityAddTraits(on ? .isSelected : [])
-        }
-    }
-
-    extension PixelGlyph {
-        /// VoiceOver name for the instance icon grid.
-        var iconName: String {
-            switch self {
-            case .cobble: String(localized: "Cobblestone")
-            case .planks: String(localized: "Oak planks")
-            case .log: String(localized: "Oak log")
-            case .neoforge: "NeoForge"
-            default: rawValue.capitalized
-            }
-        }
-    }
-
     // MARK: P04 New instance
 
     public struct NewInstanceSheet: View {
@@ -425,7 +384,6 @@
         @Environment(NavModel.self) private var nav
         @Environment(\.dismiss) private var dismiss
         @State private var name = "Survival+"
-        @State private var kind = VersionKind.release
         @State private var versions: [GameVersion] = []
         @State private var versionsFailed = false
         @State private var versionsAttempt = 0
@@ -467,9 +425,6 @@
                                 ValueRow("Version", value: version.isEmpty ? "Choose a version" : version, accent: true)
                             }.buttonStyle(RowButtonStyle())
                         }
-                        Segmented(
-                            "Version type", selection: $kind,
-                            options: [(.release, "Release"), (.snapshot, "Snap"), (.old, "Old")], size: .small)
                         SectionLabel("Loader")
                         AdaptiveGrid(minItem: 96, maxColumns: 3) {
                             ForEach(Loader.allCases) { l in
@@ -499,14 +454,14 @@
                             }
                             Row("Java", trailing: { Meta("Auto") })
                         }
-                        PreflightLine()
+                        PreflightLine(version: version)
                         if creating, loader != .vanilla, !loaderVersion.isEmpty {
                             Row("Installing \(loader.displayName) \(loaderVersion)…", leading: { Spinner() })
                         }
                         // Here, not on the page banner the sheet would hide.
                         if let error = store.lastError, !creating { Banner(error, icon: .cross, tone: .danger) }
                         BlockButton("Create", role: .primary, isLoading: creating) { create() }
-                            .disabled(name.isEmpty || version.isEmpty)
+                            .disabled(name.isEmpty || version.isEmpty || (loader != .vanilla && loaderVersion.isEmpty))
                             .keyboardShortcut(.defaultAction)
                     }
                     .padding(16)
@@ -516,9 +471,9 @@
                 store.newInstancePlan = nil
                 store.lastError = nil
             }
-            .task(id: "\(kind.rawValue)-\(versionsAttempt)") {
+            .task(id: versionsAttempt) {
                 do {
-                    versions = try await store.backend.gameVersions(kind)
+                    versions = try await store.backend.gameVersions(.release)
                     versionsFailed = false
                 } catch is CancellationError { return } catch {
                     versions = []

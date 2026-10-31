@@ -27,21 +27,34 @@ public struct MinecraftServerAddress: Equatable, Sendable {
         return .init(host: s)
     }
     public var effectivePort: UInt16 { port ?? 25565 }
+    /// The same server however it's written: `Play.Example.org` and `play.example.org:25565` match.
+    public var key: String { "\(host.lowercased()):\(effectivePort)" }
+    public static func key(_ value: String) -> String { parse(value)?.key ?? value.lowercased() }
     public var display: String { port.map { host.contains(":") ? "[\(host)]:\($0)" : "\(host):\($0)" } ?? (host.contains(":") ? "[\(host)]" : host) }
 }
 
 public enum MinecraftLaunchArguments {
-    public static func singleplayer(folder: String, gameVersion: String) -> [String] {
+    /// Quick play arrived in 1.20.
+    static func quickPlay(_ gameVersion: String) -> Bool {
         let numbers = gameVersion.split(separator: ".").compactMap { Int($0) }
-        let modern = numbers.count >= 2 && (numbers[0] > 1 || (numbers[0] == 1 && numbers[1] >= 20))
-        return modern ? ["--quickPlaySingleplayer", folder] : []
+        return numbers.count >= 2 && (numbers[0] > 1 || (numbers[0] == 1 && numbers[1] >= 20))
+    }
+
+    public static func singleplayer(folder: String, gameVersion: String) -> [String] {
+        quickPlay(gameVersion) ? ["--quickPlaySingleplayer", folder] : []
     }
 
     public static func server(_ address: MinecraftServerAddress, gameVersion: String) -> [String] {
-        let numbers = gameVersion.split(separator: ".").compactMap { Int($0) }
-        let modern = numbers.count >= 2 && (numbers[0] > 1 || (numbers[0] == 1 && numbers[1] >= 20))
-        if modern { return ["--quickPlayMultiplayer", address.display] }
+        if quickPlay(gameVersion) { return ["--quickPlayMultiplayer", address.display] }
         return ["--server", address.host, "--port", String(address.effectivePort)]
+    }
+
+    /// Quick play looks up the SRV record in game; `--server`/`--port` connects as given, so look it up first.
+    public static func resolvedServer(
+        _ address: MinecraftServerAddress, gameVersion: String,
+        resolve: (MinecraftServerAddress) async -> MinecraftServerAddress = MinecraftSRV.resolve
+    ) async -> [String] {
+        server(quickPlay(gameVersion) ? address : await resolve(address), gameVersion: gameVersion)
     }
 }
 
@@ -53,10 +66,6 @@ public enum MinecraftMOTD {
         var out = (d["text"] as? String) ?? ""
         if let extra = d["extra"] { out += flatten(extra) }
         return out
-    }
-    public static func flattenJSON(_ data: Data) -> String {
-        guard let json = try? JSONSerialization.jsonObject(with: data) else { return "" }
-        return flatten(json)
     }
 }
 
@@ -142,15 +151,17 @@ private final class ConnectionTransport: @unchecked Sendable {
     init(_ connection: NWConnection) { self.connection = connection }
     func start() async throws {
         try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in
-            var completed = false // All state callbacks run on queue.
-            connection.stateUpdateHandler = { state in
-                guard !completed else { return }
+            // Callbacks run serially on queue; dropping the handler makes the first terminal state the only one.
+            connection.stateUpdateHandler = { [connection] state in
+                let result: Result<Void, Error>
                 switch state {
-                case .ready: completed = true; c.resume()
-                case .failed(let error): completed = true; c.resume(throwing: error)
-                case .cancelled: completed = true; c.resume(throwing: CancellationError())
-                default: break
+                case .ready: result = .success(())
+                case .failed(let error): result = .failure(error)
+                case .cancelled: result = .failure(CancellationError())
+                default: return
                 }
+                connection.stateUpdateHandler = nil
+                c.resume(with: result)
             }
             connection.start(queue: queue)
         }
@@ -213,7 +224,8 @@ public struct CofreServerRecord: Sendable { public var name: String; public var 
     @discardableResult public func add(_ server: CofreServerRecord) throws -> Int {
         try writable()
         var records = try list()
-        if let index = records.firstIndex(where: { $0.ip.lowercased() == server.ip.lowercased() }) { return index }
+        let key = MinecraftServerAddress.key(server.ip)
+        if let index = records.firstIndex(where: { MinecraftServerAddress.key($0.ip) == key }) { return index }
         records.append(server); try save(records); return records.count - 1
     }
     public func remove(id: String) throws {

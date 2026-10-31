@@ -1,30 +1,14 @@
 #if canImport(UIKit)
     import Foundation
     import CofreUI
+    import CofreKit
 
     extension CofreBackendAdapter {
-        private struct VersionManifest: Decodable {
-            let latest: Latest?
-            let versions: [Entry]
-        }
-        private struct Latest: Decodable {
-            let release: String?
-            let snapshot: String?
-        }
-        private struct Entry: Decodable {
-            let id: String
-            let type: String
-        }
-        private struct FabricGame: Decodable {
-            let version: String
-            let stable: Bool?
-        }
         private struct FabricLoader: Decodable { let loader: LoaderInfo }
         private struct LoaderInfo: Decodable {
             let version: String
             let stable: Bool?
         }
-        private struct ForgeVersion: Decodable { let version: String? }
 
         private func requestData(urls: [URL]) async throws -> Data {
             var last: Error?
@@ -52,22 +36,21 @@
         }
 
         public func gameVersions(_ kind: VersionKind) async throws -> [GameVersion] {
-            let original = URL(string: "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json")!
-            let manifest: VersionManifest = try await requestJSON(
-                VersionManifest.self,
-                urls: metadataURLs(original, resource: 0))
-            let versions: [Entry]
+            let manifest = try VersionManifest.decode(
+                await requestData(urls: metadataURLs(VersionManifest.url, resource: 0)))
+            let entries: [VersionManifest.Entry]
             switch kind {
-            case .release: versions = manifest.versions.filter { $0.type == "release" }
-            case .snapshot: versions = manifest.versions.filter { $0.type == "snapshot" }
-            case .old: versions = manifest.versions.filter { $0.type != "release" && $0.type != "snapshot" }
+            case .release: entries = manifest.versions(.release)
+            case .snapshot: entries = manifest.versions(.snapshot)
+            case .old: entries = manifest.versions(.old)
             }
-            return versions.map { GameVersion(id: $0.id, kind: kind) }
+            return entries.map { GameVersion(id: $0.id, kind: kind) }
         }
 
         public func loaderVersions(loader: Loader, game: String) async throws -> [String] {
             switch loader {
             case .vanilla: return []
+            case .unknown: throw CofreBackendError.unavailable("unknown loader")
             case .fabric, .quilt:
                 let base =
                     loader == .quilt
@@ -130,24 +113,35 @@
 
         nonisolated private func instance(from d: NSDictionary) throws -> InstanceSummary {
             guard let id = d["id"] as? String else { throw CofreBackendError.unavailable("instance creation") }
-            let loader = Loader(rawValue: (d["loader"] as? String ?? "vanilla").lowercased()) ?? .vanilla
+            let loader = Loader(rawValue: (d["loader"] as? String ?? "vanilla").lowercased()) ?? .unknown
             return InstanceSummary(
                 id: id, name: d["name"] as? String ?? id, loader: loader,
                 gameVersion: d["version"] as? String ?? "",
                 loaderVersion: (d["loaderVersion"] as? String).flatMap { $0.isEmpty ? nil : $0 },
-                ownFolder: d["ownFolder"] as? Bool ?? true)
+                ownFolder: d["ownFolder"] as? Bool ?? true,
+                restartRequired: d["restartRequired"] as? Bool ?? false)
         }
 
         public func installLoader(instanceID: String, loader: Loader, version: String) async throws {
+            guard !loaderInstallInProgress, launchingGameDirectory == nil else {
+                throw CofreBackendError.unavailable("loader installation while Java is busy")
+            }
+            guard !air.jvmUsedInProcess() else { throw LaunchFailure.restartRequired }
+            loaderInstallInProgress = true
+            repairLibraries()
             if loader == .forge || loader == .neoforge {
-                let name = loader == .neoforge ? "NeoForge" : "Forge"
-                // Their installer runs Java tools, which need JIT.
-                try await ensureJIT()
+                let name = loader.displayName
+                do { try await ensureJIT() } catch {
+                    loaderInstallInProgress = false
+                    throw error
+                }
                 try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in
                     let watchdog = AirWatchdog(idle: 120) {
-                        c.resume(throwing: NSError(
-                            domain: "CofreLoader", code: NSURLErrorTimedOut,
-                            userInfo: [NSLocalizedDescriptionKey: "Installing \(name) stopped responding. Check your connection and try again."]))
+                        Task { @MainActor in
+                            self.recordJVMUse()
+                            c.resume(throwing: self.air.jvmUsedInProcess() ? LaunchFailure.restartRequired :
+                                LaunchFailure.unknown("Installing \(name) stopped responding. Close and reopen Cofre before trying again."))
+                        }
                     }
                     air.installForgeLoader(
                         loader.rawValue, forProfile: instanceID, version: version,
@@ -156,12 +150,18 @@
                             NSLog("[Cofre] loader %.0f%% %@", p * 100, message)
                         }
                     ) { error in
-                        guard watchdog.finish() else { return }
-                        if let error { c.resume(throwing: error) } else { c.resume() }
+                        Task { @MainActor in
+                            self.loaderInstallInProgress = false
+                            // Failed processors can consume Java too. Cached processors may use no JVM.
+                            self.recordJVMUse()
+                            guard watchdog.finish() else { return }
+                            if let error { c.resume(throwing: error) } else { c.resume() }
+                        }
                     }
                 }
                 return
             }
+            defer { loaderInstallInProgress = false }
             guard loader == .fabric || loader == .quilt else {
                 throw CofreBackendError.unavailable("loader installation")
             }

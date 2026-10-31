@@ -89,4 +89,24 @@ extension CofreServerEngineTests {
         XCTAssertTrue(try ServerDirectory.decode(data, version: "1.21.1", loader: "forge", saved: ["B.NET"]).isEmpty)
         XCTAssertTrue(try ServerDirectory.decode(data, version: "1.20.1", loader: "fabric", saved: []).isEmpty)
     }
+    @MainActor func testDuplicateAddressesMatchHostAndDefaultPort() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = CofreServersStore(gameDirectory: root)
+        XCTAssertEqual(try store.add(.init(name: "A", ip: "Play.Example.org")), 0)
+        XCTAssertEqual(try store.add(.init(name: "B", ip: "play.example.org:25565")), 0)
+        XCTAssertEqual(try store.add(.init(name: "C", ip: "play.example.org:25566")), 1)
+        XCTAssertEqual(try store.list().map(\.name), ["A", "C"])
+        let data = Data(#"{"hits":[{"project_id":"a","name":"A","summary":"","game_versions":["1.21.1"],"minecraft_java_server":{"address":"play.example.org:25565"}}]}"#.utf8)
+        XCTAssertTrue(try ServerDirectory.decode(data, version: "1.21.1", loader: "fabric", saved: ["PLAY.example.org"]).isEmpty)
+    }
+    func testOldVersionsJoinTheSRVTargetAndQuickPlayLeavesItToTheGame() async {
+        let srv = { (_: MinecraftServerAddress) async in MinecraftServerAddress(host: "node.example.org", port: 25570) }
+        let host = MinecraftServerAddress(host: "example.org")
+        let legacy = await MinecraftLaunchArguments.resolvedServer(host, gameVersion: "1.19.4", resolve: srv)
+        XCTAssertEqual(legacy, ["--server", "node.example.org", "--port", "25570"])
+        let modern = await MinecraftLaunchArguments.resolvedServer(host, gameVersion: "1.21.1", resolve: srv)
+        XCTAssertEqual(modern, ["--quickPlayMultiplayer", "example.org"])
+        XCTAssertEqual(MinecraftServerAddress.key("[::1]"), MinecraftServerAddress.key("[::1]:25565"))
+    }
 }

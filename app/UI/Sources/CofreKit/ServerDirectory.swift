@@ -19,12 +19,12 @@ public enum ServerDirectory {
     }
     public static func decode(_ data: Data, version: String, loader: String, saved: Set<String>) throws -> [Entry] {
         let hits = try JSONDecoder().decode(Response.self, from: data).hits
-        var seen = Set(saved.map { $0.lowercased() })
+        var seen = Set(saved.map(MinecraftServerAddress.key))
         return Array(hits.compactMap { hit -> Entry? in
             guard hit.game_versions.contains(version), let server = hit.minecraft_java_server,
                   MinecraftServerAddress.parse(server.address) != nil else { return nil }
             let loaders = hit.mrpack_loaders ?? hit.project_loader_fields?.mrpack_loaders ?? []
-            guard loaders.isEmpty || loaders.contains(loader), seen.insert(server.address.lowercased()).inserted else { return nil }
+            guard loaders.isEmpty || loaders.contains(loader), seen.insert(MinecraftServerAddress.key(server.address)).inserted else { return nil }
             return Entry(id: hit.project_id, name: hit.name, address: server.address, summary: hit.summary,
                          versions: hit.game_versions, online: server.ping?.data?.players_online, max: server.ping?.data?.players_max)
         }.prefix(20))

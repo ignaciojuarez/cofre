@@ -51,6 +51,8 @@
         @Environment(CofreStore.self) private var store
         @Environment(NavModel.self) private var nav
         @Environment(\.widthClass) private var width
+        @Environment(\.dynamicTypeSize) private var typeSize
+        @State private var showFilters = false
         public init() {}
 
         public var body: some View {
@@ -63,16 +65,34 @@
                 }
                 VStack(alignment: .leading, spacing: 8) {
                     if let inst = store.modsInstance { ModsInstanceSwitcher(current: inst) }
-                    Segmented(
-                        "Source", selection: $store.query.source,
-                        options: [(.modrinth, "Modrinth"), (.curseforge, "CurseForge")])
-                    Field("Search mods", text: $store.query.text, kind: .search)
-                        .keyboardShortcut("f", modifiers: .command)
+                    // Large text puts the two buttons on their own row under the field.
+                    let row = typeSize.isAccessibilitySize
+                        ? AnyLayout(VStackLayout(alignment: .trailing, spacing: 8)) : AnyLayout(HStackLayout(spacing: 6))
+                    row {
+                        Field("Search mods", text: $store.query.text, kind: .search)
+                            .keyboardShortcut("f", modifiers: .command)
+                        HStack(spacing: 6) {
+                            ModsSourceButton()
+                            BlockButton(activeFilters > 0 ? "Filters · \(activeFilters)" : "Filters", size: .small) {
+                                showFilters = true
+                            }
+                            .fixedSize()
+                            .accessibilityLabel(Text("Filters"))
+                            .accessibilityValue(Text("\(activeFilters) active"))
+                        }
+                    }
                     ChipGroup(
                         "Type", selection: $store.query.kind,
                         options: [
                             (.mods, "Mods"), (.modpacks, "Packs"), (.shaders, "Shaders"), (.resourcePacks, "Resource"),
                         ])
+                    if let summary = ModsFiltersSheet.summary(store) {
+                        Button { showFilters = true } label: {
+                            Text(verbatim: summary).cofreFont(.secondary).foregroundStyle(Color.cofre.muted).lineLimit(1)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHint(Text("Opens filters"))
+                    }
                 }
                 .padding(.horizontal, width == .compact ? 16 : 20).padding(.bottom, 4)
 
@@ -98,7 +118,11 @@
                     Row("Searching…", leading: { Spinner() }).padding(.horizontal, width == .compact ? 16 : 20)
                     Spacer(minLength: 0)
                 } else if store.results.isEmpty {
-                    EmptyState("No results", message: "Try another name.", icon: .book)
+                    EmptyState("No results", message: "Try another name.", icon: .book) {
+                        if activeFilters > 0 {
+                            BlockButton("Clear filters", role: .primary) { store.query.filters = .cleared }
+                        }
+                    }
                 } else {
                     BlockList {
                         ForEach(store.results) { p in
@@ -109,10 +133,11 @@
                             } label: {
                                 Row(p.title, subtitle: "\(p.summary) · \(Fmt.count(p.downloads))", isSelected: selected)
                                 {
-                                    ProjectIcon(project: p, size: 28)
+                                    ProjectIcon(project: p, size: 40)
                                 } trailing: {
                                     HStack(spacing: 5) {
-                                        if let inst = store.modsInstance, ModCompatibility.entry(for: p.id, name: p.title)?.issue(gameVersion: inst.gameVersion, renderer: ModCompatibility.renderer(instanceSetting: store.instancePreferences[inst.id]?.renderer ?? inst.renderer, globalSetting: store.preferences.renderer, gameVersion: inst.gameVersion, loader: inst.loader.rawValue, javaVersion: inst.javaVersion.flatMap(Int.init) ?? 21)) != nil { Badge("Won't run", tone: .warn) }
+                                        if !p.fits { Badge("Other version", tone: .warn) }
+                                        if let issue = store.compatibilityIssue(id: p.id, name: p.title, kind: store.query.kind) { Badge(issue.badge, tone: .warn) }
                                         GetButton(project: p) { endEditing() }
                                     }
                                 }
@@ -131,6 +156,18 @@
                 do { try await Task.sleep(for: .milliseconds(250)) } catch { return }
                 await store.search()
             }
+            .onChange(of: store.results.count) { _, count in
+                AccessibilityNotification.Announcement(
+                    count == 1 ? String(localized: "1 result") : String(localized: "\(count) results")
+                ).post()
+            }
+            .blockSheet(isPresented: $showFilters, hugsContent: true) { ModsFiltersSheet().environment(store) }
+        }
+
+        private var activeFilters: Int {
+            let inst = store.modsInstance
+            return store.query.filters.activeCount(
+                store.query.kind, source: store.query.source, game: inst?.gameVersion ?? "", loader: inst?.loader ?? .unknown)
         }
 
         private func endEditing() {
@@ -177,12 +214,8 @@
                                     if p.clientSide { Badge("Client") }
                                 }
                                 // Its own line: next to three loader badges it pushed the page past the screen edge.
-                                if ModCompatibility.entry(for: p.id, name: p.title)?.issue(
-                                    gameVersion: store.modsInstance?.gameVersion ?? "",
-                                    renderer: store.modsInstance.map { ModCompatibility.renderer(instanceSetting: store.instancePreferences[$0.id]?.renderer ?? $0.renderer, globalSetting: store.preferences.renderer, gameVersion: $0.gameVersion, loader: $0.loader.rawValue, javaVersion: $0.javaVersion.flatMap(Int.init) ?? 21) } ?? "air")
-                                    != nil
-                                {
-                                    Badge("Won't run", tone: .warn)
+                                if let issue = store.compatibilityIssue(id: p.id, name: p.title, kind: store.query.kind) {
+                                    Badge(issue.badge, tone: .warn)
                                 }
                             }
                         }
@@ -257,7 +290,11 @@
                                 .keyboardShortcut(.return, modifiers: .command)
                             }
                         }
-                        if let issue = ModCompatibility.entry(for: p.id, name: p.title)?.issue(gameVersion: store.modsInstance?.gameVersion ?? "", renderer: store.modsInstance.map { ModCompatibility.renderer(instanceSetting: store.instancePreferences[$0.id]?.renderer ?? $0.renderer, globalSetting: store.preferences.renderer, gameVersion: $0.gameVersion, loader: $0.loader.rawValue, javaVersion: $0.javaVersion.flatMap(Int.init) ?? 21) } ?? "air") { Banner(issue.title, icon: .cross, tone: .warn) }
+                        if let issue = store.compatibilityIssue(id: p.id, name: p.title, kind: store.query.kind) {
+                            Banner(issue.title, icon: .cross, tone: .warn)
+                            Text(verbatim: issue.reason).cofreFont(.secondary).foregroundStyle(Color.cofre.muted)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                         if let picked {
                             ListSection("Details", spacing: 4) {
                                 Row("Version", trailing: { Self.detail(picked.number) })
@@ -530,7 +567,7 @@
                     Segmented(
                         "Content", selection: $kind,
                         options: [
-                            (.mods, "Mods"), (.shaders, "Shaders"), (.resourcePacks, "Packs"),
+                            (.mods, "Mods"), (.shaders, "Shaders"), (.resourcePacks, "Packs"), (.dataPacks, "Data"),
                         ])
                     HStack(spacing: 8) {
                         Field("Filter", text: $filter, kind: .search)
@@ -538,7 +575,7 @@
                             BlockButton("Update \(updates)", role: .primary, size: .small, isLoading: updating) {
                                 Task {
                                     updating = true
-                                    await store.updateAll()
+                                    await store.updateAll(kind: kind)
                                     updating = false
                                 }
                             }
@@ -548,7 +585,8 @@
                 .padding(.horizontal, width == .compact ? 16 : 20).padding(.bottom, 4)
                 if all.isEmpty {
                     EmptyState(
-                        kind == .mods ? "No mods yet" : "Nothing here yet", message: "Get them in Get mods.",
+                        kind == .mods ? "No mods yet" : "Nothing here yet",
+                        message: kind == .dataPacks ? "Data packs live in each world's datapacks folder." : "Get them in Get mods.",
                         icon: .chest
                     ) {
                         // On wider windows Get mods is already beside this pane.
@@ -582,7 +620,17 @@
         @Environment(NavModel.self) private var nav
         @Environment(\.dismiss) private var dismiss
         @State private var picking = false
+        @State private var link = ""
         public init() {}
+
+        /// A pasted Modrinth page or `.mrpack`/`.zip` link; the backend says what's wrong with any other https link.
+        private var linkURL: URL? {
+            let text = link.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let url = URL(string: text.contains("://") ? text : "https://" + text), url.scheme == "https",
+                url.host()?.contains(".") == true
+            else { return nil }
+            return url
+        }
 
         public var body: some View {
             VStack(spacing: 0) {
@@ -607,6 +655,13 @@
                                     "CurseForge packs",
                                     value: store.curseForgeKey == nil ? "Browse · needs key" : "Browse")
                             }.buttonStyle(RowButtonStyle())
+                        }
+                        HStack(alignment: .top, spacing: 8) {
+                            Field("Link", text: $link, prompt: "Modrinth page or .mrpack link", kind: .mono)
+                                .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
+                                .submitLabel(.go).onSubmit(importLink)
+                            BlockButton("Import", role: .primary, fullWidth: false, action: importLink)
+                                .disabled(linkURL == nil).padding(.top, 3)
                         }
                         DropZone(
                             "Drop a pack here", detail: ".mrpack · .zip", glyph: .chest, types: [.mrpack, .zip],
@@ -646,7 +701,14 @@
             .fileImporter(isPresented: $picking, allowedContentTypes: [.mrpack, .zip]) { r in
                 if case .success(let url) = r { store.importPack(url) }
             }
-            .task { if let url = nav.pendingFile { nav.pendingFile = nil; store.importPack(url) } }
+            // Keyed by the file, so "Open in Cofre" while this sheet is already up still imports.
+            .task(id: nav.pendingFile) { if let url = nav.pendingFile { nav.pendingFile = nil; store.importPack(url) } }
+        }
+
+        private func importLink() {
+            guard let url = linkURL else { return }
+            link = ""
+            store.importPack(url)
         }
 
         private func browse(_ source: ProjectSource) {

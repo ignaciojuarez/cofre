@@ -68,7 +68,7 @@ One adapter conforming to `CofreBackend` (typealias in `Facade/Services.swift`),
 |---|---|---|---|
 | `SetupService` | Services.swift | S01–S08, X04 | `SetupStatusStore`, `PairingStore`, `TunnelService`, `JITService` |
 | `LibraryService` | Services.swift | P01, P03, P04, I02, X01 | `AirBridge.instances/createInstance/installLoader/worlds/servers/preferences/setPreferences` |
-| `ContentService` | Services.swift | M04, I02 | `AirBridge.mods/shaders/resourcePacks/toggleMod/deleteMod/updateMods` |
+| `ContentService` | Services.swift | M04, I02 | `AirBridge.mods/shaders/resourcePacks/setEnabled/deleteMod/updateMods` |
 | `AccountService` | Services.swift | S07, X05 | `AirBridge.accounts/signInMicrosoft/removeAccount` |
 | `LaunchControl` | Requirements.swift GAP-01 | P02 | new: progress stream + `cancelLaunch()` |
 | `LogSource` | GAP-02 | P02, X06 | new |

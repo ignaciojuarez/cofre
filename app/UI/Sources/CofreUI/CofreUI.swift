@@ -59,6 +59,7 @@ public enum CofreLinks {
         @State private var store: CofreStore
         @State private var nav: NavModel
         @State private var rejoin: RejoinIntent?
+        @State private var launchAfterCheck = false
         private let setupStart: Int?
 
         /// `setupStart` forces the wizard at that step (preview host); `nil` resumes where the user left off.
@@ -109,15 +110,18 @@ public enum CofreLinks {
             } message: { c in
                 c.message
             }
-            .alert(
-                store.pendingModCompatibility?.first?.title ?? "Mod compatibility", isPresented: Binding(
-                    get: { store.pendingModCompatibility != nil }, set: { if !$0 { store.pendingModCompatibility = nil } }))
-            {
-                Button("Turn off and play") { store.playAnywayAfterModWarning(turnOff: true); nav.showingLaunch = true }
-                Button("Play anyway") { store.playAnywayAfterModWarning(turnOff: false); nav.showingLaunch = true }
-                Button("Cancel", role: .cancel) { store.pendingModCompatibility = nil }
-            } message: {
-                Text(store.pendingModCompatibility?.map { "\($0.modName): \($0.reason)" }.joined(separator: "\n") ?? "")
+            // The Play-time check. The launch takeover waits for the sheet to finish closing, so it can present.
+            .blockSheet(
+                item: Binding(
+                    get: { store.pendingModCompatibility.map(PlayCheckRoute.init) },
+                    set: { if $0 == nil { store.pendingModCompatibility = nil } }),
+                hugsContent: true,
+                onDismiss: {
+                    if launchAfterCheck { nav.showingLaunch = true }
+                    launchAfterCheck = false
+                }
+            ) { route in
+                PlayCompatibilitySheet(issues: route.issues) { launchAfterCheck = true }.environment(store)
             }
             .background { commands }
             .fullScreenTakeover(isPresented: $nav.showingLaunch) { LaunchScreen().environment(store).environment(nav) }

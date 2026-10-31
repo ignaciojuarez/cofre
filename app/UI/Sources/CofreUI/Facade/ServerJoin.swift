@@ -247,11 +247,7 @@
         }
 
         public enum StandardID {
-            public static let untrustedHost = "warn.security.untrusted_host"
             public static let keyRotationUnverified = "warn.security.key_rotation_unverified"
-            public static let highRAM = "warn.hardware.high_ram"
-            public static let lowStorage = "warn.hardware.low_storage"
-            public static let cellularData = "warn.network.cellular_data"
             public static let iosIncompatible = "warn.ios.incompatible_mod_dropped"
             public static let curseForgeManual = "warn.curseforge.manual_download_needed"
         }

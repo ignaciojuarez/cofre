@@ -12,8 +12,6 @@
 #import "PLProfiles.h"
 #import "SurfaceViewController.h"
 #import "UIKit+hook.h"
-#import "WorldItem.h"
-#import "WorldService.h"
 #import "authenticator/BaseAuthenticator.h"
 #import "installer/FabricUtils.h"
 #import "installer/ForgeDirectInstaller.h"
@@ -26,6 +24,7 @@
 #import <AuthenticationServices/AuthenticationServices.h>
 #import <QuartzCore/CAMetalLayer.h>
 #include <objc/runtime.h>
+#import <objc/message.h>
 #include <stdatomic.h>
 
 static NSError *CofreAirError(NSString *message) {
@@ -42,21 +41,31 @@ static NSError *CofreAirError(NSString *message) {
 extern NSMutableArray<NSDictionary *> *remoteVersionList;
 
 static UIWindow *cofreLaunchOverlayWindow;
+static NSString *const CofreRequestedLoaderKey = @"cofreRequestedLoader";
 
 static void (^cofreLaunchEventHandler)(CofreLaunchEvent, double, NSString *);
 static atomic_bool cofreAwaitingFirstDrawable;
+static atomic_bool cofreLaunchFailurePending;
+// Where a launch is until its first frame; an engine error in that window becomes Cofre's launch error.
+typedef NS_ENUM(int, CofreLaunchPhase) { CofreLaunchPhaseIdle, CofreLaunchPhaseDownloading, CofreLaunchPhaseStarting };
+static atomic_int cofreLaunchPhase;
+static NSString *cofreLastEngineAlert;
 static id (*cofreOriginalNextDrawable)(id, SEL);
 
-BOOL CofreOwnsLaunchUI(void) { return YES; }
+extern BOOL CofreOwnsRootUI(void);
+extern void CofreShowOwnedFailure(NSString *detail);
+BOOL CofreOwnsLaunchUI(void) { return CofreOwnsRootUI(); }
 void CofreLaunchSurfaceAttached(void) { if (cofreLaunchEventHandler) cofreLaunchEventHandler(CofreLaunchEventSurfaceShown, 0, nil); }
-void CofreLaunchFirstFramePresented(void) { NSLog(@"[Cofre] first-frame source=gl/air"); if (cofreLaunchEventHandler) cofreLaunchEventHandler(CofreLaunchEventFirstFrame, 1, @"gl"); }
+static void CofreFirstFrame(NSString *source) {
+  atomic_store(&cofreLaunchPhase, CofreLaunchPhaseIdle);
+  NSLog(@"[Cofre] first-frame source=%@", source);
+  if (cofreLaunchEventHandler) cofreLaunchEventHandler(CofreLaunchEventFirstFrame, 1, source);
+}
+void CofreLaunchFirstFramePresented(void) { CofreFirstFrame(@"gl/air"); }
 static id CofreNextDrawable(CAMetalLayer *layer, SEL cmd) {
   if (atomic_exchange(&cofreAwaitingFirstDrawable, false)) {
     method_setImplementation(class_getInstanceMethod(CAMetalLayer.class, @selector(nextDrawable)), (IMP)cofreOriginalNextDrawable);
-    dispatch_async(dispatch_get_main_queue(), ^{
-      NSLog(@"[Cofre] first-frame source=metal");
-      if (cofreLaunchEventHandler) cofreLaunchEventHandler(CofreLaunchEventFirstFrame, 1, @"metal");
-    });
+    dispatch_async(dispatch_get_main_queue(), ^{ CofreFirstFrame(@"metal"); });
   }
   return cofreOriginalNextDrawable(layer, cmd);
 }
@@ -66,7 +75,59 @@ static void CofreArmFirstDrawable(void) {
   if (previous != (IMP)CofreNextDrawable) cofreOriginalNextDrawable = (id (*)(id, SEL))previous;
   atomic_store(&cofreAwaitingFirstDrawable, true);
 }
-void CofreLaunchGameExited(int code) { dispatch_async(dispatch_get_main_queue(), ^{ if (cofreLaunchEventHandler) cofreLaunchEventHandler(CofreLaunchEventExited, 0, [NSString stringWithFormat:@"exit code %d", code]); }); }
+void CofreLaunchGameExited(int code) { dispatch_async(dispatch_get_main_queue(), ^{ if (cofreLaunchEventHandler) cofreLaunchEventHandler(CofreLaunchEventExited, code, [NSString stringWithFormat:@"exit code %d", code]); }); }
+// Air's UIKit_returnToSplitView (patch 0002) lands here: put Cofre's root back from the launch overlay instead of
+// Air's split view. Air only returns before the JVM starts, while the overlay still holds Cofre's root.
+void CofreReturnToLauncher(void) {
+  dispatch_async(dispatch_get_main_queue(), ^{
+    UIWindow *overlay = cofreLaunchOverlayWindow;
+    UIViewController *root = overlay.rootViewController;
+    NSLog(@"[Cofre] engine returned to launcher restored=%d", root != nil);
+    AmeGameLandscapeLockExit();
+    if (!root) return;
+    cofreLaunchOverlayWindow = nil;
+    overlay.rootViewController = nil;
+    overlay.hidden = YES;
+    UIWindow *window = UIWindow.mainWindow;
+    window.rootViewController = root;
+    [window makeKeyAndVisible];
+  });
+}
+static void CofreReportLaunchFailure(CofreLaunchEvent event, NSString *message) {
+  NSString *detail = message.length ? message : @"Minecraft couldn't start. Check the launcher log.";
+  // Only the first error of a launch is shown; later ones (and errors outside a launch) are logged.
+  if (atomic_exchange(&cofreLaunchPhase, CofreLaunchPhaseIdle) == CofreLaunchPhaseIdle) {
+    NSLog(@"[Cofre] engine error outside a launch: %@", detail);
+    // Only visible on the owned fallback root (CofreCore failed to load).
+    CofreShowOwnedFailure(detail);
+    return;
+  }
+  atomic_store(&cofreLaunchFailurePending, true);
+  NSLog(@"[Cofre] launch failed before game start event=%ld: %@", (long)event, detail);
+  CofreReturnToLauncher();
+  dispatch_async(dispatch_get_main_queue(), ^{
+    if (cofreLaunchEventHandler) cofreLaunchEventHandler(event, 0, detail);
+  });
+}
+void CofreLaunchFailed(NSString *message) { CofreReportLaunchFailure(CofreLaunchEventFailed, message); }
+// Air's showDialog and Java's UIKit.showError (patch 0002) land here instead of a UIAlertController.
+void CofreEngineAlert(NSString *title, NSString *message) {
+  NSString *detail = message.length ? message : title;
+  NSLog(@"[Cofre] engine alert routed title=%@ message=%@", title ?: @"", detail ?: @"");
+  @synchronized(CofreAirBridgeAdapter.class) { cofreLastEngineAlert = detail; }
+  BOOL downloading = atomic_load(&cofreLaunchPhase) == CofreLaunchPhaseDownloading;
+  CofreReportLaunchFailure(downloading ? CofreLaunchEventDownloadFailed : CofreLaunchEventFailed, detail);
+}
+static NSString *CofreTakeEngineAlert(void) {
+  @synchronized(CofreAirBridgeAdapter.class) {
+    NSString *alert = cofreLastEngineAlert;
+    cofreLastEngineAlert = nil;
+    return alert;
+  }
+}
+BOOL CofreConsumeLaunchFailure(void) {
+  return atomic_exchange(&cofreLaunchFailurePending, false);
+}
 
 static void CofreFinishSurface(UIWindow *window);
 
@@ -183,6 +244,7 @@ static void CofreLoadVersionList(void (^done)(void)) {
   [PLProfiles updateCurrent];
   _profiles = [PLProfiles current];
 }
+- (BOOL)jvmUsedInProcess { return JVMUsedInProcess(); }
 
 #pragma mark - Instances
 
@@ -194,7 +256,7 @@ static void CofreLoadVersionList(void (^done)(void)) {
       [ModpackExportService parseVersionId:profile[@"lastVersionId"] ?: @""];
   return @{@"id": name, @"name": profile[@"name"] ?: name,
            @"version": profile[@"cofreGameVersion"] ?: parsed[@"minecraft"] ?: profile[@"lastVersionId"] ?: @"",
-           @"loader": profile[@"cofreRequestedLoader"] ?: parsed[@"loader"] ?: @"vanilla",
+           @"loader": profile[CofreRequestedLoaderKey] ?: profile[@"loader"] ?: parsed[@"loader"] ?: @"vanilla",
            @"loaderVersion": profile[@"loaderVersion"] ?: parsed[@"loaderVersion"] ?: @"",
            @"fabricAPI": profile[@"cofreInstallFabricAPI"] ?: @NO,
            @"icon": profile[@"icon"] ?: @"",
@@ -344,7 +406,7 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
     @"name" : name,
     @"lastVersionId" : version,
     @"cofreGameVersion" : version,
-    @"cofreRequestedLoader" : loader,
+    CofreRequestedLoaderKey : loader,
     @"cofreInstallFabricAPI" : @(fabricAPI),
     @"type" : @"custom",
     @"versionIsolation" : @"0",
@@ -404,7 +466,8 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
     return NO;
   }
   profile[@"lastVersionId"] = versionID;
-  profile[@"loader"] = loader;
+  profile[CofreRequestedLoaderKey] = loader;
+  [profile removeObjectForKey:@"loader"];
   profile[@"loaderVersion"] = version;
   NSMutableDictionary *profiles = [_profiles.profiles mutableCopy];
   profiles[name] = profile;
@@ -505,14 +568,6 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
   });
 }
 
-- (void)setCofreIcon:(NSString *)icon forProfile:(NSString *)profile {
-  NSMutableDictionary *candidate = [_profiles.profiles[profile] mutableCopy];
-  if (!candidate)
-    return;
-  candidate[@"cofreIcon"] = icon;
-  [_profiles saveProfile:candidate withName:profile];
-}
-
 - (BOOL)deleteProfile:(NSString *)name error:(NSError **)error {
   if (!_profiles.profiles[name]) {
     if (error)
@@ -565,7 +620,7 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
 }
 
 // Installs the Forge/NeoForge version picked in Cofre: downloads its official
-// installer and runs Air's direct installer (no Java, no second screen).
+// installer and runs Air's processor JVM without presenting another screen.
 - (void)installForgeLoader:(NSString *)loader
                 forProfile:(NSString *)name
                    version:(NSString *)version
@@ -576,12 +631,11 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
       completion(error);
     });
   };
-  // The installers' processors run in a headless JVM, which can start only once per app session.
-  static BOOL headlessJVMUsed;
-  if (headlessJVMUsed) {
+  if (JVMUsedInProcess()) {
     done(CofreAirError(@"Reopen Cofre to install another loader."));
     return;
   }
+  CofreTakeEngineAlert();
   NSDictionary *profile = _profiles.profiles[name];
   NSString *game = profile[@"cofreGameVersion"] ?: profile[@"lastVersionId"];
   BOOL neo = [loader isEqualToString:@"neoforge"];
@@ -652,7 +706,6 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
           // Air never clears this flag, so a run that stopped before the JVM started would
           // make the next attempt skip the processors and miss their status file.
           atomic_store(&g_ame_headlessJvmFinished, 0);
-          headlessJVMUsed = isJITEnabled(false);
           NSString *instanceDir = amePCLVersionGameDirAbsolute(profile, nil);
           void (^step)(double, NSString *) = ^(double p, NSString *message) {
             if (progress)
@@ -678,9 +731,11 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
           [NSFileManager.defaultManager removeItemAtPath:jar error:nil];
           dispatch_async(dispatch_get_main_queue(), ^{
             if (!ok) {
-              completion(
-                  installError
-                      ?: CofreAirError(@"Air could not install this loader."));
+              // The processors' JVM reports through showDialog, which patch 0002 routes to CofreEngineAlert.
+              NSString *alert = CofreTakeEngineAlert();
+              NSLog(@"[Cofre] loader install failed %@: %@", versionID,
+                    installError.localizedDescription ?: alert ?: @"no reason");
+              completion(installError ?: CofreAirError(alert ?: @"Air could not install this loader."));
               return;
             }
             NSMutableDictionary *updated =
@@ -691,7 +746,8 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
               return;
             }
             updated[@"lastVersionId"] = versionID;
-            updated[@"loader"] = loader;
+            updated[CofreRequestedLoaderKey] = loader;
+            [updated removeObjectForKey:@"loader"];
             updated[@"loaderVersion"] = version;
             NSMutableDictionary *profiles =
                 [self.profiles.profiles mutableCopy];
@@ -711,11 +767,6 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
 #pragma mark - End instances
 
 
-- (BOOL)toggleMod:(ModItem *)mod error:(NSError **)error {
-  BOOL ok = [[ModService sharedService] toggleEnableForMod:mod error:error];
-  NSLog(@"[Cofre] mod toggle=%d", ok);
-  return ok;
-}
 /* accounts are read by CofreKit; Air only owns token cleanup. */
 - (void)removeAccountToken:(NSString *)accountID {
   if (accountID.length == 0) return;
@@ -804,7 +855,6 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
     setPrefBool(@"cofre.memory_default_applied", YES);
     NSLog(@"[Cofre] memory auto default enabled");
   }
-  NSLog(@"[Cofre] memory auto ceiling=%dMB", ame141_currentLaunchAllocMem());
 }
 static NSString *CofreProfileFieldForPreference(NSString *key) {
   if ([key isEqualToString:@"video.renderer"]) return @"renderer";
@@ -816,7 +866,6 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
 }
 
 - (id)preferenceObject:(NSString *)key profile:(NSString *)profile {
-  if ([key isEqualToString:@"java.ram_ceiling"]) return @(ame141_currentLaunchAllocMem());
   NSString *field = CofreProfileFieldForPreference(key);
   if (profile.length && field.length) {
     NSMutableDictionary *candidate = self.profiles.profiles[profile];
@@ -855,6 +904,9 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
             accountID:(NSString *)accountID
         gameArguments:(NSArray<NSString *> *)gameArguments
              progress:(void (^)(CofreLaunchEvent, double, NSString *))progress {
+  atomic_store(&cofreLaunchFailurePending, false);
+  atomic_store(&cofreLaunchPhase, CofreLaunchPhaseDownloading);
+  cofreLaunchEventHandler = progress;
   [_profiles setSelectedProfileName:profile];
   if (accountID.length &&
       ![[BaseAuthenticator.current authData][@"accountId"] isEqual:accountID]) {
@@ -863,7 +915,7 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
       BaseAuthenticator.current = saved;
   }
   if (!BaseAuthenticator.current) {
-    progress(CofreLaunchEventFailed, 0, @"Sign in to your Minecraft account first.");
+    CofreLaunchFailed(@"Sign in to your Minecraft account first.");
     return;
   }
   NSString *versionID = _profiles.selectedProfile[@"lastVersionId"];
@@ -880,16 +932,15 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
     __block BOOL failed = NO;
     UIWindow *window = UIWindow.mainWindow;
     task.handleError = ^{ failed = YES; };
-    cofreLaunchEventHandler = ^(CofreLaunchEvent event, double fraction, NSString *message) {
-      progress(event, fraction, message);
-    };
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
       [task downloadVersion:version];
     });
     [NSTimer scheduledTimerWithTimeInterval:0.25 repeats:YES block:^(NSTimer *timer) {
       if (failed) {
         [timer invalidate];
-        progress(CofreLaunchEventFailed, 0, @"Couldn't download the game files. Check your connection and the launcher log.");
+        // Air's own error (showDialog) usually got there first with the reason.
+        if (atomic_load(&cofreLaunchPhase) != CofreLaunchPhaseIdle)
+          CofreReportLaunchFailure(CofreLaunchEventDownloadFailed, @"Check your connection and the launcher log.");
         return;
       }
       NSProgress *total = task.progress;
@@ -899,11 +950,13 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
         return;
       }
       [timer invalidate];
+      int downloading = CofreLaunchPhaseDownloading;
+      if (!atomic_compare_exchange_strong(&cofreLaunchPhase, &downloading, CofreLaunchPhaseStarting)) return;
       if (!task.metadata) {
-        progress(CofreLaunchEventFailed, 0, @"Air couldn't read this version's files.");
+        CofreLaunchFailed(@"Air couldn't read this version's files.");
         return;
       }
-      [self pickRendererForProfile:profile metadata:task.metadata];
+      if (![self pickRendererForProfile:profile metadata:task.metadata]) return;
       [self setGameLanguageForProfile:profile metadata:task.metadata];
       progress(CofreLaunchEventPreparing, 0, @"Starting Minecraft");
       // A JVM property belongs to this launch only; never persist it into a profile/version file.
@@ -918,45 +971,51 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
     }];
   });
 }
-// An instance on "auto" follows the global Renderer setting; when that is auto too, Cofre picks per launch:
-// Metal where the bundled Metallum supports the version (RendererManifest.json), MobileGlues for Forge and
-// NeoForge elsewhere (Air's own auto, ANGLE, can't build their main framebuffer), else Air's auto. Air reads
-// the renderer from the instance, so the pick is written there and marked, and re-made every launch.
-- (void)pickRendererForProfile:(NSString *)name metadata:(NSDictionary *)metadata {
-  NSString *game = metadata[@"inheritsFrom"] ?: metadata[@"id"];
+// Swift owns the renderer decision; ObjC only applies the Air preference.
+- (BOOL)pickRendererForProfile:(NSString *)name metadata:(NSDictionary *)metadata {
   NSMutableDictionary *profile = [_profiles.profiles[name] mutableCopy];
-  NSString *own = profile[@"renderer"];
-  if (own.length && ![own isEqualToString:@"auto"] && ![profile[@"cofreRendererPicked"] boolValue]) {
-    [self applyResolution];
-    return;
+  Class entry = NSClassFromString(@"CofreCoreEntry");
+  SEL resolve = NSSelectorFromString(@"rendererForProfile:metadata:globalSetting:");
+  if (!profile || ![entry respondsToSelector:resolve]) {
+    CofreLaunchFailed(@"Cofre could not resolve this instance's renderer. Reopen Cofre and try again.");
+    return NO;
   }
   NSString *global = getPrefObject(@"video.renderer");
-  NSString *versionID = [metadata[@"id"] lowercaseString];
-  static NSArray<NSString *> *metalVersions;
-  static dispatch_once_t once;
-  dispatch_once(&once, ^{
-    NSData *data = [NSData dataWithContentsOfURL:[NSBundle.mainBundle URLForResource:@"RendererManifest" withExtension:@"json"]];
-    NSArray<NSString *> *listed = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil][@"gameVersions"] : @[];
-    // Air loads the Metallum agent for exactly these versions when the session runs Java 21+ (patch 0003), so
-    // this list and the agent gate agree; a Java 8/17 session would get Metal's surface without its renderer.
-    metalVersions = listed;
-  });
-  NSString *pick = global.length && ![global isEqualToString:@"auto"] ? global
-                 : [metalVersions containsObject:game] ? @RENDERER_NAME_METAL
-                 : [versionID containsString:@"forge"] ? @RENDERER_NAME_MOBILEGLUES
-                 : nil;
-  if (pick) {
-    profile[@"renderer"] = pick;
-    profile[@"cofreRendererPicked"] = @YES;
-  } else {
-    [profile removeObjectForKey:@"renderer"];
-    [profile removeObjectForKey:@"cofreRendererPicked"];
+  NSString *pick = ((id (*)(id, SEL, id, id, id))objc_msgSend)(entry, resolve, profile, metadata, global ?: @"auto");
+  if (!pick.length) {
+    CofreLaunchFailed(@"Cofre could not resolve this instance's renderer. Reopen Cofre and try again.");
+    return NO;
   }
-  NSMutableDictionary *profiles = [_profiles.profiles mutableCopy];
-  profiles[name] = profile;
-  [self persistInstanceProfiles:profiles selected:name error:nil];
-  NSLog(@"[Cofre] renderer auto -> %@ for %@", pick ?: @"Air auto", metadata[@"id"]);
+  NSString *library = [pick isEqual:@"auto"] ? @"libtinygl4angle.dylib" : pick;
+  NSString *libraryPath = [[NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"Frameworks"] stringByAppendingPathComponent:library];
+  if (![NSFileManager.defaultManager fileExistsAtPath:libraryPath]) {
+    NSLog(@"[Cofre] renderer unavailable: %@", library);
+    CofreReportLaunchFailure(CofreLaunchEventRendererUnsupported, @"The selected renderer is not available in this build.");
+    return NO;
+  }
+  BOOL explicit = [profile[@"renderer"] isKindOfClass:NSString.class]
+      && [profile[@"renderer"] length] && ![profile[@"renderer"] isEqual:@"auto"]
+      && ![profile[@"cofreRendererPicked"] boolValue];
+  if (!explicit) {
+    if ([pick isEqual:@"auto"]) {
+      [profile removeObjectForKey:@"renderer"];
+      [profile removeObjectForKey:@"cofreRendererPicked"];
+    } else {
+      profile[@"renderer"] = pick;
+      profile[@"cofreRendererPicked"] = @YES;
+    }
+    NSMutableDictionary *profiles = [_profiles.profiles mutableCopy];
+    profiles[name] = profile;
+    NSError *error = nil;
+    if (![self persistInstanceProfiles:profiles selected:name error:&error]) {
+      CofreLaunchFailed(error.localizedDescription);
+      return NO;
+    }
+  }
+  NSLog(@"[Cofre] renderer resolved -> %@ for %@ loader=%@", pick, metadata[@"id"],
+        profile[CofreRequestedLoaderKey] ?: profile[@"loader"] ?: @"inferred");
   [self applyResolution];
+  return YES;
 }
 
 // Settings › Resolution keeps the picked size in Cofre's defaults; Air reads video.resolution at launch. MobileGlues'
@@ -1062,21 +1121,25 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
 }
 
 - (void)importPack:(NSURL *)url
-           profile:(NSString *)profile
           progress:(void (^)(double, NSString *))progress
         completion:(void (^)(NSError *))completion {
-  ModpackImportService *service = [ModpackImportService new];
-  NSError *error = nil;
-  NSDictionary *info = [service parseModpackAtURL:url error:&error];
-  BOOL ok = info && [service importModpack:info progress:progress error:&error];
-  if (completion) {
+  // Air's importer blocks while it downloads; Air itself runs it off the main thread.
+  dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+    ModpackImportService *service = [ModpackImportService new];
+    NSError *error = nil;
+    NSDictionary *info = [service parseModpackAtURL:url error:&error];
+    NSLog(@"[Cofre] air pack import start format=%@ loader=%@", info[@"format"] ?: @"?", info[@"loader"] ?: @"?");
+    BOOL ok = info && [service importModpack:info progress:progress error:&error];
     if (!ok && !error)
       error = [NSError
           errorWithDomain:@"CofreAir"
                      code:1
                  userInfo:@{NSLocalizedDescriptionKey : @"Air import failed"}];
-    completion(ok ? nil : error);
-  }
+    NSLog(@"[Cofre] air pack import result=%@", ok ? @"ok" : @"fail");
+    dispatch_async(dispatch_get_main_queue(), ^{
+      if (completion) completion(ok ? nil : error);
+    });
+  });
 }
 - (void)gameInputKey:(NSString *)name down:(BOOL)down {
   CofreInputKey(name.UTF8String, down);

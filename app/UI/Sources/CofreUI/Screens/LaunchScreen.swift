@@ -121,19 +121,8 @@
                         }
                         if let err = store.launchError {
                             Banner(err, icon: .cross, tone: .danger)
-                            // A next step, not just the message: JIT first, memory second.
-                            HStack(spacing: 8) {
-                                BlockButton("Test JIT", icon: .bolt) {
-                                    close()
-                                    nav.section = .settings
-                                    nav.settingsPane = .jitJava
-                                    Task { await store.testJIT() }
-                                }
-                                BlockButton("Lower memory") {
-                                    close()
-                                    nav.section = .settings
-                                    nav.settingsPane = .game
-                                }
+                            if let recovery = store.launchRecovery, recovery != .reopen {
+                                BlockButton(recovery.title) { recover(recovery) }
                             }
                         }
                         if width != .compact {
@@ -143,7 +132,9 @@
                     .padding(.horizontal, width == .compact ? 16 : 20).padding(.top, 20)
                 }
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Keep Cofre open while it loads.").cofreFont(.label).foregroundStyle(Color.cofre.muted)
+                    if store.launchFailure == nil {
+                        Text("Keep Cofre open while it loads.").cofreFont(.label).foregroundStyle(Color.cofre.muted)
+                    }
                     HStack(spacing: 8) {
                         if width == .compact {
                             BlockButton("Log") { showLog = true }.keyboardShortcut("l", modifiers: .command)
@@ -154,7 +145,7 @@
                                 }.joined(separator: "\n")
                             }
                         }
-                        if store.launchError != nil, gameStarted {
+                        if store.launchRecovery == .reopen || (store.launchError != nil && gameStarted) {
                             // The game view is up and Java can't start again in this session.
                             BlockButton("Close Cofre", role: .primary) { AppExit.close() }
                         } else if p?.finished == true || store.launchError != nil {
@@ -190,6 +181,30 @@
             store.launch = nil
             nav.showingLaunch = false
             Task { await store.cancelLaunch() }
+        }
+
+        private func recover(_ recovery: LaunchFailure.Recovery) {
+            switch recovery {
+            case .reopen:
+                AppExit.close()
+            case .jit:
+                close()
+                nav.section = .settings
+                nav.settingsPane = .jitJava
+                Task { await store.testJIT() }
+            case .repairInstance:
+                close()
+                nav.section = .instances
+                nav.instance = store.activeInstance?.id
+            case .renderer:
+                close()
+                nav.section = .settings
+                nav.settingsPane = .renderer
+            case .retry:
+                store.retryLaunch()
+            case .log:
+                showLog = true
+            }
         }
 
         /// Stage 3 (Renderer) onward runs inside Air's game view, after Java has been handed the launch.

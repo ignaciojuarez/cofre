@@ -5,6 +5,7 @@
 
 #include "glfw_keycodes.h"
 #include <objc/message.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stdatomic.h>
 
@@ -30,12 +31,28 @@ static int CofreKeyCode(const char *name) {
     if (strcmp(name, "E") == 0) return GLFW_KEY_E;
     if (strcmp(name, "T") == 0) return GLFW_KEY_T;
     if (strcmp(name, "Q") == 0) return GLFW_KEY_Q;
+    if (strcmp(name, "G") == 0) return GLFW_KEY_G;
     if (strcmp(name, "ESC") == 0) return GLFW_KEY_ESCAPE;
+    if (strcmp(name, "F2") == 0) return GLFW_KEY_F2;
+    if (strcmp(name, "F3") == 0) return GLFW_KEY_F3;
     if (strcmp(name, "F5") == 0) return GLFW_KEY_F5;
     if (strcmp(name, "F1") == 0) return GLFW_KEY_F1;
     if (strcmp(name, "TAB") == 0) return GLFW_KEY_TAB;
     if (strcmp(name, "F") == 0) return GLFW_KEY_F;
-    if (name[0] >= '1' && name[0] <= '9' && name[1] == '\0') return GLFW_KEY_1 + name[0] - '1';
+    if (strcmp(name, "ALT") == 0) return GLFW_KEY_LEFT_ALT;
+    if (strcmp(name, "ENTER") == 0) return GLFW_KEY_ENTER;
+    if (strcmp(name, "BACKSPACE") == 0) return GLFW_KEY_BACKSPACE;
+    if (strcmp(name, "UP") == 0) return GLFW_KEY_DPAD_UP;
+    if (strcmp(name, "DOWN") == 0) return GLFW_KEY_DPAD_DOWN;
+    if (strcmp(name, "LEFT") == 0) return GLFW_KEY_DPAD_LEFT;
+    if (strcmp(name, "RIGHT") == 0) return GLFW_KEY_DPAD_RIGHT;
+    if (name[0] >= '0' && name[0] <= '9' && name[1] == '\0') return GLFW_KEY_0 + name[0] - '0';
+    if (name[0] >= 'A' && name[0] <= 'Z' && name[1] == '\0') return GLFW_KEY_A + name[0] - 'A';
+    // F1–F12 are contiguous in GLFW.
+    if (name[0] == 'F' && name[1] >= '1' && name[1] <= '9') {
+        int n = atoi(name + 1);
+        if (n >= 1 && n <= 12) return GLFW_KEY_F1 + n - 1;
+    }
     return GLFW_KEY_UNKNOWN;
 }
 
@@ -149,38 +166,49 @@ void CofreSDLTextInputStateChanged(BOOL active, const char *reason) {
             if ([view isKindOfClass:CofreGameOverlayView.class]) return;
         }
 
-        // Prefs disable Air's HUD/menu; the control view is hidden only because Air
-        // has no "no controls" layout. The underlying touch view remains untouched.
-        setPrefBool(@"control.menu_button_visible", NO);
-        setPrefBool(@"video.performance_hud", NO);
-        game.ctrlView.hidden = YES;
-        game.gameMenuOverlay.hidden = YES;
+        // Find and install Cofre's overlay before hiding Air's controls. If the framework is unavailable, Air's
+        // controls must remain usable as the fallback.
+        Class entry = NSClassFromString(@"CofreCoreEntry");
+        SEL make = NSSelectorFromString(@"touchOverlay");
+        UIViewController *touch = [entry respondsToSelector:make]
+            ? ((UIViewController *(*)(id, SEL))objc_msgSend)(entry, make) : nil;
+        UIView *touchView = touch.view;
+        if (!touch || !touchView) {
+            NSLog(@"[Cofre] touch overlay failed reason=missing");
+            return;
+        }
 
         CofreGameOverlayView *overlay = [[CofreGameOverlayView alloc] initWithFrame:container.bounds];
         overlay.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
         overlay.userInteractionEnabled = YES;
         overlay.backgroundColor = UIColor.clearColor;
-        [container addSubview:overlay];
+        BOOL ctrlHidden = game.ctrlView.hidden;
+        BOOL menuHidden = game.gameMenuOverlay.hidden;
+        @try {
+            [game addChildViewController:touch];
+            touchView.frame = overlay.bounds;
+            touchView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+            [overlay addSubview:touchView];
+            [container addSubview:overlay];
+            [touch didMoveToParentViewController:game];
+        } @catch (NSException *exception) {
+            [touchView removeFromSuperview];
+            [touch removeFromParentViewController];
+            [overlay removeFromSuperview];
+            game.ctrlView.hidden = ctrlHidden;
+            game.gameMenuOverlay.hidden = menuHidden;
+            NSLog(@"[Cofre] touch overlay failed reason=%@", exception.reason ?: @"install");
+            return;
+        }
 
-        // Cofre's SwiftUI overlay (CofreCore.framework) owns every world touch, the hotbar included; game
-        // screens fall through to Air's touch view. Air would re-show its hidden buttons when a controller
-        // disconnects, so it must not manage them.
+        // Cofre's SwiftUI overlay owns every world touch, the hotbar included; game screens fall through to Air.
+        setPrefBool(@"control.menu_button_visible", NO);
+        setPrefBool(@"video.performance_hud", NO);
         setPrefBool(@"control.hardware_hide", NO);
         // ⌨ in the overlay is the only keyboard toggle; Air's two-finger tap would open it behind Cofre's back.
         setPrefBool(@"control.two_finger_keyboard", NO);
-        Class entry = NSClassFromString(@"CofreCoreEntry");
-        SEL make = NSSelectorFromString(@"touchOverlay");
-        UIViewController *touch = [entry respondsToSelector:make]
-            ? ((UIViewController *(*)(id, SEL))objc_msgSend)(entry, make) : nil;
-        if (!touch) {
-            NSLog(@"[Cofre] touch overlay missing; Air touch remains active");
-            return;
-        }
-        [game addChildViewController:touch];
-        touch.view.frame = overlay.bounds;
-        touch.view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-        [overlay addSubview:touch.view];
-        [touch didMoveToParentViewController:game];
+        game.ctrlView.hidden = YES;
+        game.gameMenuOverlay.hidden = YES;
         NSLog(@"[Cofre] touch overlay installed");
     });
 }

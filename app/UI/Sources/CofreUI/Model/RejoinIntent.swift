@@ -10,7 +10,6 @@ public struct RejoinIntent: Codable, Hashable, Sendable {
     public init(instanceID: String, kind: Kind, target: String, displayName: String, createdAt: Date = .now) {
         self.instanceID = instanceID; self.kind = kind; self.target = target; self.displayName = displayName; self.createdAt = createdAt
     }
-    public var isFresh: Bool { Date.now.timeIntervalSince(createdAt) < 600 }
 }
 
 public enum RejoinIntentStore {

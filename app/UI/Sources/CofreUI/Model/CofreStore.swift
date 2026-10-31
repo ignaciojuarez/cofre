@@ -53,6 +53,7 @@
         public var modInstallSheet: String?
         /// Installs run one at a time, so two Gets never write the same dependency twice.
         @ObservationIgnored private var installChain: Task<Void, Never>?
+        @ObservationIgnored private var fullVersionTasks: [String: Task<Void, Never>] = [:]
         public var importProgress: InstallProgress?
         /// Saved: the last modded instance picked (in Mods, Play or Instances), so Mods keeps it while Play is on
         /// Vanilla.
@@ -62,7 +63,18 @@
 
         // Launch
         public var launch: LaunchProgress?
-        public var launchError: String?
+        public var launchFailure: LaunchFailure?
+        /// Retained for callers displaying or setting an unclassified message.
+        public var launchError: String? {
+            get { launchFailure?.localizedDescription }
+            set { launchFailure = newValue.map(LaunchFailure.unknown) }
+        }
+        public var launchRecovery: LaunchFailure.Recovery? {
+            guard let failure = launchFailure else { return nil }
+            // A download can be retried only before Java has started.
+            return failure.recovery == .retry && (launch?.stage ?? 0) >= 3 ? .log : failure.recovery
+        }
+        @ObservationIgnored private var launchRejoin: RejoinIntent?
         public var launchLog: [LogLine] = []
         public var logs: [LogKind: [LogLine]] = [:]
         public var pendingModCompatibility: [ModCompatibilityIssue]?
@@ -126,12 +138,6 @@
         /// The wizard shows only for users who never finished it, once their state has loaded. It stays up through
         /// S08 Ready even when every check passes mid-flow; `finishSetup()` (Play) or a complete state at load ends it.
         public var showsSetup: Bool { setupLoaded && !setupCompleted }
-        @available(*, deprecated, renamed: "setupCompleted")
-        public var setupDismissed: Bool {
-            get { setupCompleted }
-            set { setupCompleted = newValue }
-        }
-
         /// Where a cold start opens the wizard: the saved step, unless that step's check has passed since.
         public var resumeStep: Int {
             guard let saved = setupStep else { return 0 }
@@ -297,9 +303,15 @@
 
             guard let id = instanceID ?? activeInstance?.id else { return }
             activeInstanceID = id
+            if instances.first(where: { $0.id == id })?.restartRequired == true {
+                pendingModCompatibility = nil
+                startPlay(id, server: server, rejoin: rejoin)
+                return
+            }
             if rejoin == nil, server == nil, let instance = instances.first(where: { $0.id == id }) {
-                let renderer = ModCompatibility.renderer(instanceSetting: instancePreferences[instance.id]?.renderer ?? instance.renderer, globalSetting: preferences.renderer, gameVersion: instance.gameVersion, loader: instance.loader.rawValue, javaVersion: instance.javaVersion.flatMap(Int.init) ?? 21)
-                if case .warn(let issues) = ModCompatibilityChecker.decision(items: installed[.mods] ?? [], gameVersion: instance.gameVersion, renderer: renderer) {
+                let issues = playIssues(instance)
+                if !issues.isEmpty {
+                    NSLog("[Cofre] compat play check instance=%@ issues=%@", id, issues.map(\.badge).joined(separator: ","))
                     pendingModCompatibility = issues
                     return
                 }
@@ -309,20 +321,21 @@
 
         public func playAnywayAfterModWarning(turnOff: Bool) {
             guard let id = activeInstance?.id else { pendingModCompatibility = nil; return }
-            if turnOff {
-                for item in installed[.mods] ?? [] where item.enabled && pendingModCompatibility?.contains(where: { $0.modID == (item.projectID ?? item.id) || $0.modName == item.name }) == true {
-                    setEnabled(false, item: item)
-                }
-            }
+            if turnOff, let issues = pendingModCompatibility { turnOffForPlay(issues, instanceID: id) }
             pendingModCompatibility = nil
             startPlay(id, server: nil, rejoin: nil)
         }
 
         private func startPlay(_ id: String, server: ServerSummary?, rejoin: RejoinIntent?) {
             joiningServer = server
-            launchError = nil
+            launchRejoin = rejoin
+            launchFailure = nil
             launchLog = []
             launch = LaunchProgress(stage: 1, of: 7, title: "JIT")
+            guard instances.first(where: { $0.id == id })?.restartRequired != true else {
+                launchFailure = .restartRequired
+                return
+            }
             Task {
                 for await line in backend.logLines(.launcher) {
                     launchLog.append(line)
@@ -341,10 +354,17 @@
                         launch = p
                         if p.finished { UINotificationFeedbackGenerator().notificationOccurred(.success) }
                     }
+                } catch is CancellationError {
+                    launch = nil
                 } catch {
-                    launchError = error.localizedDescription
+                    launchFailure = (error as? LaunchFailure) ?? .unknown(error.localizedDescription)
                 }
             }
+        }
+
+        public func retryLaunch() {
+            guard launchRecovery == .retry, let id = activeInstance?.id else { return }
+            startPlay(id, server: joiningServer, rejoin: launchRejoin)
         }
 
         public func cancelLaunch() async {
@@ -359,15 +379,25 @@
             name: String, version: String, loader: Loader, loaderVersion: String?,
             ownFolder: Bool = true, fabricAPI: Bool = true
         ) async -> InstanceSummary? {
+            guard loader == .vanilla || !(loaderVersion?.isEmpty ?? true) else {
+                lastError = "Choose a loader version before creating the instance."
+                return nil
+            }
             var made: InstanceSummary?
             await run {
                 let i: InstanceSummary
                 if let instanceStore = self.instanceStore {
-                    let k = Instance.Loader(rawValue: loader.rawValue) ?? .unknown
-                    let made = try instanceStore.create(name: name, version: version, loader: k, loaderVersion: loaderVersion)
-                    // The engine's installer writes the loader's real version id into the profile.
-                    if let v = loaderVersion, loader != .vanilla {
-                        try await self.backend.installLoader(instanceID: made.id, loader: loader, version: v)
+                    let made = try instanceStore.create(name: name, version: version, loader: loader, loaderVersion: loaderVersion)
+                    do {
+                        // The engine's installer writes the loader's real version id into the profile.
+                        if let v = loaderVersion, loader != .vanilla {
+                            try await self.backend.installLoader(instanceID: made.id, loader: loader, version: v)
+                        }
+                    } catch {
+                        // Do not leave a plain-Minecraft profile behind. It looks modded in Cofre's metadata,
+                        // but Air would launch the base version and silently ignore the mods.
+                        try? instanceStore.remove(made.id)
+                        throw error
                     }
                     i = Self.summary(try instanceStore.list().first { $0.id == made.id } ?? made)
                 } else {
@@ -379,6 +409,10 @@
                 self.instances.append(i)
                 made = i
             }
+            // A loader's processor JVM affects every instance, including failed installs.
+            if let instanceStore, let refreshed = try? instanceStore.list() {
+                instances = refreshed.map(Self.summary)
+            }
             return made
         }
 
@@ -388,16 +422,6 @@
                 if let instanceStore = self.instanceStore { copy = Self.summary(try instanceStore.duplicate(id)) }
                 else { copy = try await self.backend.duplicate(instanceID: id) }
                 self.instances.append(copy)
-            }
-        }
-
-        /// I02 Options icon grid. `nil` goes back to the automatic icon.
-        public func setIcon(_ glyph: PixelGlyph?, for id: String) async {
-            await run {
-                try await self.backend.setIcon(glyph, instanceID: id)
-                guard let i = self.instances.firstIndex(where: { $0.id == id }) else { return }
-                self.instances[i].icon =
-                    glyph.map { InstanceIcon(glyph: $0) } ?? .automatic(id: id, loader: self.instances[i].loader)
             }
         }
 
@@ -429,11 +453,6 @@
             }
         }
 
-        public func importInstance(_ url: URL, name: String? = nil) async {
-            guard let instanceStore else { return }
-            await run { self.instances.append(Self.summary(try instanceStore.import(url, name: name))) }
-        }
-
         public func export(_ id: String) async -> URL? {
             var url: URL?
             await run {
@@ -460,13 +479,14 @@
         }
 
         private static func summary(_ i: Instance) -> InstanceSummary {
-            let loader = Loader(rawValue: i.loader.rawValue) ?? .vanilla
+            let loader = i.loader
             // Air's "latest-release" alias resolves to the newest release at launch.
             let game = ["latest-release": "Latest release", "latest-snapshot": "Latest snapshot"][i.gameVersion] ?? i.gameVersion
             var summary = InstanceSummary(id: i.id, name: i.name, loader: loader, gameVersion: game,
                                    loaderVersion: i.loaderVersion, javaVersion: i.javaVersion.map(String.init),
                                    icon: InstanceIcon.resolve(png: nil, picked: i.icon, id: i.id, loader: loader),
-                                   favorite: i.favorite, group: i.group, notes: i.notes)
+                                   favorite: i.favorite, group: i.group, notes: i.notes,
+                                   restartRequired: i.restartRequired)
             summary.renderer = i.renderer
             return summary
         }
@@ -517,11 +537,33 @@
                 versionsError[id] = String(localized: "Pick an instance first.")
                 return
             }
+            fullVersionTasks[id]?.cancel()
+            fullVersionTasks[id] = nil
             versionsError[id] = nil
             do {
-                let v = try await backend.versions(projectID: id, instanceID: inst)
-                versions[id] = v
-                if let first = v.preferred {
+                let matching = try await backend.versions(projectID: id, instanceID: inst)
+                versions[id] = matching
+                if results.first(where: { $0.id == id })?.source != .curseforge {
+                    fullVersionTasks[id] = Task { [weak self] in
+                        guard let self else { return }
+                        do {
+                            let all = try await self.backend.allVersions(projectID: id, instanceID: inst)
+                            guard !Task.isCancelled, self.modsInstance?.id == inst else { return }
+                            var seen = Set<String>()
+                            let merged = (matching + all).filter { seen.insert($0.id).inserted }
+                            self.versions[id] = merged
+                            if merged.count > matching.count {
+                                NSLog("[Cofre] modrinth versions project=%@ matched=%ld total=%ld", id, matching.count, merged.count)
+                            }
+                            if matching.preferred == nil, let first = merged.preferred {
+                                self.dependencies[first.id] = try? await self.backend.dependencies(versionID: first.id, instanceID: inst)
+                            }
+                        } catch is CancellationError {} catch {
+                            // The fast response is already useful; a slow or offline full catalog is optional.
+                        }
+                    }
+                }
+                if let first = matching.preferred {
                     dependencies[first.id] = try await backend.dependencies(versionID: first.id, instanceID: inst)
                 }
             } catch is CancellationError {} catch {
@@ -548,10 +590,9 @@
                     modInstalls[projectID]?.plan = plan
                     if let reason = plan.blocked {
                         fail(projectID, reason, retry: false)
-                    } else if plan.needsConfirmation || (ModCompatibility.entry(for: plan.target.id, name: plan.target.name)?.issue(
-                        gameVersion: self.modsInstance?.gameVersion ?? plan.target.version,
-                        renderer: self.modsInstance.map { ModCompatibility.renderer(instanceSetting: self.instancePreferences[$0.id]?.renderer ?? $0.renderer, globalSetting: self.preferences.renderer, gameVersion: $0.gameVersion, loader: $0.loader.rawValue, javaVersion: $0.javaVersion.flatMap(Int.init) ?? 21) } ?? "air"
-                    ) != nil) {
+                    } else if plan.needsConfirmation
+                        || self.compatibilityIssue(id: plan.target.id, name: plan.target.name, kind: kind) != nil
+                    {
                         modInstalls[projectID]?.phase = .confirm
                         modInstallSheet = projectID
                     } else {
@@ -658,12 +699,6 @@
             return items.first { $0.projectID == p.id } ?? items.first { $0.matches(p.id, title: p.title) }
         }
 
-        public func compatibilityIssue(for item: InstalledItem, instance: InstanceSummary? = nil) -> ModCompatibilityIssue? {
-            guard let i = instance ?? modsInstance else { return nil }
-            let renderer = ModCompatibility.renderer(instanceSetting: instancePreferences[i.id]?.renderer ?? i.renderer, globalSetting: preferences.renderer, gameVersion: i.gameVersion, loader: i.loader.rawValue, javaVersion: i.javaVersion.flatMap(Int.init) ?? 21)
-            return ModCompatibility.entry(for: item.projectID ?? item.id, name: item.name)?.issue(gameVersion: i.gameVersion, renderer: renderer)
-        }
-
         /// Update: exactly the build the backend offered, so a beta never replaces a release unasked.
         public func update(_ p: ProjectSummary) {
             get(p.id, versionID: installedItem(for: p)?.updateVersionID)
@@ -683,7 +718,9 @@
 
         /// Points the search at the Mods target whenever it may have changed.
         private func searchModsInstance() {
-            if query.instanceID != modsInstance?.id { query.instanceID = modsInstance?.id }
+            guard query.instanceID != modsInstance?.id else { return }
+            query.instanceID = modsInstance?.id
+            for kind in query.filtersByKind.keys { query.filtersByKind[kind]?.followInstance() }
         }
 
         /// P04 from Mods: Fabric on the active version (empty: the newest release), with a name that isn't taken.
@@ -707,8 +744,11 @@
                     for try await p in backend.importPack(url, instanceID: intoInstance ? activeInstance?.id : nil) {
                         importProgress = p
                     }
-                    instances = try await backend.instances()
-                } catch { lastError = error.localizedDescription }
+                    await refreshLibrary()
+                } catch {
+                    importProgress = nil
+                    lastError = error.localizedDescription
+                }
             }
         }
 
@@ -735,13 +775,14 @@
             Task { await run { try await self.backend.delete(item, instanceID: inst) } }
         }
 
-        public func updateAll() async {
+        public func updateAll(kind: ContentKind = .mods) async {
             guard let inst = modsInstance?.id else { return }
             await run {
-                try await self.backend.updateAll(instanceID: inst)
-                self.installed[.mods] = try await self.backend.installed(.mods, instanceID: inst)
+                let count = self.installed[kind]?.filter { $0.updateTo != nil }.count ?? 0
+                try await self.backend.updateAll(kind: kind, instanceID: inst)
+                self.installed[kind] = try await self.backend.installed(kind, instanceID: inst)
                 if let i = self.instances.firstIndex(where: { $0.id == inst }) {
-                    self.instances[i].updatesAvailable = 0
+                    self.instances[i].updatesAvailable = max(0, self.instances[i].updatesAvailable - count)
                 }
             }
         }

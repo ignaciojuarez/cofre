@@ -1,16 +1,58 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Cofre <cofre@example.invalid>
 Date: Thu, 29 Oct 2026 01:00:00 -0700
-Subject: [PATCH 2/2] Install Cofre root UI
+Subject: [PATCH 2/5] Install Cofre root UI and route engine alerts to Cofre
 
-Reason: make the production app show CofreUI while retaining Air screens behind the facade; Air's launch popups (translation notice, Air updater, version isolation wizard) only run over Air's own UI.
-Drop when: Air exposes an official root-controller integration point.
+Reason: Cofre owns the launcher, launch errors and recovery. Air's launcher root is never built, its startup popups stay off, showDialog/UIKit.showError go to CofreEngineAlert and UIKit_returnToSplitView to CofreReturnToLauncher, so no Air alert or launcher screen can replace Cofre UI.
+Drop when: Air exposes an official root-controller and error-reporting integration point.
 ---
- Natives/SceneDelegate.m | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+  Natives/ModpackImportService.m | 29 +----------------------------
+  Natives/SceneDelegate.m        | 25 +++++++------------------
+  Natives/ios_uikit_bridge.m     | 10 ++++++++++
+  3 files changed, 18 insertions(+), 46 deletions(-)
 
+diff --git a/Natives/ModpackImportService.m b/Natives/ModpackImportService.m
+index 26e19c9..6e8b35a 100644
+--- a/Natives/ModpackImportService.m
++++ b/Natives/ModpackImportService.m
+@@ -1334,34 +1334,7 @@ - (BOOL)importModpack:(NSDictionary *)modpackInfo
+ 
+     if (progress) progress(1.0, localize(@"i18n_str_1295", nil));
+ 
+-    // Forge/NeoForge 直装在本进程执行过 processors（headless JVM），进程内 JVM
+-    // 只能创建一次，直接启动游戏会崩溃，提示用户重启 app 释放后再玩。
+-    if ([ForgeProcessorExecutor jvmUsedThisProcess]) {
+-        dispatch_async(dispatch_get_main_queue(), ^{
+-            UIWindow *keyWindow = nil;
+-            if (@available(iOS 13.0, *)) {
+-                for (UIWindowScene *scene in [UIApplication sharedApplication].connectedScenes) {
+-                    if (scene.activationState == UISceneActivationStateForegroundActive) {
+-                        keyWindow = scene.windows.firstObject;
+-                        break;
+-                    }
+-                }
+-            }
+-            if (!keyWindow) {
+-                keyWindow = [[UIApplication sharedApplication] windows].firstObject;
+-            }
+-            UIViewController *rootVC = keyWindow.rootViewController;
+-            if (!rootVC) return;
+-            UIAlertController *alert = [UIAlertController alertControllerWithTitle:localize(@"i18n_str_214", nil)
+-                                                                           message:localize(@"i18n_str_544", nil)
+-                                                                    preferredStyle:UIAlertControllerStyleAlert];
+-            [alert addAction:[UIAlertAction actionWithTitle:localize(@"i18n_str_216", nil) style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+-                [PLCrashView restartLauncher];
+-            }]];
+-            [alert addAction:[UIAlertAction actionWithTitle:localize(@"i18n_str_217", nil) style:UIAlertActionStyleCancel handler:nil]];
+-            [rootVC presentViewController:alert animated:YES completion:nil];
+-        });
+-    }
++    // Cofre marks the instance restart-required itself (JVMUsedInProcess); no Air restart alert.
+     return YES;
+ }
+ 
 diff --git a/Natives/SceneDelegate.m b/Natives/SceneDelegate.m
-index 7e2ff3629..53c7d59f2 100644
+index 7e2ff36..0e4dc9a 100644
 --- a/Natives/SceneDelegate.m
 +++ b/Natives/SceneDelegate.m
 @@ -1,4 +1,6 @@
@@ -20,12 +62,24 @@ index 7e2ff3629..53c7d59f2 100644
  #import "ios_uikit_bridge.h"
  #import "utils.h"
  #import "LauncherRootViewController.h"
-@@ -85,26 +87,28 @@ - (void)scene:(UIScene *)scene willConnectToSession:(UISceneSession *)session op
+@@ -64,9 +66,7 @@ - (void)scene:(UIScene *)scene willConnectToSession:(UISceneSession *)session op
+     }
+     mainWindow = self.window;
+ 
+-    // ★ [I18N] 根 UI 由统一入口安装（语言切换时会整体重建，见 handleLauncherLanguageChanged:）。
+-    // 之前这里内联按布局创建主页容器；抽成方法后，重建走同一逻辑，避免两处漂移。
+-    [self ameInstallLauncherRootUIWithSettingsLanguagePage:NO];
++    // Cofre: Air's launcher root is never built; Cofre's root is installed below.
+ 
+     // 外观模式（浅色/深色/跟随系统）：读 general.ui_theme 偏好。
+     //   light  -> UIUserInterfaceStyleLight
+@@ -85,27 +85,16 @@ - (void)scene:(UIScene *)scene willConnectToSession:(UISceneSession *)session op
      }
  
      [self.window makeKeyAndVisible];
 +    UIViewController *cofreRoot = CofreMakeRootViewController();
-+    if (cofreRoot) { self.window.rootViewController = cofreRoot; NSLog(@"[Cofre] UI root installed"); }
++    self.window.rootViewController = cofreRoot;
++    NSLog(@"[Cofre] UI root installed");
  
      // 立即应用背景（移除原来的 0.1s 延迟）：
      // 延迟会在启动时露出窗口底色形成"黑条"或"黑闪"。BackgroundManager 在其 init
@@ -33,22 +87,63 @@ index 7e2ff3629..53c7d59f2 100644
      [[BackgroundManager sharedManager] applyBackgroundToWindow:self.window];
  
 -    [self showTranslationNoticeIfNeeded];
-+    if (!cofreRoot) [self showTranslationNoticeIfNeeded];  // Cofre: Air popups only over Air UI
- 
-     // 启动时自动检查启动器更新（参照 ZL2 LauncherUpgradeViewModel.checkOnAppStart）。
-     // 仅当确实存在新版本时才弹窗；请求失败、已是最新、处于限频窗口内一律静默。
-     // 延后一拍执行，等 rootViewController 完成首轮布局后再 present。
-     dispatch_async(dispatch_get_main_queue(), ^{
+-
+-    // 启动时自动检查启动器更新（参照 ZL2 LauncherUpgradeViewModel.checkOnAppStart）。
+-    // 仅当确实存在新版本时才弹窗；请求失败、已是最新、处于限频窗口内一律静默。
+-    // 延后一拍执行，等 rootViewController 完成首轮布局后再 present。
+-    dispatch_async(dispatch_get_main_queue(), ^{
 -        [UpdateChecker performStartupCheckFromPresenter:self.window.rootViewController];
-+        if (!cofreRoot) [UpdateChecker performStartupCheckFromPresenter:self.window.rootViewController];
-     });
- 
-     // ★ [VI-FLOW] B：版本隔离向导 —— 每次进启动器都会再弹，直到用户主动选「以后不再提示」
-     //   （哨兵 internal.version_isolation_wizard_off 只在用户点该按钮时写；弹出时【不】写哨兵）。
-     //   延后一拍 + 可跳过 ⇒ 绝不阻碍启动；用户随时可从实例设置页的「版本隔离向导」入口重新打开。
-     dispatch_async(dispatch_get_main_queue(), ^{
+-    });
+-
+-    // ★ [VI-FLOW] B：版本隔离向导 —— 每次进启动器都会再弹，直到用户主动选「以后不再提示」
+-    //   （哨兵 internal.version_isolation_wizard_off 只在用户点该按钮时写；弹出时【不】写哨兵）。
+-    //   延后一拍 + 可跳过 ⇒ 绝不阻碍启动；用户随时可从实例设置页的「版本隔离向导」入口重新打开。
+-    dispatch_async(dispatch_get_main_queue(), ^{
 -        [self amePresentVersionIsolationWizardIfNeeded];
-+        if (!cofreRoot) [self amePresentVersionIsolationWizardIfNeeded];
-     });
+-    });
++    // Cofre owns launcher, update and recovery UI. Air startup popups stay disabled.
  
      // ★ [MP-RESTORE] 联机恢复 —— lazy init：启动路径上**不**创建 TerracottaManager /
+     //   不触发 terracotta_ios_start / 不起 ZeroTier 节点（避免把当年"启动崩溃"风险带回）。
+diff --git a/Natives/ios_uikit_bridge.m b/Natives/ios_uikit_bridge.m
+index 2db9ca4..4ac9cf2 100644
+--- a/Natives/ios_uikit_bridge.m
++++ b/Natives/ios_uikit_bridge.m
+@@ -11,6 +11,10 @@
+ #include "ios_uikit_bridge.h"
+ #include "utils.h"
+ 
++// Cofre shows engine errors and the launcher itself (CofreGlue/AirBridgeAdapter.m).
++extern void CofreEngineAlert(NSString *title, NSString *message);
++extern void CofreReturnToLauncher(void);
++
+ // ===== ★ [GAME-LANDSCAPE] 游戏方向锁（幂等、成对）=====
+ // 为什么放在这里：本文件已经拥有「启动器根 ⇄ 游戏曲面根」的唯一互换点
+ //   (UIKit_launchMinecraftSurfaceVC / UIKit_returnToSplitView)，方向锁与根互换同源最不容易漂移。
+@@ -173,6 +177,8 @@ void internal_showDialog(NSString* title, NSString* message) {
+ }
+ 
+ void showDialog(NSString* title, NSString* message) {
++    CofreEngineAlert(title, message);
++    return;
+     dispatch_async(dispatch_get_main_queue(), ^{
+         internal_showDialog(title, message);
+     });
+@@ -191,6 +197,8 @@ JNIEXPORT void JNICALL Java_net_kdt_pojavlaunch_uikit_UIKit_showError(JNIEnv* en
+         [PLLogOutputView handleExitCode:1];
+         return;
+     }
++    CofreEngineAlert(title_o, message_o);
++    return;
+ 
+ dispatch_async(dispatch_get_main_queue(), ^{
+ 
+@@ -270,6 +278,8 @@ void UIKit_launchMinecraftSurfaceVC(UIWindow* window, NSDictionary* metadata) {
+ }
+ 
+ void UIKit_returnToSplitView() {
++    CofreReturnToLauncher();
++    return;
+     // Researching memory-safe ways to return from SurfaceViewController to the split view
+     // so that the app doesn't close when quitting the game (similar behaviour to Android)
+     dispatch_async(dispatch_get_main_queue(), ^{

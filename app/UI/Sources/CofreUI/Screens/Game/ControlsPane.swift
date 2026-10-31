@@ -8,8 +8,10 @@
     struct ControlsPane: View {
         @Environment(CofreStore.self) private var store
         @State private var settings = TouchControlSettings.load()
+        private let defaults = TouchControlSettings()
         @State private var override = CofreInputMode.auto
         @State private var current = CofreInputMode.touch
+        @State private var quickMenu = false
 
         var body: some View {
             let backend = store.services.backend
@@ -49,19 +51,20 @@
                 }
             }
             ListSection("Touch", spacing: 4) {
-                BlockSlider("Button size", value: $settings.buttonScale, in: 0.6...1.5, step: 0.05) {
+                BlockButton("Quick menu") { quickMenu = true }
+                BlockSlider("Button size", value: $settings.buttonScale, in: 0.6...1.5, step: 0.05, defaultValue: defaults.buttonScale) {
                     "\(Int(($0 * 100).rounded()))%"
                 }
-                BlockSlider("Opacity", value: $settings.opacity, in: 0.2...1, step: 0.05) {
+                BlockSlider("Opacity", value: $settings.opacity, in: 0.2...1, step: 0.05, defaultValue: defaults.opacity) {
                     "\(Int(($0 * 100).rounded()))%"
                 }
                 BlockSlider(
                     "Stick area", value: $settings.stickArea, in: 0.2...0.6, step: 0.05,
-                    note: "Left side of the screen that moves you"
+                    note: "Left side of the screen that moves you", defaultValue: defaults.stickArea
                 ) {
                     "\(Int(($0 * 100).rounded()))%"
                 }
-                BlockSlider("Hold to break", value: $settings.holdToBreak, in: 0.1...0.5, step: 0.05) {
+                BlockSlider("Hold to break", value: $settings.holdToBreak, in: 0.1...0.5, step: 0.05, defaultValue: defaults.holdToBreak) {
                     "\(Int(($0 * 1000).rounded())) ms"
                 }
                 ToggleRow("Fade when idle", subtitle: "Dims to 35% after 3 s", isOn: $settings.fadeWhenIdle)
@@ -75,7 +78,7 @@
                 }
             }
             ListSection("Look", spacing: 4) {
-                BlockSlider("Look sensitivity", value: $settings.lookSensitivity, in: 0.25...3, step: 0.05) {
+                BlockSlider("Look sensitivity", value: $settings.lookSensitivity, in: 0.25...3, step: 0.05, defaultValue: defaults.lookSensitivity) {
                     String(format: "%.2f×", $0)
                 }
                 ToggleRow("Invert Y", isOn: $settings.invertY)
@@ -90,6 +93,7 @@
                         }))
             }
             .onChange(of: settings) { _, new in new.save() }
+            .sheet(isPresented: $quickMenu) { QuickTrayEditorView() }
         }
 
         static func title(_ mode: CofreInputMode) -> LocalizedStringKey {

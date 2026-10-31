@@ -40,12 +40,12 @@
         func setPreferences(_ preferences: GamePreferences, instanceID: String?) async throws
     }
 
-    /// M04. Maps to `AirBridge.mods/shaders/resourcePacks/toggleMod/deleteMod/updateMods`.
+    /// M04. Maps to `AirBridge.mods/shaders/resourcePacks/setEnabled/deleteMod/updateMods`.
     public protocol ContentService: AnyObject {
         func installed(_ kind: ContentKind, instanceID: String) async throws -> [InstalledItem]
         func setEnabled(_ enabled: Bool, item: InstalledItem, instanceID: String) async throws
         func delete(_ item: InstalledItem, instanceID: String) async throws
-        func updateAll(instanceID: String) async throws
+        func updateAll(kind: ContentKind, instanceID: String) async throws
     }
 
     /// S07, X05. Maps to `AirBridge.accounts/signInMicrosoft/removeAccount`.

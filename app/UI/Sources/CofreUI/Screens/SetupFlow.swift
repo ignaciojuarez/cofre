@@ -49,8 +49,13 @@
         }
 
         /// The next check that isn't ready, after this one. Steps run in order; none can be skipped.
+        static func nextStep(_ current: Int, setup: SetupState) -> Int {
+            guard (1...6).contains(current) else { return 7 }
+            return (current..<6).first { !setup.all[$0].isReady }.map { $0 + 1 } ?? 7
+        }
+
         private func next() {
-            step = (step..<6).first { !store.setup.all[$0].isReady }.map { $0 + 1 } ?? 7
+            step = Self.nextStep(step, setup: store.setup)
         }
     }
 

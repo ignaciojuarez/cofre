@@ -10,6 +10,7 @@ final class CofreScenarioRunner {
     private let instances: InstanceStore?
     private let scenario: CofreScenario
     private var targetID: String?
+    private var createdIDs: [String] = []
 
     init(backend: CofreBackendAdapter, instances: InstanceStore?, scenario: CofreScenario) {
         self.backend = backend; self.instances = instances; self.scenario = scenario
@@ -30,13 +31,29 @@ final class CofreScenarioRunner {
     }
 
     private func execute() async {
+        guard let store = instances else {
+            fail("instance", CofreBackendError.unavailable("instances"))
+            return
+        }
+        defer {
+            for id in createdIDs.reversed() {
+                do {
+                    try store.remove(id)
+                    NSLog("[Cofre] scenario name=%@ cleanup instance=%@ result=ok", scenario.name, id)
+                } catch {
+                    NSLog("[Cofre] scenario name=%@ cleanup instance=%@ result=fail detail=%@", scenario.name, id, error.localizedDescription)
+                }
+            }
+        }
         do {
             try scenario.validate(); step("instance")
-            var existing = try await backend.instances().first { $0.name == scenario.name }
-            if scenario.fresh, let old = existing { try await backend.delete(instanceID: old.id); existing = nil }
+            var existing = try store.list().first { $0.name == scenario.name }
+            if scenario.fresh, let old = existing { try store.remove(old.id); existing = nil }
             if existing == nil {
-                let loader = Loader(rawValue: scenario.loader.lowercased()) ?? .vanilla
-                existing = try await backend.createInstance(name: scenario.name, version: scenario.version ?? "1.21.1", loader: loader)
+                let loader = Loader(rawValue: scenario.loader.lowercased()) ?? .unknown
+                let made = try store.create(name: scenario.name, version: scenario.version ?? "1.21.1", loader: loader)
+                createdIDs.append(made.id)
+                existing = made
             }
             guard let instance = existing else { throw CofreBackendError.unavailable("instance") }
             targetID = instance.id
@@ -57,11 +74,12 @@ final class CofreScenarioRunner {
                 guard let found else { throw CofreBackendError.unavailable("pack \(pack) not found") }
                 let versions = try await backend.versions(projectID: found.id, instanceID: instance.id)
                 let version = scenario.packVersion ?? versions.first?.id ?? "latest"
-                let before = Set(try await backend.instances().map(\.id))
+                let before = Set(try store.list().map(\.id))
                 for try await _ in backend.install(projectID: found.id, versionID: version, instanceID: instance.id) {}
                 // A pack makes its own instance; launch that one, not whichever other instance lists first.
-                guard let made = try await backend.instances().first(where: { !before.contains($0.id) }) else { throw CofreBackendError.unavailable("pack \(pack) made no instance") }
+                guard let made = try store.list().first(where: { !before.contains($0.id) }) else { throw CofreBackendError.unavailable("pack \(pack) made no instance") }
                 targetID = made.id
+                createdIDs.append(made.id)
                 NSLog("[Cofre] scenario name=%@ step=pack result=ok", scenario.name)
             } else {
                 for mod in scenario.mods {

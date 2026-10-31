@@ -41,9 +41,6 @@ NS_ASSUME_NONNULL_BEGIN
               completion:(void (^)(NSDictionary *_Nullable,
                                    NSError *_Nullable))completion;
 - (BOOL)deleteProfile:(NSString *)profile error:(NSError **)error;
-/// Saves the user's icon pick (a CofreUI glyph name) as the profile's
-/// cofreIcon; nil removes it.
-- (void)setCofreIcon:(nullable NSString *)icon forProfile:(NSString *)profile;
 - (void)exportProfile:(NSString *)profile
                format:(NSString *)format
            completion:
@@ -52,10 +49,6 @@ NS_ASSUME_NONNULL_BEGIN
 /// Returns the selected Air profile name.
 - (NSString *)selectedProfileName;
 - (void)reloadProfiles;
-/// Adds a server to a profile and reports an optional error.
-/// Scans installed mods for a profile.
-/// Toggles a mod's enabled state.
-- (BOOL)toggleMod:(id)mod error:(NSError **)error;
 /// Returns configured accounts: id, name, active.
 - (void)removeAccountToken:(NSString *)accountID;
 /// Signs in with Microsoft through Air's login (web page, then Xbox and
@@ -91,7 +84,6 @@ NS_ASSUME_NONNULL_BEGIN
 /// Searches multiplayer servers.
 /// Imports a modpack into a profile.
 - (void)importPack:(NSURL *)url
-           profile:(NSString *_Nullable)profile
           progress:(void (^)(double, NSString *))progress
         completion:(void (^)(NSError *_Nullable))completion;
 /// Returns Air's controls editor.
