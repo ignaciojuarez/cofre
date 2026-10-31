@@ -102,9 +102,11 @@ public final class LlaveModel: ObservableObject {
                     self.handlePairingEvent(event, device: device, outURL: outURL)
                 }
             } catch let error as LlaveError {
-                self?.state = .error(error)
+                if !Task.isCancelled { self?.state = .error(error) }
             } catch {
-                self?.state = .error(LlaveError(code: "PAIRING_FAILED", message: error.localizedDescription))
+                if !Task.isCancelled {
+                    self?.state = .error(LlaveError(code: "PAIRING_FAILED", message: error.localizedDescription))
+                }
             }
         }
     }

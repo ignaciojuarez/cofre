@@ -22,6 +22,8 @@ public struct LlaveError: Error, Equatable, Sendable, LocalizedError {
                 self.friendlyCopy = "No iPhone detected. Connect your iPhone via USB cable."
             case "VALIDATION_FAILED":
                 self.friendlyCopy = "Pairing file validation failed. Please try pairing again."
+            case "REMOTE_PAIRING_FAILED":
+                self.friendlyCopy = "This iPhone did not provide the RemotePairing data Cofre needs. Run the Mac pairing command again."
             case "COFRE_MISSING":
                 self.friendlyCopy = "Install Cofre first, then try again."
             case "PLACEMENT_FAILED":

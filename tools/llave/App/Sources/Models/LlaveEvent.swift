@@ -37,6 +37,8 @@ public enum LlaveEvent: Equatable, Sendable {
             return .wifiEnabled
         case "warning" where wire.code == "REMOTE_PAIRING_FAILED":
             return .remotePairingWarning(message: wire.message ?? "RemotePairing unavailable")
+        case "error" where wire.code == "REMOTE_PAIRING_FAILED":
+            return .error(code: "REMOTE_PAIRING_FAILED", message: wire.message ?? "RemotePairing is required; pair this device again")
         case "error" where (wire.code == "WIFI_CONNECTIONS_FAILED" || wire.code == "WIFI_DEBUGGING_FAILED"):
             return .wifiFailed(code: wire.code ?? "WIFI_FAILED", message: wire.message ?? "Wi-Fi setup failed")
         case "validated":

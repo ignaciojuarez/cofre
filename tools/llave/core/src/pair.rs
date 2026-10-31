@@ -15,7 +15,6 @@ use idevice::{
 
 use crate::models::PairEvent;
 
-
 /// The usbmuxd connection, with the pairing record Llave just made. Llave never saves that record to usbmuxd, so
 /// the stock provider has none and every service after pairing (remote pairing, house_arrest) would fail.
 #[derive(Debug)]
@@ -208,7 +207,8 @@ pub async fn run_pair(
         _ => return Err("Lockdown record is not a dictionary".to_string()),
     };
 
-    // RemotePairing is optional when legacy lockdown pairing already works.
+    // iOS 17.4+ needs the RemotePairing record for StikJIT. A legacy lockdown
+    // record is still valid for older iOS versions.
     if !is_ios_version_below(&prod_version, 17, 4) {
         let result: Result<plist::Dictionary, String> = async {
             let hostname = format!("llave-{}", &uuid::Uuid::new_v4().simple().to_string()[..6]);
@@ -235,11 +235,17 @@ pub async fn run_pair(
                     combined_dict.insert(k, v);
                 }
             }
-            Err(message) => PairEvent::Warning {
-                code: "REMOTE_PAIRING_FAILED".into(),
-                message,
+            Err(message) => {
+                let message = format!(
+                    "RemotePairing is required on iOS {prod_version}; {message}. Pair this device again."
+                );
+                PairEvent::Error {
+                    code: "REMOTE_PAIRING_FAILED".into(),
+                    message: message.clone(),
+                }
+                .emit();
+                return Err(message);
             }
-            .emit(),
         }
     }
 
@@ -266,6 +272,22 @@ pub async fn run_pair(
         }
     }
 
+    if !is_ios_version_below(&prod_version, 17, 4) {
+        for key in ["public_key", "private_key", "identifier"] {
+            if !combined_dict.contains_key(key) {
+                let message = format!(
+                    "RemotePairing output is missing {key} on iOS {prod_version}. Pair this device again."
+                );
+                PairEvent::Error {
+                    code: "REMOTE_PAIRING_FAILED".into(),
+                    message: message.clone(),
+                }
+                .emit();
+                return Err(message);
+            }
+        }
+    }
+
     PairEvent::Validated.emit();
 
     // Write file with 0600 permissions
@@ -285,7 +307,7 @@ pub async fn run_pair(
                 .emit();
                 "Cofre is not installed or house_arrest is unavailable".to_string()
             })?;
-        let mut afc = match house.vend_container("com.ignaciojuarez.cofre").await {
+        let mut afc = match house.vend_container("com.ignacio.cofre").await {
             Ok(a) => a,
             Err(_) => idevice::house_arrest::HouseArrestClient::connect(&provider)
                 .await
@@ -297,7 +319,7 @@ pub async fn run_pair(
                     .emit();
                     format!("Cofre placement failed: {e}")
                 })?
-                .vend_documents("com.ignaciojuarez.cofre")
+                .vend_documents("com.ignacio.cofre")
                 .await
                 .map_err(|e| {
                     PairEvent::Error {
@@ -409,4 +431,16 @@ fn is_ios_version_below(version: &str, target_major: u32, target_minor: u32) -> 
         })
         .unwrap_or(0);
     (major, minor) < (target_major, target_minor)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_ios_version_below;
+
+    #[test]
+    fn remote_pairing_cutoff_is_17_4() {
+        assert!(is_ios_version_below("17.3.1", 17, 4));
+        assert!(!is_ios_version_below("17.4", 17, 4));
+        assert!(!is_ios_version_below("18.0", 17, 4));
+    }
 }

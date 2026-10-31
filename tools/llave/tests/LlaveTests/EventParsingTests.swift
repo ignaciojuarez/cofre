@@ -16,6 +16,12 @@ final class EventParsingTests: XCTestCase {
         XCTAssertEqual(LlaveEvent.parse(line: line), .error(code: "USER_DENIED", message: "User denied prompt"))
     }
 
+    func testRemotePairingFailureRemainsTypedAndActionable() {
+        let event = LlaveEvent.parse(line: "{\"event\":\"error\",\"code\":\"REMOTE_PAIRING_FAILED\",\"message\":\"Pair again\"}")
+        XCTAssertEqual(event, .error(code: "REMOTE_PAIRING_FAILED", message: "Pair again"))
+        XCTAssertTrue(LlaveError(code: "REMOTE_PAIRING_FAILED", message: "Pair again").friendlyCopy.contains("RemotePairing"))
+    }
+
     func testParseInvalidLines() {
         XCTAssertNil(LlaveEvent.parse(line: ""))
         XCTAssertNil(LlaveEvent.parse(line: "   \n"))
