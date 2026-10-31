@@ -13,7 +13,8 @@ final class AccountsTests: XCTestCase {
         var selected: String? = "old"
         let store = AccountStore(directory: root, now: { now }, readSelected: { selected }, writeSelected: { selected = $0 })
         XCTAssertEqual(store.list().first { $0.id == "ready" }?.state, .ready)
-        XCTAssertEqual(store.list().first { $0.id == "old" }?.state, .expired)
+        // A past access-token date is renewed at launch, so the account is still ready.
+        XCTAssertEqual(store.list().first { $0.id == "old" }?.state, .ready)
         XCTAssertEqual(store.list().first { $0.id == "demo" }?.state, .demo)
         try store.remove(id: "old")
         XCTAssertEqual(selected, "demo")

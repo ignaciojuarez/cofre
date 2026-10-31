@@ -38,10 +38,10 @@ public final class AccountStore: @unchecked Sendable {
             let microsoft = json["xuid"] != nil || json["xboxGamertag"] != nil || json["expiresAt"] != nil
             let expiry = (json["expiresAt"] as? NSNumber).map { Date(timeIntervalSince1970: $0.doubleValue) }
             let demo = (json["demo"] as? Bool == true) || (json["isDemoUser"] as? Bool == true) || (json["ownsJava"] as? Bool == false)
-            let expired = expiry.map { $0 <= now() } ?? false
+            // `expiresAt` is the daily Minecraft access token. Air keeps the Microsoft refresh token in the Keychain and
+            // renews the access token at every launch, so a past date doesn't mean signed out.
             return CofreAccount(id: id, name: name, kind: microsoft ? "Microsoft" : "Offline",
-                                isActive: id == selected, expiry: expiry,
-                                state: demo ? .demo : (expired ? .expired : .ready))
+                                isActive: id == selected, expiry: expiry, state: demo ? .demo : .ready)
         }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
