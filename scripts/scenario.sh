@@ -10,13 +10,20 @@ bundle=com.ignacio.cofre; file=$(basename "$scenario")
 xcrun devicectl device copy to --device "$device" --domain-type appDataContainer --domain-identifier "$bundle" --source "$scenario" --destination "Documents/$file" >/dev/null
 # Stop only the app by PID: terminating by bundle ID also kills the VPN extension (com.ignacio.cofre.tunnel),
 # and the next launch then finds a dead tunnel.
-for pid in $(xcrun devicectl device info processes --device "$device" 2>/dev/null | awk '/Cofre\.app\/AngelAuraAmethyst[[:space:]]*$/ {print $1}'); do
-  # A running JVM ignores SIGTERM.
-  xcrun devicectl device process signal --device "$device" --pid "$pid" --signal SIGKILL >/dev/null 2>&1 || true
-done
+stop_app() {
+  for pid in $(xcrun devicectl device info processes --device "$device" 2>/dev/null | awk '/Cofre\.app\/AngelAuraAmethyst[[:space:]]*$/ {print $1}'); do
+    # A running JVM ignores SIGTERM.
+    xcrun devicectl device process signal --device "$device" --pid "$pid" --signal SIGKILL >/dev/null 2>&1 || true
+  done
+}
+launch_scenario() {
+  xcrun devicectl device process launch --device "$device" "$bundle" -cofreScenario "$file" >/dev/null
+}
+stop_app
 since=$(date -v-5S "+%Y-%m-%d %H:%M:%S")  # ignore the previous run's log until the app rotates it
-xcrun devicectl device process launch --device "$device" "$bundle" -cofreScenario "$file" >/dev/null
+launch_scenario
 log="$out/latestlog.txt"; verdict="FAIL timeout"
+restarted=0
 for ((i=0; i<timeout; i++)); do
   xcrun devicectl device copy from --device "$device" --domain-type appDataContainer --domain-identifier "$bundle" --source Documents/latestlog.txt --destination "$log" >/dev/null 2>&1 || true
   first=$(grep -m1 -oE '^20[0-9]{2}-[0-9]{2}-[0-9]{2} [0-9:]{8}' "$log" 2>/dev/null || true)
@@ -24,6 +31,15 @@ for ((i=0; i<timeout; i++)); do
     clean=$(sed -E 's/(accessToken|uuid|xuid)([[:space:]]*[:=][[:space:]]*)[^,}]*/\1\2<redacted>/Ig' "$log")
     printf '%s\n' "$clean" > "$log"
     if grep -q 'launch state=inGame' "$log"; then verdict="PASS in-game"; break; fi
+    if grep -q 'scenario .*result=restart' "$log"; then
+      if ((restarted)); then verdict="FAIL scenario step"; break; fi
+      restarted=1
+      stop_app
+      rm -f "$log"
+      since=$(date -v-5S "+%Y-%m-%d %H:%M:%S")
+      launch_scenario
+      continue
+    fi
     if grep -q 'scenario .*result=fail' "$log"; then verdict="FAIL scenario step"; break; fi
     if grep -qE 'game exit code|launch state=failed' "$log"; then verdict="FAIL game exit"; break; fi
   fi

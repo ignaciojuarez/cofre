@@ -11,6 +11,7 @@ final class CofreScenarioRunner {
     private let scenario: CofreScenario
     private var targetID: String?
     private var createdIDs: [String] = []
+    private var keepInstances = false
 
     init(backend: CofreBackendAdapter, instances: InstanceStore?, scenario: CofreScenario) {
         self.backend = backend; self.instances = instances; self.scenario = scenario
@@ -20,13 +21,28 @@ final class CofreScenarioRunner {
         Task { await execute() }
     }
 
+    private func log(_ line: String) {
+        NSLog("%@", line)
+        guard let data = (line + "\n").data(using: .utf8) else { return }
+        do {
+            let handle = try FileHandle(forWritingTo: LogStore().latestLog)
+            try handle.seekToEnd()
+            try handle.write(contentsOf: data)
+            try handle.close()
+        } catch {
+            // Air normally captures NSLog through its latestlog pipe. The
+            // headless installer can close that pipe, so the direct append is
+            // best effort and must never change the scenario result.
+        }
+    }
+
     private func step(_ name: String) {
-        NSLog("[Cofre] scenario name=%@ step=%@ result=ok", scenario.name, name)
+        log("[Cofre] scenario name=\(scenario.name) step=\(name) result=ok")
         NotificationCenter.default.post(name: .cofreScenarioStep, object: "Scenario: \(scenario.name) · \(name)")
     }
 
     private func fail(_ step: String, _ error: Error) {
-        NSLog("[Cofre] scenario name=%@ step=%@ result=fail detail=%@", scenario.name, step, error.localizedDescription)
+        log("[Cofre] scenario name=\(scenario.name) step=\(step) result=fail detail=\(error.localizedDescription)")
         NotificationCenter.default.post(name: .cofreScenarioStep, object: "Scenario: \(scenario.name) · failed")
     }
 
@@ -36,12 +52,14 @@ final class CofreScenarioRunner {
             return
         }
         defer {
-            for id in createdIDs.reversed() {
-                do {
-                    try store.remove(id)
-                    NSLog("[Cofre] scenario name=%@ cleanup instance=%@ result=ok", scenario.name, id)
-                } catch {
-                    NSLog("[Cofre] scenario name=%@ cleanup instance=%@ result=fail detail=%@", scenario.name, id, error.localizedDescription)
+            if !keepInstances {
+                for id in createdIDs.reversed() {
+                    do {
+                        try store.remove(id)
+                        log("[Cofre] scenario name=\(scenario.name) cleanup instance=\(id) result=ok")
+                    } catch {
+                        log("[Cofre] scenario name=\(scenario.name) cleanup instance=\(id) result=fail detail=\(error.localizedDescription)")
+                    }
                 }
             }
         }
@@ -60,12 +78,17 @@ final class CofreScenarioRunner {
 
             let scenarioLoader: Loader? = scenario.loader == .unknown ? nil : scenario.loader
             if instance.loader != .vanilla, let loader = scenarioLoader {
-                let availableLoaderVersions = try await backend.loaderVersions(loader: loader, game: instance.gameVersion)
-                let loaderVersion = scenario.loaderVersion ?? availableLoaderVersions.first
-                guard let loaderVersion else { throw CofreBackendError.unavailable("no loader version") }
-                NotificationCenter.default.post(name: .cofreScenarioStep, object: "Scenario: \(scenario.name) · loader")
-                try await backend.installLoader(instanceID: instance.id, loader: loader, version: loaderVersion)
-                NSLog("[Cofre] scenario name=%@ step=loader result=ok", scenario.name)
+                if instance.loader.isInstalled(in: instance.versionID, root: store.root,
+                                               minecraftVersion: instance.gameVersion) {
+                    log("[Cofre] scenario name=\(scenario.name) step=loader result=ok detail=already-installed")
+                } else {
+                    let availableLoaderVersions = try await backend.loaderVersions(loader: loader, game: instance.gameVersion)
+                    let loaderVersion = scenario.loaderVersion ?? availableLoaderVersions.first
+                    guard let loaderVersion else { throw CofreBackendError.unavailable("no loader version") }
+                    NotificationCenter.default.post(name: .cofreScenarioStep, object: "Scenario: \(scenario.name) · loader")
+                    try await backend.installLoader(instanceID: instance.id, loader: loader, version: loaderVersion)
+                    log("[Cofre] scenario name=\(scenario.name) step=loader result=ok")
+                }
             }
 
             if let pack = scenario.pack {
@@ -81,7 +104,7 @@ final class CofreScenarioRunner {
                 guard let made = try store.list().first(where: { !before.contains($0.id) }) else { throw CofreBackendError.unavailable("pack \(pack) made no instance") }
                 targetID = made.id
                 createdIDs.append(made.id)
-                NSLog("[Cofre] scenario name=%@ step=pack result=ok", scenario.name)
+                log("[Cofre] scenario name=\(scenario.name) step=pack result=ok")
             } else {
                 for mod in scenario.mods {
                     NotificationCenter.default.post(name: .cofreScenarioStep, object: "Scenario: \(scenario.name) · mods")
@@ -90,7 +113,7 @@ final class CofreScenarioRunner {
                     let versions = try await backend.versions(projectID: project.id, instanceID: instance.id)
                     for try await _ in backend.install(projectID: project.id, versionID: versions.first?.id ?? "latest", instanceID: instance.id) {}
                 }
-                if !scenario.mods.isEmpty { NSLog("[Cofre] scenario name=%@ step=mods result=ok", scenario.name) }
+                if !scenario.mods.isEmpty { log("[Cofre] scenario name=\(scenario.name) step=mods result=ok") }
             }
 
             var prefs = try await backend.preferences(instanceID: targetID)
@@ -102,7 +125,15 @@ final class CofreScenarioRunner {
                 NotificationCenter.default.post(name: .cofreScenarioStep, object: "Scenario: \(scenario.name) · launch")
                 for try await _ in backend.launch(instanceID: targetID, accountID: nil) {}
             }
-        } catch { fail("run", error) }
+        } catch {
+            if let failure = error as? LaunchFailure, failure == .restartRequired {
+                keepInstances = true
+                log("[Cofre] scenario name=\(scenario.name) step=run result=restart")
+                NotificationCenter.default.post(name: .cofreScenarioStep, object: "Scenario: \(scenario.name) · restart")
+            } else {
+                fail("run", error)
+            }
+        }
     }
 
     private func foundPack(_ slug: String, from rows: [ProjectSummary]) -> ProjectSummary? { rows.first }
