@@ -40,6 +40,11 @@ Modded play needs Metal. Every OpenGL path translates on the CPU and was unplaya
 - If only Metal is truly playable, steer users to Metal-capable setups (vanilla or Fabric + Metallum on 26.x) and label the rest "experimental / slow".
 - **iPhone test kit:** build the app once on the iPhone 17 Pro with a ready-made set of instances (one per renderer × loader case) so the user only taps Play on each and reads FPS. Needs the user's go-ahead before installing on the iPhone.
 
+## Applied (2026-10-31)
+
+- Picker on Metal vanilla versions: Auto, Metal, MobileGlues only (Air's agent ignores other picks there).
+- Play warns and offers to turn Iris off on 26.x with MobileGlues or ANGLE (black screen on the iPad).
+
 ## Pending device results
 
 Keep these matrix rules provisional until the iPad benchmarks complete:
