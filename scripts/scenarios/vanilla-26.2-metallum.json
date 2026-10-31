@@ -1,0 +1,9 @@
+{
+  "name": "vanilla-26.2-metallum",
+  "version": "26.2",
+  "loader": "vanilla",
+  "mods": [],
+  "renderer": "metallum",
+  "resolution": 1.0,
+  "launch": true
+}

@@ -1,0 +1,9 @@
+{
+  "name": "vanilla-1.21.11-metallum",
+  "version": "1.21.11",
+  "loader": "vanilla",
+  "mods": [],
+  "renderer": "metallum",
+  "resolution": 1.0,
+  "launch": true
+}

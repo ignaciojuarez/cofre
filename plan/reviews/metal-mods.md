@@ -175,3 +175,45 @@ Run each with `COFRE_LAUNCH_ARGS="-cofrePerfLog 1" scripts/scenario.sh scripts/s
 2. **`neoforge-26.2-metal-agent-noearly`**: same pass lines, plus no `earlydisplay` window in the log.
 3. **`neoforge-26.2-metal-connector`**: pass lines `Connector`/`Launchpad` loading, `[Launchpad] PreLaunch`, `Invoking Fabric preLaunch entrypoint`, `Using graphics backend Metal`. Watch for duplicate Metallum (`define skipped (already defined here)`, `LinkageError … duplicate class definition`, two `MetalDevice` inits). Expect a black picture with 1.0.4; swap in the patched MetalUniversal jar URL when it exists.
 4. When one passes: add NeoForge Sodium (`sodium-neoforge-0.9.2+mc26.2`, note MetalUniversal #22) and one gameplay mod (JEI), then record results in `renderer-benchmarks.md`.
+
+## Vanilla 1.21.11 and 26.2 on Air's agent (fixed off-device 2026-10-31, device run pending)
+
+### Root cause: three classes the shipped `metallum_agent.jar` references but never ships
+
+The agent picks one class set per version and defines its `com/metallum/client/`, `com/metallum/shims/`, `com/metallum/Metallum` and Fabric API stubs into the game loader (`PojavClassLoader`). Anything else (all of `com/metallum/agent/`) comes from the jar root through the app loader, which has **no Minecraft libraries and no slf4j**. The agent's own slf4j fallback (`ensureSlf4jOnSystem`) looks in `<instance>/libraries/org/slf4j`, which never exists in Cofre's layout (`… slf4j-api not found, skip` in every log).
+
+| Version → set | Gap | Device symptom |
+|---|---|---|
+| 26.2 → `classes262iris/` | Its `Metallum` implements `net.fabricmc.api.ModInitializer` + `PreLaunchEntrypoint`, but only `classes261/263/264` bundle those stubs (`FIX461 fabric stub absent`, `defineClass incomplete … com/metallum/Metallum`). `MetalBackend.createDevice` then loads the **root** `Metallum` in the app loader, whose `<clinit>` needs slf4j | `NoClassDefFoundError org/slf4j/LoggerFactory` |
+| 1.21.11 → `classes12111_1_21_11/` | 1. Same missing stubs. 2. `MetalDevice.prepareShaderSource` calls `com/metallum/agent/ShaderVersionBump.bump(String)`, absent from **every** Air jar in history (checked all 7 commits of `JavaApp/libs/others/metallum_agent.jar` and all remote branches; no public source). 3. Its `Metallum.<clinit>` does `new NopLogger()`, but the root `NopLogger` has a private constructor (`INSTANCE` singleton build) | `NoClassDefFoundError com/metallum/agent/ShaderVersionBump`; gaps 1 and 3 would crash right after |
+| 26.3 → `classes263/` | None: stubs present (`bundled stubs queued = 4`), all 93 classes defined in the game loader | Works |
+
+Not the cause: Java version (25 after 09fd2fa), agent args, or Air's committed vs working-copy jar (identical contents, different zip bytes).
+
+`ShaderVersionBump` semantics, from the bytecode and shaderc: Metallum compiles with `shaderc_compile_options_set_target_env(opengl, 450)`; glslang rejects desktop GLSL below 330 there (`Desktop shaders for OpenGL SPIR-V require version 330 or higher`). Vanilla 1.21.11 shaders are all `#version 330`, so vanilla needs only the class to exist; resource-pack `#version 150` shaders need the raise.
+
+### Fix (Cofre-side, no Air patch)
+
+- `app/Glue/MetallumAgent/com/metallum/agent/ShaderVersionBump.java`: raises `#version` < 330 to `330 core`, leaves 330+ untouched.
+- `scripts/repair-metallum-agent.py`, run by `scripts/run.sh --build` on `$APP/libs/metallum_agent.jar` before signing (the renderer manifest now hashes that shipped jar): copies the Fabric stubs from `classes263/` into any set whose `Metallum` needs them, compiles `ShaderVersionBump` into the jar root (JDK 21+, `--release 21`), and makes public any private root member a set uses (`NopLogger.<init>`). Idempotent and byte-reproducible; then verifies every set (fails the build on a dangling `com/metallum` class or a private cross-loader member). On the current jar it reports exactly the gaps above and nothing else.
+- `tests/renderer/metallum_agent.py` (in `scripts/test.sh`): repairs the pinned jar and, on JDK 25, defines both sets' `Metallum` in a child loader the way the agent does and exercises `bump`.
+
+### Off-device evidence
+
+| Check | Original jar | Repaired jar |
+|---|---|---|
+| Loader simulation, `classes262iris/` (+ slf4j-api 2.0.17 as game lib) | `define failed: NoClassDefFoundError net/fabricmc/api/ModInitializer` → app-loader `Metallum` → `NoClassDefFoundError org/slf4j/LoggerFactory` (= device) | `Metallum` defined in game loader, `<clinit>` OK |
+| Loader simulation, `classes12111_1_21_11/` | same fallback + `ClassNotFoundException ShaderVersionBump` (= device) | defined in game loader, `<clinit>` (`new NopLogger()`) OK |
+| Real `MetalDevice.prepareShaderSource` with the MC 1.21.11 client jar, LWJGL 3.3.3, fastutil, guava, Mojang libs | `NoClassDefFoundError com/metallum/agent/ShaderVersionBump` | returns prepared source; `Metallum` and `MetalDevice` both in the game loader |
+| All 75 MC 1.21.11 core shaders through shaderc (Metallum's options) | — | 74/75 compile with and without the bump, at 330 and at 150; the 75th needs the runtime `PORTAL_LAYERS` define |
+
+### Device check (not run: the iPad was busy)
+
+1. Build and install: `scripts/run.sh remote fast` (the build log shows `Repair Metallum agent` and the `added …`/`made public …` lines).
+2. `COFRE_LAUNCH_ARGS="-cofrePerfLog 1" scripts/scenario.sh scripts/scenarios/vanilla-1.21.11-metallum.json`
+3. `COFRE_LAUNCH_ARGS="-cofrePerfLog 1" scripts/scenario.sh scripts/scenarios/vanilla-26.2-metallum.json`
+
+Pass, per run: `PASS in-game`; `bundled stubs queued = 4`; `DEFINE-OK summary` with **no** `defineClass incomplete … com/metallum/Metallum`; no `NoClassDefFoundError`/`IllegalAccessError`/`NoSuchFieldError`; `[Cofre] perf … renderer=libmetallum.dylib` with fps > 0; a title-screen screenshot. Then record both rows in `renderer-benchmarks.md`.
+If 1.21.11 still fails, the next suspect is another mismatch between `classes12111_1_21_11/` and the root `com/metallum/agent/` build; `scripts/repair-metallum-agent.py --check` covers classes and private access but not member signatures (Air's own rewrite leaves unused constant-pool entries, e.g. a dead `Metallum.LOGGER:Lorg/slf4j/Logger;`). If a version cannot be fixed, drop it from Cofre's Metal list so Auto picks MobileGlues.
+
+NeoForge 26.2 through the agent (route D above) should pick the same `classes262iris/` set (the Iris route depends only on the jar marker), so it too should now define `Metallum` in the game loader instead of falling back to the root copy; unverified.

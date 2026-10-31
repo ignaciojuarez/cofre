@@ -89,8 +89,10 @@ if (( BUILD )); then
   if [[ -n "$IPA" && -f "$IPA" ]]; then unzip -q -o "$IPA" -d "$ROOT/artifacts"; else BUILT_APP=$(find "$AIR/Natives/build" -maxdepth 1 -type d -name "*.app" -print -quit); [[ -n "$BUILT_APP" && -d "$BUILT_APP" ]] || bt_die "no IPA or app artifact"; cp -R "$BUILT_APP" "$ROOT/artifacts/Payload/AngelAuraAmethyst.app"; fi
   mv "$ROOT/artifacts/Payload/AngelAuraAmethyst.app" "$APP"
   python3 "$ROOT/scripts/update-info-plist.py" "$APP/Info.plist"
+  bt_step "Repair Metallum agent"
+  python3 "$ROOT/scripts/repair-metallum-agent.py" "$APP/libs/metallum_agent.jar" || bt_die "metallum_agent.jar still has missing classes"
   bt_step "Generate renderer manifest"
-  python3 "$ROOT/scripts/generate-renderer-manifest.py" "$AIR/JavaApp/libs/others/metallum_agent.jar" "$APP/RendererManifest.json"
+  python3 "$ROOT/scripts/generate-renderer-manifest.py" "$APP/libs/metallum_agent.jar" "$APP/RendererManifest.json"
   bt_step "Build CofreCore framework"
   SIGNING="$ROOT/.build-tools/signing"
   "$ROOT/scripts/stikjit-sources.sh" || bt_die "could not prepare StikJIT sources"
