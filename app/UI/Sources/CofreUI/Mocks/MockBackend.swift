@@ -89,9 +89,9 @@
                 InstalledItem(
                     id: "glass", name: "Better Glass", version: "1.4", enabled: true, issue: "Fabric API missing"),
                 {
-                    // Its jar asks for a mod Modrinth didn't list: Installed shows "Needs Fabric API · Get".
+                    // Its jar asks for a language provider Modrinth didn't list: Installed shows "Needs Kotlin for Forge · Get".
                     var item = InstalledItem(id: "bountiful", name: "Bountiful", version: "8.0.0-beta.2", enabled: true)
-                    item.needs = [ProjectDependency(id: "fabric-api", name: "Fabric API", installed: false)]
+                    item.needs = [ProjectDependency(id: "kotlinforforge", name: "Kotlin for Forge", installed: false)]
                     return item
                 }(),
                 InstalledItem(id: "lithium", name: "Lithium", version: "0.14.3", enabled: true, updateTo: "0.14.4"),
@@ -442,10 +442,12 @@
         static let extraTitles = [
             "cloth-config": "Cloth Config", "reeses": "Reese's Sodium Options", "indium": "Indium",
             "sodium-extra": "Sodium Extra", "canvas": "Canvas", "flywheel": "Flywheel",
+            "kotlinforforge": "Kotlin for Forge",
         ]
         static let sizes: [String: Int64] = [
             "fabric-api": 2_412_000, "cloth-config": 1_051_000, "culling": 386_000, "sodium-extra": 512_000,
             "reeses": 241_000, "iris": 2_830_000, "create": 15_900_000, "flywheel": 1_230_000,
+            "kotlinforforge": 12_000_000,
         ]
         static func title(_ id: String) -> String {
             projects.first { $0.id == id }?.title ?? extraTitles[id] ?? id

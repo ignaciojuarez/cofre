@@ -262,11 +262,12 @@
 
         func testNeedsGetInstallsTheMissingModWhateverTheSearchTab() async {
             let (s, mock) = await store()
-            XCTAssertEqual(s.installed[.mods]?.first { $0.id == "bountiful" }?.needs.map(\.id), ["fabric-api"])
+            XCTAssertEqual(
+                s.installed[.mods]?.first { $0.id == "bountiful" }?.needs.map(\.id), ["kotlinforforge"])
             s.query.kind = .shaders
-            s.get("fabric-api", kind: .mods)
-            await until { mock.mods.contains { $0.id == "fabric-api" } }
-            XCTAssertEqual(s.modInstalls["fabric-api"]?.plan?.kind ?? .mods, .mods)
+            s.get("kotlinforforge", kind: .mods)
+            await until { mock.mods.contains { $0.id == "kotlinforforge" } }
+            XCTAssertEqual(s.modInstalls["kotlinforforge"]?.plan?.kind ?? .mods, .mods)
         }
 
         func testGetWithDependenciesConfirmsThenInstallsAll() async {
