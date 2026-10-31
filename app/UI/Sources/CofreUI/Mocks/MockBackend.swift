@@ -411,6 +411,15 @@
             guard let inst = instanceList.first(where: { $0.id == instanceID }) else {
                 throw URLError(.fileDoesNotExist)
             }
+            // The bundled preset pins are offline sample data too; keep them on the same plan/install path.
+            if inst.gameVersion == "26.2", inst.loader == .fabric,
+               let versionID, PresetCatalog.presets.flatMap({ $0.pinnedMods + $0.optionalMods })
+                .contains(where: { $0.project == projectID && $0.version == versionID })
+            {
+                return ModInstallPlan(
+                    target: PlannedMod(id: projectID, name: Self.title(projectID), versionID: versionID, version: versionID),
+                    kind: kind)
+            }
             let resolver = ModResolver(
                 game: inst.gameVersion, loader: inst.loader, kind: kind, installed: try await installed(kind, instanceID: instanceID),
                 versions: { Self.candidates($0, kind: kind) })

@@ -434,6 +434,46 @@
             return made
         }
 
+        /// Creates a normal instance, then installs the preset's pinned files through the existing staged path.
+        public func createPreset(
+            _ preset: CofrePreset, includeOptional: Bool = false, physicalMB: Int? = nil
+        ) async -> InstanceSummary? {
+            do { try preset.validate() } catch {
+                lastError = "This preset is invalid."
+                return nil
+            }
+            let memory = physicalMB ?? Int(ProcessInfo.processInfo.physicalMemory >> 20)
+            guard let made = await createInstance(
+                name: preset.name, version: preset.gameVersion, loader: preset.loader,
+                loaderVersion: preset.loaderVersion, ownFolder: true, fabricAPI: false
+            ) else { return nil }
+            do {
+                if let instanceStore, let instance = try instanceStore.list().first(where: { $0.id == made.id }) {
+                    try GameOptions.seedPreset(preset.options(forPhysicalMemoryMB: memory), in: instance.gameDirectory, physicalMB: memory)
+                } else {
+                    try await backend.seedPresetOptions(
+                        instanceID: made.id, options: preset.options(forPhysicalMemoryMB: memory), physicalMB: memory)
+                }
+                for mod in preset.pinnedMods + (includeOptional ? preset.optionalMods : []) {
+                    let plan = try await backend.installPlan(
+                        projectID: mod.project, versionID: mod.version, kind: .mods, instanceID: made.id)
+                    guard plan.blocked == nil else { throw PresetInstallError.blocked(mod.slug) }
+                    for try await _ in backend.install(plan, picking: [], instanceID: made.id) {}
+                }
+                return made
+            } catch {
+                lastError = error.localizedDescription
+                return nil
+            }
+        }
+
+        private enum PresetInstallError: LocalizedError {
+            case blocked(String)
+            var errorDescription: String? {
+                switch self { case .blocked(let name): "\(name) is unavailable for this instance." }
+            }
+        }
+
         public func duplicate(_ id: String) async {
             await run {
                 let copy: InstanceSummary

@@ -397,6 +397,7 @@
         @State private var ownFolder = true
         @State private var fabricAPI = true
         @State private var creating = false
+        @State private var includeIPN = false
         @State private var showingVersionPicker = false
         /// From Mods: pre-fills the form, then makes the new instance the one Mods (and Play) works on.
         private let plan: NewInstancePlan?
@@ -416,6 +417,16 @@
                 SheetHeader("New instance")
                 ScrollView {
                     VStack(alignment: .leading, spacing: 10) {
+                        SectionLabel("Recommended")
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(alignment: .top, spacing: 10) {
+                                ForEach(PresetCatalog.presets) { preset in
+                                    presetCard(preset)
+                                }
+                            }
+                        }
+                        .scrollClipDisabled()
+                        SectionLabel("Custom")
                         SectionLabel("Name")
                         Field("Name", text: $name)
                         SectionLabel("Version")
@@ -508,6 +519,52 @@
             .accessibilityAddTraits(on ? .isSelected : [])
         }
 
+        private func presetCard(_ preset: CofrePreset) -> some View {
+            VStack(alignment: .leading, spacing: 7) {
+                Button { create(preset) } label: {
+                    VStack(alignment: .leading, spacing: 7) {
+                        HStack(spacing: 6) {
+                            Text(verbatim: preset.name).cofreFont(.rowTitle).foregroundStyle(Color.cofre.ink)
+                                .lineLimit(2)
+                            Spacer(minLength: 0)
+                            if preset.status == .recommended { Badge("Recommended", tone: .success) }
+                        }
+                        HStack(spacing: 5) {
+                            Badge("\(preset.gameVersion) · \(preset.loader.displayName)", tone: preset.loader.tone)
+                            Badge(preset.status == .experimental ? "Experimental · Metal picture not ready" : "Metal", tone: .accent)
+                        }
+                        Text(verbatim: preset.pitch).cofreFont(.caption).foregroundStyle(Color.cofre.muted)
+                            .lineLimit(2)
+                        Text(verbatim: "Includes \(preset.pinnedMods.count) mods · \(ramNote(for: preset))")
+                            .cofreFont(.caption).foregroundStyle(Color.cofre.inkSoft).lineLimit(2)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(RowButtonStyle())
+                if let optional = preset.optionalMods.first {
+                    ToggleRow(
+                        "Add \(optionalName(optional))",
+                        subtitle: "Optional · \(optional.license) license",
+                        isOn: $includeIPN
+                    )
+                }
+            }
+            .padding(11)
+            .frame(width: 275, alignment: .topLeading)
+            .block(.panel)
+            .blockHover()
+        }
+
+        private func ramNote(for preset: CofrePreset) -> String {
+            let lowMemory = ProcessInfo.processInfo.physicalMemory < 6_000 * 1_048_576
+            return lowMemory ? "4 GB RAM · low-distance start" : "RAM-safe start"
+        }
+
+        private func optionalName(_ mod: CofrePreset.Mod) -> String {
+            mod.slug == "inventory-profiles-next" ? "Inventory Profiles Next" : mod.slug
+        }
+
         private func create() {
             creating = true
             Task {
@@ -517,19 +574,34 @@
                 creating = false
                 // On failure the sheet stays open; the error shows above Create.
                 guard let made else { return }
-                dismiss()
-                if let plan {
-                    // From Mods: stay there, on the new instance. From a server that needs this version: save it
-                    // there and show Servers, one tap from Join.
-                    if let server = plan.server {
-                        await store.addServer(address: server.address, name: server.name, from: server, to: made.id)
-                    }
-                    await store.selectInstance(made.id)
-                    if plan.server != nil { nav.playPane = 2 }
-                } else {
-                    nav.instance = made.id
-                    nav.section = .instances
+                await finish(made)
+            }
+        }
+
+        private func create(_ preset: CofrePreset) {
+            guard !creating else { return }
+            creating = true
+            Task {
+                let made = await store.createPreset(preset, includeOptional: includeIPN)
+                creating = false
+                guard let made else { return }
+                await finish(made)
+            }
+        }
+
+        private func finish(_ made: InstanceSummary) async {
+            dismiss()
+            if let plan {
+                // From Mods: stay there, on the new instance. From a server that needs this version: save it
+                // there and show Servers, one tap from Join.
+                if let server = plan.server {
+                    await store.addServer(address: server.address, name: server.name, from: server, to: made.id)
                 }
+                await store.selectInstance(made.id)
+                if plan.server != nil { nav.playPane = 2 }
+            } else {
+                nav.instance = made.id
+                nav.section = .instances
             }
         }
     }

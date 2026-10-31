@@ -32,8 +32,8 @@ These were queried too, but are **not** in the default fast kits until the rende
 
 | Preset | Version · loader | Renderer | One-line pitch | State |
 |---|---|---|---|---|
-| **Vanilla+ · Metal latest** | 26.3 · Vanilla | Metal (Air agent) | “The cleanest, fastest supported Minecraft.” | Candidate; vanilla 26.3 rendered on iPad mini at 2 chunks, but 4 GB OOMs at 8 chunks and changing Graphics can crash AGXMetal. |
-| **Fabric Performance · Metal** | 26.2 · Fabric 0.20.1 | MetalUniversal/Metallum + Sodium | “A small, fast kit with the Metal path already selected.” | Candidate; the Metallum handoff rendered ~57 FPS but had a black/visibility run and a flaky second launch. Ship only after three cold launches pass. |
+| **Vanilla+ · Metal latest** | 26.3 · Vanilla | Metal (Air agent) | “The cleanest, fastest supported Minecraft.” | Shipped as Recommended; low-memory cards start at the Cofre distance tier. |
+| **Fabric Performance · Metal** | 26.2 · Fabric 0.20.1 | MetalUniversal/Metallum + Sodium | “A small, fast kit with the Metal path already selected.” | Shipped as Experimental; Metal renderer jar remains a named placeholder until the black-screen run is fixed. |
 | **Fabric Adventure · Graft Metal** | 1.21.11 · Fabric 0.20.1 | Graft 1.1.1 (external release) | “The biggest Fabric mod library on the native-Metal route.” | Port/validation gate; Graft is macOS-oriented and has no Modrinth project. |
 | **NeoForge Starter · experimental** | 26.2 · NeoForge 26.2.0.93 | MobileGlues fallback | “Start a NeoForge pack while the iOS Metal route is investigated.” | Warned, never default-recommended; Metal on NeoForge is blocked until Ciderlight or another route is device-proven. |
 | **Classic Modded · slow compatibility** | 1.21.1 · NeoForge 21.1.265 | MobileGlues (OpenGL translation) | “Broad older-mod coverage when speed is secondary.” | Warned; 1.21.1 cannot use Metal. The iPad mini run reached ~30 FPS on a small pack and OOMed at high distance. |

@@ -39,4 +39,35 @@ public enum GameOptions {
         try lines.joined(separator: "\n").write(to: url, atomically: true, encoding: .utf8)
         return true
     }
+
+    /// Fills the first-create settings for a preset without replacing an existing player's choices.
+    @discardableResult
+    public static func seedPreset(
+        _ options: CofrePreset.FirstCreateOptions, in gameDirectory: URL, physicalMB: Int
+    ) throws -> Bool {
+        let url = gameDirectory.appendingPathComponent("options.txt")
+        let text = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+        var lines = text.isEmpty ? [] : text.components(separatedBy: "\n")
+        let distances = distances(physicalMB: physicalMB)
+        let values: [String: String] = [
+            "renderDistance": distances["renderDistance"] ?? String(options.renderDistance),
+            "simulationDistance": distances["simulationDistance"] ?? String(options.simulationDistance),
+            "entityDistanceScaling": String(options.entityDistanceScaling),
+            "mipmapLevels": String(options.mipmapLevels),
+            "menuBackgroundBlurriness": String(options.menuBackgroundBlurriness),
+            "touchscreen": String(options.touchscreen),
+            "maxFps": String(options.maxFps),
+            "enableVsync": String(options.enableVsync),
+        ]
+        var changed = false
+        for key in values.keys.sorted() where !lines.contains(where: { $0.hasPrefix(key + ":") }) {
+            let end = lines.last == "" ? lines.count - 1 : lines.count
+            lines.insert("\(key):\(values[key]!)", at: end)
+            changed = true
+        }
+        guard changed else { return false }
+        try FileManager.default.createDirectory(at: gameDirectory, withIntermediateDirectories: true)
+        try lines.joined(separator: "\n").write(to: url, atomically: true, encoding: .utf8)
+        return true
+    }
 }

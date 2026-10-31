@@ -38,4 +38,23 @@ final class GameOptionsTests: XCTestCase {
         XCTAssertFalse(try GameOptions.seedDistances(in: dir, physicalMB: 12000, replacingEngineDefaults: true))
         XCTAssertEqual(try options(), "renderDistance:16\nsimulationDistance:12")
     }
+
+    func testPresetSeedsSettingsWithoutReplacingExistingOptions() throws {
+        let preset = try XCTUnwrap(PresetCatalog.presets.first)
+        XCTAssertTrue(try GameOptions.seedPreset(preset.options(forPhysicalMemoryMB: 3862), in: dir, physicalMB: 3862))
+        let first = try options()
+        XCTAssertTrue(first.contains("renderDistance:6"))
+        XCTAssertTrue(first.contains("simulationDistance:5"))
+        XCTAssertTrue(first.contains("menuBackgroundBlurriness:0"))
+        XCTAssertTrue(first.contains("touchscreen:false"))
+        XCTAssertTrue(first.contains("maxFps:60"))
+
+        try write("renderDistance:16\nmaxFps:30\n")
+        XCTAssertTrue(
+            try GameOptions.seedPreset(preset.options(forPhysicalMemoryMB: 12000), in: dir, physicalMB: 12000))
+        let preserved = try options()
+        XCTAssertTrue(preserved.contains("renderDistance:16"))
+        XCTAssertTrue(preserved.contains("maxFps:30"))
+        XCTAssertFalse(preserved.contains("renderDistance:10"))
+    }
 }

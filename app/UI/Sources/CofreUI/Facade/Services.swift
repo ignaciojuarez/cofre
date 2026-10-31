@@ -34,10 +34,16 @@
         func instances() async throws -> [InstanceSummary]
         func createInstance(name: String, version: String, loader: Loader) async throws -> InstanceSummary
         func installLoader(instanceID: String, loader: Loader, version: String) async throws
+        /// Seeds a preset's first-create options when the backend owns the game directory.
+        func seedPresetOptions(instanceID: String, options: CofrePreset.FirstCreateOptions, physicalMB: Int) async throws
         func servers(instanceID: String) async throws -> [ServerSummary]
         /// `nil` means the global defaults (Settings), an ID means per-instance overrides.
         func preferences(instanceID: String?) async throws -> GamePreferences
         func setPreferences(_ preferences: GamePreferences, instanceID: String?) async throws
+    }
+
+    public extension LibraryService {
+        func seedPresetOptions(instanceID: String, options: CofrePreset.FirstCreateOptions, physicalMB: Int) async throws {}
     }
 
     /// M04. Maps to `AirBridge.mods/shaders/resourcePacks/setEnabled/deleteMod/updateMods`.

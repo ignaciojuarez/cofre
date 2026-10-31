@@ -548,4 +548,15 @@
         }
         private func unavailable(_ name: String) -> CofreBackendError { .unavailable(name) }
     }
+
+    extension CofreBackendAdapter {
+        public func seedPresetOptions(
+            instanceID: String, options: CofrePreset.FirstCreateOptions, physicalMB: Int
+        ) async throws {
+            guard let directory = air.gameDirectory(forProfile: instanceID) else {
+                throw CofreBackendError.unavailable("instance options")
+            }
+            try GameOptions.seedPreset(options, in: directory, physicalMB: physicalMB)
+        }
+    }
 #endif
