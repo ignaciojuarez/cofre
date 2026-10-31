@@ -307,3 +307,13 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 - 1.21.11 investigation: shipped RendererManifest.json lists 1.21.11 with 102 mapped classes. Patch 0003 gates the agent on manifest support and Java >= 21; it no longer uses the old MC >= 26 condition. The comment in pickRendererForProfile claiming the old gate is stale. Existing historical black-screen evidence does not establish the failure on this build. No speculative fallback or compatibility list added; title screen remains unverified.
 - 1.21.11 black screen evidence (`/tmp/cofre-ipad-logs4/latestlog.txt`, 08:56) predates 656c9e1: Auto picked Metal, but Air skipped the Metallum agent ("MC major 1 < 26 … Java 8"), so EGL fell back to ANGLE with zero-size framebuffers. The current gate (manifest + Java >= 21) loads the agent for 1.21.11; Auto keeps Metal there. Not re-verified on device (no pairing).
 - No launch fixes committed. Scenario runner remains unverified; its inGame verdict alone does not prove a rendered title screen. Final rebuild/device verification remains outstanding.
+
+## iPad mini JIT setup (2026-10-31 · build b023f57)
+
+| Step | Result | Evidence |
+|---|---|---|
+| Install `com.ignacio.cofre` (`scripts/run.sh local fast --device=00008110-…`) | PASS: `[Cofre] UI root installed`, `tunnel not allowed yet` | device `latestlog.txt` |
+| Pair with Llave CLI (`llave-pair pair --udid … --place`) | PASS after Ignacio tapped Trust: `paired → wifi_enabled → validated → placed` | event names only; pairing not printed |
+| agent-device runner | FIXED: "certificate not trusted" came from a stale runner install. `devicectl device uninstall app` both runner bundles, `open` again (first try races SpringBoard registration: "Unknown application display identifier"), then `snapshot` works | `~/.agent-device/sessions/cofre-ipad/runner.log` |
+| Play `(Default)` vanilla latest (26.3) | PASS: Play screen said "JIT ready · Auto at launch" before Play. VPN came up with no prompt, JIT ✓, game files downloaded, `renderer resolved -> libmetallum.dylib`, JIT mapping 0x143fac000, `Setting user`, `first-frame source=metal`, Mojang screen | `/tmp/cofre-device/s1.png`, `/tmp/cofre-device/s2.png` |
+| `agent-device alert get` on the physical iPad | Not supported in this session (UNSUPPORTED_OPERATION); use `devicectl device capture screenshot` and AX snapshots | — |
