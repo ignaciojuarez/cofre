@@ -189,7 +189,7 @@ How a launcher gets a key:
 | 4 | New page layout: header, `Segmented` tabs, pinned Get (iPhone), right rail (iPad); versions move to their tab with "What's new". Delete the old inline layout in the same change | `Screens/ModsScreen.swift` (`ModPagePane` split into `ModPage{About,Gallery,Versions}`), `MockBackend` sample page | UI tests: tabs switch, the Gallery tab hides when empty, Get works from every tab, iPhone and iPad sizes | Device: open Sodium and Create, both tabs render |
 | 5 | Gallery grid + viewer (paging, pinch/double-tap zoom, captions, counter, Share), video cards open outside | `Components/GalleryViewer.swift`, `Components/ZoomableImage.swift` | Order and index tests; VoiceOver labels; Reduce Motion path | Device: pinch and swipe on Iris's gallery; `[Cofre] gallery open id=… index=i` |
 | 6 | Image session with a bigger `URLCache`; Low Data Mode (no body images, thumbs only on tap) | `CofreKit/ImageLoading.swift` or extend `Downloads`; `ProjectIcon` uses it too | Cache config test; constrained → CSP without remote `img-src` | Device: Low Data Mode on, body shows "Show images" |
-| 7 🤔 | CurseForge client: search, mod, description, files, changelog, download with key; no caching; Keychain key; Settings field works; delete Air's CurseForge bridge and the `source == 2` branches | `CofreKit/CurseForge.swift`, `CofreKit/Keychain.swift` (or reuse existing storage), `+Mods.swift`, `AirBridgeAdapter.{h,m}`, `CofreBackendAdapter.swift` | Fixtures written from the docs: mod with screenshots, `allowModDistribution=false`, description HTML, changelog HTML; the request has `x-api-key`; no `URLCache` | Device (with a real key): `[Cofre] curseforge page id=…` and one download |
+| 7 | CurseForge client: search, mod, description, files, changelog, download with key; no caching; Keychain key; Settings field works; delete Air's CurseForge bridge and the `source == 2` branches | `CofreKit/CurseForge.swift`, `CofreKit/Keychain.swift` (or reuse existing storage), `+Mods.swift`, `AirBridgeAdapter.{h,m}`, `CofreBackendAdapter.swift` | Fixtures written from the docs: mod with screenshots, `allowModDistribution=false`, description HTML, changelog HTML; the request has `x-api-key`; no `URLCache` | Device (with a real key): `[Cofre] curseforge page id=…` and one download |
 | 8 | Docs: ROADMAP status, AGENTS "Already Cofre-owned" if CurseForge lands | `plan/ROADMAP.md`, `AGENTS.md` | — | — |
 
 Steps 1–2 are Mac-only and can run in parallel. Steps 3–6 follow in order. Step 7 waits on the decision but doesn't block 1–6.
@@ -198,15 +198,15 @@ Notes for agents:
 - Project links (source, wiki, …) are user content opened outside. They aren't Cofre site links, so `CofreLinks` and its allowlist test don't change.
 - Keep the summary and Get usable when the body or gallery fails; a page fetch failure must never block installing.
 
-## 7. Open questions for Ignacio
+## 7. Decisions (Ignacio, 2026-10-30) ✅
 
-1. **CurseForge:** own Swift client with your own key now (recommended), or drop CurseForge until there's an official key?
-2. **Official key:** apply for Cofre's 3rd-party key before the public release (it'd be injected at build time, never in the repo)?
-3. **Videos:** always open in YouTube (recommended), or try inline playback later?
-4. **Changelog:** inside Versions, under the picked version (recommended), or its own tab?
-5. **Cellular:** load body images automatically except in Low Data Mode (recommended), or always tap to load?
-6. **First package dependency:** OK to add Apple's `swift-markdown`? Without it, Modrinth bodies lose their HTML (Create's page loses its images and layout).
-7. **About font:** Geist body + Pixelify headings (recommended), or Pixelify throughout like the rest of the app?
+1. **CurseForge:** own Swift client now, with the user's own key in the Keychain; Air's CurseForge path goes.
+2. **Official key:** apply for Cofre's 3rd-party key before the public release (injected at build time, never in the repo).
+3. **Videos:** always open in YouTube.
+4. **Changelog:** inside Versions, under the picked version.
+5. **Cellular:** body images load automatically except in Low Data Mode.
+6. **Dependency:** add Apple's `swift-markdown`.
+7. **About font:** Geist body, Pixelify headings.
 
 ## Sources
 

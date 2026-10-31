@@ -9,10 +9,21 @@ let package = Package(
         .library(name: "CofreUI", targets: ["CofreUI"]),
         .library(name: "CofreKit", targets: ["CofreKit"]),
     ],
+    dependencies: [
+        // GitHub-flavoured Markdown → HTML for mod pages (the engine under Apple's swift-markdown).
+        .package(url: "https://github.com/swiftlang/swift-cmark.git", exact: "0.9.0")
+    ],
     targets: [
         // Cofre's own model of the game's files (instances, worlds, servers, content, accounts, downloads, logs).
         // Foundation only: no UIKit, no Air, so it runs and tests on the Mac.
-        .target(name: "CofreKit", resources: [.copy("Resources/protocolVersions.json")]),
+        .target(
+            name: "CofreKit",
+            dependencies: [
+                .product(name: "cmark-gfm", package: "swift-cmark"),
+                .product(name: "cmark-gfm-extensions", package: "swift-cmark"),
+            ],
+            resources: [.copy("Resources/protocolVersions.json")]
+        ),
         .target(
             name: "CofreUI",
             dependencies: ["CofreKit"],
