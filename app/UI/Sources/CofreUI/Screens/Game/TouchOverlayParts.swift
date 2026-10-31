@@ -29,7 +29,8 @@ enum OverlayGlyph {
         case .chat: ["WWWWWWW", "W.....W", "W.W.W.W", "W.....W", "WWWWWWW", ".WW....", ".W....."]
         case .pause: ["WW.WW", "WW.WW", "WW.WW", "WW.WW", "WW.WW", "WW.WW", "WW.WW"]
         case .dots: ["WW.WW.WW", "WW.WW.WW"]
-        case .moreVertical: ["WW", "WW", "..", "WW", "WW", "..", "WW", "WW"]
+        // As wide as `dots`: the pixel size follows the column count.
+        case .moreVertical: ["...WW...", "...WW...", "........", "...WW...", "...WW...", "........", "...WW...", "...WW..."]
         case .menu: ["WWWWWWW", ".......", "WWWWWWW", ".......", "WWWWWWW"]
         case .close: ["W.....W", ".W...W.", "..W.W..", "...W...", "..W.W..", ".W...W.", "W.....W"]
         case .keyboard: ["WWWWWWWWW", "W.W.W.W.W", "WWWWWWWWW", "W.W.W.W.W", "WWWWWWWWW", "W..WWW..W", "WWWWWWWWW"]
