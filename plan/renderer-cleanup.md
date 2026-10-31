@@ -12,6 +12,8 @@ Status: in progress (2026-10-31). Owner: main thread; findings land in `plan/rev
 
 Modded play needs Metal. Every OpenGL path translates on the CPU and was unplayable with fewer than 20 mods on an iPhone 17 Pro. So every test round should push at least one popular modded version onto Metal (first: Fabric 26.2 + MetalUniversal + Sodium; routes in `reviews/metal-mods.md`).
 
+**Metal targets (popular modding versions only, decided 2026-10-31):** 1.21.11 Fabric (Graft port; 18k Fabric mods), 26.2 Fabric and NeoForge (MetalUniversal; 13.6k Fabric mods). 26.3 only if its numbers grow. 1.21.1 / 1.20.1 can't get Metal (older than Minecraft's 1.21.5 GPU-device layer); they stay on MobileGlues, labelled slower. Ready-made preset instances: `presets.md`.
+
 ## Goals
 
 1. Find out per renderer × Minecraft version × loader: works / black screen / crashes / unplayable FPS. Use Air's and Amethyst's own notes, upstream docs, and our device runs.
