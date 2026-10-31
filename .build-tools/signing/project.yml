@@ -19,7 +19,7 @@ targets:
     platform: iOS
     sources: [main.c]
     settings:
-      PRODUCT_BUNDLE_IDENTIFIER: com.ignaciojuarez.cofre
+      PRODUCT_BUNDLE_IDENTIFIER: ${BUNDLE_ID}
       CODE_SIGN_ENTITLEMENTS: App.entitlements
       GENERATE_INFOPLIST_FILE: YES
   CofreCore:
@@ -32,8 +32,10 @@ targets:
       - path: ../../app/Glue/AirBridge/CofrePreferences.swift
       - path: ../../app/Glue/AirBridge/CofreBackendAdapter+Instances.swift
       - path: ../../app/Glue/AirBridge/CofreBackendAdapter+Mods.swift
+      - path: ../../app/Glue/AirBridge/CofreBackendAdapter+Modpacks.swift
       - path: ../../app/Glue/AirBridge/CofreScenarioRunner.swift
       - path: ../../app/Glue/AirBridge/CofreBackendAdapter+Servers.swift
+      - path: ../../app/Glue/AirBridge/CofreBackendAdapter+Downloads.swift
       - path: ../../app/Glue/AirBridge/ServerJoinAdapter.swift
       - path: ../../app/Glue/AirBridge/CofreCoreEntry.swift
       - path: ../../app/Glue/AirBridge/CofreGameExit.swift
@@ -50,7 +52,7 @@ targets:
       - package: CofreServerJoin
         product: CofreServerJoin
     settings:
-      PRODUCT_BUNDLE_IDENTIFIER: com.ignaciojuarez.cofre.core
+      PRODUCT_BUNDLE_IDENTIFIER: com.ignacio.cofre.core
       DEFINES_MODULE: YES
       MACH_O_TYPE: mh_dylib
       GENERATE_INFOPLIST_FILE: YES
@@ -69,7 +71,7 @@ targets:
       - package: CofreUI
         product: CofreKit
     settings:
-      PRODUCT_BUNDLE_IDENTIFIER: com.ignaciojuarez.cofre.core.tests
+      PRODUCT_BUNDLE_IDENTIFIER: com.ignacio.cofre.core.tests
   PacketTunnel:
     type: app-extension
     platform: iOS
@@ -92,7 +94,7 @@ targets:
       - sdk: CFNetwork.framework
       - sdk: IOKit.framework
     settings:
-      PRODUCT_BUNDLE_IDENTIFIER: com.ignaciojuarez.cofre.tunnel
+      PRODUCT_BUNDLE_IDENTIFIER: ${TUNNEL_BUNDLE_ID}
       INFOPLIST_FILE: PacketTunnel-Info.plist
       CODE_SIGN_ENTITLEMENTS: Tunnel.entitlements
       SWIFT_OBJC_BRIDGING_HEADER: $(SRCROOT)/../../extensions/PacketTunnel/TunnelRoute.h

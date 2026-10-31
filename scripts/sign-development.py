@@ -16,8 +16,8 @@ if not app_profile.exists() or not tunnel_profile.exists():
     raise SystemExit("build .build-tools/signing first to generate both profiles")
 identity = os.environ.get("SIGNING_IDENTITY") or sys.exit("SIGNING_IDENTITY is required")
 team = os.environ.get("TEAM_ID") or sys.exit("TEAM_ID is required")
-bundle = os.environ.get("BUNDLE_ID", "com.ignaciojuarez.cofre")
-tunnel_bundle = os.environ.get("TUNNEL_BUNDLE_ID", "com.ignaciojuarez.cofre.tunnel")
+bundle = os.environ.get("BUNDLE_ID", "com.ignacio.cofre")
+tunnel_bundle = os.environ.get("TUNNEL_BUNDLE_ID", "com.ignacio.cofre.tunnel")
 if not bundle.startswith("com.") or not tunnel_bundle.startswith(bundle + "."):
     raise SystemExit("invalid bundle IDs")
 

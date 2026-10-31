@@ -27,7 +27,7 @@ python3 - "$TAG" <<'PY'
 import plistlib,sys
 from pathlib import Path
 tag=sys.argv[1]
-plist={'items':[{'assets':[{'kind':'software-package','url':f'https://github.com/ignaciojuarez/cofre/releases/download/{tag}/Cofre.ipa'}],'metadata':{'bundle-identifier':'com.ignaciojuarez.cofre','bundle-version':tag[1:], 'kind':'software','title':'Cofre'}}]}
+plist={'items':[{'assets':[{'kind':'software-package','url':f'https://github.com/ignaciojuarez/cofre/releases/download/{tag}/Cofre.ipa'}],'metadata':{'bundle-identifier':'com.ignacio.cofre','bundle-version':tag[1:], 'kind':'software','title':'Cofre'}}]}
 Path('manifest.plist').write_bytes(plistlib.dumps(plist))
 PY
 NOTES=".work/release-notes-$TAG.md"; printf 'Cofre %s\n' "$TAG" > "$NOTES"

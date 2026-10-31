@@ -14,14 +14,45 @@ load_config # the build tools reset some of these
 BUILD=0
 SQIM=0
 NO_INSTALL=0
-export RELAY_HOST RELAY_DEVICE_ID SIGNING_IDENTITY TEAM_ID BOOTJDK MAKE_ARGS
+LOCAL_INSTALL=0
+export RELAY_HOST RELAY_DEVICE_ID SIGNING_IDENTITY TEAM_ID BOOTJDK MAKE_ARGS BUNDLE_ID TUNNEL_BUNDLE_ID
+DEVICE_ID="${DEVICE_ID:-$RELAY_DEVICE_ID}"
+export DEVICE_ID
+
+[[ "$BUNDLE_ID" == com.* ]] || bt_die "invalid app bundle ID: $BUNDLE_ID"
+[[ "$TUNNEL_BUNDLE_ID" == "$BUNDLE_ID."* ]] || bt_die "invalid tunnel bundle ID: $TUNNEL_BUNDLE_ID"
+
+# Match the shared iOS runner's convenient entry points while keeping Cofre's
+# Air build pipeline local to this project:
+#   scripts/run.sh local fast     Build and install on a phone attached here.
+#   scripts/run.sh remote fast    Build and install through the MacBook relay.
+#   scripts/run.sh local sim      Use the simulator runner.
+if [[ "${1:-}" == local || "${1:-}" == remote ]]; then
+  WHERE=$1
+  shift
+  MODE=${1:-fast}
+  shift || true
+  case "$MODE" in
+    sim)
+      [[ "$WHERE" == local ]] || bt_die "simulator mode is local only"
+      exec "$ROOT/scripts/sim.sh" "$@"
+      ;;
+    fast|full)
+      BUILD=1
+      [[ "$WHERE" == local ]] && LOCAL_INSTALL=1
+      ;;
+    *) bt_die "unknown runner mode: $MODE (use sim, fast, or full)" ;;
+  esac
+fi
+
 for a in "$@"; do
   case "$a" in
     --build) BUILD=1 ;;
     --sqim) SQIM=1 ;;
     --no-install) NO_INSTALL=1 ;;
+    --local) LOCAL_INSTALL=1 ;;
     --relay-host=*) RELAY_HOST=${a#*=} ;;
-    --device=*) RELAY_DEVICE_ID=${a#*=} ;;
+    --device=*) RELAY_DEVICE_ID=${a#*=}; DEVICE_ID=${a#*=} ;;
     *) bt_die "unknown option: $a" ;;
   esac
 done
@@ -63,7 +94,9 @@ if (( BUILD )); then
   bt_step "Build CofreCore framework"
   SIGNING="$ROOT/.build-tools/signing"
   (cd "$SIGNING" && xcodegen generate --spec project.yml --quiet) || bt_die "could not generate the signing project"
-  xcodebuild -project "$SIGNING/CofreSigning.xcodeproj" -scheme CofreSigning -configuration Debug -destination 'generic/platform=iOS' -derivedDataPath "$SIGNING/build" -allowProvisioningUpdates DEVELOPMENT_TEAM="$TEAM_ID" -quiet build || bt_die "CofreCore build failed"
+  xcodebuild -project "$SIGNING/CofreSigning.xcodeproj" -scheme CofreSigning -configuration Debug \
+    -destination 'generic/platform=iOS' -derivedDataPath "$SIGNING/build" \
+    -allowProvisioningUpdates DEVELOPMENT_TEAM="$TEAM_ID" -quiet build || bt_die "Cofre signing build failed"
   mkdir -p "$APP/Frameworks"
   cp -R "$SIGNING/build/Build/Products/Debug-iphoneos/CofreCore.framework" "$APP/Frameworks/"
   # SwiftPM resources (CofreUI fonts) live in *_*.bundle; Bundle.module looks for them at the app root.
@@ -72,12 +105,6 @@ if (( BUILD )); then
     cp -R "$bundle" "$APP/"
   done
   [[ -d "$APP/CofreUI_CofreUI.bundle" ]] || bt_die "CofreUI resources missing from the app"
-  bt_step "Build VPN extension"
-  SIGNING="$ROOT/.build-tools/signing"
-  (cd "$SIGNING" && xcodegen generate --spec project.yml --quiet) || bt_die "could not generate the signing project"
-  xcodebuild -project "$SIGNING/CofreSigning.xcodeproj" -scheme CofreSigning -configuration Debug \
-    -destination 'generic/platform=iOS' -derivedDataPath "$SIGNING/build" \
-    -allowProvisioningUpdates DEVELOPMENT_TEAM="$TEAM_ID" -quiet build || bt_die "VPN extension build failed"
   rm -rf "$APP/PlugIns"
   mkdir -p "$APP/PlugIns"
   cp -R "$SIGNING/build/Build/Products/Debug-iphoneos/PacketTunnel.appex" "$APP/PlugIns/PacketTunnel.appex"
@@ -88,4 +115,12 @@ fi
 codesign -d --entitlements - "$APP" 2>/dev/null | grep -q get-task-allow || bt_die "not development-signed"
 if (( SQIM )); then bt_sqim_upload "$APP"; exit 0; fi
 if (( NO_INSTALL )); then exit 0; fi
-bt_relay_preflight; bt_relay_install "$APP" "$BUNDLE_ID"
+if (( LOCAL_INSTALL )); then
+  [[ -n "$DEVICE_ID" ]] || bt_die "set DEVICE_ID (or pass --device=<udid>) for local installs"
+  bt_step "Install $APP_NAME on $DEVICE_ID"
+  xcrun devicectl device install app --device "$DEVICE_ID" "$APP"
+  xcrun devicectl device process launch --device "$DEVICE_ID" --terminate-existing "$BUNDLE_ID"
+else
+  bt_relay_preflight
+  bt_relay_install "$APP" "$BUNDLE_ID"
+fi

@@ -9,6 +9,7 @@ SIGNING="$ROOT/.build-tools/signing"
 mkdir -p "$OUT"
 source "$ROOT/scripts/run.config"
 [[ -f "$ROOT/scripts/run.local.config" ]] && source "$ROOT/scripts/run.local.config"
+export BUNDLE_ID TUNNEL_BUNDLE_ID
 echo "CofreBuild $SHA"
 echo "Output $OUT"
 # Air's simulator CMake graph still links device-only framework stubs. Build
@@ -24,7 +25,7 @@ rm -rf "$APP/Frameworks/CofreCore.framework"
 cp -R "$CORE" "$APP/Frameworks/"
 for bundle in "$OUT/derived"/Build/Products/Debug-iphoneos/*_*.bundle; do
   [[ -d "$bundle" ]] || continue
-  rm -rf "$APP/$(basename "$bundle")"
+  rm -rf "${APP:?}/$(basename "$bundle")"
   cp -R "$bundle" "$APP/"
 done
 retag() {
@@ -46,5 +47,5 @@ while IFS= read -r -d '' f; do
   xcrun vtool -show-build "$f" 2>/dev/null | grep -q 'platform IOSSIMULATOR' || { echo "platform validation failed: $f" >&2; exit 1; }
 done < <(find "$APP" -type f -print0 | while IFS= read -r -d '' f; do file "$f" | grep -q 'Mach-O' && printf '%s\0' "$f"; done)
 xcrun simctl install "$UDID" "$APP"
-xcrun simctl launch "$UDID" com.ignaciojuarez.cofre
+xcrun simctl launch "$UDID" "$BUNDLE_ID"
 echo "Installed $APP on $UDID"

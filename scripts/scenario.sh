@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
-ROOT="$(cd -P "$(dirname "$0")/.." && pwd)"
 scenario=${1:?usage: scripts/scenario.sh scenario.json [--device UDID] [--timeout seconds]}
 device=COFRE_DEVICE_UDID; timeout=900
 shift
 while (($#)); do case "$1" in --device) device=$2; shift 2;; --timeout) timeout=$2; shift 2;; *) echo "unknown option: $1" >&2; exit 2;; esac; done
 [[ -f "$scenario" ]] || { echo "missing scenario: $scenario" >&2; exit 2; }
 name=$(basename "$scenario" .json); stamp=$(date +%Y%m%d-%H%M%S); out="/tmp/cofre-scenarios/$name-$stamp"; mkdir -p "$out"
-bundle=com.ignaciojuarez.cofre; file=$(basename "$scenario")
+bundle=com.ignacio.cofre; file=$(basename "$scenario")
 xcrun devicectl device copy to --device "$device" --domain-type appDataContainer --domain-identifier "$bundle" --source "$scenario" --destination "Documents/$file" >/dev/null
 xcrun devicectl device process terminate --device "$device" "$bundle" >/dev/null 2>&1 || true
 since=$(date -v-5S "+%Y-%m-%d %H:%M:%S")  # ignore the previous run's log until the app rotates it
