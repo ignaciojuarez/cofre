@@ -372,3 +372,25 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 | 9 | Default | launcher flows | — | — | BLOCKED | — | — | runner/UI then device unavailable | — |
 
 Vanilla evidence: `[Cofre] renderer resolved -> libmetallum.dylib`, `[Cofre] first-frame source=metal`, and `launch overlay dismissed after first frame`; FPS was not visible. No crash log was opened.
+
+### Day pass update (2026-10-31, current HEAD)
+
+- Start: current HEAD installed with mandated build lock on physical iPad mini `COFRE_DEVICE_UDID`; device remained connected throughout. No iPhone access.
+- Vanilla 26.3: PASS. First frame reached on Metal; title screen captured. Cofre log contains `renderer resolved -> libmetallum.dylib`, `first-frame source=metal`, and `launch overlay dismissed after first frame`.
+- JIT: PASS. Play screen showed `JIT ready · Auto at launch · ON` before launch.
+- Launcher UI: PASS for Mods empty state, Settings Game pane, and RAM label (`Auto RAM`, `Memory`). No duplicate or navigation defect observed in the available pass.
+- Cases 2–7 and deeper mod/gallery/download flows: BLOCKED by the time-box after the required vanilla verification; no product defect asserted.
+
+| # | Instance | Version / loader | Renderer | Mods | Result | First-frame | FPS | Crash cause | Evidence |
+|---:|---|---|---|---|---|---|---|---|---|
+| 1 | Default | 26.3 Vanilla | Metal | none | PASS | yes | not visible | none | `/tmp/cofre-device/day-2026-10-31/01-vanilla-55s.png`, `/tmp/cofre-device/day-2026-10-31/01-latestlog-current.txt` |
+| 2 | — | 26.2 Fabric | Metal | Sodium + Iris | BLOCKED (time-box) | — | — | not run | — |
+| 3 | — | 26.2 NeoForge | Auto → MobileGlues | EvilCraft + Cyclops Core | BLOCKED (time-box) | — | — | not run | — |
+| 4 | — | 1.21.11 Fabric | Auto → Metal | Sodium | BLOCKED (time-box) | — | — | not run | — |
+| 5 | — | 1.21.1 NeoForge | Auto | Bountiful + dependencies | BLOCKED (time-box) | — | — | not run | — |
+| 6 | — | 1.21.1 NeoForge | MobileGlues | RenderScale | BLOCKED (time-box) | — | — | not run | — |
+| 7 | — | small Modrinth pack | configured | pack contents | BLOCKED (time-box) | — | — | not run | — |
+| 8 | Default | in-game controls | Metal | — | BLOCKED (requires world load) | — | — | not run | — |
+| 9 | Default | launcher flows | — | — | PASS (Mods/Settings smoke) | n/a | n/a | none | agent-device snapshots; Settings shows `Auto RAM` and disabled `Memory` slider |
+
+Bugs found: none. Fixes: none. No commit beyond this test log update.
