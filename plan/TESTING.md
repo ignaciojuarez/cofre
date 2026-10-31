@@ -36,7 +36,7 @@ Legend: ✅ testable on the simulator · ⚠️ partly (UI states only) · 📱 
 > - Air has `PLATFORM=7` (`iossimulator`) and its Swift target compiles with `SDKPATH=$(xcrun --sdk iphonesimulator --show-sdk-path)`.
 > - The normal native recipe is not end-to-end simulator-clean: several commands remain hard-coded to `xcrun -sdk iphoneos` and `actool --platform iphoneos`. Do not run this against `.work/air` during device builds.
 > - Existing device payload binaries report `LC_BUILD_VERSION platform IOS` (including Air, renderer dylibs, Java runtime dylibs, and CofreCore). A disposable copy was retagged with `vtool ... -set-build-version 7`, every nested Mach-O was ad-hoc signed, and the VPN plug-in/provisioning profile were removed from that copy.
-> - Real bundle ID: `com.ignaciojuarez.cofre`. Install/relaunch: `xcrun simctl install <UDID> <app>` · `xcrun simctl launch <UDID> com.ignaciojuarez.cofre`.
+> - Real bundle ID: `com.ignacio.cofre`. Install/relaunch: `xcrun simctl install <UDID> <app>` · `xcrun simctl launch <UDID> com.ignacio.cofre`.
 > - Probe result: real Cofre launcher UI runs on both shared devices. It reaches the setup screen; no PreviewHost or mock data was installed. Screenshots: `/tmp/cofre-sim-probe-1793344038/iphone-2.png` and `/tmp/cofre-sim-probe-1793344038/ipad.png`.
 > - Installed probe UDIDs: iPhone `SIMULATOR_UDID`; iPad `SIMULATOR_UDID`.
 > - This is launcher-only evidence. The full game is not verified: the probe has no PacketTunnel (Network Extension is unavailable in Simulator), no JIT pairing/TXM, and no Microsoft account. Do not enter credentials in logs or files; owner must provide the test account at runtime.
@@ -265,7 +265,7 @@ export AGENT_DEVICE_IOS_TEAM_ID=APPLE_TEAM_ID \
   AGENT_DEVICE_IOS_RUNNER_APP_BUNDLE_ID=com.ignaciojuarez.agentdevice.runner \
   AGENT_DEVICE_IOS_RUNNER_TEST_BUNDLE_ID=com.ignaciojuarez.agentdevice.runner.uitests
 AD=<local-home>/.t3/tools/agent-device/0.21.31/node_modules/agent-device/dist/src/cli.js
-node $AD open com.ignaciojuarez.cofre --platform ios --udid COFRE_DEVICE_UDID --session cofre-ipad
+node $AD open com.ignacio.cofre --platform ios --udid COFRE_DEVICE_UDID --session cofre-ipad
 node $AD snapshot -i --session cofre-ipad        # then press/fill/scroll … --settle --session cofre-ipad
 node $AD close --session cofre-ipad              # always, when done
 ```

@@ -244,7 +244,7 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 
 | Area | Test case | Result | Evidence |
 |---|---|---|---|
-| Build/install/launch | `scripts/run.sh --build --no-install`; install and launch `com.ignaciojuarez.cofre` on UDID `COFRE_DEVICE_UDID` | PASS; build/install/launch completed. Device log reports `[Cofre] app version=0.1 build=98bd015`, `[Cofre] UI root installed`, foreground/active, and attached JIT mode | `/tmp/cofre-ipad-build.log`, `/tmp/cofre-ipad-install.log`, `/tmp/cofre-ipad-launch.log`, `/tmp/cofre-ipad-logs/latestlog.txt` |
+| Build/install/launch | `scripts/run.sh --build --no-install`; install and launch `com.cofre.app` on UDID `COFRE_DEVICE_UDID` | PASS; build/install/launch completed. Device log reports `[Cofre] app version=0.1 build=98bd015`, `[Cofre] UI root installed`, foreground/active, and attached JIT mode | `/tmp/cofre-ipad-build.log`, `/tmp/cofre-ipad-install.log`, `/tmp/cofre-ipad-launch.log`, `/tmp/cofre-ipad-logs/latestlog.txt` |
 | Physical UI control | agent-device session for the owner iPad mini | BLOCKED: `device_list` exposed simulators only and `device_open` rejected the requested physical UDID; CLI therefore refused to start without a device session | tool output in session; no non-Cofre screen captured |
 | Vanilla / loaders / versions / configurations / modpacks | requested launch matrix | BLOCKED pending physical agent-device session; no result claimed | — |
 

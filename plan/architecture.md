@@ -38,11 +38,11 @@ app/UI (one Swift package)
 │   NBT        NBT                           shared reader/writer for servers.dat and level.dat
 ├─ CofreUI    SwiftUI screens + one @Observable model per feature (InstancesModel, WorldsModel…), each using CofreKit directly
 └─ Engine     (in app/Glue) the only code that touches Air
-     protocol GameEngine { launch, signIn, refresh, testJIT, input, installLoader }   2 implementations: Air, and Preview
+     Air bridge entry points for launch, sign-in/refresh, JIT, input and loader installation
 ```
 
 - **Previews and tests** run on fixture folders (a sample `Documents/` in test resources) through the real
-  CofreKit types, plus `PreviewEngine`. That replaces the 1,200-line `MockBackend` and its drift.
+  CofreKit types and `MockBackend` sample data.
 - **The ObjC bridge** (`CofreAirBridging`, 33 methods today) shrinks to the engine. Profiles, worlds, mods,
   servers, accounts and preferences leave it as CofreKit owns them.
 
@@ -50,9 +50,9 @@ app/UI (one Swift package)
 
 | Today | After |
 |---|---|
-| ~18 facade protocols composed into `CofreBackend`, one real implementation | Concrete CofreKit types plus one `GameEngine` protocol |
+| ~18 facade protocols composed into `CofreBackend`, one real implementation | Concrete CofreKit types plus Air bridge entry points |
 | `CofreBackendAdapter` (+Instances, +Mods), ~1,500 lines of forwarding and string dictionaries | Deleted, piece by piece, per domain |
-| `MockBackend` + `MockServers` (~1,300 lines) | Fixture folders + `PreviewEngine` |
+| `MockBackend` + `MockServers` (~1,300 lines) | Fixture folders + focused mock data |
 | Air's ModService, ServerService, WorldService, ModrinthAPI and ModpackImportService calls | CofreKit Content, Servers, Worlds, Modrinth, Modpacks |
 | String launch events, KVC polls | Typed launch state machine (done in `ff659d2`) |
 | Large `CofreStore` | Small per-feature models |
@@ -66,7 +66,6 @@ app/UI (one Swift package)
 
 Order: Instances → Accounts → Logs → Worlds → Content (+ Modrinth) → Downloads → Modpacks → Engine seam.
 
-Engine seam first slice (BM): `GameEngine` now names the remaining Air work (launch, sign-in/refresh,
-JIT, input, loader installation, renderer/preferences keys and CurseForge). `PreviewEngine` is Air-free
-and emits no sample launcher data. The bridge inventory was recorded in an engine-seam audit;
+Engine seam first slice (BM): the remaining Air work is launch, sign-in/refresh, JIT, input, loader
+installation, renderer/preferences keys and CurseForge. The bridge inventory was recorded in an engine-seam audit;
 the uncalled `modsForProfile` bridge method and the superseded Draft/Servers comparison previews are removed.

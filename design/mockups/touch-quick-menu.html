@@ -1,0 +1,122 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{--panel:#1a1727;--well:#0c0b12;--btn:#2b2641;--bev:#3d3560;--out:#05040a;--ink:#ecedf3;--soft:#c5c7d1;--muted:#a29cb8;--accent:#9a86ff;--face:#5b3fd6;--faceBev:#8a74ff;--lip:#3a2694}
+  body{margin:0;font-family:var(--font-sans)}
+  .px{font-family:'Pixelify Sans',monospace}
+  h3{margin:18px 0 8px;font-size:13px;color:var(--muted-foreground,var(--muted));font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+  .cap{font-size:12px;color:var(--muted-foreground,#999);margin:6px 0 0}
+  /* game screen */
+  .game{position:relative;height:300px;border-radius:var(--radius);overflow:hidden;padding:0;
+    background:linear-gradient(#7fb6ff 0 55%,#6aa84f 55% 62%,#7a5a3a 62%)}
+  .glass{background:rgba(20,18,30,.78);box-shadow:inset 2px 2px 0 rgba(255,255,255,.18),inset -2px -2px 0 rgba(0,0,0,.45);color:#fff}
+  .menuBtn{position:absolute;top:14px;right:16px;width:40px;height:40px;display:grid;place-items:center;font-size:18px}
+  .menuBtn:after{content:"";position:absolute;left:3px;bottom:3px;width:5px;height:5px;background:var(--accent)}
+  .tray{position:absolute;top:14px;right:64px;display:grid;grid-template-columns:repeat(4,48px);gap:4px}
+  .tile{width:48px;height:48px;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:16px}
+  .tile b{font-size:9px;font-weight:500;margin-top:2px}
+  .tile i{position:absolute;top:2px;right:3px;font-size:7px;font-style:normal;opacity:.75}
+  .tile.hl{box-shadow:inset -2px -2px 0 rgba(255,255,255,.18),inset 2px 2px 0 rgba(0,0,0,.45);background:rgba(60,50,100,.85)}
+  .tile.fixed{outline:1px dashed rgba(255,255,255,.25);outline-offset:-4px}
+  .chip{position:absolute;top:60px;right:16px;font-size:10px;padding:3px 6px;outline:2px solid var(--accent)}
+  .cross{position:absolute;left:50%;top:48%;color:#fff;font-size:22px;transform:translate(-50%,-50%)}
+  .zone{position:absolute;left:0;top:0;bottom:0;width:40%;border-right:2px dashed rgba(255,255,255,.35);background:rgba(255,255,255,.06)}
+  .zone span{position:absolute;top:10px;left:10px;font-size:10px;color:#fff;opacity:.8}
+  .stick{position:absolute;left:60px;bottom:70px;width:70px;height:70px;border-radius:50%;border:1px solid rgba(255,255,255,.35)}
+  .hotbar{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:2px}
+  .hotbar div{width:26px;height:26px;font-size:9px;display:grid;place-items:center}
+  .hotbar .sel{outline:2px solid #fff}
+  .jump{position:absolute;right:22px;bottom:56px;width:52px;height:52px;display:grid;place-items:center;font-size:10px}
+  .finger{position:absolute;width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.45);border:2px solid #fff}
+  /* app panels */
+  .row2{display:grid;grid-template-columns:1.15fr 1fr;gap:12px}
+  .app{background:var(--panel);color:var(--ink);padding:16px;border-radius:var(--radius);outline:2px solid var(--out)}
+  .bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:14px}
+  .bar .act{font-size:12px;color:var(--accent)}
+  .mini{display:grid;grid-template-columns:repeat(4,40px);gap:4px}
+  .mini .tile{width:40px;height:40px;background:var(--btn);box-shadow:inset 0 2px 0 var(--bev),inset 0 -2px 0 var(--out)}
+  .mini .tile.sel{outline:2px solid var(--accent);outline-offset:1px}
+  .lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:10px 0 4px}
+  .item{display:flex;align-items:center;justify-content:space-between;background:var(--well);padding:7px 8px;margin-bottom:3px;font-size:12px}
+  .item kbd{font-size:10px;color:var(--soft);background:var(--btn);padding:1px 5px;margin-left:6px}
+  .plus{color:var(--accent);font-weight:700}
+  .btns{display:flex;gap:4px;margin-top:8px}
+  .b{background:var(--btn);box-shadow:inset 0 2px 0 var(--bev),inset 0 -3px 0 var(--out);padding:6px 9px;font-size:11px}
+  .b.p{background:var(--face);box-shadow:inset 0 2px 0 var(--faceBev),inset 0 -3px 0 var(--lip);color:#fff}
+  .field{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #2a2540;font-size:12px}
+  .seg{display:flex}.seg span{padding:4px 8px;background:var(--well);font-size:11px}.seg .on{background:var(--face);color:#fff}
+  /* slider */
+  .slider{background:var(--panel);color:var(--ink);padding:12px 14px;border-radius:var(--radius);outline:2px solid var(--out)}
+  .track{position:relative;height:44px}
+  .rail{position:absolute;top:16px;left:0;right:0;height:12px;background:var(--well);outline:2px solid var(--out);outline-offset:-2px}
+  .fill{position:absolute;left:0;top:0;bottom:0;background:var(--face)}
+  .tick{position:absolute;top:31px;width:2px;height:8px;background:#8a82a3}
+  .thumb{position:absolute;top:11px;width:14px;height:22px;background:#fff;box-shadow:inset 0 -3px 0 #c9c9c9;outline:2px solid var(--out);outline-offset:-2px}
+</style></head><body>
+
+<h3>1 · In game — hold ☰ for the quick tray</h3>
+<div class="game">
+  <div class="zone"><span class="px">Stick area 40% (shown while editing slider)</span></div>
+  <div class="stick"></div>
+  <div class="cross">┼</div>
+  <div class="tray px">
+    <div class="tile glass fixed">⎋<b>Pause</b></div>
+    <div class="tile glass">◐<b>View</b><i>F5</i></div>
+    <div class="tile glass">☰<b>Players</b><i>Tab</i></div>
+    <div class="tile glass">⇄<b>Swap</b><i>F</i></div>
+    <div class="tile glass">◌<b>Hide HUD</b><i>F1</i></div>
+    <div class="tile glass hl">M<b>Map</b><i>M</i></div>
+    <div class="tile glass">⌨<b>Keys</b></div>
+    <div class="tile glass fixed">✎<b>Edit</b></div>
+  </div>
+  <div class="finger" style="top:76px;right:150px"></div>
+  <div class="menuBtn glass px">☰</div>
+  <div class="chip glass px">Zoom ×</div>
+  <div class="jump glass px">JUMP</div>
+  <div class="hotbar px"><div class="glass">💬</div><div class="glass sel">1</div><div class="glass">2</div><div class="glass">3</div><div class="glass">4</div><div class="glass">5</div><div class="glass">6</div><div class="glass">7</div><div class="glass">8</div><div class="glass">9</div><div class="glass">▦</div></div>
+</div>
+<p class="cap">Tap ☰ = pause. Hold = tray; slide to a tile, release to fire. Pause/Edit fixed, 6 slots yours. Latched Toggle keys show a chip to release. Long-press a hotbar slot = drop.</p>
+
+<div class="row2">
+  <div>
+    <h3>2 · Edit tray</h3>
+    <div class="app px">
+      <div class="bar"><span>Quick menu</span><span class="act">Reset · Done</span></div>
+      <div class="mini">
+        <div class="tile">⎋<b>Pause</b></div><div class="tile">◐<b>View</b></div><div class="tile">☰<b>Players</b></div><div class="tile">⇄<b>Swap</b></div>
+        <div class="tile">◌<b>HUD</b></div><div class="tile sel">M<b>Map</b></div><div class="tile">⌨<b>Keys</b></div><div class="tile">✎<b>Edit</b></div>
+      </div>
+      <div class="btns"><span class="b">◀ Move</span><span class="b">Move ▶</span><span class="b">Remove</span></div>
+      <div class="lbl">Common</div>
+      <div class="item"><span>Drop<kbd>Q</kbd></span><span class="plus">+</span></div>
+      <div class="item"><span>Screenshot<kbd>F2</kbd></span><span class="plus">+</span></div>
+      <div class="lbl">Debug</div>
+      <div class="item"><span>Chunk borders<kbd>F3+G</kbd></span><span class="plus">+</span></div>
+      <div class="lbl">Custom keys</div>
+      <div class="item"><span>Map<kbd>M</kbd> Tap</span><span>✓</span></div>
+      <div class="item"><span>Zoom<kbd>C</kbd> Hold</span><span class="plus">+</span></div>
+      <div class="item"><span class="plus">＋ New custom key</span><span></span></div>
+    </div>
+  </div>
+  <div>
+    <h3>3 · Custom key (mods)</h3>
+    <div class="app px">
+      <div class="bar"><span>New key</span><span class="act">Cancel · Save</span></div>
+      <div class="field"><span>Label</span><span class="b">Zoom</span></div>
+      <div class="field"><span>Key</span><span><span class="b">C</span> <span class="b">Record</span></span></div>
+      <div class="field"><span>Chord</span><span class="b">+ Shift</span></div>
+      <div class="field"><span>Behaviour</span><span class="seg"><span>Tap</span><span class="on">Hold</span><span>Toggle</span></span></div>
+      <div class="field" style="border:0"><span>Preview</span><span style="color:var(--soft)">“Holds C while touched.”</span></div>
+    </div>
+    <h3>4 · Slider default tick (built)</h3>
+    <div class="slider px">
+      <div style="display:flex;justify-content:space-between;font-size:13px"><span>Stick area</span><span style="color:var(--soft)">50%</span></div>
+      <div class="track"><div class="rail"><div class="fill" style="width:75%"></div></div>
+        <div class="tick" style="left:calc((100% - 14px)*.5 + 6px)"></div>
+        <div class="thumb" style="left:calc((100% - 14px)*.75)"></div></div>
+      <div style="font-size:11px;color:var(--muted)">Tick = default (40%)</div>
+    </div>
+  </div>
+</div>
+</body></html>

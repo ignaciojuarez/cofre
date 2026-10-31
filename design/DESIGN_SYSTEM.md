@@ -165,7 +165,7 @@ Pixel scenes are static (no parallax). Haptics: `.selection` on segment and swit
 | 14 | **Spinner** | 4-pixel blink | — | Hidden from VoiceOver. The parent row says "Loading". Static under Reduce Motion. |
 | 15 | **StepBar** | bars only (compact) · bars + names (regular) | done, current, pending | Reads "Step 3 of 6, Pairing file" |
 | 16 | **PixelIcon** | 8×8-grid glyphs (grass, stone, ore(tint), book, gear, play, bolt, cmd, key, shield, check, paper, chest, head, cross; blocks dirt, cobble, planks, sand, gravel, log, bricks) and 12×12 loader marks (fabric, quilt, forge, neoforge; vanilla uses grass) × any size. Instance icons: pack PNG, else the user's pick, else the loader's mark or a block picked from the instance ID | dimmed (55% in nav) | Decorative (`accessibilityHidden`) unless it's the only content. Then it gets a label. |
-| 17 | **AppIcon** | placeholder `cofre-design/icons/01-vanilla.png` | — | Decorative |
+| 17 | **AppIcon** | amethyst pixel block `design/icons/02-amethyst-classic.png` | — | Decorative |
 | 18 | **PixelScene** | seeded moonlit lake (square moon, cube-tree forest, glowing cabin, mirrored water) × pixel size | — | Decorative. Ignores Smart Invert. Rendered once per seed and size, then cached. Keeps a dark top for white titles and the moon near the middle, so narrow crops keep it. |
 | 19 | **Stat** | value + label, tone | — | Combined: "142, mods" |
 | 20 | **Banner** | warn · ok · bad · info + optional action | — | Announced when it appears for errors (`AccessibilityNotification.Announcement`) |
@@ -265,7 +265,7 @@ NavModel { section, instance?, mod?, settingsPane, path[section] }   // one per 
 | M01 | Browse mods | AdaptiveListDetail | Segmented, Field(search), ChipGroup, Switch, Row+BlockButton(S)/Badge | `searchModrinth(query:)`, `searchCurseForge(query:)`, `install(pack:instanceID:)` · ⚠ project metadata |
 | M02 | Mod page | detail column / pushed | PixelIcon(64), Badge, AdaptiveGrid(Stat), PixelScene(gallery), Radio rows, Row(dependency), BlockButton | `install(pack:instanceID:)` · ⚠ versions, dependencies |
 | M03 | Import pack | Sheet(form) | Rows, DropZone, ProgressBar, Row(stage) | `importPack(_:instanceID:)` · ⚠ progress |
-| M04 | Installed | AdaptiveListDetail (filters ↔ list) | Segmented, Field(filter), Row+Switch, Badge(update/needs dep), BlockButton | `mods(instanceID:)`, `shaders(instanceID:)`, `resourcePacks(instanceID:)`, `toggleMod(instanceID:id:enabled:)`, `deleteMod(instanceID:id:)`, `updateMods(instanceID:)` |
+| M04 | Installed | AdaptiveListDetail (filters ↔ list) | Segmented, Field(filter), Row+Switch, Badge(update/needs dep), BlockButton | `mods(instanceID:)`, `shaders(instanceID:)`, `resourcePacks(instanceID:)`, `setEnabled(_:item:instanceID:)`, `delete(_:instanceID:)`, `updateAll(instanceID:)` |
 | X00 | Settings index | AdaptiveListDetail | ListSection×3, Row+PixelIcon | — |
 | X01 | Game | ReadableColumn | Slider, Switch, Segmented, Rows | `preferences(instanceID:)`, `setPreferences(_:instanceID:)` (`ramMB`, `renderer`, `resolution`, `fsr`) |
 | X02 | Renderer | ReadableColumn | Radio rows, Badge, Rows | `preferences.renderer` · ⚠ renderer list |

@@ -196,7 +196,7 @@ Overlaps with `logic-review.md` are noted, not repeated.
 
 ### M6. The same identifiers are hard-coded in many places
 - **Where:**
-  - `com.ignaciojuarez.cofre.tunnel`: `CofreJIT.swift:30`, `CofreBackendAdapter.swift:318`, `CofreTunnelService.m:3,4`, `run.config:4`, `sign-development.py:10`, `.build-tools/signing/project.yml`.
+  - `com.ignacio.cofre.tunnel`: `CofreJIT.swift:30`, `CofreBackendAdapter.swift:318`, `CofreTunnelService.m:3,4`, `run.config:4`, `sign-development.py:10`, `.build-tools/signing/project.yml`.
   - `10.7.0.1`: `CofreTunnelService.m:4`, `LoopbackTunnel.swift:10,13`, `PacketTunnelProvider.swift:12,54`.
   - `StikJIT/pairingFile.plist`: `CofreBackendAdapter.swift:305`, `CofrePairingImport.m:16-18`, `pair.rs:269`.
 - **Change:** add one `app/Glue/CofreIDs.swift`:
@@ -248,8 +248,7 @@ Overlaps with `logic-review.md` are noted, not repeated.
   - `Data(base64URL:)` is written 3 times: `Decoder.swift:83-89`, `Trust.swift:58-64` and `tools/server-card/Sources/server-card/main.swift:16-20`. Keep one `Base64URL.swift` (internal).
   - `server-card` redefines the envelope (`main.swift:4-11`). Add `.package(path: "../../app/ServerJoin")` and reuse `CardEnvelope`.
   - `Discovery.fetchEnvelope` (`Discovery.swift:24-29`) is unused; the adapter inlines the same 2 lines → use it, or delete it.
-  - `JoinDownloader` (`InstallEngine.swift:13`) has no implementation → delete.
-  - `InstallEngine`/`JoinFileSystem` aren't used outside tests → delete, or keep with a "planned" comment.
+  - The unused downloader/filesystem protocols and test-only install overload were removed; `InstallEngine.verify` is the live production path.
   - Magic limits `512 * 1024` (`Decoder.swift:25,37`) and `2_147_483_648` (`Decoder.swift:63`, `InstallEngine.swift:36`) → `enum CardLimits { static let cardBytes, packBytes }`.
   - The allowed-key set includes `min_launcher_version` and `signing` (`Decoder.swift:41`), which `ServerCard` ignores → add a comment saying why.
 

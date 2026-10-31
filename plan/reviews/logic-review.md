@@ -20,7 +20,7 @@ Scope: `cofre/` only, plus `launcher-plan/server-join/`. Read-only review on 202
 
 4. **Starting Cofre can reconfigure and start an unrelated VPN** — **CONFIRMED** (`cofre/app/Glue/AirBridge/CofreTunnelService.m:5-16`)
    - **What goes wrong:** The code takes `managers.firstObject` without matching Cofre's provider bundle or localized description. If another VPN manager is first, Cofre overwrites its protocol and starts it.
-   - **Fix:** Find the manager whose `protocolConfiguration` is `NETunnelProviderProtocol` with `providerBundleIdentifier == com.ignaciojuarez.cofre.tunnel`; create a new manager only when absent, and verify the identifier again after reload.
+   - **Fix:** Find the manager whose `protocolConfiguration` is `NETunnelProviderProtocol` with `providerBundleIdentifier == com.ignacio.cofre.tunnel`; create a new manager only when absent, and verify the identifier again after reload.
 
 5. **Pairing reports Wi-Fi enabled even when both lockdown writes fail** — **CONFIRMED** (`cofre/tools/llave/core/src/pair.rs:135-152`)
    - **What goes wrong:** Errors from `EnableWifiConnections` and `EnableWifiDebugging` are discarded, then `WifiEnabled` is emitted. On a device that rejects either setting, the app stores a pairing file and claims success; later JIT fails with a misleading error.

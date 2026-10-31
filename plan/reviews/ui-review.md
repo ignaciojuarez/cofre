@@ -150,7 +150,7 @@ Read-only review, 2026-10-29. Scope: `cofre/app/UI`, `cofre/tools/llave/App/Sour
 | Detail ⋯ | `InstancesScreen.swift:131` | 30 pt tall |
 | Sidebar pinned instances | `NavChrome.swift:127` | 36 pt tall |
 
-- **Fix:** `minWidth: 44` / `minHeight: 44`, or `.minimumHitArea()`. That modifier exists at `Block.swift:71` but nothing uses it.
+- **Fix:** `minWidth: 44` / `minHeight: 44` on each target; the unused hit-area modifier was removed.
 
 ### 14. The rail's JIT status relies on color, and the account may be hidden from VoiceOver — CONFIRMED (visual), PLAUSIBLE (VoiceOver)
 - **Where:** `NavChrome.swift:76-82`: "JIT" is the same word in green or gray. Screenshot: `ipad11-portrait-mods.png`. At `:83-84`, `.accessibilityHidden(false)` probably can't undo the `accessibilityHidden(true)` inside `PixelIcon`.
@@ -223,7 +223,7 @@ Read-only review, 2026-10-29. Scope: `cofre/app/UI`, `cofre/tools/llave/App/Sour
 - **Duplicates:**
   - The back-chevron button is implemented three times: `ColumnHeader.swift:20`, `Sheet.swift:45`, `SetupFlow.swift:51`.
   - "Label + Spacer + `SelectButton.compactStyle()` + `.padding(11).block(.panel)`" repeats six times in `SettingsScreen.swift` (plus `InstancesScreen.swift:238`). It should be one `PickerRow`.
-  - The 44 pt hit-area inset is re-derived inside each component while `minimumHitArea` goes unused.
+  - The 44 pt hit-area inset is re-derived inside each component.
   - Raw colors bypass the tokens: `BlockSlider.swift:52-53`, `Switch.swift:45-46`.
 
 ### 25. SwiftUI performance pitfalls — CONFIRMED (code)

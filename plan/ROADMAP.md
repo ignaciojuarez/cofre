@@ -25,13 +25,14 @@ same step.
 | 2 | **Accounts** | Remove with confirm, "Signed out, sign in again" row state, "Demo / doesn't own Java" warning, banners on Play | ✅ `263ff9b` `1c4e1b3` |
 | 3 | **Logs and crash reports** | Live log with search and filter, a redacted share bundle (Settings › Logs › Share report, and the crash screen's Share). This is also step 1–2 of [auto-triage](auto-triage.md) | ✅ `d52e309` `d81b536` `577d44b` |
 | 4 | **Worlds** | "Jump back in" on Play (recent worlds, quick play straight in), back up / restore, export / import `.zip`, copy to another instance, delete with undo plus Recently deleted, world cards | ✅ `8615a1e` `7c060fc` |
-| 5 | **Content parity** | Resource packs, shaders and data packs get the mods treatment: installed list, on/off, update, delete. "In use" is read-only from the game | 🚧 BG |
+| 5 | **Content parity** | Resource packs, shaders and data packs get the mods treatment: installed list, on/off, update, delete. "In use" is read-only from the game | 🚧 Built and Mac/simulator-tested (`CofreKit/Content.swift`): Installed has Mods · Shaders · Packs · Data, every kind turns on/off and deletes by its file, updates come from Modrinth for every kind (a data pack goes back into its world; an in-use pack keeps its file name so the game's choice holds). "In use" reads `options.txt` and `config/iris.properties` / `oculus.properties` / `optionsshaders.txt`, never written. One `ContentKind` (`folderName`, `isInstallable`). Device markers `[Cofre] content …` not yet checked |
 | 6a | **Over-the-air updates** | Play banner checks GitHub Releases once per launch and installs signed IPA via manifest | ✅ |
-| 6 | **Downloads and versions** | A downloads strip on Play, resume/retry, background downloads, disk-space preflight, a version picker (releases/snapshots) and loader version list | 🎯 |
-| 7 | **Modpack import + Files** | Import `.mrpack`/`.zip` from a file or link with staged rollback, "Open in Cofre" from Files and the share sheet | 🎯 |
+| 6 | **Downloads and versions** | A downloads strip on Play, resume/retry, background downloads, disk-space preflight, a version picker (releases/snapshots) and loader version list | 🚧 Built and Mac-tested (`CofreKit/Downloads.swift`, `VersionManifest.swift`): the queue survives relaunch (journal + resume data), big downloads on cellular ask (Download now / Wait) and start on Wi‑Fi, disk check in the version picker and before launch, snapshots switch, loader change from instance detail. Device markers `[Cofre] downloads …` not yet checked |
+| 7 | **Modpack import + Files** | Import `.mrpack`/`.zip` from a file or link with staged rollback, "Open in Cofre" from Files and the share sheet | 🚧 Built and Mac-tested (`ModpackImport`: receive, inspect, links, rollback; Air still downloads mods and installs the loader, now off the main thread). Needs a device check: `[Cofre] pack import done` |
 | 8 | ~~iOS niceties~~ | ❌ Not in the launcher (Ignacio): no heat/Low Power banner or power-saving switches. Big-download Wi-Fi gating stays in Downloads | — |
-| 9a | **Own Modrinth client** | Mod pages load slowly because Air fetches every version (hundreds for Sodium). A CofreKit Modrinth client asks for the instance's versions first and the rest in the background | 🎯 |
-| 9 | **Engine seam** | Dissolve `CofreBackendAdapter`, the facade protocols and `MockBackend` into CofreKit + `GameEngine` | 🎯 |
+| 9a | **Own Modrinth client** | Mod pages show instance-matching versions first, then merge the complete Modrinth catalog in the background; the page path never asks Air for Modrinth versions | ✅ |
+| 9 | **Engine seam** | Dissolve `CofreBackendAdapter`, the facade protocols and `MockBackend` into CofreKit + the Air bridge | 🎯 |
+| 10 | **Rich mod pages** | Rendered About, Gallery with a full-screen viewer, video cards, links, changelog in Versions; one `ProjectPage` for Modrinth and CurseForge ([rich-mod-pages](rich-mod-pages.md)) | 🤔 Planned: Modrinth steps 1–6 ready; CurseForge waits on the key decision |
 
 Z's variations, recommended picks taken (Ignacio: "I like it all"):
 - instances in sections with ★ Favorites first;
@@ -40,15 +41,20 @@ Z's variations, recommended picks taken (Ignacio: "I like it all"):
 
 ## 🚧 In progress
 
-- **Mod compatibility with the renderer (AH):**
-  - a "Not on Metal · 26.3" badge;
-  - a warning before Get;
-  - a Play-time sheet ("Iris doesn't run here", with Turn off and play).
-- **Servers on the real engine:** W's UI (`1cb801d`) plus V's engine (`1feffeb`, `84f1e3d`, now in `CofreKit/Servers.swift`). Still to wire:
-  - ping, join, copy, remove and discover in the app;
-  - SRV record lookup;
-  - `cofre://join` without a card offers Add + Join;
-  - a world's Play uses quick play.
+- **Mod compatibility with the renderer (AH):** built and simulator-tested (`ContentCompatibility` in
+  `CofreKit/Compatibility.swift`); device markers `[Cofre] compat …` not yet checked.
+  - ✅ a "Not on Metal · 26.3" badge on search rows, mod pages and installed rows (mods and shader packs);
+  - ✅ a warning before Get (mods, and shader packs on MobileGlues or on Metal without Iris);
+  - ✅ a Play-time sheet ("Iris doesn't run here", with Turn off and play / Play anyway). It reads the instance's
+    folder, so it holds for any instance, and it also covers an active shader pack on MobileGlues (Turn off uses
+    the shader mod's own switch).
+- **Servers on the real engine:** W's UI (`1cb801d`) plus V's engine (`1feffeb`, `84f1e3d`, now in `CofreKit/Servers.swift`). Built and Mac-tested; needs a device check:
+  - ping, join, copy, remove and discover are wired (`c1f7e99`); a duplicate is the same host and port (`play.x` = `play.x:25565`);
+  - SRV records: ping looks them up; quick play (1.20+) leaves it to the game; older versions get the SRV target as `--server`/`--port`;
+  - `cofre://join` without a card offers Add + Join (device-tested, B-008);
+  - a world's Play uses quick play (`--quickPlaySingleplayer`, 1.20+);
+  - server-card installs use the Import pack path (rollback, the real instance ID) and save the server to the new instance (bridge review B2).
+  - Device markers: `[Cofre] server saved profile=… address=…`, `[Cofre] server quick play instance=… args=…`, `[Cofre] pack import done instance=… server=…`.
 - **CofreKit migration:** started in `c379b09`, with servers moved in first.
 - **Computed compatibility (BC)** ([compatibility](compatibility.md)): no hand-kept list. A renderer manifest is read from the Metallum jar we ship, mod jars are scanned for declared problems, desktop natives and direct OpenGL/Vulkan use, and shader packs are scanned too. This replaces AH's hand-written table. 💤 Later: dry-run preflight and a crash-learned feed (needs auto-triage).
 
@@ -87,7 +93,7 @@ Z's variations, recommended picks taken (Ignacio: "I like it all"):
 | On MC 26.3, Metal runs no Iris or Sodium (Metallum supports Iris only on 26.2, Sodium on 1.21.11 and 26.2); Distant Horizons needs GL | Crash naming (`e2fa287`) + AH's warnings |
 | Metallum writes a log line per draw call (7 MB in 3 minutes), which likely costs FPS | Find a log-level switch or filter (performance #4) |
 | Touch overlay checks for "menu open" 10 times a second | An Air hook folded into an existing patch |
-| Metal on 1.21.11 is a black screen: the bundled Metallum lists 1.21.11, but Air loads its agent only for Minecraft 26+ | Auto uses Metal only on 26+ (`[Cofre] renderer auto`); enabling 1.21.11 needs Air's gate changed (fold into an existing patch) — owner decision |
+| Metal on 1.21.11 is a black screen: the bundled Metallum lists 1.21.11, but Air loads its agent only for Minecraft 26+ | Auto uses explicit MobileGlues for modern 1.20.5+ versions; keep Metal gated to 26+ until Air's agent gate is changed |
 | MobileGlues FSR turns the screen black: its upscale shader is desktop GLSL 4.50, which ANGLE on iOS rejects | Cofre keeps FSR off (`mobileglues.fsr1_setting = 0` at launch); report upstream to Air/MobileGlues |
 | Settings changed in game used to be overwritten at launch | ✅ `0e18921`: the game owns VSync, FPS and language |
 | Game untouchable for 45 s after launch | ✅ `aace89e` + the launch state machine `ff659d2` |
@@ -198,6 +204,16 @@ Done already: the frame rate is the game's (`0e18921`), and ProMotion's 30–120
   - update notifications;
   - LAN server scan and ping history;
   - world thumbnails and stats.
+- **Might do: shaders on MobileGlues** 💤
+  - Found 2026-10-30 (iPhone 17 Pro): Complementary Reimagined r5.9.3 with Iris 1.8.14 on NeoForge 1.21.1 fails at pipeline creation (`Draw buffers [0, 1] Status: 36054`, incomplete attachment). Iris turns shaders off and only says so in one chat line.
+  - Why there's no up-front "not supported" warning: MobileGlues reports OpenGL 4.0 to the game, while the real context is ANGLE on Metal with OpenGL ES 3.0. Iris's capability check passes.
+  - Likely cause (unverified): float colour targets (RGBA16F, R11F_G11F_B10F) can't be drawn into on this ES 3.0 context.
+  - Steps:
+    1. Test 3–4 packs (light, Complementary-style, heavy) to learn which ones work.
+    2. Then warn before shaders are turned on with MobileGlues, or mark known-good packs in the shader search.
+       ✅ A warning now shows for every shader pack on MobileGlues (Get, Installed and the Play-time sheet); narrow
+       it once step 1 finds packs that work.
+    3. Report the error to MobileGlues.
 - **P3 (skip):**
   - news, marketplace and Realms promos;
   - creator social feeds;
