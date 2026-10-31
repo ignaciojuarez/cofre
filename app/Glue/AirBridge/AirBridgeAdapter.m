@@ -1186,13 +1186,22 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
   BOOL explicit = [profile[@"renderer"] isKindOfClass:NSString.class]
       && [profile[@"renderer"] length] && ![profile[@"renderer"] isEqual:@"auto"]
       && ![profile[@"cofreRendererPicked"] boolValue];
-  if (!explicit) {
+  // MobileGlues is stored in Cofre's UI as "mobileglues", while Air's
+  // renderer bridge requires the actual dylib filename.  Minecraft 26.x
+  // reaches this explicit-profile path before Air can normalize the value;
+  // leaving the alias makes Air fall back to ANGLE and bind the wrong GL
+  // profile, so MobileGlues submits #version 300 es to a desktop context.
+  BOOL needsMobileGluesCanonicalName = explicit
+      && [profile[@"renderer"] isEqual:@"mobileglues"]
+      && [pick isEqual:@"libmobileglues.dylib"];
+  if (!explicit || needsMobileGluesCanonicalName) {
     if ([pick isEqual:@"auto"]) {
       [profile removeObjectForKey:@"renderer"];
       [profile removeObjectForKey:@"cofreRendererPicked"];
     } else {
       profile[@"renderer"] = pick;
-      profile[@"cofreRendererPicked"] = @YES;
+      if (!explicit) profile[@"cofreRendererPicked"] = @YES;
+      else [profile removeObjectForKey:@"cofreRendererPicked"];
     }
     NSMutableDictionary *profiles = [_profiles.profiles mutableCopy];
     profiles[name] = profile;
