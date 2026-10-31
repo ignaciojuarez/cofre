@@ -1,0 +1,505 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Cofre <cofre@example.invalid>
+Date: Sat, 31 Oct 2026 15:00:00 -0700
+Subject: [PATCH] [COFRE] Run Graft's 1.21.11 Metal renderer on iOS
+
+Reason: Graft v1.1.1 is macOS-only: it installs a CAMetalLayer on the GLFW Cocoa NSView, translates shaders for the macOS MSL platform, calls the macOS-only CAMetalLayer.displaySyncEnabled, and nests macOS shaderc/SPIRV-Cross natives. On iOS (Air) it must present through the launcher's published UIView CAMetalLayer with main-queue layer writes, target iOS MSL, and use the launcher's signed iOS shaderc/SPIRV-Cross.
+Drop when: Graft ships an iOS host-layer path (or a generic "external CAMetalLayer" hook) and an iOS MSL target upstream.
+---
+diff --git a/COFRE-NOTICE.md b/COFRE-NOTICE.md
+new file mode 100644
+index 0000000..a82d22e
+--- /dev/null
++++ b/COFRE-NOTICE.md
+@@ -0,0 +1,14 @@
++# Cofre iOS build of Graft
++
++This jar is a modified build of Graft (https://github.com/kkorenn/Graft, tag v1.1.1,
++commit 4386b98945178da071ba0ffe0b7a1e7e57eddb97), licensed under the GNU Lesser General
++Public License v3.0 (LICENSE_graft in this jar).
++
++Modified by Cofre (2026-10-31) to run on iOS inside the Air launcher:
++- detect iOS and present through the launcher's published UIView/CAMetalLayer
++  (layer writes on the main queue) instead of an AppKit NSView;
++- translate shaders for the iOS Metal platform (SPIRV-Cross MSL iOS target);
++- use the launcher's signed shaderc/SPIRV-Cross libraries instead of bundled macOS natives;
++- build only the Minecraft 1.21.11 Fabric module.
++
++The exact changes and build recipe are in the Cofre repository: patches/graft/ and scripts/graft.sh.
+diff --git a/core/src/main/java/dev/graft/metal/IosHost.java b/core/src/main/java/dev/graft/metal/IosHost.java
+new file mode 100644
+index 0000000..3c19a6d
+--- /dev/null
++++ b/core/src/main/java/dev/graft/metal/IosHost.java
+@@ -0,0 +1,191 @@
++package dev.graft.metal;
++
++import java.lang.foreign.Arena;
++import java.lang.foreign.FunctionDescriptor;
++import java.lang.foreign.Linker;
++import java.lang.foreign.MemoryLayout;
++import java.lang.foreign.MemorySegment;
++import java.lang.foreign.SymbolLookup;
++import java.lang.invoke.MethodHandle;
++import java.lang.invoke.MethodHandles;
++import java.lang.invoke.MethodType;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.util.Locale;
++
++import static dev.graft.metal.ObjC.*;
++import static java.lang.foreign.ValueLayout.*;
++
++/**
++ * iOS host integration (Cofre/Air, Amethyst, PojavLauncher). There is no AppKit window: the launcher owns a UIView whose
++ * backing layer is a CAMetalLayer and publishes its address as {@code -Dmetallum.ios.view.pointer=0x...}. UIKit and
++ * layer-tree writes run on the main queue; the render thread only acquires drawables and submits command buffers.
++ */
++public final class IosHost {
++	/** -Dgraft.ios=true|false overrides detection. */
++	public static final boolean ACTIVE = detect();
++
++	private static final SymbolLookup SYSTEM = ObjC.library("/usr/lib/libSystem.B.dylib");
++	private static MethodHandle dispatchSync;
++	private static MethodHandle pthreadMain;
++	private static MemorySegment mainQueue;
++	private static MemorySegment trampoline;
++	private static Runnable pending;
++	private static Throwable failure;
++
++	private IosHost() {
++	}
++
++	private static boolean detect() {
++		String forced = System.getProperty("graft.ios");
++		if (forced != null) {
++			return Boolean.parseBoolean(forced);
++		}
++		String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
++		if (os.contains("ios") || System.getProperty("metallum.ios.view.pointer") != null) {
++			return true;
++		}
++		// iOS JVMs may report "Mac OS X"/"Darwin". UIKit is loaded in every iOS app process and never in a desktop JVM.
++		// (Air registers AppKit stub classes, so the absence of NSApplication is not a usable signal.)
++		return (os.contains("mac") || os.contains("darwin")) && ObjC.classOrZero("UIApplication") != 0L;
++	}
++
++	private static synchronized void initDispatch() {
++		if (trampoline != null) {
++			return;
++		}
++		Linker linker = Linker.nativeLinker();
++		dispatchSync = linker.downcallHandle(SYSTEM.find("dispatch_sync_f").orElseThrow(), FunctionDescriptor.ofVoid(ADDRESS, JAVA_LONG, ADDRESS));
++		pthreadMain = linker.downcallHandle(SYSTEM.find("pthread_main_np").orElseThrow(), FunctionDescriptor.of(JAVA_INT));
++		// dispatch_get_main_queue() is a macro for &_dispatch_main_q.
++		mainQueue = SYSTEM.find("_dispatch_main_q").orElseThrow();
++		try {
++			MethodHandle target = MethodHandles.lookup().findStatic(IosHost.class, "runPending", MethodType.methodType(void.class, long.class));
++			trampoline = linker.upcallStub(target, FunctionDescriptor.ofVoid(JAVA_LONG), Arena.global());
++		} catch (ReflectiveOperationException e) {
++			throw new IllegalStateException(e);
++		}
++	}
++
++	/** Upcall on the main queue. Must never throw: an exception escaping an upcall aborts the process. */
++	private static void runPending(long context) {
++		long pool = poolPush();
++		try {
++			pending.run();
++		} catch (Throwable t) {
++			failure = t;
++		} finally {
++			poolPop(pool);
++		}
++	}
++
++	private static boolean isMainThread() {
++		try {
++			return (int)pthreadMain.invokeExact() != 0;
++		} catch (Throwable t) {
++			throw rethrow(t);
++		}
++	}
++
++	/** Runs body synchronously on the main queue (inline if already there). */
++	public static void onMain(Runnable body) {
++		initDispatch();
++		if (isMainThread()) {
++			body.run();
++			return;
++		}
++		synchronized (IosHost.class) {
++			pending = body;
++			failure = null;
++			try {
++				dispatchSync.invokeExact(mainQueue, 0L, trampoline);
++			} catch (Throwable t) {
++				throw rethrow(t);
++			} finally {
++				pending = null;
++			}
++			if (failure != null) {
++				Throwable t = failure;
++				failure = null;
++				throw rethrow(t);
++			}
++		}
++	}
++
++	/** The launcher's game UIView: -Dgraft.ios.view.pointer, Air/Metallum's property, Pojav's, then +[SurfaceViewController surface]. */
++	public static long hostView() {
++		for (String key : new String[]{"graft.ios.view.pointer", "metallum.ios.view.pointer", "pojav.view.pointer"}) {
++			String raw = System.getProperty(key);
++			if (raw != null && !raw.isBlank()) {
++				raw = raw.trim();
++				long view = Long.parseUnsignedLong(raw.startsWith("0x") || raw.startsWith("0X") ? raw.substring(2) : raw, 16);
++				if (view != 0L) {
++					return view;
++				}
++			}
++		}
++		long[] view = new long[1];
++		long controller = ObjC.classOrZero("SurfaceViewController");
++		if (controller != 0L) {
++			onMain(() -> view[0] = send(controller, sel("surface")));
++		}
++		if (view[0] == 0L) {
++			throw new IllegalStateException("Graft: no iOS game view. The launcher must pass -Dmetallum.ios.view.pointer=<UIView address>.");
++		}
++		return view[0];
++	}
++
++	/** The host view's own CAMetalLayer (not retained). Graft never creates or replaces the layer on iOS. */
++	public static long hostLayer() {
++		long view = hostView();
++		long[] layer = new long[1];
++		onMain(() -> {
++			long l = send(view, sel("layer"));
++			if (l == 0L || (send(l, sel("isKindOfClass:"), cls("CAMetalLayer")) & 0xFF) == 0) {
++				throw new IllegalStateException("Graft: the iOS game view's layer is not a CAMetalLayer");
++			}
++			layer[0] = l;
++		});
++		System.out.println("[Graft] iOS host layer " + Long.toHexString(layer[0]) + " from view " + Long.toHexString(view));
++		return layer[0];
++	}
++
++	/** Major OS version from NSProcessInfo (os.version is not reliable on iOS JVMs). */
++	public static int osMajor() {
++		MemoryLayout version = MemoryLayout.structLayout(JAVA_LONG, JAVA_LONG, JAVA_LONG);
++		MethodHandle get = ObjC.custom(FunctionDescriptor.of(version, JAVA_LONG, JAVA_LONG));
++		try (Arena arena = Arena.ofConfined()) {
++			MemorySegment v = (MemorySegment)get.invokeExact((java.lang.foreign.SegmentAllocator)arena, send(cls("NSProcessInfo"), sel("processInfo")), sel("operatingSystemVersion"));
++			return (int)v.get(JAVA_LONG, 0);
++		} catch (Throwable t) {
++			return 0;
++		}
++	}
++
++	/**
++	 * Points LWJGL's shaderc and SPIRV-Cross at the launcher's signed iOS libraries (app Frameworks, on
++	 * java.library.path) unless the launcher already chose them. Must run before Shaderc/Spvc are first initialized.
++	 */
++	public static void prepareNatives() {
++		pick("org.lwjgl.shaderc.libname", "libshaderc.dylib");
++		pick("org.lwjgl.spvc.libname", "libspirv-cross-c-shared.0.dylib", "libspvc.dylib");
++	}
++
++	private static void pick(String property, String... files) {
++		if (System.getProperty(property) != null) {
++			System.out.println("[Graft] iOS " + property + "=" + System.getProperty(property) + " (launcher)");
++			return;
++		}
++		for (String dir : System.getProperty("java.library.path", "").split(java.io.File.pathSeparator)) {
++			for (String file : files) {
++				Path path = Path.of(dir, file);
++				if (!dir.isEmpty() && Files.isRegularFile(path)) {
++					System.setProperty(property, path.toString());
++					System.out.println("[Graft] iOS " + property + "=" + path);
++					return;
++				}
++			}
++		}
++		System.out.println("[Graft] iOS " + property + " not found on java.library.path; LWJGL default lookup");
++	}
++}
+diff --git a/core/src/main/java/dev/graft/metal/MetalSurface.java b/core/src/main/java/dev/graft/metal/MetalSurface.java
+index b262465..71014cb 100644
+--- a/core/src/main/java/dev/graft/metal/MetalSurface.java
++++ b/core/src/main/java/dev/graft/metal/MetalSurface.java
+@@ -1,6 +1,5 @@
+ package dev.graft.metal;
+ 
+-import java.lang.foreign.Arena;
+ import java.lang.foreign.FunctionDescriptor;
+ import java.lang.foreign.SymbolLookup;
+ import java.lang.invoke.MethodHandle;
+@@ -14,7 +13,7 @@ import static java.lang.foreign.ValueLayout.JAVA_LONG;
+  * Metal schedules the present on the command buffer, so it is attached during blit and present() only drops the drawable.
+  */
+ public final class MetalSurface implements AutoCloseable {
+-	private static final SymbolLookup CG = SymbolLookup.libraryLookup("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics", Arena.global());
++	private static final SymbolLookup CG = ObjC.library("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics");
+ 	private static final MethodHandle CS_CREATE = fn(CG, "CGColorSpaceCreateWithName", FunctionDescriptor.of(JAVA_LONG, JAVA_LONG));
+ 	private static final MethodHandle CS_RELEASE = fn(CG, "CGColorSpaceRelease", FunctionDescriptor.ofVoid(JAVA_LONG));
+ 	private final MetalDevice device;
+@@ -22,6 +21,9 @@ public final class MetalSurface implements AutoCloseable {
+ 	private long drawable;
+ 	private int width;
+ 	private int height;
++	private int layerWidth = -1;
++	private int layerHeight = -1;
++	private int layerVsync = -1;
+ 	/**
+ 	 * -Dgraft.offscreen=true (benchmarks): frames are "presented" into a private texture instead of a window
+ 	 * drawable. macOS throttles drawables of hidden/occluded windows, which would cap a background benchmark's frame rate.
+@@ -39,15 +41,33 @@ public final class MetalSurface implements AutoCloseable {
+ 		}
+ 	}
+ 
+-	/** Wraps an existing CAMetalLayer (retained here). */
++	/** Wraps an existing CAMetalLayer (retained here). On iOS the layer belongs to a live UIView: configure it on main. */
+ 	public MetalSurface(MetalDevice device, long layer) {
+ 		this.device = device;
+ 		this.layer = retain(layer);
+-		send(layer, sel("setDevice:"), device.device);
+-		send(layer, sel("setPixelFormat:"), Mtl.PIXEL_BGRA8);
+-		send(layer, sel("setFramebufferOnly:"), 1L);
+-		send(layer, sel("setMaximumDrawableCount:"), 3L);
+-		setColorspace(layer, MetalConfig.displayP3 ? "kCGColorSpaceDisplayP3" : "kCGColorSpaceSRGB");
++		onLayerThread(() -> {
++			send(layer, sel("setDevice:"), device.device);
++			send(layer, sel("setPixelFormat:"), Mtl.PIXEL_BGRA8);
++			send(layer, sel("setFramebufferOnly:"), 1L);
++			send(layer, sel("setMaximumDrawableCount:"), 3L);
++			// CAMetalLayer.colorspace is macOS 10.11+ / iOS 16+; iOS treats an untagged drawable as sRGB anyway.
++			if (send(layer, sel("respondsToSelector:"), sel("setColorspace:")) != 0L) {
++				setColorspace(layer, MetalConfig.displayP3 ? "kCGColorSpaceDisplayP3" : "kCGColorSpaceSRGB");
++			}
++		});
++	}
++
++	/** iOS: the launcher's own CAMetalLayer (Graft does not create, resize or replace it; Air owns frame and scale). */
++	public static MetalSurface forIosHost(MetalDevice device) {
++		return new MetalSurface(device, IosHost.hostLayer());
++	}
++
++	private static void onLayerThread(Runnable body) {
++		if (IosHost.ACTIVE) {
++			IosHost.onMain(body);
++		} else {
++			body.run();
++		}
+ 	}
+ 
+ 	/** Without an explicit colorspace macOS shows the drawable in the display's native gamut, oversaturating sRGB content. */
+@@ -83,8 +103,21 @@ public final class MetalSurface implements AutoCloseable {
+ 	public void configure(int width, int height, boolean vsync) {
+ 		this.width = width;
+ 		this.height = height;
+-		Calls.setDrawableSize(layer, width, height);
+-		send(layer, sel("setDisplaySyncEnabled:"), vsync ? 1L : 0L);
++		// Called every frame: only touch the layer when something changed (on iOS each write is a main-queue hop).
++		int sync = vsync ? 1 : 0;
++		if (width == layerWidth && height == layerHeight && sync == layerVsync) {
++			return;
++		}
++		layerWidth = width;
++		layerHeight = height;
++		layerVsync = sync;
++		onLayerThread(() -> {
++			Calls.setDrawableSize(layer, width, height);
++			// displaySyncEnabled is macOS-only (an unrecognized selector on iOS, where presentation always syncs).
++			if (!IosHost.ACTIVE) {
++				send(layer, sel("setDisplaySyncEnabled:"), sync);
++			}
++		});
+ 	}
+ 
+ 	/** Returns false if no drawable became available (window hidden or timeout). */
+diff --git a/core/src/main/java/dev/graft/metal/ObjC.java b/core/src/main/java/dev/graft/metal/ObjC.java
+index bf9d5d4..8a000d2 100644
+--- a/core/src/main/java/dev/graft/metal/ObjC.java
++++ b/core/src/main/java/dev/graft/metal/ObjC.java
+@@ -13,10 +13,10 @@ import static java.lang.foreign.ValueLayout.*;
+  */
+ public final class ObjC {
+ 	private static final Linker LINKER = Linker.nativeLinker();
+-	private static final SymbolLookup OBJC = SymbolLookup.libraryLookup("/usr/lib/libobjc.A.dylib", Arena.global());
+-	public static final SymbolLookup METAL = SymbolLookup.libraryLookup("/System/Library/Frameworks/Metal.framework/Metal", Arena.global());
++	private static final SymbolLookup OBJC = library("/usr/lib/libobjc.A.dylib");
++	public static final SymbolLookup METAL = library("/System/Library/Frameworks/Metal.framework/Metal");
+ 	// Loaded for its side effect: registers CAMetalLayer with the runtime.
+-	public static final SymbolLookup QUARTZ = SymbolLookup.libraryLookup("/System/Library/Frameworks/QuartzCore.framework/QuartzCore", Arena.global());
++	public static final SymbolLookup QUARTZ = library("/System/Library/Frameworks/QuartzCore.framework/QuartzCore");
+ 	private static final MemorySegment MSG_SEND = OBJC.find("objc_msgSend").orElseThrow();
+ 
+ 	private static final MethodHandle GET_CLASS = fn(OBJC, "objc_getClass", FunctionDescriptor.of(JAVA_LONG, ADDRESS));
+@@ -43,6 +43,27 @@ public final class ObjC {
+ 	private ObjC() {
+ 	}
+ 
++	/**
++	 * dlopen by absolute path (macOS and iOS keep these system paths in the dyld shared cache). If a launcher's dlopen
++	 * hook refuses the path, fall back to dlsym(RTLD_DEFAULT): an iOS app already links Metal, QuartzCore and libobjc.
++	 */
++	public static SymbolLookup library(String path) {
++		try {
++			return SymbolLookup.libraryLookup(path, Arena.global());
++		} catch (IllegalArgumentException e) {
++			MethodHandle dlsym = LINKER.downcallHandle(LINKER.defaultLookup().find("dlsym").orElseThrow(), FunctionDescriptor.of(ADDRESS, JAVA_LONG, ADDRESS));
++			Arena arena = Arena.global();
++			return name -> {
++				try {
++					MemorySegment symbol = (MemorySegment)dlsym.invokeExact(-2L /* RTLD_DEFAULT */, arena.allocateFrom(name));
++					return symbol.address() == 0L ? java.util.Optional.empty() : java.util.Optional.of(symbol);
++				} catch (Throwable t) {
++					throw rethrow(t);
++				}
++			};
++		}
++	}
++
+ 	static MethodHandle fn(SymbolLookup lib, String name, FunctionDescriptor desc) {
+ 		return LINKER.downcallHandle(lib.find(name).orElseThrow(() -> new UnsatisfiedLinkError(name)), desc);
+ 	}
+@@ -92,6 +113,15 @@ public final class ObjC {
+ 		});
+ 	}
+ 
++	/** objc_getClass without caching or throwing: 0 if the class isn't registered. */
++	public static long classOrZero(String name) {
++		try (Arena arena = Arena.ofConfined()) {
++			return (long)GET_CLASS.invokeExact(arena.allocateFrom(name));
++		} catch (Throwable t) {
++			throw rethrow(t);
++		}
++	}
++
+ 	public static long send(long obj, long sel) {
+ 		try {
+ 			return (long)J0.invokeExact(obj, sel);
+diff --git a/core/src/main/java/dev/graft/metal/ShaderTranslator.java b/core/src/main/java/dev/graft/metal/ShaderTranslator.java
+index 9abab54..f650f31 100644
+--- a/core/src/main/java/dev/graft/metal/ShaderTranslator.java
++++ b/core/src/main/java/dev/graft/metal/ShaderTranslator.java
+@@ -19,8 +19,9 @@ import java.util.List;
+  */
+ public final class ShaderTranslator {
+ 	public static final int PUSH_CONSTANTS = 24;
+-	/** MSL 3.1 (macOS 14+) has native texture atomics (GLSL imageAtomic*); older systems get 2.3. */
+-	static final int MSL_VERSION = macOSMajor() >= 14 ? 30100 : 20300;
++	/** MSL 3.1 (macOS 14+ / iOS 17+) has native texture atomics (GLSL imageAtomic*); older systems get 2.3. */
++	static final int MSL_VERSION = IosHost.ACTIVE ? (IosHost.osMajor() >= 17 ? 30100 : 20300) : macOSMajor() >= 14 ? 30100 : 20300;
++	private static final int MSL_PLATFORM = IosHost.ACTIVE ? Spvc.SPVC_MSL_PLATFORM_IOS : Spvc.SPVC_MSL_PLATFORM_MACOS;
+ 
+ 	private static int macOSMajor() {
+ 		try {
+@@ -157,7 +158,9 @@ public final class ShaderTranslator {
+ 
+ 				check(Spvc.spvc_compiler_create_compiler_options(compiler, ptr), context, name, "create options");
+ 				long options = ptr.get(0);
+-				Spvc.spvc_compiler_options_set_uint(options, Spvc.SPVC_COMPILER_OPTION_MSL_PLATFORM, Spvc.SPVC_MSL_PLATFORM_MACOS);
++				Spvc.spvc_compiler_options_set_uint(options, Spvc.SPVC_COMPILER_OPTION_MSL_PLATFORM, MSL_PLATFORM);
++				// Graft draws with baseInstance/baseVertex; on iOS SPIRV-Cross only honors them when told the GPU can (A9+).
++				Spvc.spvc_compiler_options_set_bool(options, Spvc.SPVC_COMPILER_OPTION_MSL_IOS_SUPPORT_BASE_VERTEX_INSTANCE, true);
+ 				Spvc.spvc_compiler_options_set_uint(options, Spvc.SPVC_COMPILER_OPTION_MSL_VERSION, MSL_VERSION);
+ 				Spvc.spvc_compiler_options_set_bool(options, Spvc.SPVC_COMPILER_OPTION_MSL_TEXTURE_BUFFER_NATIVE, true);
+ 				Spvc.spvc_compiler_options_set_bool(options, Spvc.SPVC_COMPILER_OPTION_MSL_ENABLE_POINT_SIZE_BUILTIN, true);
+diff --git a/mc1_21_11/build.gradle b/mc1_21_11/build.gradle
+index 66aca04..c5f49d8 100644
+--- a/mc1_21_11/build.gradle
++++ b/mc1_21_11/build.gradle
+@@ -1,6 +1,6 @@
+ plugins { id 'net.fabricmc.fabric-loom-remap' version "${loom_version}" }
+ 
+-base.archivesName = 'graft-1.21.11'
++base.archivesName = 'graft-ios-1.21.11'
+ java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+ 
+ repositories { maven { url = 'https://api.modrinth.com/maven'; content { includeGroup 'maven.modrinth' } } }
+@@ -12,18 +12,20 @@ dependencies {
+ 	implementation project(':core')
+ 	// Compat only; Sodium is not bundled. Jar from Modrinth (sodium-fabric 0.8.14+mc1.21.11).
+ 	modCompileOnly "maven.modrinth:sodium:mc1.21.11-0.8.14-fabric"
+-	// 1.21.x ships no shaderc / SPIRV-Cross (26.x does, for its Vulkan backend): bundle them at the game's LWJGL version.
++	// iOS (Cofre/Air): the launcher's LWJGL 3.3.3 already has lwjgl-shaderc/lwjgl-spvc on the game classpath and signed iOS
++	// libshaderc / libspirv-cross in the app's Frameworks. Nesting the jars would duplicate those classes, and macOS
++	// natives can't load on iOS, so compile against them only.
+ 	for (String module : ['lwjgl-shaderc', 'lwjgl-spvc']) {
+-		implementation "org.lwjgl:${module}:3.3.3"
+-		include "org.lwjgl:${module}:3.3.3"
+-		for (String natives : ['natives-macos-arm64', 'natives-macos']) {
+-			runtimeOnly "org.lwjgl:${module}:3.3.3:${natives}"
+-			include "org.lwjgl:${module}:3.3.3:${natives}"
+-		}
++		compileOnly "org.lwjgl:${module}:3.3.3"
+ 	}
+ }
+ 
+-jar { from(project(':core').sourceSets.main.output) }
++jar {
++	from(project(':core').sourceSets.main.output)
++	// LGPL-3.0: ship the license and the modification notice with the binary.
++	from(rootProject.file('LICENSE')) { rename { 'LICENSE_graft' } }
++	from(rootProject.file('COFRE-NOTICE.md'))
++}
+ 
+ // ./gradlew :mc1_21_11:runClient -Pquickplay=<world>
+ tasks.named('runClient') {
+diff --git a/mc1_21_11/src/main/java/dev/graft/v1_21_11/MetalGpuDevice.java b/mc1_21_11/src/main/java/dev/graft/v1_21_11/MetalGpuDevice.java
+index d21c103..48c83eb 100644
+--- a/mc1_21_11/src/main/java/dev/graft/v1_21_11/MetalGpuDevice.java
++++ b/mc1_21_11/src/main/java/dev/graft/v1_21_11/MetalGpuDevice.java
+@@ -55,6 +55,10 @@ public class MetalGpuDevice implements GpuDevice {
+ 
+ 	private static boolean disabled() {
+ 		dev.graft.metal.MetalConfig.load(net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("graft.properties"));
++		if (dev.graft.metal.IosHost.ACTIVE) {
++			LogUtils.getLogger().info("Graft: iOS host detected; presenting through the launcher's CAMetalLayer");
++			dev.graft.metal.IosHost.prepareNatives();
++		}
+ 		if (Boolean.getBoolean("graft.disable") || Boolean.getBoolean("graft.disabled")) {
+ 			return true;
+ 		}
+@@ -136,8 +140,13 @@ public class MetalGpuDevice implements GpuDevice {
+ 	/** presentTexture: draws the frame into the window's next drawable (presented by {@link #swap}). */
+ 	void blitToSurface(MetalTexture.View view) {
+ 		if (surface == null) {
+-			long nsWindow = GLFWNativeCocoa.glfwGetCocoaWindow(window);
+-			surface = MetalSurface.forNSView(metal, ObjC.send(nsWindow, ObjC.sel("contentView")), MetalSurface.backingScale(nsWindow));
++			if (dev.graft.metal.IosHost.ACTIVE) {
++				// No AppKit/GLFW Cocoa handles on iOS: the launcher publishes its game view.
++				surface = MetalSurface.forIosHost(metal);
++			} else {
++				long nsWindow = GLFWNativeCocoa.glfwGetCocoaWindow(window);
++				surface = MetalSurface.forNSView(metal, ObjC.send(nsWindow, ObjC.sel("contentView")), MetalSurface.backingScale(nsWindow));
++			}
+ 		}
+ 		surface.configure(view.getWidth(0), view.getHeight(0), vsync);
+ 		if (surface.acquire()) {
+diff --git a/mc1_21_11/src/main/resources/fabric.mod.json b/mc1_21_11/src/main/resources/fabric.mod.json
+index 1356084..33218e9 100644
+--- a/mc1_21_11/src/main/resources/fabric.mod.json
++++ b/mc1_21_11/src/main/resources/fabric.mod.json
+@@ -3,8 +3,8 @@
+ 	"id": "graft",
+ 	"version": "${version}",
+ 	"name": "Graft",
+-	"description": "Native Apple Metal renderer: replaces Minecraft's OpenGL device with Metal.",
+-	"license": "MIT",
++	"description": "Native Apple Metal renderer: replaces Minecraft's OpenGL device with Metal. iOS build for Cofre (modified, see COFRE-NOTICE.md).",
++	"license": "LGPL-3.0-only",
+ 	"environment": "client",
+ 	"icon": "assets/graft/icon.png",
+ 	"entrypoints": { "sodium:config_api_user": ["dev.graft.v1_21_11.compat.SodiumOptions"] },
+diff --git a/settings.gradle b/settings.gradle
+index 57bdee2..24e4bb5 100644
+--- a/settings.gradle
++++ b/settings.gradle
+@@ -9,4 +9,4 @@ pluginManagement {
+ 	}
+ }
+ rootProject.name = 'graft'
+-include 'core', 'mc26_2', 'mc26_3', 'mc1_21_6', 'mc1_21_7', 'mc1_21_8', 'mc1_21_9', 'mc1_21_10', 'mc1_21_11', 'mc1_8_9', 'mc1_12_2', 'mc1_7_10', 'mc1_21_5'
++include 'core', 'mc1_21_11'

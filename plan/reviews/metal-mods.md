@@ -87,6 +87,24 @@ Popular pack evidence is version-specific only when a pack version exists: Fabul
 - Official [VulkanMod](https://github.com/xCollateral/VulkanMod) 0.6.8 supports 1.21.11 and 26.1–26.1.2 on Fabric/Quilt; NeoForge forks target other ranges. [MoltenVK](https://github.com/KhronosGroup/MoltenVK) is a Vulkan implementation over Metal on iOS, but this is still a translation layer and not a direct Metal backend. VulkanMod issue #329 discusses macOS/M1 MoltenVK requirements; PR #474 (Pojav iOS) is closed/unmerged. No reproducible Cofre/iOS FPS result was found. Air’s direct MoltenVK result (<10 FPS) is not a VulkanMod benchmark, so do not conflate them.
 - MetalFX is useful only after a native backend is stable: it reduces GPU pixels, not Java tick/render translation cost. Metallum issue #15 says the spatial overhead often outweighs gains unless scale is below roughly 70%; MetalUniversal has an unmerged MetalFX/upscale branch. Add render-scale controls only with a native HUD, screenshot/rotation tests and a GPU-time acceptance threshold.
 
+## Graft 1.21.11 iOS port (prepared 2026-10-31, not device-tested)
+
+Build: `scripts/graft.sh` → `/tmp/graft-build/graft-ios-1.21.11-1.1.1-cofre.1.jar` (reproducible SHA-256 in the `.sha256` next to it). Patch: `patches/graft/0001`. Test: `scripts/graft.sh serve`, then `scripts/scenario.sh /tmp/graft-build/fabric-1.21.11-graft.json` (DEBUG build).
+
+| macOS-only piece in v1.1.1 (`4386b98`) | iOS port |
+|---|---|
+| `MetalGpuDevice.java:139-140` GLFW Cocoa NSWindow → `contentView`; `MetalSurface.java:66-80` `forNSView` (`setLayer:`/`setWantsLayer:`, `backingScaleFactor`) | Air's `-Dmetallum.ios.view.pointer` UIView (fallback `+[SurfaceViewController surface]`); its own CAMetalLayer, configured on the main queue |
+| `MetalSurface.java:87` `setDisplaySyncEnabled:` (macOS-only selector) | skipped on iOS; layer writes only when size changes |
+| `MetalSurface.java:50-58` `setColorspace:` | guarded by `respondsToSelector:` |
+| `ShaderTranslator.java:23-27,160` MSL platform MACOS, version from `os.version` | iOS platform, base vertex/instance on, MSL 3.1 from `NSProcessInfo` (iOS 17+) |
+| `mc1_21_11/build.gradle:15-23` nested lwjgl-shaderc/spvc + macOS natives | not nested; Air's `lwjgl-333` jars + signed `libshaderc`/`libspirv-cross-c-shared.0` in Frameworks |
+| `ObjC.java:16-19`, `MetalSurface.java:17` absolute dylib/framework paths | same paths (valid on iOS), with a `dlsym(RTLD_DEFAULT)` fallback |
+| `settings.gradle:12` legacy Forge modules need JDK 8 to configure | build includes only `core` + `mc1_21_11` |
+
+Verified on the Mac only: Graft's GPU smoke test passes in macOS and forced-iOS modes; all 80 translatable vanilla 1.21.11 core shader programs (160 MSL files) compile with `xcrun -sdk iphoneos metal -target air64-apple-ios17.0 -std=metal3.1`; the main-queue dispatch/upcall works. No macOS-only API without an iOS equivalent was found.
+
+Open risks for the device run: Air's Metallum agent must keep skipping Fabric (its log: `Fabric Loader detected - skipping injection`); Sodium 0.8.x makes Graft open an idle GL context, which on Air goes through ANGLE on the same CAMetalLayer (test vanilla first); `dispatch_sync` to main deadlocks if Air ever blocks main on the render thread; Graft is class version 69 (Java 25), so the Metal Java floor must keep picking 25; MetalUniversal's "black after first frame" on 26.2 may share a cause.
+
 ## Concrete Cofre plan
 
 1. **Lock the 26.2 baseline:** one MetalUniversal 1.0.4 jar, one tested Sodium 0.9.0 jar, Fabric API and Mod Menu; bundle signed iOS libmetallum/libspvc through the existing framework path. Reject duplicate IDs and any Air agent injection in this profile.

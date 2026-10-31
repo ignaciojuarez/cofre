@@ -1,0 +1,16 @@
+{
+  "name": "fabric-1.21.11-graft",
+  "version": "1.21.11",
+  "loader": "fabric",
+  "loaderVersion": "0.19.5",
+  "files": [
+    {
+      "url": "http://GRAFT_HOST:8765/graft-ios-1.21.11-1.1.1-cofre.1.jar",
+      "to": "mods/graft-ios-1.21.11-1.1.1-cofre.1.jar"
+    }
+  ],
+  "renderer": "metallum",
+  "resolution": 1.0,
+  "launch": true,
+  "fresh": true
+}
