@@ -24,9 +24,13 @@ Measured results only: what launched, what rendered, frame rate, memory, limits.
 | 10-31 | 26.2 | Fabric + Sodium + Iris | MobileGlues (after 097a82f) | ✅ | ⬛ black | — | 1149 | Still black with Sodium/Iris |
 | 10-31 | 26.2 | Fabric + **Metallum mod 1.0.4** + Sodium 0.9.0 | Metal (mod) | ✅ | ❓ screenshot black | **~57 / 55** (title) | 1104 | Run A: `Using graphics backend Metal`, steady 17.9 ms frames, thermal serious. Run B (same files): picked GlBackend → crash `no OpenGL context`. Flaky; investigating |
 | 10-31 | 26.2 | Fabric + **Metallum mod 1.0.4** + Sodium 0.9.0 | Metal (mod, canonical handoff) | ✅ | ⬛ black after first frame | **57.2 / 55** (t=60 s) | 1015 | Fresh process: `libmetallum.dylib`, `AMETHYST_METAL=1`, Metal/A15/CAMetalLayer; no GL crash. The screenshot stayed black despite Metal drawables, so visibility is still unresolved. |
+| 10-31 | 26.2 | Fabric + **MetalUniversal 1.0.4 (stock)** + Sodium 0.9.0 | Metal (mod, after 062e3e3) | ✅ | ✅ title ×3, ✅ world | **57.4 / 34** (world, 60 s; median 59.2) | 1957 | Black screen was the scenario runner deleting the instance at first frame (Fabric lost `.fabric/processedMods`). 4 runs in a row on Metal, all visible. Heap 960 MB; at 1280 MB, opening Create World hit ~2.5 GB and jetsam |
+| 10-31 | 26.2 | Fabric + MetalUniversal (own native) | Metal (mod) | ✅ | ✅ title | ~57 (title) | — | No Sodium. Jar's own `libmetallum.dylib` (ad-hoc signed) loads from instance `tmp/` with JIT; stock jar instead loads Air's `Frameworks/libmetallum.dylib` |
+| 10-31 | 26.2 | vanilla | Metal (Air agent) | ❌ | — | — | — | `NoClassDefFoundError org/slf4j/LoggerFactory` in `Metallum.<clinit>` |
 | 10-31 | 26.2 | Fabric + Metallum mod + Sodium + Iris | Metal (mod) | ❌ | — | — | 677 | Iris: `No GLCapabilities instance set` |
 | 10-31 | 1.21.11 | vanilla | Metal (Auto, after 12ee163) | ❌ | — | — | 1377 | `NoSuchMethodError SymbolLookup.findOrThrow`: agent needs Java 22+, game got Java 21. Fix in progress |
 | 10-31 | 1.21.11 | vanilla | MobileGlues requested | ✅ | ✅ title | — | — | Air attached the Metal agent anyway and Metal drew; picker choice ignored on manifest versions |
+| 10-31 | 1.21.11 | vanilla | Metal (Auto, after 09fd2fa) | ❌ | — | — | — | Java 25 now (`java-25-openjdk`), no `findOrThrow`. New crash: `NoClassDefFoundError com/metallum/agent/ShaderVersionBump`; Air's `metallum_agent.jar` lacks that class |
 | 10-31 | 26.3 | vanilla | MobileGlues requested | ✅ | — | — | 755 | Agent attached too; `Using graphics device: ANGLE … MobileGlues` this time |
 | 10-31 | 1.21.1 | NeoForge + JEI + Sodium + ModernFix | MobileGlues | ✅ | ✅ | ~30 (mod-warning screen) | 1236 | ModernFix warns FerriteCore missing |
 
@@ -42,6 +46,6 @@ Measured results only: what launched, what rendered, frame rate, memory, limits.
 | MC | Vanilla | Fabric | Forge / NeoForge | Notes |
 |---|---|---|---|---|
 | 26.3 / 26.4 / 26.1 | ✅ Air's agent | ❓ Metallum mod (testing) | ❌ | |
-| 26.2 | ✅ | ❓ Metallum mod (testing) | ❌ | Upstream Metallum lists Sodium + Iris for 26.2 |
+| 26.2 | ⚠️ Air agent crashed 10-31 (slf4j) | ✅ MetalUniversal 1.0.4 + Sodium 0.9.0 | ❌ | Upstream Metallum lists Sodium + Iris for 26.2; Iris still fails |
 | 1.21.11 | ✅ in manifest | ❓ | ❌ | |
 | 1.20.1 | ❌ | ❌ | ❌ | Older than Minecraft's GPU-device layer (1.21.5+) that Metallum plugs into; would need a new backend |
