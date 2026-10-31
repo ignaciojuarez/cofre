@@ -104,10 +104,13 @@
                             ForEach(Array(stageNames.enumerated()), id: \.offset) { i, name in
                                 let n = i + 1
                                 let cur = p?.stage ?? 0
+                                let failedStage = store.launchFailure?.failedStage
                                 let state: CheckState =
-                                    n < cur || p?.finished == true
+                                    n == failedStage
+                                    ? .failed("")
+                                    : n < cur || p?.finished == true
                                     ? .ready
-                                    : n == cur ? (store.launchError != nil ? .failed("") : .checking) : .unknown
+                                    : n == cur && store.launchFailure == nil ? .checking : .unknown
                                 Row(
                                     name, leading: { StatusMark(state: state).frame(width: 14) },
                                     trailing: {

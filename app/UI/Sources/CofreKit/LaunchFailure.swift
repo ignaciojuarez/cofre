@@ -25,7 +25,8 @@ public enum LaunchFailure: Error, Equatable, Sendable, LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .loaderMissing: "This modded instance has no installed loader. Reinstall the loader before launching."
+        case .loaderMissing:
+            "This modded instance has no installed loader. Pick a loader version in the instance, then try again."
         case .modsNeedLoader:
             "This instance has mods, but no mod loader is installed. Choose Fabric, Forge or NeoForge, then reinstall the instance."
         case .unknownLoader:
@@ -48,6 +49,17 @@ public enum LaunchFailure: Error, Equatable, Sendable, LocalizedError {
         case .jitUnavailable: .jit
         case .downloadFailed: .retry
         case .jvmExit, .unknown: .log
+        }
+    }
+
+    /// The launch stage that owns this failure, when the failure can be attributed to one.
+    /// Pre-flight validation failures happen before progress starts, so they leave every stage pending.
+    public var failedStage: Int? {
+        switch self {
+        case .jitUnavailable: 1
+        case .downloadFailed: 2
+        case .rendererUnsupported: 3
+        default: nil
         }
     }
 }
