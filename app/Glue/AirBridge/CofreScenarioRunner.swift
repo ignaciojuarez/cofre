@@ -47,6 +47,10 @@ final class CofreScenarioRunner {
     }
 
     private func execute() async {
+#if DEBUG
+        RendererPolicy.allowMetalForModdedScenario = scenario.renderer == .metallum
+        defer { RendererPolicy.allowMetalForModdedScenario = false }
+#endif
         guard let store = instances else {
             fail("instance", CofreBackendError.unavailable("instances"))
             return
@@ -114,6 +118,24 @@ final class CofreScenarioRunner {
                     for try await _ in backend.install(projectID: project.id, versionID: versions.first?.id ?? "latest", instanceID: instance.id) {}
                 }
                 if !scenario.mods.isEmpty { log("[Cofre] scenario name=\(scenario.name) step=mods result=ok") }
+            }
+
+            if !scenario.files.isEmpty {
+                guard let targetID, let directory = backend.air.gameDirectory(forProfile: targetID) else {
+                    throw CofreBackendError.unavailable("instance folder")
+                }
+                for file in scenario.files {
+                    guard let url = URL(string: file.url) else { throw CofreBackendError.unavailable("scenario file URL") }
+                    let (data, response) = try await URLSession.shared.data(from: url)
+                    guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+                        throw CofreBackendError.unavailable("scenario file download")
+                    }
+                    let destination = directory.appendingPathComponent(file.to)
+                    try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+                    try data.write(to: destination, options: .atomic)
+                    log("[Cofre] scenario name=\(scenario.name) file=\(file.to) bytes=\(data.count) result=ok")
+                }
+                step("files")
             }
 
             var prefs = try await backend.preferences(instanceID: targetID)

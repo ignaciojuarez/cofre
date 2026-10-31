@@ -13,6 +13,11 @@ public struct RendererManifest: Codable, Sendable, Hashable {
 }
 /// One decision for engine launch, compatibility checks, and renderer display.
 public enum RendererPolicy {
+#if DEBUG
+    /// Device scenarios may exercise Metal on a loader instance without changing normal policy.
+    public static var allowMetalForModdedScenario = false
+#endif
+
     public static func resolve(profile: [String: Any], metadata: [String: Any], globalSetting: String,
                                fallbackLoader: Instance.Loader? = nil, metalVersions: Set<String>) -> RendererID {
         let versionID = profile["lastVersionId"] as? String ?? metadata["id"] as? String ?? ""
@@ -33,8 +38,18 @@ public enum RendererPolicy {
         // Metallum is attached by Air only for a vanilla version id. A loader's
         // version id cannot use it, even when the base Minecraft version is in
         // the Metal manifest.
-        if setting != .auto { return isMetal(setting) && loader != .vanilla ? fallback : setting }
-        if globalSetting != .auto { return isMetal(globalSetting) && loader != .vanilla ? fallback : globalSetting }
+        if setting != .auto {
+#if DEBUG
+            if allowMetalForModdedScenario && isMetal(setting) && loader != .vanilla { return setting }
+#endif
+            return isMetal(setting) && loader != .vanilla ? fallback : setting
+        }
+        if globalSetting != .auto {
+#if DEBUG
+            if allowMetalForModdedScenario && isMetal(globalSetting) && loader != .vanilla { return globalSetting }
+#endif
+            return isMetal(globalSetting) && loader != .vanilla ? fallback : globalSetting
+        }
         // Air only attaches the bundled Metallum agent for Minecraft 26+.
         let major = Int(gameVersion.prefix(while: { $0.isNumber })) ?? 0
         if loader == .vanilla && major >= 26 && metalVersions.contains(gameVersion) { return .metallum }

@@ -11,4 +11,11 @@ final class ScenarioTests: XCTestCase {
         let s = CofreScenario(name: "x", version: "1.21.1", mods: ["sodium"], pack: "pack", resolution: 2)
         XCTAssertThrowsError(try s.validate())
     }
+
+    func testRemoteFilesDecodeAndRejectTraversal() throws {
+        let s = try CofreScenario.load(Data(#"{"name":"metal","version":"26.2","loader":"fabric","files":[{"url":"https://example.com/metallum.jar","to":"mods/metallum.jar"}]}"#.utf8))
+        XCTAssertEqual(s.files.first?.to, "mods/metallum.jar")
+        let bad = CofreScenario(name: "metal", version: "26.2", files: [.init(url: "https://example.com/x.jar", to: "mods/../x.jar")])
+        XCTAssertThrowsError(try bad.validate())
+    }
 }

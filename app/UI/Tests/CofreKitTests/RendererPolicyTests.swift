@@ -114,4 +114,16 @@ final class RendererPolicyTests: XCTestCase {
             RendererPolicy.resolve(setting: "metallum", gameVersion: "26.2", loader: .vanilla, metalVersions: ["26.2"]),
             "metallum")
     }
+
+    func testDebugScenarioCanKeepExplicitMetallumForFabric() {
+        #if DEBUG
+            RendererPolicy.allowMetalForModdedScenario = true
+            defer { RendererPolicy.allowMetalForModdedScenario = false }
+            XCTAssertEqual(
+                RendererPolicy.resolve(
+                    setting: "metallum", gameVersion: "26.2", loader: .fabric,
+                    metalVersions: ["26.2"]),
+                "metallum")
+        #endif
+    }
 }
