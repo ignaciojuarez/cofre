@@ -246,7 +246,11 @@ final class TouchControlsTests: XCTestCase {
         m.buttonUp(.inventory)
         m.buttonDown(.pause)
         m.buttonUp(.pause)
-        XCTAssertEqual(spy.events, ["touch", "+SPACE", "-SPACE", "touch", "+E", "-E", "touch", "+ESC", "-ESC"])
+        XCTAssertEqual(spy.events, ["touch", "+SPACE", "-SPACE", "touch", "+E", "-E", "touch"])
+        XCTAssertTrue(m.trayOpen, "⋮ opens the menu; Pause is inside it")
+        m.buttonDown(.pause)
+        m.buttonUp(.pause)
+        XCTAssertFalse(m.trayOpen)
     }
 
     @MainActor
@@ -260,6 +264,11 @@ final class TouchControlsTests: XCTestCase {
         XCTAssertEqual(m.controls, [.pause])
         XCTAssertEqual(m.opacity, 0.3)
         XCTAssertTrue(spy.events.contains("+F1"))
+        // ⋮ is the only button left, so it brings the HUD back instead of opening the menu.
+        m.buttonDown(.pause)
+        m.buttonUp(.pause)
+        XCTAssertFalse(m.hudHidden)
+        XCTAssertFalse(m.trayOpen)
     }
 
     @MainActor
@@ -309,7 +318,12 @@ final class TouchControlsTests: XCTestCase {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: "TouchTrayTests"))
         defaults.removePersistentDomain(forName: "TouchTrayTests")
         let tray = QuickTraySettings()
-        XCTAssertEqual(tray.slots.compactMap { $0?.id }, ["view", "players", "swap", "hud", "debug", "keyboard"])
+        XCTAssertEqual(tray.slots.compactMap { $0?.id }, ["view", "players", "swap", "drop", "debug", "keyboard"])
+        // A saved tray still on the old defaults (Hide HUD) moves to the new ones; edited trays don't.
+        var old = tray
+        old.slots[3] = QuickTrayCatalog.action(id: .hud)
+        old.save(defaults)
+        XCTAssertEqual(QuickTraySettings.load(defaults), tray)
         var edited = tray
         edited.slots[0] = QuickTrayAction(id: "custom-slot", label: "Map", keys: [.f3], mode: .toggle)
         edited.custom = [QuickTrayAction(id: "mine", label: "Mining", keys: [.f3, .g])]

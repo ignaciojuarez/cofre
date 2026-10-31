@@ -39,7 +39,6 @@ public final class TouchOverlayModel {
     @ObservationIgnored private var tasks: [Task<Void, Never>] = []
     @ObservationIgnored private var idleTask: Task<Void, Never>?
     @ObservationIgnored private var holdTask: Task<Void, Never>?
-    @ObservationIgnored private var trayOpenedByHold = false
     @ObservationIgnored private var settingsObserver: NSObjectProtocol?
     @ObservationIgnored private var keyboardObservers: [NSObjectProtocol] = []
     @ObservationIgnored private var trayTapTasks: [QuickTrayActionID: Task<Void, Never>] = [:]
@@ -239,15 +238,6 @@ public final class TouchOverlayModel {
         case .sneak:
             sneakPressedAt = now
             if sneak.press(time: now) { press(.sneak) }
-        case .pause:
-            trayOpenedByHold = false
-            holdTask = Task { [weak self] in
-                try? await Task.sleep(for: .milliseconds(300))
-                guard !Task.isCancelled, let self else { return }
-                self.trayOpenedByHold = true
-                self.trayOpen = true
-                self.buzz()
-            }
         default: break
         }
     }
@@ -260,11 +250,15 @@ public final class TouchOverlayModel {
         case .jump: release(.jump)
         case .sneak:
             if sneak.release(time: now, pressedAt: sneakPressedAt) { release(.sneak) }
-        case .pause:
-            holdTask?.cancel()
-            if trayOpenedByHold { return }
-            if trayOpen { trayOpen = false } else { tap(.escape) }
-        case .menu: trayOpen.toggle()
+        case .pause, .menu:
+            // ⋮ opens the menu (Pause is its first tile). With the HUD hidden it's the only button, so it brings
+            // the HUD back first.
+            if hudHidden {
+                tap(.f1)
+                hudHidden = false
+            } else {
+                trayOpen.toggle()
+            }
         case .chat: tap(.chat)
         case .inventory: tap(.inventory)
         case .keyboard: toggleKeyboard()
@@ -514,7 +508,7 @@ public struct TouchOverlayView: View {
         switch c {
         case .jump: OverlayGlyph(TouchLayout.jumpGlyph(model.context))
         case .sneak: OverlayGlyph(TouchLayout.sneakGlyph(model.context))
-        case .pause: .pause
+        case .pause: .moreVertical
         case .chat: .chat
         case .inventory: .dots
         case .menu: .menu
@@ -528,7 +522,7 @@ public struct TouchOverlayView: View {
         switch c {
         case .jump: Text("Jump")
         case .sneak: model.sneak.locked ? Text("Sneak, locked") : Text("Sneak")
-        case .pause: Text("Pause")
+        case .pause: Text("Menu")
         case .chat: Text("Chat")
         case .inventory: Text("Inventory")
         case .menu: Text("More")

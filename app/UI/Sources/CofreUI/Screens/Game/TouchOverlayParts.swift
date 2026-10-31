@@ -3,7 +3,7 @@ import SwiftUI
 // Visual pieces of the in-game overlay: Cofre's square block in dark glass, pixel glyphs (plan/touch-controls.md).
 
 enum OverlayGlyph {
-    case jump, sneak, flyUp, flyDown, swimUp, swimDown, chat, pause, dots, menu, close, keyboard, dismount, eye,
+    case jump, sneak, flyUp, flyDown, swimUp, swimDown, chat, pause, dots, moreVertical, menu, close, keyboard, dismount, eye,
         players, drop, swap, hide, edit
 
     init(_ g: TouchGlyph) {
@@ -29,6 +29,7 @@ enum OverlayGlyph {
         case .chat: ["WWWWWWW", "W.....W", "W.W.W.W", "W.....W", "WWWWWWW", ".WW....", ".W....."]
         case .pause: ["WW.WW", "WW.WW", "WW.WW", "WW.WW", "WW.WW", "WW.WW", "WW.WW"]
         case .dots: ["WW.WW.WW", "WW.WW.WW"]
+        case .moreVertical: ["WW", "WW", "..", "WW", "WW", "..", "WW", "WW"]
         case .menu: ["WWWWWWW", ".......", "WWWWWWW", ".......", "WWWWWWW"]
         case .close: ["W.....W", ".W...W.", "..W.W..", "...W...", "..W.W..", ".W...W.", "W.....W"]
         case .keyboard: ["WWWWWWWWW", "W.W.W.W.W", "WWWWWWWWW", "W.W.W.W.W", "WWWWWWWWW", "W..WWW..W", "WWWWWWWWW"]
@@ -141,7 +142,7 @@ enum TrayItem: CaseIterable {
     }
 }
 
-/// Quick tray: a grid of rarer actions under the pause (or ≡) button.
+/// Quick tray: a grid of rarer actions under the ⋮ (or ≡) button, starting with Pause.
 struct QuickTray: View {
     let items: [QuickTrayAction?], k: CGFloat
     var on: Set<QuickTrayActionID> = []

@@ -124,7 +124,7 @@ public enum QuickTrayCatalog {
 
     public static var defaults: [QuickTrayAction?] {
         [
-            action(id: .view), action(id: .players), action(id: .swap), action(id: .hud), action(id: .debug),
+            action(id: .view), action(id: .players), action(id: .swap), action(id: .drop), action(id: .debug),
             action(id: .keyboard),
         ]
     }
@@ -151,7 +151,12 @@ public struct QuickTraySettings: Codable, Equatable, Sendable {
 
     public static func load(_ defaults: UserDefaults = .standard) -> Self {
         guard let data = defaults.data(forKey: key) else { return Self() }
-        if let value = try? JSONDecoder().decode(Self.self, from: data) { return value }
+        if var value = try? JSONDecoder().decode(Self.self, from: data) {
+            // Drop replaced Hide HUD in the defaults; a tray nobody edited follows.
+            let previous: [QuickTrayActionID] = [.view, .players, .swap, .hud, .debug, .keyboard]
+            if value.slots.map({ $0?.id }) == previous.map(Optional.some) { value.reset() }
+            return value
+        }
         // Early previews stored only an array of catalog IDs. Keep those slots when possible.
         if let ids = try? JSONDecoder().decode([String].self, from: data) {
             return Self(slots: ids.prefix(6).map { QuickTrayCatalog.action(id: $0) })
