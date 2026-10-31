@@ -171,12 +171,13 @@ final class RendererPolicyTests: XCTestCase {
         let manifest: Set<String> = ["1.21.11", "26.3"]
         let modern = RendererPolicy.pickerRenderers(
             gameVersion: "26.3", loader: .vanilla, metalVersions: manifest)
-        XCTAssertTrue(modern.contains(.metallum))
+        XCTAssertEqual(modern.map(\.rawValue), ["auto", "metallum", "mobileglues"])
         XCTAssertFalse(modern.contains(.gl4es))
         XCTAssertFalse(modern.contains(.simpleFPEWrapper))
         let modded = RendererPolicy.pickerRenderers(
             gameVersion: "26.3", loader: .fabric, metalVersions: manifest)
         XCTAssertFalse(modded.contains(.metallum))
+        XCTAssertTrue(modded.contains(.zink))
         let legacy = RendererPolicy.pickerRenderers(
             gameVersion: "1.16.5", loader: .vanilla, metalVersions: manifest)
         XCTAssertTrue(legacy.contains(.gl4es))

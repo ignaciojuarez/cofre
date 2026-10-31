@@ -110,6 +110,10 @@ public enum RendererPolicy {
             if !isLegacy(gameVersion) { ids.removeAll { $0 == .gl4es || $0 == .simpleFPEWrapper } }
             if let loader, !metalAvailable(gameVersion: gameVersion, loader: loader, metalVersions: metalVersions) {
                 ids.removeAll { $0 == .metallum }
+            } else if loader != nil {
+                // Air attaches its Metal agent to every manifest vanilla version whatever the choice,
+                // so only MobileGlues stays as the fallback for a Metal driver crash.
+                ids.removeAll { $0 == .zink || $0 == .angle }
             }
         }
         if let current, !ids.contains(where: { sameRenderer($0, current) }) { ids.append(current) }
