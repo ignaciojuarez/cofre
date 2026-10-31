@@ -394,3 +394,21 @@ Vanilla evidence: `[Cofre] renderer resolved -> libmetallum.dylib`, `[Cofre] fir
 | 9 | Default | launcher flows | — | — | PASS (Mods/Settings smoke) | n/a | n/a | none | agent-device snapshots; Settings shows `Auto RAM` and disabled `Memory` slider |
 
 Bugs found: none. Fixes: none. No commit beyond this test log update.
+
+### Day pass 2 (2026-10-31)
+
+| # | Instance | Version / loader | Renderer | Mods | Result | First-frame | FPS | Crash cause | Evidence |
+|---:|---|---|---|---|---|---|---|---|---|
+| 2 | — | 26.2 Fabric | Metal | Sodium + Iris | IN PROGRESS | — | — | — | — |
+
+| 2 | Fabric26.2 | 26.2 Fabric | Metal requested | Sodium + Iris | BLOCKED: scenario completed setup, Play attempted, VPN JIT enable failed | no | — | `The VPN extension didn't enable JIT.` | `/tmp/cofre-scenarios/fabric-26.2-sodium-iris-20261031-103816/latestlog.txt` |
+| 3 | NeoForge26.2 | 26.2 NeoForge | Auto → MobileGlues | EvilCraft + Cyclops Core | BLOCKED: scenario path attempted; same VPN JIT failure before JVM | no | — | `The VPN extension didn't enable JIT.` | `/tmp/cofre-scenarios/neoforge-1.21.1-20261031-103837/latestlog.txt` (NeoForge setup path) |
+| 4 | Fabric12111 | 1.21.11 Fabric | Auto then Metal | Sodium | BLOCKED: setup completed; Play attempted; VPN JIT enable failed | no | — | `The VPN extension didn't enable JIT.` | `/tmp/cofre-scenarios/fabric-1.21.11-sodium-20261031-104005/latestlog.txt` |
+| 5 | NeoForge1211 | 1.21.1 NeoForge | Auto | Bountiful | BLOCKED: dependency/loader work exceeded active attempt; no title frame; app process terminated after timeout | no | — | setup log incomplete; no Cofre crash screen | `/tmp/cofre-scenarios/neoforge-1.21.1-bountiful-20261031-104234/` |
+| 6 | NeoForge1211-RenderScale | 1.21.1 NeoForge | MobileGlues | RenderScale (Va8PJBFX intent) | BLOCKED: instance and loader setup completed; Play attempted; VPN JIT enable failed | no | — | `The VPN extension didn't enable JIT.` | `/tmp/cofre-scenarios/neoforge-1.21.1-renderscale-20261031-104206/latestlog.txt` |
+| 7 | Modrinth pack | small pack flows | configured | pack contents | BLOCKED: pack flow attempted; Fabulously Optimized failed installing Fabric (`Fabric didn't install, so the pack wasn't kept`); small NeoForge reached Play then VPN JIT failed | no | — | exact scenario details in logs | `/tmp/cofre-scenarios/pack-fabulously-optimized-20261031-103918/latestlog.txt`, `/tmp/cofre-scenarios/pack-small-neoforge-20261031-103907/latestlog.txt` |
+| 8 | Default | 26.3 Vanilla | Metal | none | BLOCKED: runner could not connect (`Runner did not accept connection (xcodebuild exited early)`); no UI tap possible | — | — | runner failure | `<local-home>/.agent-device/sessions/cofre-ipad/runner.log`, `/tmp/cofre-device/day2-2026-10-31/current.png` |
+| 9 | Launcher flows | — | — | Mods/search/gallery/downloads | BLOCKED: same agent-device runner failure prevented interaction; no duplicate/navigation claim | — | — | runner failure | `<local-home>/.agent-device/sessions/cofre-ipad/runner.log` |
+
+Bugs: none confirmed as clear Cofre app-layer defects. The repeated JIT failure is device/VPN infrastructure; pack Fabric installation failure and NeoForge dependency timeout require separate investigation.
+Fixes: none.
