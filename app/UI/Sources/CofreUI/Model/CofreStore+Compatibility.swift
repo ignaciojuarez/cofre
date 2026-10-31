@@ -10,7 +10,45 @@
             ModCompatibility.renderer(
                 instanceSetting: (instancePreferences[instance.id]?.renderer ?? instance.renderer)?.rawValue,
                 globalSetting: preferences.renderer.rawValue, gameVersion: instance.gameVersion,
-                loader: instance.loader.rawValue, javaVersion: instance.javaVersion.flatMap(Int.init) ?? 21)
+                loader: instance.loader.rawValue, javaVersion: instance.javaVersion.flatMap(Int.init) ?? 21,
+                metalMod: metalModEnabled(instance))
+        }
+
+        /// MetalUniversal is on in `instance`'s mods folder; previews without files use the loaded Mods list.
+        public func metalModEnabled(_ instance: InstanceSummary) -> Bool {
+            guard MetalMod.supports(gameVersion: instance.gameVersion, loader: instance.loader) else { return false }
+            if let dir = gameDirectory(instance.id) { return MetalMod.isEnabled(in: dir) }
+            return instance.id == modsInstance?.id
+                && (installed[.mods] ?? []).contains { $0.enabled && $0.id.lowercased().hasPrefix(MetalMod.modID) }
+        }
+
+        /// "Use Metal": the pinned MetalUniversal jar into the mods folder (hash-checked), then Auto picks Metal.
+        public func installMetalMod(_ instance: InstanceSummary) async {
+            let pin = MetalMod.pin
+            CofreBreadcrumb.log("metal-mod", details: instance.id)
+            await run {
+                if let dir = self.gameDirectory(instance.id) {
+                    try await self.installPinned(pin, in: dir)
+                } else if instance.id == self.modsInstance?.id {
+                    self.installed[.mods, default: []].append(
+                        InstalledItem(id: pin.file, name: "MetalUniversal", version: pin.version, enabled: true))
+                }
+                var p = self.preferences(for: instance.id)
+                if !RendererPolicy.isMetal(p.renderer) && p.renderer != .auto {
+                    p.renderer = .auto
+                    self.save(p, instanceID: instance.id)
+                }
+                NSLog("[Cofre] metal mod installed instance=%@ renderer=%@", instance.id, self.renderer(for: instance))
+            }
+            if instance.id == modsInstance?.id, gameDirectory(instance.id) != nil { await loadInstalled(.mods) }
+        }
+
+        /// A preset or Metal file that isn't on Modrinth: a direct download checked against its pinned SHA-512.
+        func installPinned(_ mod: CofrePreset.Mod, in gameDirectory: URL) async throws {
+            guard let url = mod.url.flatMap(URL.init(string:)) else { throw CocoaError(.fileReadInvalidFileName) }
+            _ = try await DownloadQueue.shared.download(
+                url: url, destination: gameDirectory.appendingPathComponent("mods").appendingPathComponent(mod.file),
+                title: "\(mod.slug) \(mod.version)", sha512: mod.sha512)
         }
 
         /// A search row, mod page or Get for the Mods instance (or `instance`).
@@ -69,7 +107,7 @@
             }
         }
 
-        private func gameDirectory(_ instanceID: String) -> URL? {
+        func gameDirectory(_ instanceID: String) -> URL? {
             (try? instanceStore?.list())?.first { $0.id == instanceID }?.gameDirectory
         }
     }

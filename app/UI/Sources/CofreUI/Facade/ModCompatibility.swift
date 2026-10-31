@@ -9,21 +9,21 @@ public struct ModCompatibility: Hashable, Sendable {
     /// The renderer an instance runs, using the same policy as the launch path.
     public static func renderer(
         instanceSetting: RendererID? = nil, globalSetting: RendererID = .auto, gameVersion: String,
-        loader: Instance.Loader, javaVersion: Int = 21
+        loader: Instance.Loader, javaVersion: Int = 21, metalMod: Bool = false
     ) -> RendererID {
         let metal = javaVersion >= 21 ? metalVersions : []
         return RendererPolicy.resolve(setting: instanceSetting ?? .auto, globalSetting: globalSetting, gameVersion: gameVersion,
-            loader: loader, metalVersions: metal)
+            loader: loader, metalVersions: metal, metalMod: metalMod)
     }
 
     public static func renderer(
         instanceSetting: String? = nil, globalSetting: String, gameVersion: String, loader: String,
-        javaVersion: Int = 21
+        javaVersion: Int = 21, metalMod: Bool = false
     ) -> String {
         renderer(
             instanceSetting: instanceSetting.map(RendererID.init(rawValue:)), globalSetting: RendererID(rawValue: globalSetting),
             gameVersion: gameVersion, loader: Instance.Loader(rawValue: loader.lowercased()) ?? .unknown,
-            javaVersion: javaVersion
+            javaVersion: javaVersion, metalMod: metalMod
         ).rawValue
     }
     /// Compatibility overload for callers that only have one setting.
@@ -61,7 +61,8 @@ public struct ModCompatibility: Hashable, Sendable {
         guard let found = ContentCompatibility.integration(for: name ?? id, manifest) else { return nil }
         let label = name ?? id
         return .init(id: id, name: label, metalVersions: found.versions,
-                     reason: "Metal runs vanilla only for now.", verified: true)
+                     reason: found.name == "iris" ? ContentCompatibility.irisOnMetal
+                        : "Metal runs this mod only on Fabric 26.2 for now.", verified: true)
     }
 }
 public enum ModLaunchDecision: Equatable, Sendable { case play, warn([ModCompatibilityIssue]) }

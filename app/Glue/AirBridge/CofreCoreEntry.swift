@@ -45,14 +45,14 @@ public final class CofreCoreEntry: NSObject {
     @objc(rendererForProfile:metadata:globalSetting:)
     @MainActor public static func renderer(forProfile profile: [String: Any], metadata: [String: Any],
                                           globalSetting: String) -> String {
-        let fallback = bridge.flatMap { bridge in
-            bridge.gameDirectory(forProfile: bridge.selectedProfileName()).flatMap { directory in
-                (try? Data(contentsOf: directory.appendingPathComponent("cofre.json")))
-                    .flatMap { try? JSONDecoder().decode(Instance.self, from: $0) }?.loader
-            }
+        let directory = bridge.flatMap { $0.gameDirectory(forProfile: $0.selectedProfileName()) }
+        let fallback = directory.flatMap { directory in
+            (try? Data(contentsOf: directory.appendingPathComponent("cofre.json")))
+                .flatMap { try? JSONDecoder().decode(Instance.self, from: $0) }?.loader
         }
+        // A Fabric instance with MetalUniversal in its mods folder runs Metal (RendererPolicy).
         return RendererPolicy.resolve(profile: profile, metadata: metadata, globalSetting: globalSetting,
-            fallbackLoader: fallback, metalVersions: ModCompatibility.metalVersions).rawValue
+            fallbackLoader: fallback, gameDirectory: directory, metalVersions: ModCompatibility.metalVersions).rawValue
     }
     @objc(startWithBridge:)
     @MainActor public static func start(withBridge bridge: Any) {

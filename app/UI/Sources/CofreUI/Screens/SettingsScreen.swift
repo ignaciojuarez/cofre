@@ -139,14 +139,17 @@
     struct RendererContent: View {
         @Environment(CofreStore.self) private var store
         @Environment(NavModel.self) private var nav
+        /// Also redraws the pane once the jar is in, since the folder isn't observed.
+        @State private var installingMetal = false
         var body: some View {
             let instance = nav.instance.flatMap { id in store.instances.first { $0.id == id } }
             let context = instance ?? store.activeInstance
             let instanceID = instance?.id
             let current = prefBinding(store, instanceID, \.renderer)
+            let metalMod = context.map { store.metalModEnabled($0) } ?? false
             let visibleIDs = RendererPolicy.pickerRenderers(
                 gameVersion: context?.gameVersion, loader: context?.loader,
-                metalVersions: ModCompatibility.metalVersions, current: current.wrappedValue)
+                metalVersions: ModCompatibility.metalVersions, metalMod: metalMod, current: current.wrappedValue)
             let options = visibleIDs.compactMap { id -> RendererOption? in
                 if let found = store.renderers.first(where: { RendererPolicy.sameRenderer($0.id, id) }) { return found }
                 guard RendererPolicy.sameRenderer(current.wrappedValue, id) else { return nil }
@@ -154,13 +157,32 @@
             }
             let recommended = context.map {
                 RendererPolicy.recommendedRenderer(
-                    gameVersion: $0.gameVersion, loader: $0.loader, metalVersions: ModCompatibility.metalVersions)
+                    gameVersion: $0.gameVersion, loader: $0.loader, metalVersions: ModCompatibility.metalVersions,
+                    metalMod: metalMod)
+            }
+            if let instance = context, !metalMod, MetalMod.supports(gameVersion: instance.gameVersion, loader: instance.loader) {
+                ListSection(spacing: 4) {
+                    Button {
+                        installingMetal = true
+                        Task {
+                            await store.installMetalMod(instance)
+                            installingMetal = false
+                        }
+                    } label: {
+                        Row(installingMetal ? String(localized: "Installing Metal…") : String(localized: "Use Metal (faster)"),
+                            subtitle: String(localized: "Adds MetalUniversal \(MetalMod.pin.version) to this instance's mods. Sodium works; Iris and shader packs need OpenGL."),
+                            trailing: { Badge("Recommended", tone: .success) })
+                    }
+                    .buttonStyle(RowButtonStyle())
+                    .disabled(installingMetal)
+                }
             }
             ListSection(spacing: 4) {
                 ForEach(options) { r in
                     let metalUnavailable = context.map {
                         RendererPolicy.isMetal(r.id) && !RendererPolicy.metalAvailable(
-                            gameVersion: $0.gameVersion, loader: $0.loader, metalVersions: ModCompatibility.metalVersions)
+                            gameVersion: $0.gameVersion, loader: $0.loader, metalVersions: ModCompatibility.metalVersions,
+                            metalMod: metalMod)
                     } ?? false
                     let legacyUnavailable = context.map {
                         (RendererPolicy.sameRenderer(r.id, .gl4es)
@@ -171,7 +193,9 @@
                     let unavailableDetail: String? = metalUnavailable
                         ? (context?.loader == .vanilla
                             ? "Metal is available only for vanilla versions in the shipped manifest."
-                            : "Metal runs vanilla only for now.")
+                            : MetalMod.supports(gameVersion: context?.gameVersion ?? "", loader: context?.loader ?? .unknown)
+                                ? "Metal needs MetalUniversal: use Metal above."
+                                : "Metal runs mods only on Fabric 26.2 for now.")
                         : legacyUnavailable ? "This legacy renderer is only for Minecraft 1.16.5 and older." : nil
                     let detail = unavailableDetail ?? r.detail
                     Button {

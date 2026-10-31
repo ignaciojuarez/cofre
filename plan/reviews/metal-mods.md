@@ -4,6 +4,8 @@ Research date: 2026-10-31. This is a source review, not an iOS validation run.
 
 ## Decision
 
+**Shipped (2026-10-31):** Fabric 26.2 runs Metal when MetalUniversal 1.0.4 is enabled in the instance's mods (detected by jar id `metallum`); Settings › Renderer installs the pinned jar in one tap, and the Fabric preset includes it with Sodium 0.9.0. Iris and shader packs stay flagged. Device-verified with the DEBUG override (4/4 runs on Metal, 57 FPS in world); the release path's check is `scripts/scenarios/fabric-26.2-metal-release.json`.
+
 **Ship the managed Fabric 26.2 Metal kit first.** It is the only released iOS-targeted mod backend that has rendered in Cofre. Stabilize its backend selection, pin its exact jars, and permit only a tested mod allowlist. In parallel, port **Graft** to the existing Cofre view for a 1.21.11 track and evaluate **Ciderlight** for NeoForge 26.3. Keep Air’s agent for vanilla; do not make it the first mod-loader bridge.
 
 “Native Metal” here means a renderer that submits to Metal directly (Metallum/MetalUniversal, Graft, Ciderlight, or a Cofre port). Zink, VulkanMod/MoltenVK, ANGLE, MobileGlues, LTW and GL4ES are translation/fallback routes, not the product target.

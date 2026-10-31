@@ -196,4 +196,81 @@ final class RendererPolicyTests: XCTestCase {
             RendererPolicy.recommendedRenderer(gameVersion: "1.16.5", loader: .vanilla, metalVersions: manifest),
             .gl4es)
     }
+
+    func testFabricMetalNeedsMetalUniversalOnAValidatedVersion() {
+        let manifest: Set<String> = ["26.2", "26.3"]
+        // Auto, the global choice and a saved Metal pick all run Metal once the mod is in.
+        XCTAssertEqual(
+            RendererPolicy.resolve(
+                setting: "auto", gameVersion: "26.2", loader: .fabric, metalVersions: manifest,
+                metalMod: true), "metallum")
+        XCTAssertEqual(
+            RendererPolicy.resolve(
+                setting: "auto", gameVersion: "26.2", loader: .fabric, metalVersions: [],
+                metalMod: true), "metallum")
+        XCTAssertEqual(
+            RendererPolicy.resolve(
+                setting: "metallum", gameVersion: "26.2", loader: .fabric, metalVersions: manifest,
+                metalMod: true), "metallum")
+        XCTAssertEqual(
+            RendererPolicy.resolve(
+                setting: "auto", globalSetting: "metallum", gameVersion: "26.2", loader: .fabric,
+                metalVersions: manifest, metalMod: true), "metallum")
+        // An explicit GL choice still wins.
+        XCTAssertEqual(
+            RendererPolicy.resolve(
+                setting: "mobileglues", gameVersion: "26.2", loader: .fabric,
+                metalVersions: manifest, metalMod: true), "mobileglues")
+        // Without the mod, or off its validated versions and loader, nothing changes.
+        XCTAssertEqual(
+            RendererPolicy.resolve(setting: "auto", gameVersion: "26.2", loader: .fabric, metalVersions: manifest),
+            "mobileglues")
+        XCTAssertEqual(
+            RendererPolicy.resolve(
+                setting: "auto", gameVersion: "26.3", loader: .fabric, metalVersions: manifest,
+                metalMod: true), "mobileglues")
+        XCTAssertEqual(
+            RendererPolicy.resolve(
+                setting: "metallum", gameVersion: "26.2", loader: .neoforge,
+                metalVersions: manifest, metalMod: true), "mobileglues")
+        XCTAssertEqual(
+            RendererPolicy.resolve(
+                setting: "auto", gameVersion: "26.2", loader: .quilt, metalVersions: manifest,
+                metalMod: true), "mobileglues")
+    }
+
+    func testFabricMetalPickerAndRecommendation() {
+        let withMod = RendererPolicy.pickerRenderers(gameVersion: "26.2", loader: .fabric, metalMod: true)
+        XCTAssertTrue(withMod.contains(.metallum))
+        XCTAssertTrue(withMod.contains(.mobileglues))
+        XCTAssertFalse(RendererPolicy.pickerRenderers(gameVersion: "26.2", loader: .fabric).contains(.metallum))
+        XCTAssertEqual(
+            RendererPolicy.recommendedRenderer(gameVersion: "26.2", loader: .fabric, metalVersions: [], metalMod: true),
+            .metallum)
+        XCTAssertEqual(
+            RendererPolicy.recommendedRenderer(gameVersion: "26.2", loader: .fabric, metalVersions: []), .mobileglues)
+    }
+
+    func testLaunchHandsAirTheMetalLibraryForAFabricFolderWithMetalUniversal() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let mods = root.appendingPathComponent("mods")
+        try FileManager.default.createDirectory(at: mods, withIntermediateDirectories: true)
+        let profile: [String: Any] = ["lastVersionId": "fabric-loader-0.19.3-26.2", "cofreRequestedLoader": "fabric"]
+        let metadata: [String: Any] = [
+            "id": "fabric-loader-0.19.3-26.2", "inheritsFrom": "26.2",
+            "libraries": [["name": "net.fabricmc:fabric-loader:0.19.3"]],
+        ]
+        func pick() -> RendererID {
+            RendererPolicy.resolve(
+                profile: profile, metadata: metadata, globalSetting: "auto", gameDirectory: root,
+                metalVersions: ["26.2"])
+        }
+        XCTAssertEqual(pick(), "libmobileglues.dylib")
+        // A jar named like Metal isn't enough: the Fabric id decides.
+        try MetalModTests.jar(id: "notmetal").write(to: mods.appendingPathComponent("metallum-fake.jar"))
+        XCTAssertEqual(pick(), "libmobileglues.dylib")
+        try MetalModTests.jar(id: "metallum").write(to: mods.appendingPathComponent("metaluniversal.jar"))
+        XCTAssertEqual(pick(), "libmetallum.dylib")
+    }
 }

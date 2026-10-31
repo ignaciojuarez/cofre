@@ -29,9 +29,14 @@ final class ContentCompatibilityTests: XCTestCase {
         let iris = try XCTUnwrap(issue("iris-fabric-1.8.0+mc26.3", .mods, "26.3", "metallum"))
         XCTAssertEqual(iris.badge, "Not on Metal · 26.3")
         XCTAssertEqual(iris.title, "Iris doesn't run here")
-        XCTAssertEqual(iris.reason, "Metal runs vanilla only for now.")
+        XCTAssertEqual(iris.reason, "Iris needs OpenGL; Metal runs without shaders for now.")
         XCTAssertNotNil(issue("Iris Shaders", .mods, "26.2", "metallum"))
-        XCTAssertNotNil(issue("Sodium", .mods, "1.21.11", "libmetallum.dylib"))
+        XCTAssertEqual(
+            issue("Sodium", .mods, "1.21.11", "libmetallum.dylib")?.reason,
+            "Metal runs this mod only on Fabric 26.2 for now.")
+        // MetalUniversal on Fabric 26.2 renders with Sodium (iPad mini, 57 FPS in world).
+        XCTAssertNil(issue("sodium-fabric-0.9.0+mc26.2", .mods, "26.2", "libmetallum.dylib"))
+        XCTAssertNil(issue("metallum-1.0.4", .mods, "26.2", "libmetallum.dylib"))
         // Metallum's own mixin package isn't a mod; an unknown mod has no evidence either way.
         XCTAssertNil(issue("MixinExtras", .mods, "26.3", "metallum"))
         XCTAssertNil(issue("JEI", .mods, "26.3", "metallum"))
@@ -53,7 +58,9 @@ final class ContentCompatibilityTests: XCTestCase {
         XCTAssertEqual(mg.badge, "Not on MobileGlues · 1.21.1")
         XCTAssertEqual(mg.title, "Shaders don't run here")
         XCTAssertNotNil(issue("BSL", .shaders, "26.3", "metallum"))
-        XCTAssertNotNil(issue("BSL", .shaders, "26.2", "metallum"))
+        XCTAssertEqual(
+            issue("BSL", .shaders, "26.2", "metallum")?.reason, "Iris needs OpenGL; Metal runs without shaders for now."
+        )
         XCTAssertNil(issue("BSL", .shaders, "1.21.1", "air"))
         XCTAssertNil(issue("Faithful", .resourcePacks, "26.3", "metallum"))
         // Shader packs are not a Metal path even without a manifest.
@@ -98,5 +105,15 @@ final class ContentCompatibilityTests: XCTestCase {
             ContentCompatibility.playIssues(
                 gameDirectory: root, gameVersion: "26.3", renderer: "metallum", manifest: manifest
             ).isEmpty)
+    }
+
+    func testPlayCheckOnFabricMetalKeepsSodiumAndFlagsIris() throws {
+        try write("mods/metallum-1.0.4.jar")
+        try write("mods/sodium-fabric-0.9.0+mc26.2.jar")
+        try write("mods/iris-fabric-1.10.0+mc26.2.jar")
+        let issues = ContentCompatibility.playIssues(
+            gameDirectory: root, gameVersion: "26.2", renderer: "libmetallum.dylib", manifest: manifest)
+        XCTAssertEqual(issues.map(\.modName), ["Iris"])
+        XCTAssertEqual(issues.first?.file, "iris-fabric-1.10.0+mc26.2.jar")
     }
 }

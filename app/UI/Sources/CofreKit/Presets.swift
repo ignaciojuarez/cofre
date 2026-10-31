@@ -16,14 +16,20 @@ public struct CofrePreset: Codable, Hashable, Identifiable, Sendable {
         public let file: String
         public let sha512: String
         public let license: String
+        /// A direct download for a file that isn't on Modrinth; `project` and `version` then only label it.
+        public let url: String?
 
-        public init(project: String, slug: String, version: String, file: String, sha512: String, license: String) {
+        public init(
+            project: String, slug: String, version: String, file: String, sha512: String, license: String,
+            url: String? = nil
+        ) {
             self.project = project
             self.slug = slug
             self.version = version
             self.file = file
             self.sha512 = sha512
             self.license = license
+            self.url = url
         }
     }
 
@@ -62,8 +68,6 @@ public struct CofrePreset: Codable, Hashable, Identifiable, Sendable {
     public let status: Status
     public let pinnedMods: [Mod]
     public let optionalMods: [Mod]
-    /// The reviewed native Metal renderer artifact is deliberately not bundled yet.
-    public let metalRendererModPlaceholder: String?
     public let firstCreateOptions: [RAMTier: FirstCreateOptions]
     public let sourceDate: String?
 
@@ -73,7 +77,7 @@ public struct CofrePreset: Codable, Hashable, Identifiable, Sendable {
     public init(
         id: String, name: String, pitch: String, gameVersion: String, loader: Instance.Loader,
         loaderVersion: String?, renderer: String, status: Status, pinnedMods: [Mod], optionalMods: [Mod] = [],
-        metalRendererModPlaceholder: String? = nil, firstCreateOptions: [RAMTier: FirstCreateOptions],
+        firstCreateOptions: [RAMTier: FirstCreateOptions],
         sourceDate: String? = nil
     ) {
         self.id = id
@@ -86,14 +90,13 @@ public struct CofrePreset: Codable, Hashable, Identifiable, Sendable {
         self.status = status
         self.pinnedMods = pinnedMods
         self.optionalMods = optionalMods
-        self.metalRendererModPlaceholder = metalRendererModPlaceholder
         self.firstCreateOptions = firstCreateOptions
         self.sourceDate = sourceDate
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, name, pitch, gameVersion, loader, loaderVersion, renderer, status, pinnedMods, mods, optionalMods
-        case metalRendererModPlaceholder, firstCreateOptions, sourceDate
+        case firstCreateOptions, sourceDate
     }
 
     public init(from decoder: Decoder) throws {
@@ -110,7 +113,6 @@ public struct CofrePreset: Codable, Hashable, Identifiable, Sendable {
             try c.decodeIfPresent([Mod].self, forKey: .pinnedMods)
             ?? c.decode([Mod].self, forKey: .mods)
         optionalMods = try c.decodeIfPresent([Mod].self, forKey: .optionalMods) ?? []
-        metalRendererModPlaceholder = try c.decodeIfPresent(String.self, forKey: .metalRendererModPlaceholder)
         let raw = try c.decode([String: FirstCreateOptions].self, forKey: .firstCreateOptions)
         firstCreateOptions = Dictionary(
             uniqueKeysWithValues: raw.compactMap { key, value in
@@ -131,7 +133,6 @@ public struct CofrePreset: Codable, Hashable, Identifiable, Sendable {
         try c.encode(status, forKey: .status)
         try c.encode(pinnedMods, forKey: .pinnedMods)
         try c.encode(optionalMods, forKey: .optionalMods)
-        try c.encodeIfPresent(metalRendererModPlaceholder, forKey: .metalRendererModPlaceholder)
         let raw = Dictionary(uniqueKeysWithValues: firstCreateOptions.map { ($0.key.rawValue, $0.value) })
         try c.encode(raw, forKey: .firstCreateOptions)
         try c.encodeIfPresent(sourceDate, forKey: .sourceDate)
@@ -153,7 +154,8 @@ public struct CofrePreset: Codable, Hashable, Identifiable, Sendable {
         var projects = Set<String>()
         for mod in allMods {
             guard !mod.project.isEmpty, !mod.version.isEmpty, !mod.file.isEmpty,
-                mod.sha512.range(of: "^[0-9a-fA-F]{128}$", options: .regularExpression) != nil
+                mod.sha512.range(of: "^[0-9a-fA-F]{128}$", options: .regularExpression) != nil,
+                mod.url.map({ $0.hasPrefix("https://") && URL(string: $0) != nil }) ?? true
             else { throw PresetValidationError.invalidMod(id, mod.slug) }
             guard projects.insert(mod.project).inserted else {
                 throw PresetValidationError.duplicateMod(id, mod.project)

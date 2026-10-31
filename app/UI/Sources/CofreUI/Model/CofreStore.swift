@@ -455,6 +455,11 @@
                         instanceID: made.id, options: preset.options(forPhysicalMemoryMB: memory), physicalMB: memory)
                 }
                 for mod in preset.pinnedMods + (includeOptional ? preset.optionalMods : []) {
+                    // Off Modrinth (MetalUniversal): a pinned download. Previews have no folder to put it in.
+                    if mod.url != nil {
+                        if let dir = gameDirectory(made.id) { try await installPinned(mod, in: dir) }
+                        continue
+                    }
                     let plan = try await backend.installPlan(
                         projectID: mod.project, versionID: mod.version, kind: .mods, instanceID: made.id)
                     guard plan.blocked == nil else { throw PresetInstallError.blocked(mod.slug) }

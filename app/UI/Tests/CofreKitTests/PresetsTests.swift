@@ -9,11 +9,39 @@ final class PresetsTests: XCTestCase {
         XCTAssertEqual(PresetCatalog.presets.first(where: { $0.loader == .vanilla })?.status, .recommended)
         let fabric = try XCTUnwrap(PresetCatalog.presets.first { $0.loader == .fabric })
         XCTAssertEqual(fabric.status, .experimental)
-        XCTAssertEqual(fabric.pinnedMods.count, 8)
+        XCTAssertEqual(fabric.pinnedMods.count, 9)
         XCTAssertTrue(fabric.pinnedMods.allSatisfy { $0.sha512.count == 128 })
         XCTAssertTrue(fabric.pinnedMods.allSatisfy { $0.project != "w79ASAJD" })
         XCTAssertEqual(fabric.optionalMods.first?.license, "AGPL-3.0-or-later")
-        XCTAssertNotNil(fabric.metalRendererModPlaceholder)
+        // The Metal path: the stock MetalUniversal jar and the Sodium build it rendered with on the iPad.
+        XCTAssertEqual(fabric.pinnedMods.filter { $0.url != nil }, [MetalMod.pin])
+        let sodium = try XCTUnwrap(fabric.pinnedMods.first { $0.slug == "sodium" })
+        XCTAssertEqual(sodium.version, "3QgJXuSK")
+        XCTAssertEqual(sodium.file, "sodium-fabric-0.9.0+mc26.2.jar")
+        XCTAssertTrue(MetalMod.supports(gameVersion: fabric.gameVersion, loader: fabric.loader))
+    }
+
+    func testURLPinsDecodeAndMustBeHTTPS() throws {
+        let json = #"""
+            {"project": "EternityQwQ/MetalUniversal", "slug": "metaluniversal", "version": "1.0.4",
+             "file": "metallum-1.0.4.jar", "sha512": "\#(MetalMod.pin.sha512)", "license": "MIT",
+             "url": "\#(MetalMod.pin.url!)"}
+            """#
+        let mod = try JSONDecoder().decode(CofrePreset.Mod.self, from: Data(json.utf8))
+        XCTAssertEqual(mod, MetalMod.pin)
+        let modrinth = try JSONDecoder().decode(
+            CofrePreset.Mod.self,
+            from: JSONEncoder().encode(PresetCatalog.presets.flatMap(\.pinnedMods).first { $0.slug == "lithium" }))
+        XCTAssertNil(modrinth.url)
+        let fabric = try XCTUnwrap(PresetCatalog.presets.first { $0.loader == .fabric })
+        let plain = CofrePreset.Mod(
+            project: mod.project, slug: mod.slug, version: mod.version, file: mod.file, sha512: mod.sha512,
+            license: mod.license, url: "http://example.com/metallum.jar")
+        let bad = CofrePreset(
+            id: fabric.id, name: fabric.name, pitch: fabric.pitch, gameVersion: fabric.gameVersion,
+            loader: fabric.loader, loaderVersion: fabric.loaderVersion, renderer: fabric.renderer,
+            status: fabric.status, pinnedMods: [plain], firstCreateOptions: fabric.firstCreateOptions)
+        XCTAssertThrowsError(try bad.validate())
     }
 
     func testPresetsHaveBothRAMTiersAndSelectByDeviceMemory() throws {

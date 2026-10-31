@@ -44,6 +44,7 @@ Modded play needs Metal. Every OpenGL path translates on the CPU and was unplaya
 
 - Picker on Metal vanilla versions: Auto, Metal, MobileGlues only (Air's agent ignores other picks there).
 - Play warns and offers to turn Iris off on 26.x with MobileGlues or ANGLE (black screen on the iPad).
+- **Fabric 26.2 Metal shipped behind mod presence.** Auto picks Metal (and the picker marks it Recommended) when a Fabric instance on a `MetalMod.gameVersions` version (`["26.2"]`) has an enabled jar whose `fabric.mod.json` id is `metallum`. Air gets `libmetallum.dylib`; Java stays 25. Without the mod, Settings › Renderer offers "Use Metal (faster)", which downloads the pinned MetalUniversal 1.0.4 jar (SHA-512 checked) into `mods/`. Sodium isn't flagged there; Iris and shader packs are ("Iris needs OpenGL"). The Fabric preset ships the same jar + Sodium 0.9.0. Device check: `scripts/scenarios/fabric-26.2-metal-release.json`.
 
 ## Pending device results
 

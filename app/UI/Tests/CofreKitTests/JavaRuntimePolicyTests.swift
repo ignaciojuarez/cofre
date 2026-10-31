@@ -51,4 +51,17 @@ final class JavaRuntimePolicyTests: XCTestCase {
                 bundledMajors: [8, 17, 21]),
             .unavailable)
     }
+
+    func testFabricMetalGetsJava25() {
+        // Air merges a Fabric profile with its base version (26.2 asks for Java 25), so the game's own runtime stays.
+        XCTAssertEqual(
+            JavaRuntimePolicy.decision(
+                requiredJava: 25, selectedJava: nil, renderer: "libmetallum.dylib", bundledMajors: [8, 17, 21, 25]),
+            .keep)
+        // Unmerged metadata has no javaVersion (8): Auto still lands on the shipped Java 25.
+        XCTAssertEqual(
+            JavaRuntimePolicy.decision(
+                requiredJava: 8, selectedJava: nil, renderer: "libmetallum.dylib", bundledMajors: [8, 17, 21, 25]),
+            .use(major: 25))
+    }
 }

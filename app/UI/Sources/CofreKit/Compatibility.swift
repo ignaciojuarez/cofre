@@ -24,8 +24,10 @@ public enum RendererPolicy {
         .auto, .metallum, .mobileglues, .zink, .gl4es, .simpleFPEWrapper, .angle,
     ]
 
+    /// `gameDirectory` lets a Fabric instance with MetalUniversal in its mods folder run Metal.
     public static func resolve(profile: [String: Any], metadata: [String: Any], globalSetting: String,
-                               fallbackLoader: Instance.Loader? = nil, metalVersions: Set<String>) -> RendererID {
+                               fallbackLoader: Instance.Loader? = nil, gameDirectory: URL? = nil,
+                               metalVersions: Set<String>) -> RendererID {
         let versionID = profile["lastVersionId"] as? String ?? metadata["id"] as? String ?? ""
         let libraries = (metadata["libraries"] as? [[String: Any]] ?? []).compactMap { $0["name"] as? String }
         let loader = Instance.Loader.resolve(requested: profile[Instance.Loader.requestedProfileKey] as? String,
@@ -33,33 +35,31 @@ public enum RendererPolicy {
             versionID: versionID, libraries: libraries, fallback: fallbackLoader)
         let game = metadata["inheritsFrom"] as? String ?? profile["cofreGameVersion"] as? String ?? metadata["id"] as? String ?? ""
         let picked = profile["cofreRendererPicked"] as? Bool ?? false
+        let metalMod = MetalMod.supports(gameVersion: game, loader: loader)
+            && gameDirectory.map(MetalMod.isEnabled(in:)) == true
         return airIdentifier(resolve(setting: picked ? .auto : RendererID(rawValue: profile["renderer"] as? String ?? "auto"),
             globalSetting: RendererID(rawValue: globalSetting), gameVersion: game, loader: loader,
-            metalVersions: metalVersions))
+            metalVersions: metalVersions, metalMod: metalMod))
     }
 
+    /// `metalMod`: the instance has MetalUniversal enabled in its mods folder.
     public static func resolve(setting: RendererID, globalSetting: RendererID = .auto, gameVersion: String,
-                               loader: Instance.Loader, metalVersions: Set<String>) -> RendererID {
+                               loader: Instance.Loader, metalVersions: Set<String>, metalMod: Bool = false) -> RendererID {
         let fallback = automatic(gameVersion: gameVersion, loader: loader)
-        // Metallum is attached by Air only for a vanilla version id. A loader's
-        // version id cannot use it, even when the base Minecraft version is in
-        // the Metal manifest.
-        if setting != .auto {
+        // Air attaches its Metallum agent only for a vanilla version id. A loader
+        // runs Metal only through MetalUniversal, on the versions it was validated on.
+        let modMetal = metalMod && MetalMod.supports(gameVersion: gameVersion, loader: loader)
+        func allowed(_ choice: RendererID) -> RendererID {
 #if DEBUG
-            if allowMetalForModdedScenario && isMetal(setting) && loader != .vanilla { return setting }
+            if allowMetalForModdedScenario && isMetal(choice) && loader != .vanilla { return choice }
 #endif
-            return isMetal(setting) && loader != .vanilla ? fallback : setting
+            return isMetal(choice) && loader != .vanilla && !modMetal ? fallback : choice
         }
-        if globalSetting != .auto {
-#if DEBUG
-            if allowMetalForModdedScenario && isMetal(globalSetting) && loader != .vanilla { return globalSetting }
-#endif
-            return isMetal(globalSetting) && loader != .vanilla ? fallback : globalSetting
+        if setting != .auto { return allowed(setting) }
+        if globalSetting != .auto { return allowed(globalSetting) }
+        if metalAvailable(gameVersion: gameVersion, loader: loader, metalVersions: metalVersions, metalMod: metalMod) {
+            return .metallum
         }
-        // Air attaches the bundled Metallum agent for every vanilla version in
-        // the shipped manifest, including 1.21.11. A future validated Fabric
-        // + Metallum mod can be added here without changing picker callers.
-        if metalAvailable(gameVersion: gameVersion, loader: loader, metalVersions: metalVersions) { return .metallum }
         return fallback
     }
 
@@ -89,9 +89,11 @@ public enum RendererPolicy {
         }
     }
 
+    /// Vanilla: Air's agent on manifest versions. Fabric: MetalUniversal on its validated versions.
     public static func metalAvailable(gameVersion: String, loader: Instance.Loader,
-                                      metalVersions: Set<String>) -> Bool {
-        loader == .vanilla && metalVersions.contains(gameVersion)
+                                      metalVersions: Set<String>, metalMod: Bool = false) -> Bool {
+        loader == .vanilla ? metalVersions.contains(gameVersion)
+            : metalMod && MetalMod.supports(gameVersion: gameVersion, loader: loader)
     }
 
     public static func isLegacy(_ gameVersion: String) -> Bool {
@@ -104,13 +106,15 @@ public enum RendererPolicy {
     /// IDs to render in Settings for this instance. `current` is retained so
     /// a saved debug/legacy choice is visible instead of being changed.
     public static func pickerRenderers(gameVersion: String? = nil, loader: Instance.Loader? = nil,
-                                       metalVersions: Set<String> = [], current: RendererID? = nil) -> [RendererID] {
+                                       metalVersions: Set<String> = [], metalMod: Bool = false,
+                                       current: RendererID? = nil) -> [RendererID] {
         var ids = normalPickerRenderers
         if let gameVersion {
             if !isLegacy(gameVersion) { ids.removeAll { $0 == .gl4es || $0 == .simpleFPEWrapper } }
-            if let loader, !metalAvailable(gameVersion: gameVersion, loader: loader, metalVersions: metalVersions) {
+            if let loader, !metalAvailable(gameVersion: gameVersion, loader: loader, metalVersions: metalVersions,
+                                           metalMod: metalMod) {
                 ids.removeAll { $0 == .metallum }
-            } else if loader != nil {
+            } else if loader == .vanilla {
                 // Air attaches its Metal agent to every manifest vanilla version whatever the choice,
                 // so only MobileGlues stays as the fallback for a Metal driver crash.
                 ids.removeAll { $0 == .zink || $0 == .angle }
@@ -121,8 +125,9 @@ public enum RendererPolicy {
     }
 
     public static func recommendedRenderer(gameVersion: String, loader: Instance.Loader,
-                                           metalVersions: Set<String>) -> RendererID {
-        let resolved = resolve(setting: .auto, gameVersion: gameVersion, loader: loader, metalVersions: metalVersions)
+                                           metalVersions: Set<String>, metalMod: Bool = false) -> RendererID {
+        let resolved = resolve(setting: .auto, gameVersion: gameVersion, loader: loader, metalVersions: metalVersions,
+                               metalMod: metalMod)
         return resolved == .air ? .angle : canonical(resolved)
     }
 
@@ -160,7 +165,7 @@ public enum RendererPolicy {
     public static func detail(_ renderer: RendererID) -> String {
         switch key(renderer) {
         case "auto": "Chooses a tested renderer for this version and loader."
-        case "metallum": "Native Metal; fastest on supported vanilla versions."
+        case "metallum": "Native Metal; fastest. Vanilla, or Fabric 26.2 with MetalUniversal."
         case "mobileglues": "OpenGL translated on the CPU; broad but slower."
         case "zink": "Slower: OpenGL is translated through Vulkan; for advanced compatibility."
         case "gl4es": "Legacy OpenGL path for Minecraft 1.16.5 and older."
@@ -206,9 +211,9 @@ public enum RendererPolicy {
     }
 
     public static func resolve(setting: String, globalSetting: String = "auto", gameVersion: String,
-                               loader: Instance.Loader, metalVersions: Set<String>) -> String {
+                               loader: Instance.Loader, metalVersions: Set<String>, metalMod: Bool = false) -> String {
         resolve(setting: RendererID(rawValue: setting), globalSetting: RendererID(rawValue: globalSetting),
-                 gameVersion: gameVersion, loader: loader, metalVersions: metalVersions).rawValue
+                 gameVersion: gameVersion, loader: loader, metalVersions: metalVersions, metalMod: metalMod).rawValue
     }
 
     public static func airIdentifier(_ renderer: RendererID) -> RendererID {
@@ -255,7 +260,8 @@ public struct CompatibilityIssue: Hashable, Sendable {
 }
 
 /// Which mods and shader packs can't run with an instance's renderer. Metal
-/// runs vanilla only for now; shader packs on MobileGlues fail at pipeline
+/// runs mods only through MetalUniversal on Fabric 26.2, with Sodium but
+/// without Iris or shader packs; shader packs on MobileGlues fail at pipeline
 /// creation (ES 3.0 via ANGLE: "Draw buffers … Status: 36054"), though
 /// MobileGlues reports OpenGL 4.0 so Iris's own check passes.
 public enum ContentCompatibility {
@@ -283,10 +289,13 @@ public enum ContentCompatibility {
         switch (kind, shown) {
         case (.mods, "Metal"):
             guard let found = integration(for: name, manifest) ?? integration(for: id, manifest) else { return nil }
+            // Sodium rendered with MetalUniversal on the iPad (plan/reviews/renderer-benchmarks.md).
+            if found.name == "sodium", MetalMod.gameVersions.contains(gameVersion) { return nil }
             // Named after the integration: a file name like "iris-fabric-1.8.0+mc26.3" reads badly in a title.
-            return make("Metal runs vanilla only for now.", as: found.name.capitalized)
+            return make(found.name == "iris" ? irisOnMetal : "Metal runs this mod only on Fabric "
+                + MetalMod.gameVersions.sorted().joined(separator: ", ") + " for now.", as: found.name.capitalized)
         case (.shaders, "Metal"):
-            return make("Metal runs vanilla only for now.")
+            return make(irisOnMetal)
         case (.shaders, "MobileGlues"):
             return make("On MobileGlues, shader packs fail to start and Iris turns them off.")
         case (.mods, "MobileGlues"), (.mods, "ANGLE"):
@@ -328,6 +337,9 @@ public enum ContentCompatibility {
             if let item = mods.first(where: { $0.enabled && $0.id == issue.file }) { try store.setEnabled(false, item) }
         }
     }
+
+    /// Stock Iris fails on Metal with "No GLCapabilities instance set".
+    public static let irisOnMetal = "Iris needs OpenGL; Metal runs without shaders for now."
 
     private static func normalized(_ s: String) -> String { s.lowercased().filter { $0.isLetter || $0.isNumber } }
 }

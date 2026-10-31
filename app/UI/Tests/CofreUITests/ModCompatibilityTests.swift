@@ -21,11 +21,11 @@ final class ModCompatibilityTests: XCTestCase {
     func testModsDoNotOfferMetalEvenOnManifestVersions() {
         XCTAssertEqual(
             ModCompatibility.entry(for: "iris")?.issue(gameVersion: "26.2", renderer: "metallum")?.reason,
-            "Metal runs vanilla only for now.")
+            "Iris needs OpenGL; Metal runs without shaders for now.")
         XCTAssertNotNil(ModCompatibility.entry(for: "iris")?.issue(gameVersion: "26.3", renderer: "metallum"))
         XCTAssertEqual(
             ModCompatibility.entry(for: "sodium")?.issue(gameVersion: "1.21.11", renderer: "metallum")?.reason,
-            "Metal runs vanilla only for now.")
+            "Metal runs this mod only on Fabric 26.2 for now.")
     }
 
     func testLaunchDecisionWarnsOnlyEnabledIncompatibleMods() {
