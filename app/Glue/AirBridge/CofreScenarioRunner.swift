@@ -48,8 +48,10 @@ final class CofreScenarioRunner {
 
     private func execute() async {
 #if DEBUG
-        RendererPolicy.allowMetalForModdedScenario = scenario.renderer == .metallum
-        defer { RendererPolicy.allowMetalForModdedScenario = false }
+        if scenario.renderer == .metallum {
+            RendererPolicy.allowMetalForModdedScenario = true
+            UserDefaults.standard.set(true, forKey: "cofre.debug.moddedMetal")
+        }
 #endif
         guard let store = instances else {
             fail("instance", CofreBackendError.unavailable("instances"))

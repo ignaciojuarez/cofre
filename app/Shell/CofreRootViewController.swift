@@ -32,6 +32,8 @@ public final class CofreRootViewController: UIViewController {
         addChild(root); root.view.frame = view.bounds; root.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         view.addSubview(root.view); root.didMove(toParent: self)
         #if DEBUG
+        // A device test kit made by Metal scenarios keeps its modded Metal choice when the tester taps Play later.
+        RendererPolicy.allowMetalForModdedScenario = UserDefaults.standard.bool(forKey: "cofre.debug.moddedMetal")
         if let index = ProcessInfo.processInfo.arguments.firstIndex(of: "-cofreScenario"), index + 1 < ProcessInfo.processInfo.arguments.count {
             let relative = ProcessInfo.processInfo.arguments[index + 1]
             let url = URL(fileURLWithPath: relative, relativeTo: FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0])
