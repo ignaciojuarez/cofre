@@ -31,6 +31,8 @@ Measured results only: what launched, what rendered, frame rate, memory, limits.
 | 10-31 | 1.21.11 | vanilla | Metal (Auto, after 12ee163) | ❌ | — | — | 1377 | `NoSuchMethodError SymbolLookup.findOrThrow`: agent needs Java 22+, game got Java 21. Fix in progress |
 | 10-31 | 1.21.11 | vanilla | MobileGlues requested | ✅ | ✅ title | — | — | Air attached the Metal agent anyway and Metal drew; picker choice ignored on manifest versions |
 | 10-31 | 1.21.11 | vanilla | Metal (Auto, after 09fd2fa) | ❌ | — | — | — | Java 25 now (`java-25-openjdk`), no `findOrThrow`. New crash: `NoClassDefFoundError com/metallum/agent/ShaderVersionBump`; Air's `metallum_agent.jar` lacks that class |
+| 10-31 | 1.21.11 | Fabric 0.19.5 + Graft iOS (before 0077933) | Metal (Graft) | ✅ | — | — | 801 | SIGBUS in `UpcallStub::create` ~5 s after first frame: FFM upcall stubs can't be created on iOS |
+| 10-31 | 1.21.11 | Fabric 0.19.5 + **Graft iOS** (0077933), no Sodium | Metal (Graft) | ✅ | ✅ world | **~51 steady** (t≥280 s) / 43 avg incl. chunk load; 1%-low ~32 | 2149 | Title → world (`joined the game` at t≈150 s); thermal serious; Java 25; heap 1024 MB |
 | 10-31 | 26.3 | vanilla | MobileGlues requested | ✅ | — | — | 755 | Agent attached too; `Using graphics device: ANGLE … MobileGlues` this time |
 | 10-31 | 1.21.1 | NeoForge + JEI + Sodium + ModernFix | MobileGlues | ✅ | ✅ | ~30 (mod-warning screen) | 1236 | ModernFix warns FerriteCore missing |
 
@@ -47,5 +49,5 @@ Measured results only: what launched, what rendered, frame rate, memory, limits.
 |---|---|---|---|---|
 | 26.3 / 26.4 / 26.1 | ✅ Air's agent | ❓ Metallum mod (testing) | ❌ | |
 | 26.2 | ⚠️ Air agent crashed 10-31 (slf4j) | ✅ MetalUniversal 1.0.4 + Sodium 0.9.0 | ❌ | Upstream Metallum lists Sodium + Iris for 26.2; Iris still fails |
-| 1.21.11 | ✅ in manifest | ❓ | ❌ | |
+| 1.21.11 | ❌ agent jar bug (fix in progress) | ✅ Graft iOS port (~51 FPS) | ❌ | |
 | 1.20.1 | ❌ | ❌ | ❌ | Older than Minecraft's GPU-device layer (1.21.5+) that Metallum plugs into; would need a new backend |
