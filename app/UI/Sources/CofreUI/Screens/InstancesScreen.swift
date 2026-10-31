@@ -468,6 +468,21 @@
                             }
                             Row("Java", trailing: { Meta("Auto") })
                         }
+                        if loader != .vanilla, !RendererPolicy.isRecommendedForMods(
+                            gameVersion: version, loader: loader, metalVersions: ModCompatibility.metalVersions
+                        ) {
+                            VStack(alignment: .leading, spacing: 0) {
+                                Banner("Not recommended · no Metal, slow", icon: .cross, tone: .warn)
+                                Text(
+                                    "Runs on OpenGL translation (MobileGlues): ~11 FPS on iPhone 17 Pro. For mods, pick 26.2 (Fabric or NeoForge) or Fabric 1.21.11."
+                                )
+                                .cofreFont(.caption)
+                                .foregroundStyle(Color.cofre.muted)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.horizontal, 12)
+                                .padding(.bottom, 10)
+                            }
+                        }
                         PreflightLine(version: version)
                         if creating, loader != .vanilla, !loaderVersion.isEmpty {
                             Row("Installing \(loader.displayName) \(loaderVersion)…", leading: { Spinner() })
@@ -500,7 +515,7 @@
                 loaderVersion = loaderVersions.first ?? ""
             }
             .blockSheet(isPresented: $showingVersionPicker) {
-                VersionPickerSheet(loader: nil, selection: $version).environment(store)
+                VersionPickerSheet(loader: nil, recommendationLoader: loader, selection: $version).environment(store)
             }
         }
 

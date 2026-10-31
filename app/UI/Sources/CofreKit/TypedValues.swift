@@ -182,6 +182,7 @@ public enum PreferenceKey: Hashable, Sendable {
     case setupCompleted, setupStep, modsInstance, inputMode, rejoinIntent
     case renderScale, resolutionDefaulted, memoryDefaultApplied, downloadSourceDefaulted
     case optionsBefore(String)
+    case slowModsNotice(String)
     case launchStarted(String)
     case gameSession
     case distancesSeeded(String)
@@ -203,6 +204,7 @@ public enum PreferenceKey: Hashable, Sendable {
         case .memoryDefaultApplied: "cofre.memory_default_applied"
         case .downloadSourceDefaulted: "cofre.download_source_defaulted"
         case .optionsBefore(let id): "cofre.options.before.\(id)"
+        case .slowModsNotice(let id): "cofre.slow-mods-notice.\(id)"
         case .launchStarted(let id): "cofre.launch.started.\(id)"
         case .gameSession: "cofre.game.session"
         case .distancesSeeded(let id): "cofre.options.distances-seeded.\(id)"

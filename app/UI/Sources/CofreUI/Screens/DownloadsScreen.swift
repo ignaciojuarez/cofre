@@ -155,6 +155,8 @@ struct CofreDownloadsSheet: View {
 /// Minecraft versions (releases, snapshots behind a switch) or, with `loader`, that loader's versions for `game`.
 struct VersionPickerSheet: View {
     let loader: Loader?
+    /// When choosing a Minecraft version, annotate it for the loader selected in New Instance.
+    var recommendationLoader: Loader? = nil
     /// The Minecraft version a loader list is for.
     var game: String? = nil
     @Binding var selection: String
@@ -184,7 +186,7 @@ struct VersionPickerSheet: View {
                 if loader == nil { PreflightLine(version: selection) }
             }.padding(16) }
         }
-        .task(id: "\(snapshots)-\(attempt)-\(loader?.rawValue ?? "game")-\(game ?? "")") {
+        .task(id: "\(snapshots)-\(attempt)-\(loader?.rawValue ?? "game")-\(recommendationLoader?.rawValue ?? "")-\(game ?? "")") {
             do {
                 if let loader {
                     let game = game ?? store.activeInstance?.gameVersion ?? ""
@@ -205,7 +207,18 @@ struct VersionPickerSheet: View {
                 ForEach(shown) { version in
                     Button { selection = version.id; dismiss() } label: {
                         Row(version.id, isSelected: selection == version.id, leading: { Radio(isOn: selection == version.id) },
-                            trailing: { Meta(version.id == versions.first?.id ? "Newest" : "") })
+                            trailing: {
+                                HStack(spacing: 4) {
+                                    if version.id == versions.first?.id { Meta("Newest") }
+                                    if let recommendationLoader, recommendationLoader != .vanilla {
+                                        let recommended = RendererPolicy.isRecommendedForMods(
+                                            gameVersion: version.id, loader: recommendationLoader,
+                                            metalVersions: ModCompatibility.metalVersions)
+                                        Badge(recommended ? "Recommended" : "Not recommended",
+                                              tone: recommended ? .success : .warn)
+                                    }
+                                }
+                            })
                     }.buttonStyle(RowButtonStyle())
                 }
             }

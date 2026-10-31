@@ -97,6 +97,7 @@
         public private(set) var unexpectedGameExit: GameSession?
         public var logs: [LogKind: [LogLine]] = [:]
         public var pendingModCompatibility: [ModCompatibilityIssue]?
+        public var dismissedSlowModsNotices: Set<String> = []
 
         // System
         public var renderers: [RendererOption] = []

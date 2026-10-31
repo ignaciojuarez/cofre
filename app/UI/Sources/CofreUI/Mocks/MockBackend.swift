@@ -68,8 +68,8 @@
                     loaderVersion: "47.3.0", modCount: 189,
                     sizeBytes: 6_228_000_000, lastPlayed: now.addingTimeInterval(-86400), javaVersion: "17"),
                 InstanceSummary(
-                    id: "cobblemon", name: "Cobblemon", loader: .neoforge, gameVersion: "1.21.1",
-                    loaderVersion: "21.1.77", modCount: 64,
+                    id: "cobblemon", name: "Cobblemon", loader: .neoforge, gameVersion: "1.21.11",
+                    loaderVersion: "21.11.48", modCount: 64,
                     sizeBytes: 2_362_000_000, lastPlayed: now.addingTimeInterval(-3 * 86400), javaVersion: "21"),
                 InstanceSummary(
                     id: "skyblock", name: "Skyblock", loader: .quilt, gameVersion: "1.20.4", loaderVersion: "0.26.4",
@@ -295,7 +295,7 @@
         public func gameVersions(_ kind: VersionKind) async throws -> [GameVersion] {
             switch kind {
             case .release:
-                ["26.3", "1.21.4", "1.21.1", "1.20.4", "1.20.1", "1.19.2", "1.18.2", "1.16.5", "1.12.2"].map {
+                ["26.3", "26.2", "1.21.11", "1.21.4", "1.21.1", "1.20.4", "1.20.1", "1.19.2", "1.18.2", "1.16.5", "1.12.2"].map {
                     GameVersion(id: $0)
                 }
             case .snapshot: ["26w44a", "26w43b"].map { GameVersion(id: $0, kind: .snapshot) }
@@ -309,7 +309,7 @@
             case .fabric: ["0.16.14", "0.16.10", "0.15.11"]
             case .quilt: ["0.26.4", "0.26.3"]
             case .forge: ["52.0.31", "47.3.0"]
-            case .neoforge: ["21.1.77", "21.1.65"]
+            case .neoforge: game == "1.21.11" ? ["21.11.48", "21.11.40"] : ["21.1.77", "21.1.65"]
             }
         }
 

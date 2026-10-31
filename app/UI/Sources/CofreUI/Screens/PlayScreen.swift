@@ -35,6 +35,13 @@
                     if let update = availableUpdate, update.version != dismissedUpdate {
                         UpdateBanner(update: update, dismiss: { dismissedUpdate = update.version })
                     }
+                    if let instance = store.activeInstance, store.showsSlowModsNotice(for: instance) {
+                        Banner("This setup can't use Metal and will be slow", icon: .cross, tone: .warn) {
+                            BlockButton("Dismiss", size: .small) {
+                                store.dismissSlowModsNotice(for: instance.id)
+                            }
+                        }
+                    }
                     if store.libraryLoaded { CofreDownloadsStrip().environment(nav) }
                     if let session = store.unexpectedGameExit {
                         let instance = store.instances.first { $0.id == session.instanceID }?.name ?? session.instanceID

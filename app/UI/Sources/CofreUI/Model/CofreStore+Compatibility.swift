@@ -5,6 +5,22 @@
     // Renderer compatibility for Mods (badges, the Get warning) and Play (the "doesn't run here" sheet). The rules
     // are CofreKit's `ContentCompatibility`; this only picks the instance and its renderer.
     extension CofreStore {
+        /// The Play banner is shown once for modded versions without a validated Metal route.
+        public func showsSlowModsNotice(for instance: InstanceSummary) -> Bool {
+            guard instance.loader != .vanilla,
+                !RendererPolicy.isRecommendedForMods(
+                    gameVersion: instance.gameVersion, loader: instance.loader,
+                    metalVersions: ModCompatibility.metalVersions)
+            else { return false }
+            return !dismissedSlowModsNotices.contains(instance.id)
+                && !defaults.bool(forKey: PreferenceKey.slowModsNotice(instance.id).rawValue)
+        }
+
+        public func dismissSlowModsNotice(for instanceID: String) {
+            dismissedSlowModsNotices.insert(instanceID)
+            defaults.set(true, forKey: PreferenceKey.slowModsNotice(instanceID).rawValue)
+        }
+
         /// The renderer `instance` launches with, as the launch path decides it.
         func renderer(for instance: InstanceSummary) -> String {
             ModCompatibility.renderer(

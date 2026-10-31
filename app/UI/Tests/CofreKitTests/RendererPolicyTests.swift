@@ -101,6 +101,26 @@ final class RendererPolicyTests: XCTestCase {
             "mobileglues")
     }
 
+    func testModRecommendationMatchesValidatedMetalRoutes() {
+        let manifest: Set<String> = ["1.21.11", "26.2", "26.3"]
+        XCTAssertTrue(
+            RendererPolicy.isRecommendedForMods(gameVersion: "26.3", loader: .vanilla, metalVersions: manifest))
+        XCTAssertFalse(
+            RendererPolicy.isRecommendedForMods(gameVersion: "1.20.1", loader: .vanilla, metalVersions: manifest))
+        XCTAssertTrue(RendererPolicy.isRecommendedForMods(gameVersion: "26.2", loader: .fabric, metalVersions: []))
+        XCTAssertTrue(RendererPolicy.isRecommendedForMods(gameVersion: "1.21.11", loader: .fabric, metalVersions: []))
+        XCTAssertTrue(RendererPolicy.isRecommendedForMods(gameVersion: "26.2", loader: .neoforge, metalVersions: []))
+        XCTAssertFalse(
+            RendererPolicy.isRecommendedForMods(gameVersion: "1.21.11", loader: .neoforge, metalVersions: manifest))
+        XCTAssertFalse(
+            RendererPolicy.isRecommendedForMods(gameVersion: "1.21.1", loader: .fabric, metalVersions: manifest))
+        XCTAssertFalse(
+            RendererPolicy.isRecommendedForMods(gameVersion: "26.2", loader: .forge, metalVersions: manifest))
+        XCTAssertFalse(
+            RendererPolicy.isRecommendedForMods(gameVersion: "26.2", loader: .quilt, metalVersions: manifest))
+        XCTAssertEqual(RendererPolicy.detail(.mobileglues), "OpenGL translated on the CPU; slow for mods.")
+    }
+
     func testSavedMetalFallsBackForModdedInstances() {
         XCTAssertEqual(
             RendererPolicy.resolve(setting: "metallum", gameVersion: "26.2", loader: .fabric, metalVersions: ["26.2"]),

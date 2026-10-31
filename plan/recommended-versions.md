@@ -17,7 +17,7 @@ Only native Metal is playable with mods; every OpenGL path translates on the CPU
 
 | Minecraft | Loader | Why |
 |---|---|---|
-| 1.21.11 | NeoForge | No Connector build, no NeoForge Metal renderer for 1.21.x |
+| 1.21.11 | NeoForge | No Connector build, no NeoForge Metal renderer for 1.21.x; MobileGlues 2.0.17 over ANGLE measured ~11 FPS in world and 60 ms/tick integrated server on iPhone 17 Pro (A19 Pro, 12 GB) |
 | 1.21.1, 1.20.1 | any | Older than Minecraft's GPU layer (1.21.5+) that Metal mods plug into; MobileGlues only |
 | any | Forge | No Metal route |
 | any | Quilt | Untested on Metal |

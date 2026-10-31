@@ -166,7 +166,7 @@ public enum RendererPolicy {
         switch key(renderer) {
         case "auto": "Chooses a tested renderer for this version and loader."
         case "metallum": "Native Metal; fastest. Vanilla, or the validated 26.2 Metal kit."
-        case "mobileglues": "OpenGL translated on the CPU; broad but slower."
+        case "mobileglues": "OpenGL translated on the CPU; slow for mods."
         case "zink": "Slower: OpenGL is translated through Vulkan; for advanced compatibility."
         case "gl4es": "Legacy OpenGL path for Minecraft 1.16.5 and older."
         case "simplefpewrapper": "Fixed-function compatibility for very old clients."
@@ -180,6 +180,23 @@ public enum RendererPolicy {
         case "virgl": "Mesa compatibility path; hidden until an iOS result is validated."
         case "nggl4es": "Shader translation path; hidden until an iOS result is validated."
         default: "Saved renderer; hidden from the normal picker."
+        }
+    }
+
+    /// Whether a version and loader have a validated Metal route for modded play.
+    /// Vanilla routes come from Air's shipped manifest; the modded routes are the
+    /// Cofre-supported kits documented in `plan/recommended-versions.md`.
+    public static func isRecommendedForMods(gameVersion: String, loader: Instance.Loader,
+                                            metalVersions: Set<String>) -> Bool {
+        switch loader {
+        case .vanilla:
+            metalVersions.contains(gameVersion)
+        case .fabric:
+            gameVersion == "26.2" || gameVersion == "1.21.11"
+        case .neoforge:
+            gameVersion == "26.2"
+        case .forge, .quilt, .unknown:
+            false
         }
     }
 

@@ -192,6 +192,11 @@
                             && !RendererPolicy.isLegacy($0.gameVersion)
                     } ?? false
                     let unavailable = metalUnavailable || legacyUnavailable
+                    // Choosing any GL renderer is a no-Metal route for modded play, even when a validated kit is available.
+                    let slowForMods = context.map {
+                        $0.loader != .vanilla && !RendererPolicy.isMetal(r.id)
+                            && !RendererPolicy.sameRenderer(r.id, .auto)
+                    } ?? false
                     let unavailableDetail: String? = metalUnavailable
                         ? (context?.loader == .vanilla
                             ? "Metal is available only for vanilla versions in the shipped manifest."
@@ -199,7 +204,7 @@
                                 ? "Metal needs the validated 26.2 kit: use Metal above."
                                 : "Metal runs modded 26.2 only with its validated kit.")
                         : legacyUnavailable ? "This legacy renderer is only for Minecraft 1.16.5 and older." : nil
-                    let detail = unavailableDetail ?? r.detail
+                    let detail = slowForMods ? "Slow for mods: OpenGL is translated on the CPU." : unavailableDetail ?? r.detail
                     Button {
                         current.wrappedValue = r.id
                     } label: {
@@ -208,7 +213,9 @@
                             isSelected: RendererPolicy.sameRenderer(current.wrappedValue, r.id)) {
                             Radio(isOn: RendererPolicy.sameRenderer(current.wrappedValue, r.id))
                         } trailing: {
-                            if recommended.map({ RendererPolicy.sameRenderer($0, r.id) }) == true {
+                            if slowForMods {
+                                Badge("Not recommended", tone: .warn)
+                            } else if recommended.map({ RendererPolicy.sameRenderer($0, r.id) }) == true {
                                 Badge("Recommended", tone: .success)
                             }
                         }
