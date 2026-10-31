@@ -4,8 +4,8 @@ import Foundation
 /// More heap than the game needs only slows GC and invites a jetsam kill, which closes the whole app.
 public enum JavaHeap {
     /// Memory outside the heap: GL driver, textures, metaspace, code cache, thread stacks.
-    /// Tuned on a 3 GB iPhone, where a smaller reserve was killed while loading.
-    public static let nativeReserveMB = 1200
+    /// Tuned for translated OpenGL on small devices, where native buffers can grow sharply while loading a world.
+    public static let nativeReserveMB = 1500
     public static let minimumMB = 512
 
     /// What the game needs, capped at half the device.

@@ -23,7 +23,7 @@ final class GameOptionsTests: XCTestCase {
     func testSmallDevicesGetShorterDistances() throws {
         try write("lang:en_us\n")
         try GameOptions.seedDistances(in: dir, physicalMB: 3862, replacingEngineDefaults: false)
-        XCTAssertEqual(try options(), "lang:en_us\nrenderDistance:8\nsimulationDistance:6\n")
+        XCTAssertEqual(try options(), "lang:en_us\nrenderDistance:6\nsimulationDistance:5\n")
     }
 
     func testEngineDefaultsAreReplacedOnlyWhenAsked() throws {

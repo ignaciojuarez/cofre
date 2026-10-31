@@ -7,11 +7,11 @@ public enum GameOptions {
     /// What Air writes when the keys are missing.
     static let engineDefaults = ["renderDistance": "2", "simulationDistance": "5"]
 
-    /// Distances for this device: 4 GB iPads and older iPhones get less, since chunks cost heap.
+    /// Distances for this device: devices under 6 GB get less, since chunks cost native graphics memory too.
     public static func distances(physicalMB: Int) -> [String: String] {
         physicalMB >= 6000
             ? ["renderDistance": "10", "simulationDistance": "8"]
-            : ["renderDistance": "8", "simulationDistance": "6"]
+            : ["renderDistance": "6", "simulationDistance": "5"]
     }
 
     /// Fills missing distances. With `replacingEngineDefaults`, also replaces values equal to Air's defaults
