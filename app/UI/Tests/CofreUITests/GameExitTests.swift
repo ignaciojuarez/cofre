@@ -24,6 +24,21 @@ final class GameExitTests: XCTestCase {
         XCTAssertTrue(MockGameExit.report(.java).clue?.hasPrefix("java.lang.NullPointerException") == true)
     }
 
+    // NeoForge refuses later events "to a broken mod state"; the shader event in that line isn't the cause.
+    func testNeoForgeLoaderFailureBeatsTheShaderEvent() {
+        let client = """
+            Description: Rendering overlay
+            java.lang.IllegalStateException: Cowardly refusing to send event net.neoforged.neoforge.client.event.RegisterShadersEvent to a broken mod state
+            """
+        let log = """
+            [22:43:32] [Render thread/FATAL] [ne.ne.fm.ModLoader/CORE]: Error during pre-loading phase: Mod File mods/bountiful.jar needs language provider kotlinforforge:4 or above to load
+            [22:43:32] [Render thread/ERROR] [ne.ne.fm.ModLoader/]: Cowardly refusing to send event net.neoforged.neoforge.client.event.RegisterShadersEvent to a broken mod state
+            """
+        let r = diagnose(1, report: client, log: log)
+        XCTAssertEqual(r.reason, .mods)
+        XCTAssertEqual(r.clue, "Mod File mods/bountiful.jar needs language provider kotlinforforge:4 or above to load")
+    }
+
     // The shader pack in System Details and an INFO log line must not turn a Java error into a renderer one.
     func testMetalDriverCrashIsTheRenderer() {
         let fatal = "#  SIGSEGV (0xb)\n  #19 0x262d24730  /System/Library/Extensions/AGXMetalG18P.bundle/AGXMetalG18P"

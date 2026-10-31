@@ -24,7 +24,8 @@ public final class Modrinth {
         public var iconURL: URL? { Modrinth.url(icon) }
         enum CodingKeys: String, CodingKey { case id, title, description, icon = "icon_url", projectType = "project_type" }
     }
-    public struct Version: Codable, Sendable { public let id: String; public let projectID: String; public let name: String; public let versionNumber: String; public let gameVersions: [String]; public let loaders: [String]; public let versionType: String; public let dependencies: [Dependency]; public let files: [File]; enum CodingKeys: String, CodingKey { case id, projectID = "project_id", name, versionNumber = "version_number", gameVersions = "game_versions", loaders, versionType = "version_type", dependencies, files } }
+    /// `changelog` is Markdown; nil when the list was fetched without changelogs.
+    public struct Version: Codable, Sendable { public let id: String; public let projectID: String; public let name: String; public let versionNumber: String; public let gameVersions: [String]; public let loaders: [String]; public let versionType: String; public let dependencies: [Dependency]; public let files: [File]; public let changelog: String?; enum CodingKeys: String, CodingKey { case id, projectID = "project_id", name, versionNumber = "version_number", gameVersions = "game_versions", loaders, versionType = "version_type", dependencies, files, changelog } }
     public struct Dependency: Codable, Sendable { public let versionID: String?; public let projectID: String?; public let dependencyType: String; enum CodingKeys: String, CodingKey { case versionID = "version_id", projectID = "project_id", dependencyType = "dependency_type" } }
     public struct File: Codable, Sendable { public let hashes: [String: String]; public let url: URL?; public let filename: String; public let size: Int64; public let primary: Bool }
 
@@ -54,16 +55,21 @@ public final class Modrinth {
         return try await get("search", query: q, as: Response.self).hits
     }
     public func project(id: String) async throws -> Project { try await get("project/\(id)", as: Project.self) }
-    public func versions(projectID: String, loaders: [String] = [], gameVersions: [String] = []) async throws -> [Version] {
-        return try await getURL(Self.versionsURL(projectID: projectID, loaders: loaders, gameVersions: gameVersions), as: [Version].self)
+    public func page(id: String) async throws -> ProjectPage { ProjectPage(modrinth: try await get("project/\(id)", as: ProjectDetail.self)) }
+    /// One version with its changelog, for "What's new" on versions from the changelog-free full list.
+    public func version(id: String) async throws -> Version { try await get("version/\(id)", as: Version.self) }
+    public func versions(projectID: String, loaders: [String] = [], gameVersions: [String] = [], includeChangelog: Bool = true) async throws -> [Version] {
+        return try await getURL(Self.versionsURL(projectID: projectID, loaders: loaders, gameVersions: gameVersions, includeChangelog: includeChangelog), as: [Version].self)
     }
 
     /// URL construction stays separate so the API contract is testable without a network request.
-    public static func versionsURL(projectID: String, loaders: [String] = [], gameVersions: [String] = []) -> URL {
+    /// The full list skips changelogs: they are most of its size (Sodium 539 KB → 219 KB).
+    public static func versionsURL(projectID: String, loaders: [String] = [], gameVersions: [String] = [], includeChangelog: Bool = true) -> URL {
         var components = URLComponents(string: "https://api.modrinth.com/v2/project/\(projectID)/version")!
         var query: [URLQueryItem] = []
         if !loaders.isEmpty { query.append(.init(name: "loaders", value: try! jsonValue(loaders))) }
         if !gameVersions.isEmpty { query.append(.init(name: "game_versions", value: try! jsonValue(gameVersions))) }
+        if !includeChangelog { query.append(.init(name: "include_changelog", value: "false")) }
         components.queryItems = query.isEmpty ? nil : query
         return components.url!
     }

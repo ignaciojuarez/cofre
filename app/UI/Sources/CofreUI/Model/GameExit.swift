@@ -104,6 +104,16 @@ public struct GameExitReport: Hashable, Sendable {
         {
             return (.mods, "\(name) \(needsGL)")
         }
+        // NeoForge stops loading mods, then refuses every later event ("…RegisterShadersEvent to a broken mod state"),
+        // so the client report reads like a shader crash. The loader's own failure line names the real cause.
+        let loaderFailures = ["Failure message: ", "Error during pre-loading phase: "]
+        for line in report + logLines {
+            if let marker = loaderFailures.first(where: { line.contains($0) }),
+                let range = line.range(of: marker)
+            {
+                return (.mods, clean(String(line[range.upperBound...])))
+            }
+        }
         for source in [report, errors] {
             for (reason, keys) in signs {
                 // The last match: the root cause in a stack trace, the newest line in a log.

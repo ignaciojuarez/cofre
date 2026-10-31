@@ -42,8 +42,8 @@ public final class TouchOverlayModel {
     @ObservationIgnored private var trayOpenedByHold = false
     @ObservationIgnored private var settingsObserver: NSObjectProtocol?
     @ObservationIgnored private var keyboardObservers: [NSObjectProtocol] = []
-    @ObservationIgnored private var trayTapTasks: [String: Task<Void, Never>] = [:]
-    var latchedTrayActions: [String: QuickTrayAction] = [:]
+    @ObservationIgnored private var trayTapTasks: [QuickTrayActionID: Task<Void, Never>] = [:]
+    var latchedTrayActions: [QuickTrayActionID: QuickTrayAction] = [:]
 
     public init(input: (any GameInputService)?, settings: TouchControlSettings = .load()) {
         self.input = input
@@ -176,7 +176,7 @@ public final class TouchOverlayModel {
 
     func trayActionDown(_ action: QuickTrayAction) {
         touched()
-        if action.id == "keyboard" { toggleKeyboard(); return }
+        if action.id == .keyboard { toggleKeyboard(); return }
         switch action.mode {
         case .tap:
             pressChord(action.keys)

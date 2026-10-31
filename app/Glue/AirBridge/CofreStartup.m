@@ -3,7 +3,6 @@
 // SceneDelegate (patch 0002) asks CofreMakeRootViewController() for the root
 // screen; every path stays in Cofre UI.
 #import "AirBridgeAdapter.h"
-#import "CofreTunnelService.h"
 #import "LauncherPreferences.h"
 #import "utils.h"
 #import <UIKit/UIKit.h>
@@ -21,13 +20,15 @@ static UILabel *cofreFallbackDetail;
 static NSMutableArray<NSURL *> *cofrePendingURLs;
 static BOOL cofreRootReady = NO;
 static NSString *const CofreOpenURLNotification = @"CofreOpenURL";
+static Class CofreCoreEntryClass(void);
+static void CofreDeliverURL(NSURL *url);
 
 static void CofreReceiveURL(NSURL *url) {
   if (!url) return;
   NSLog(@"[Cofre] open url scheme=%@", url.scheme.lowercaseString ?: @"");
   dispatch_async(dispatch_get_main_queue(), ^{
     if (cofreRootReady) {
-      [[NSNotificationCenter defaultCenter] postNotificationName:CofreOpenURLNotification object:url];
+      CofreDeliverURL(url);
     } else {
       if (!cofrePendingURLs) cofrePendingURLs = [NSMutableArray array];
       [cofrePendingURLs addObject:url];
@@ -41,7 +42,7 @@ static void CofreDrainPendingOpenURLs(void) {
     NSArray<NSURL *> *urls = [cofrePendingURLs copy];
     [cofrePendingURLs removeAllObjects];
     for (NSURL *url in urls) {
-      [[NSNotificationCenter defaultCenter] postNotificationName:CofreOpenURLNotification object:url];
+      CofreDeliverURL(url);
     }
   });
 }
@@ -132,6 +133,16 @@ static Class CofreCoreEntryClass(void) {
   return entry;
 }
 
+static void CofreDeliverURL(NSURL *url) {
+  Class entry = CofreCoreEntryClass();
+  SEL handler = @selector(handleOpenURL:);
+  if (entry && [entry respondsToSelector:handler]) {
+    ((void (*)(id, SEL, NSURL *))objc_msgSend)(entry, handler, url);
+    return;
+  }
+  [[NSNotificationCenter defaultCenter] postNotificationName:CofreOpenURLNotification object:url];
+}
+
 /// On iOS 26+ JIT comes from a debugger-made code region. Detaching after it
 /// leaves dyld unable to load the unsigned libraries newer Minecraft needs (JNA
 /// for 26.3), so keep Cofre's debugger attached for breakpoints only and let
@@ -186,12 +197,14 @@ static void CofreEnsureStarted(void) {
     // The game owns VSync and its frame limit in options.txt. With this Air setting on, Air's Java launcher
     // overwrites both (VSync off, 260 FPS) at every launch, undoing what the player picked in game.
     setPrefBool(@"video.disable_game_vsync", NO);
+    // Cofre has no FPS overlay; older builds turned Air's on by default.
+    setPrefBool(@"video.performance_hud", NO);
     // Air defaults every download to the BMCLAPI mirror in China. Start on
     // Mojang and the loaders' own servers once, then keep the player's pick.
     NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
-    if (![defaults boolForKey:@"cofre.download_source_defaulted"]) {
+    if (![defaults boolForKey:COFRE_DOWNLOAD_SOURCE_DEFAULTED_KEY]) {
       setPrefObject(@"general.download_source", @"official");
-      [defaults setBool:YES forKey:@"cofre.download_source_defaulted"];
+      [defaults setBool:YES forKey:COFRE_DOWNLOAD_SOURCE_DEFAULTED_KEY];
     }
   });
 }
@@ -250,6 +263,5 @@ __attribute__((constructor)) static void CofreStartup(void) {
                        queue:[NSOperationQueue mainQueue]
                   usingBlock:^(__unused NSNotification *note) {
                     CofreEnsureStarted();
-                    [CofreTunnelService startIfInstalled];
                   }];
 }

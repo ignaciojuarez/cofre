@@ -8,8 +8,8 @@
         /// The renderer `instance` launches with, as the launch path decides it.
         func renderer(for instance: InstanceSummary) -> String {
             ModCompatibility.renderer(
-                instanceSetting: instancePreferences[instance.id]?.renderer ?? instance.renderer,
-                globalSetting: preferences.renderer, gameVersion: instance.gameVersion,
+                instanceSetting: (instancePreferences[instance.id]?.renderer ?? instance.renderer)?.rawValue,
+                globalSetting: preferences.renderer.rawValue, gameVersion: instance.gameVersion,
                 loader: instance.loader.rawValue, javaVersion: instance.javaVersion.flatMap(Int.init) ?? 21)
         }
 

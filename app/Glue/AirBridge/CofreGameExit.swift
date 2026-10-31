@@ -3,6 +3,20 @@ import CofreKit
 import SwiftUI
 import UIKit
 
+extension ReportBundle.Context {
+    /// What a shared report says about this app and phone; the bundle redacts anything personal.
+    @MainActor static func current(exitReason: String? = nil, clue: String? = nil) -> Self {
+        let info = Bundle.main.infoDictionary ?? [:]
+        var system = utsname()
+        uname(&system)
+        let model = withUnsafeBytes(of: system.machine) { String(decoding: $0.prefix { $0 != 0 }, as: UTF8.self) }
+        return Self(
+            appVersion: (info["CofreVersion"] ?? info["CFBundleShortVersionString"]) as? String,
+            build: (info["CofreBuild"] ?? info["CFBundleVersion"]) as? String, device: model,
+            iOS: UIDevice.current.systemVersion, exitReason: exitReason, clue: clue)
+    }
+}
+
 /// Cofre's recovery screen over a stopped game. Patch 0004 asks
 /// `CofreHandleGameExit` (CofreStartup.m), which calls `handle` on the main
 /// queue while the JVM thread waits for the process to end.
@@ -25,14 +39,14 @@ import UIKit
         let logText = logs.tail(.game, limit: 512).map(\.text).joined(separator: "\n")
         let crashText = crashURL.flatMap { try? String(contentsOf: $0, encoding: .utf8) }
         // Settings changed in game: logged as breadcrumbs, and named on the screen when they caused the crash.
-        let before = bridge.flatMap { UserDefaults.standard.string(forKey: "cofre.options.before.\($0.selectedProfileName())") } ?? ""
+        let before = bridge.flatMap { UserDefaults.standard.string(forKey: PreferenceKey.optionsBefore($0.selectedProfileName()).rawValue) } ?? ""
         let after = instanceURL.flatMap { try? String(contentsOf: $0.appendingPathComponent("options.txt"), encoding: .utf8) } ?? ""
         let changes = OptionsDiff.changed(before: before, after: after)
         OptionsDiff.changes(before: before, after: after).forEach { NSLog("%@", $0) }
         let report = GameExitReport(code: code, crashReport: crashText, log: logText, instance: bridge.flatMap(instanceLabel), files: [logs.gameLog].compactMap { $0 } + (crashURL.map { [$0] } ?? []), changedSettings: OptionsDiff.reloadingNames(changes))
         let bundleURL = FileManager.default.temporaryDirectory.appendingPathComponent("report-\(UUID().uuidString).zip")
-        let reportBundle = try? ReportBundle(store: logs, context: .init(exitReason: report.reason.rawValue, clue: report.clue)).make(at: bundleURL)
-        let preview = ReportBundle(store: logs, context: .init(exitReason: report.reason.rawValue, clue: report.clue)).preview()
+        let reportBundle = try? ReportBundle(store: logs, context: .current(exitReason: report.reason.rawValue, clue: report.clue)).make(at: bundleURL)
+        let preview = ReportBundle(store: logs, context: .current(exitReason: report.reason.rawValue, clue: report.clue)).preview()
         let intent = bridge.flatMap { makeRejoinIntent($0) }
         if let intent { RejoinIntentStore.save(intent) }
         NSLog("[Cofre] game exit screen reason=%@ crashReport=%d", report.reason.rawValue, report.files.count > 1)
@@ -55,7 +69,7 @@ import UIKit
         let id = bridge.selectedProfileName()
         guard !id.isEmpty, let dir = bridge.gameDirectory(forProfile: id) else { return nil }
         let defaults = UserDefaults.standard
-        let since = Date(timeIntervalSince1970: defaults.double(forKey: "cofre.launch.started.\(id)"))
+        let since = Date(timeIntervalSince1970: defaults.double(forKey: PreferenceKey.launchStarted(id).rawValue))
         let logURL = dir.appendingPathComponent("logs/latest.log")
         if let log = try? String(contentsOf: logURL), let server = RejoinDetector.server(in: log) {
             return RejoinIntent(instanceID: id, kind: .server, target: server, displayName: server)

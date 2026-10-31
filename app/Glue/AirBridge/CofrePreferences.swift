@@ -1,4 +1,5 @@
 import Foundation
+import CofreKit
 import CofreUI
 
 /// Typed owner for the preferences exposed by CofreUI.
@@ -7,6 +8,7 @@ import CofreUI
 /// conversion and profile fallback stay here.
 public struct CofrePreferenceStore {
     public enum Key: String, CaseIterable {
+        case selectedAccount = "internal.selected_account"
         case autoRAM = "java.auto_ram"
         case ramAllocation = "java.allocated_memory"
         case renderer = "video.renderer"
@@ -46,7 +48,7 @@ public struct CofrePreferenceStore {
     }
 
     /// The picked size (0–1), owned by Cofre; written to Air at launch by the Air bridge.
-    static let scaleKey = "cofre.render.scale"
+    static let scaleKey = PreferenceKey.renderScale.rawValue
 
     public typealias Read = (_ key: String, _ profile: String?) -> Any?
     public typealias Write = (_ key: String, _ value: Any, _ profile: String?) -> Void
@@ -60,20 +62,18 @@ public struct CofrePreferenceStore {
     }
 
     public func load(instanceID: String?) -> GamePreferences {
-        applyFirstResolution()
         var p = GamePreferences()
         p.autoRAM = bool(.autoRAM, instanceID, default: p.autoRAM)
         // With Auto on, the backend fills in the launch-time size (CofreBackendAdapter.javaHeap).
         p.ramMB = integer(.ramAllocation, instanceID, default: p.ramMB)
         p.deviceRAMMB = Int(ProcessInfo.processInfo.physicalMemory / 1_048_576)
-        p.renderer = string(.renderer, instanceID, default: p.renderer)
+        p.renderer = RendererID(rawValue: string(.renderer, instanceID, default: p.renderer.rawValue))
         // Cofre keeps the picked size; the launch writes it to Air (AirBridgeAdapter applyResolution).
         p.resolution = UserDefaults.standard.object(forKey: Self.scaleKey) as? Double
             ?? double(.resolution, instanceID, default: p.resolution * 100) / 100
-        p.graphicsApi = string(.graphicsAPI, instanceID, default: p.graphicsApi)
-        p.java = string(.java, instanceID, default: p.java)
+        p.graphicsApi = GraphicsAPI(rawValue: string(.graphicsAPI, instanceID, default: p.graphicsApi.rawValue))
+        p.java = JavaRuntimeID(rawValue: string(.java, instanceID, default: p.java.rawValue))
         p.jvmArgs = string(.javaArgs, instanceID, default: p.jvmArgs)
-        p.fpsOverlay = bool(.fpsOverlay, instanceID, default: p.fpsOverlay)
         p.muteWithSwitch = bool(.muteWithSwitch, instanceID, default: p.muteWithSwitch)
         p.microphone = bool(.microphone, instanceID, default: p.microphone)
         p.gyroAim = bool(.gyroAim, instanceID, default: p.gyroAim)
@@ -96,13 +96,12 @@ public struct CofrePreferenceStore {
     public func save(_ p: GamePreferences, instanceID: String?) {
         put(.autoRAM, p.autoRAM, instanceID)
         if !p.autoRAM { put(.ramAllocation, p.ramMB, instanceID) }
-        put(.renderer, p.renderer, instanceID)
+        put(.renderer, p.renderer.rawValue, instanceID)
         UserDefaults.standard.set(p.resolution, forKey: Self.scaleKey)
         put(.resolution, p.resolution * 100, instanceID)
-        put(.graphicsAPI, p.graphicsApi == "auto" ? "" : p.graphicsApi, instanceID)
-        put(.java, p.java, instanceID)
+        put(.graphicsAPI, p.graphicsApi == .auto ? "" : p.graphicsApi.rawValue, instanceID)
+        put(.java, p.java.rawValue, instanceID)
         put(.javaArgs, p.jvmArgs, instanceID)
-        put(.fpsOverlay, p.fpsOverlay, instanceID)
         put(.muteWithSwitch, p.muteWithSwitch, instanceID)
         put(.microphone, p.microphone, instanceID)
         put(.gyroAim, p.gyroAim, instanceID)
@@ -121,26 +120,6 @@ public struct CofrePreferenceStore {
     }
 
     public func stringValue(_ key: Key, profile: String?) -> String? { object(key, profile) as? String }
-
-    /// Air saves 100% on first launch. A new install (JIT never set up) on iPhone starts at ½ instead: sharp 2×2
-    /// pixels, cooler and longer battery. Runs once and never changes a value the player picked.
-    private func applyFirstResolution() {
-        let defaults = UserDefaults.standard
-        guard !defaults.bool(forKey: "cofre.resolution.defaulted") else { return }
-        defaults.set(true, forKey: "cofre.resolution.defaulted")
-        guard Self.isPhone, !defaults.bool(forKey: "cofre.setup.jit"), double(.resolution, nil, default: 100) == 100
-        else { return }
-        put(.resolution, 50.0, nil)
-        NSLog("[Cofre] resolution default 50%% (iPhone)")
-    }
-
-    /// The hardware, not the UI idiom (Air rewrites the idiom).
-    private static var isPhone: Bool {
-        var system = utsname()
-        uname(&system)
-        return withUnsafeBytes(of: system.machine) { String(decoding: $0.prefix { $0 != 0 }, as: UTF8.self) }
-            .hasPrefix("iPhone")
-    }
 
     private func put(_ key: Key, _ value: Any, _ profile: String?) { write(key.rawValue, value, key.profileField == nil ? nil : profile) }
     private func object(_ key: Key, _ profile: String?) -> Any? { read(key.rawValue, key.profileField == nil ? nil : profile) }

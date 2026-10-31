@@ -1,4 +1,5 @@
 #import "AirBridgeAdapter.h"
+#import "CofreConstants.h"
 #import "CofreGameInput.h"
 #import "DownloadTaskManager.h"
 #import "JavaLauncher.h"
@@ -345,8 +346,8 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
                                    game:(NSString *)game
                                 version:(NSString *)version {
   return [FabricUtils
-      candidateURLsForVendor:[loader isEqualToString:@"quilt"] ? @"Quilt"
-                                                               : @"Fabric"
+      candidateURLsForVendor:CofreLoaderKindFromRaw(loader) == CofreLoaderKindQuilt ? @"Quilt"
+                                                                                     : @"Fabric"
             minecraftVersion:game
                loaderVersion:version];
 }
@@ -638,7 +639,7 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
   CofreTakeEngineAlert();
   NSDictionary *profile = _profiles.profiles[name];
   NSString *game = profile[@"cofreGameVersion"] ?: profile[@"lastVersionId"];
-  BOOL neo = [loader isEqualToString:@"neoforge"];
+  BOOL neo = CofreLoaderKindFromRaw(loader) == CofreLoaderKindNeoForge;
   if (!profile || !game.length || !version.length) {
     done(CofreAirError(@"The instance or loader version is invalid."));
     return;

@@ -112,10 +112,13 @@
         /// The directory containing Air's launcher_profiles.json. Production derives this from Air's profiles;
         /// previews and tests may provide a fixture folder.
         public var instances: InstanceStore?
+        /// The app's one Modrinth client (project pages call it directly). `nil` in previews: pages show sample data.
+        public var modrinth: Modrinth?
 
-        public init(backend: any CofreBackend, instances: InstanceStore? = nil) {
+        public init(backend: any CofreBackend, instances: InstanceStore? = nil, modrinth: Modrinth? = nil) {
             self.backend = backend
             self.instances = instances
+            self.modrinth = modrinth
         }
 
         /// Sample data from the mockups, for previews, tests and the preview host.

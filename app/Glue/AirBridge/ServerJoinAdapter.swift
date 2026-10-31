@@ -97,7 +97,7 @@ extension MrpackIndex {
             let address = card.server.addresses.first.map { "\($0.host):\($0.port)" } ?? request.server
             let mapped = ServerJoinRequirementsState(
                 serverID: card.id, serverName: card.server.name, serverAddress: address, iconURL: card.server.icon,
-                gameVersion: card.game.version, loader: Loader(rawValue: card.loader.type.rawValue) ?? .unknown,
+                gameVersion: card.game.version, loader: card.loader.type,
                 loaderVersion: card.loader.version, javaMajorVersion: card.game.javaVersion, packName: card.id,
                 packVersion: card.pack.version, totalDownloadSizeBytes: plan.totalDownloadSize,
                 formattedDownloadSize: ByteCountFormatter.string(
@@ -183,7 +183,7 @@ extension MrpackIndex {
             }
             NSLog("[Cofre] pack import done instance=%@ server=%@", instanceID, request.server)
             UserDefaults.standard.set(
-                true, forKey: "cofre.server-card.\(resolution.card.server.addresses.first?.host ?? request.server)")
+                true, forKey: PreferenceKey.serverCard(resolution.card.server.addresses.first?.host ?? request.server).rawValue)
             // So the server shows under My servers for the new instance.
             if let store = try? serverStore(instanceID),
                (try? store.add(CofreServerRecord(name: resolution.card.server.name, ip: request.server))) != nil {

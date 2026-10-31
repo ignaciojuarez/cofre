@@ -373,9 +373,9 @@
             return Self.candidates(projectID).map { c in
                 ProjectVersion(
                     id: c.versionID, name: VersionLabel.clean(c.version),
-                    gameVersions: c.gameVersions.joined(separator: ", "), channel: c.channel.capitalized,
+                    gameVersions: c.gameVersions.joined(separator: ", "), channel: c.channel,
                     fits: inst.map { c.fits(game: $0.gameVersion, loader: $0.loader) } ?? false, number: c.version,
-                    games: c.gameVersions, loaders: c.loaders.compactMap(Loader.init(rawValue:)))
+                    games: c.gameVersions, loaders: c.loaders)
             }
         }
         public func dependencies(versionID: String, instanceID: String) async throws -> [ProjectDependency] {
@@ -440,9 +440,9 @@
 
         /// Versions newest first, with the same IDs as `versions(projectID:instanceID:)`.
         static func candidates(_ id: String, kind: ContentKind = .mods) -> [ModCandidate] {
-            let loaders =
-                kind != .mods ? [] : projects.first { $0.id == id }?.loaders.map(\.rawValue)
-                ?? (id == "flywheel" ? ["forge", "neoforge"] : ["fabric", "quilt"])
+            let loaders: [Loader] =
+                kind != .mods ? [] : projects.first { $0.id == id }?.loaders
+                ?? (id == "flywheel" ? [.forge, .neoforge] : [.fabric, .quilt])
             if id == "sodium", kind == .mods { return sodiumBuilds }
             let builds: [(String, String, String)] = [
                 ("188", "1.8.8", "1.21.1"), ("187", "1.8.7", "1.21.1"), ("181", "1.8.1", "1.21"),
@@ -566,17 +566,17 @@
         }
 
         // MARK: GAP-07 JITTester
-        public func testJIT() -> AsyncThrowingStream<JITStep, Error> {
+        public func testJIT() -> AsyncThrowingStream<JITStatusStep, Error> {
             AsyncThrowingStream { c in
                 Task {
-                    let details: [JITStep.Kind: String] = [
+                        let details: [JITStatusStep.Kind: String] = [
                         .pairing: "Valid", .vpn: "On", .diskImage: "Mounted", .debugger: "Attached", .region: "64 MB",
                         .detach: "Done",
                     ]
-                    for k in JITStep.Kind.allCases {
-                        c.yield(JITStep(kind: k, state: .checking))
+                        for k in JITStatusStep.Kind.allCases {
+                        c.yield(JITStatusStep(kind: k, state: .checking))
                         await pause(0.8)
-                        c.yield(JITStep(kind: k, state: .ready, detail: details[k]))
+                        c.yield(JITStatusStep(kind: k, state: .ready, detail: details[k]))
                     }
                     state.jit = .ready
                     c.finish()

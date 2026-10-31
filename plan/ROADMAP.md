@@ -32,7 +32,7 @@ same step.
 | 8 | ~~iOS niceties~~ | ❌ Not in the launcher (Ignacio): no heat/Low Power banner or power-saving switches. Big-download Wi-Fi gating stays in Downloads | — |
 | 9a | **Own Modrinth client** | Mod pages show instance-matching versions first, then merge the complete Modrinth catalog in the background; the page path never asks Air for Modrinth versions | ✅ |
 | 9 | **Engine seam** | Dissolve `CofreBackendAdapter`, the facade protocols and `MockBackend` into CofreKit + the Air bridge | 🎯 |
-| 10 | **Rich mod pages** | Rendered About, Gallery with a full-screen viewer, video cards, links, changelog in Versions; one `ProjectPage` for Modrinth and CurseForge ([rich-mod-pages](rich-mod-pages.md)) | 🤔 Planned: Modrinth steps 1–6 ready; CurseForge waits on the key decision |
+| 10 | **Rich mod pages** | Rendered About, Gallery with a full-screen viewer, video cards, links, changelog in Versions; one `ProjectPage` for Modrinth and CurseForge ([rich-mod-pages](rich-mod-pages.md)) | 🚧 Approved 2026-10-30; steps 1–2 in progress |
 
 Z's variations, recommended picks taken (Ignacio: "I like it all"):
 - instances in sections with ★ Favorites first;
@@ -198,6 +198,8 @@ Done already: the frame rate is the game's (`0e18921`), and ProMotion's 30–120
   - Java runtimes on demand;
   - Swift 6 language mode.
 - **P2:**
+  - FPS overlay 💤: the old Air performance HUD toggle didn't work and was removed (Ignacio, 2026-10-30). If it comes
+    back, put it in Cofre's in-game menu, not Settings;
   - widgets and Live Activity for downloads and launch;
   - Game Center (optional);
   - localization;

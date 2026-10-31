@@ -68,7 +68,7 @@ struct CofreModVersion {
         var hashes: [String: String] = [:]
         /// Modrinth's answer per SHA-1: "projectID|versionID", or "" when Modrinth doesn't know the file.
         var identities: [String: String] =
-            UserDefaults.standard.dictionary(forKey: "cofre.mods.identities") as? [String: String] ?? [:]
+            UserDefaults.standard.dictionary(forKey: PreferenceKey.modsIdentities.rawValue) as? [String: String] ?? [:]
         /// Newest fitting version per instance and SHA-1, with when it was asked.
         var updates: [String: (asked: Date, latest: [String: [String: Any]])] = [:]
         /// "instance|sha" → the allowed update found by hand when the newest was less stable ("" for none).
@@ -144,7 +144,8 @@ struct CofreModVersion {
             let source = source(of: projectID)
             let loaders = source == 1 && target.loader != .vanilla && target.loader != .unknown ? [target.loader.rawValue] : []
             let games = source == 1 && !target.game.isEmpty ? [target.game] : []
-            let versions = try await loadModVersions(projectID: projectID, source: source, loaders: loaders, gameVersions: games)
+            let versions = try await loadModVersions(
+                projectID: projectID, source: source, loaders: loaders, gameVersions: games, includeChangelog: true)
             return Self.projectVersions(versions, target: target, kind: kind)
         }
 
@@ -165,12 +166,14 @@ struct CofreModVersion {
                 let number = version.data["version"] as? String ?? version.name
                 // CurseForge's "number" is a file ID; its name is the file name, which cleans up better.
                 let raw = version.source == 2 ? version.name : number
-                return ProjectVersion(
+                var row = ProjectVersion(
                     id: version.id, name: VersionLabel.clean(raw),
                     gameVersions: version.gameVersions.joined(separator: ", "),
                     channel: (version.data["channel"] as? String ?? "release").capitalized,
                     fits: version.candidate(title: "").fits(game: target.game, loader: target.loader, kind: kind),
                     number: raw, games: version.gameVersions, loaders: version.loaders.compactMap(Loader.init(rawValue:)))
+                row.changelog = (version.data["changelog"] as? String).flatMap { $0.isEmpty ? nil : .markdown($0) }
+                return row
             }
         }
 
@@ -403,7 +406,7 @@ struct CofreModVersion {
                     modCatalog.identities[sha] = v.map { "\($0.projectID)|\($0.id)|\($0.versionType)" } ?? ""
                 }
                 UserDefaults.standard.set(
-                    modCatalog.identities.filter { !$0.value.isEmpty }, forKey: "cofre.mods.identities")
+                    modCatalog.identities.filter { !$0.value.isEmpty }, forKey: PreferenceKey.modsIdentities.rawValue)
             }
             for i in items.indices {
                 if let entry = index[items[i].id]?.split(separator: "|").map(String.init), entry.count == 3 {
@@ -624,9 +627,9 @@ struct CofreModVersion {
 
         /// Files Cofre installed: file name → "source|projectID|versionID".
         private func modIndex(_ instanceID: String) -> [String: String] {
-            UserDefaults.standard.dictionary(forKey: Self.indexKey(instanceID)) as? [String: String] ?? [:]
+            UserDefaults.standard.dictionary(forKey: PreferenceKey.modsIndex(instanceID).rawValue) as? [String: String] ?? [:]
         }
-        private static func indexKey(_ instanceID: String) -> String { "cofre.mods.index.\(instanceID)" }
+        private static func indexKey(_ instanceID: String) -> String { PreferenceKey.modsIndex(instanceID).rawValue }
         private static let userAgent = "ignaciojuarez/cofre (github.com/ignaciojuarez/cofre)"
 
         /// The instance's Minecraft version and loader, read by CofreKit from launcher_profiles.json.
@@ -653,14 +656,15 @@ struct CofreModVersion {
             ContentKind.allCases.first { self.projectType($0) == projectType } ?? .mods
         }
 
-        private func loadModVersions(projectID: String, source: Int, loaders: [String] = [], gameVersions: [String] = []) async throws -> [CofreModVersion] {
+        /// Only the page's filtered request needs changelogs; full lists skip them (less than half the size).
+        private func loadModVersions(projectID: String, source: Int, loaders: [String] = [], gameVersions: [String] = [], includeChangelog: Bool = false) async throws -> [CofreModVersion] {
             if source == 1 {
-                return try await modCatalog.modrinth.versions(projectID: projectID, loaders: loaders, gameVersions: gameVersions).map { v in
+                return try await modCatalog.modrinth.versions(projectID: projectID, loaders: loaders, gameVersions: gameVersions, includeChangelog: includeChangelog).map { v in
                     // The same file keys Air's rows carry; `download` needs the URL and the file name.
                     let file: [String: Any] = (v.files.first(where: { $0.primary }) ?? v.files.first).map {
                         ["url": $0.url?.absoluteString ?? "", "filename": $0.filename, "size": $0.size, "hashes": $0.hashes]
                     } ?? [:]
-                    let version = CofreModVersion(data: ["id": v.id, "projectID": v.projectID, "apiSource": 1, "name": v.name, "version": v.versionNumber, "gameVersions": v.gameVersions, "loaders": v.loaders, "channel": v.versionType, "dependencies": v.dependencies.map { ["project_id": $0.projectID as Any, "version_id": $0.versionID as Any, "dependency_type": $0.dependencyType] }, "file": file])
+                    let version = CofreModVersion(data: ["id": v.id, "projectID": v.projectID, "apiSource": 1, "name": v.name, "version": v.versionNumber, "gameVersions": v.gameVersions, "loaders": v.loaders, "channel": v.versionType, "dependencies": v.dependencies.map { ["project_id": $0.projectID as Any, "version_id": $0.versionID as Any, "dependency_type": $0.dependencyType] }, "file": file, "changelog": v.changelog ?? ""])
                     modCatalog.versions[version.id] = version
                     return version
                 }

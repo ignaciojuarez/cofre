@@ -26,7 +26,7 @@ public final class CofreRootViewController: UIViewController {
         }
         instances?.didWriteProfiles = { bridge.reloadProfiles() }
         backend.instances = instances
-        let services = CofreServices(backend: backend, instances: instances)
+        let services = CofreServices(backend: backend, instances: instances, modrinth: backend.modrinth)
         let root = CofreUI.makeRootViewController(services: services, nav: nav)
         addChild(root); root.view.frame = view.bounds; root.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         view.addSubview(root.view); root.didMove(toParent: self)

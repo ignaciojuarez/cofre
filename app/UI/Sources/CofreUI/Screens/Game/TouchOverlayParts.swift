@@ -144,16 +144,16 @@ enum TrayItem: CaseIterable {
 /// Quick tray: a grid of rarer actions under the pause (or ≡) button.
 struct QuickTray: View {
     let items: [QuickTrayAction?], k: CGFloat
-    var on: Set<String> = []
+    var on: Set<QuickTrayActionID> = []
     let down: (QuickTrayAction) -> Void
     let up: (QuickTrayAction) -> Void
     let edit: () -> Void
 
     private var cells: [QuickTrayAction] {
-        let pause = QuickTrayAction(id: "pause", label: "Pause", keys: [.escape])
-        let editAction = QuickTrayAction(id: "edit", label: "Edit", keys: [])
+        let pause = QuickTrayAction(id: .pause, label: "Pause", keys: [.escape])
+        let editAction = QuickTrayAction(id: .edit, label: "Edit", keys: [])
         let slots = items.enumerated().map { pair in
-            pair.element ?? QuickTrayAction(id: "empty-\(pair.offset)", label: "", keys: [])
+            pair.element ?? QuickTrayAction(id: .emptySlot(pair.offset), label: "", keys: [])
         }
         return [pause] + slots + [editAction]
     }
@@ -178,32 +178,32 @@ struct QuickTray: View {
 }
 
 private struct QuickTrayTile: View {
-    let item: QuickTrayAction, k: CGFloat, on: Set<String>
+    let item: QuickTrayAction, k: CGFloat, on: Set<QuickTrayActionID>
     let down: (QuickTrayAction) -> Void, up: (QuickTrayAction) -> Void, edit: () -> Void
     @State private var active = false
 
     var body: some View {
         let gesture = DragGesture(minimumDistance: 0)
             .onChanged { _ in
-                guard !item.id.hasPrefix("empty-") else { return }
+                guard !item.id.isEmptySlot else { return }
                 guard !active else { return }
                 active = true
-                if item.id != "edit" { down(item) }
+                if item.id != .edit { down(item) }
             }
             .onEnded { _ in
-                guard !item.id.hasPrefix("empty-") else { return }
-                if item.id == "edit" { edit() } else { up(item) }
+                guard !item.id.isEmptySlot else { return }
+                if item.id == .edit { edit() } else { up(item) }
                 active = false
             }
         return VStack(spacing: 3) {
             OverlayButton(
-                glyph: item.id == "edit" ? .edit : item.glyph,
-                size: 40 * k, on: on.contains(item.id) || item.id == "pause" || item.id == "edit")
+                glyph: item.id == .edit ? .edit : item.glyph,
+                size: 40 * k, on: on.contains(item.id) || item.id == .pause || item.id == .edit)
             Text(verbatim: item.label).font(.cofre(.label)).foregroundStyle(Color.cofre.ink).fixedSize()
         }
         .frame(width: 64 * k)
         .contentShape(Rectangle())
-        .opacity(item.id.hasPrefix("empty-") ? 0.4 : 1)
+        .opacity(item.id.isEmptySlot ? 0.4 : 1)
         .accessibilityLabel(Text(verbatim: item.label))
         .gesture(gesture)
     }

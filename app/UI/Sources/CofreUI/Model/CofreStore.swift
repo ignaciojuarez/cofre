@@ -16,12 +16,12 @@
         /// `true` once the first `setupState()` returns. Until then the root shows a neutral splash, not the wizard.
         public private(set) var setupLoaded = false
         /// Saved: setup finished once. After that, live failures show as a banner on Play, never the wizard again.
-        public var setupCompleted: Bool { didSet { defaults.set(setupCompleted, forKey: Keys.completed) } }
+        public var setupCompleted: Bool { didSet { defaults.set(setupCompleted, forKey: PreferenceKey.setupCompleted.rawValue) } }
         /// Saved: the wizard step the user was on (0 welcome … 7 ready), so a cold start resumes there.
-        public var setupStep: Int? { didSet { defaults.set(setupStep, forKey: Keys.step) } }
+        public var setupStep: Int? { didSet { defaults.set(setupStep, forKey: PreferenceKey.setupStep.rawValue) } }
         /// Set when the key came from a picked file (AirDrop fallback), so S04 can say to delete that copy.
         public var pairingFromFile = false
-        public var jitSteps: [JITStep] = []
+        public var jitSteps: [JITStatusStep] = []
         public var jitTesting = false
         public var signing: SigningInfo?
         public var device: DeviceInfo?
@@ -45,6 +45,14 @@
         public var versions: [String: [ProjectVersion]] = [:]
         /// Why a project's versions didn't load, so M02 shows Try again instead of a spinner.
         public var versionsError: [String: String] = [:]
+        /// Project pages (About, Gallery, links) by project ID, with videos found in the body (`CofreStore+Pages`).
+        public var pages: [String: ProjectPage] = [:]
+        /// The About tab's sanitized HTML for `ProjectBody`; missing when the project has no body.
+        public var pageDocuments: [String: PageDocument] = [:]
+        /// Why a page didn't load. The summary and Get keep working without it.
+        public var pageErrors: [String: String] = [:]
+        /// Loaded page IDs, oldest first, so only the newest few stay in memory.
+        @ObservationIgnored var pageOrder: [String] = []
         public var dependencies: [String: [ProjectDependency]] = [:]
         public var installed: [ContentKind: [InstalledItem]] = [:]
         /// Gets in flight or waiting to be read, by project ID (planning, confirming, installing, done, failed).
@@ -57,7 +65,7 @@
         public var importProgress: InstallProgress?
         /// Saved: the last modded instance picked (in Mods, Play or Instances), so Mods keeps it while Play is on
         /// Vanilla.
-        public var modsInstanceID: String? { didSet { defaults.set(modsInstanceID, forKey: Keys.modsInstance) } }
+        public var modsInstanceID: String? { didSet { defaults.set(modsInstanceID, forKey: PreferenceKey.modsInstance.rawValue) } }
         /// Pre-fills P04 New instance when it opens from Mods.
         public var newInstancePlan: NewInstancePlan?
 
@@ -112,20 +120,14 @@
         public private(set) var recentlyDeleted: [InstanceStore.Deleted] = []
         @ObservationIgnored private let defaults: UserDefaults
 
-        private enum Keys {
-            static let completed = "cofre.setup.completed"
-            static let step = "cofre.setup.step"
-            static let modsInstance = "cofre.mods.instance"
-        }
-
         /// `defaults` holds the setup progress; tests and the preview host pass their own suite.
         public init(services: CofreServices, defaults: UserDefaults = .standard) {
             self.services = services
             self.instanceStore = services.instances
             self.defaults = defaults
-            setupCompleted = defaults.bool(forKey: Keys.completed)
-            setupStep = defaults.object(forKey: Keys.step) as? Int
-            modsInstanceID = defaults.string(forKey: Keys.modsInstance)
+            setupCompleted = defaults.bool(forKey: PreferenceKey.setupCompleted.rawValue)
+            setupStep = defaults.object(forKey: PreferenceKey.setupStep.rawValue) as? Int
+            modsInstanceID = defaults.string(forKey: PreferenceKey.modsInstance.rawValue)
         }
 
         public var capabilities: BackendCapabilities { backend.capabilities }
@@ -228,7 +230,7 @@
 
         public func testJIT() async {
             jitTesting = true
-            jitSteps = JITStep.Kind.allCases.map { JITStep(kind: $0, state: .unknown) }
+            jitSteps = JITStatusStep.Kind.allCases.map { JITStatusStep(kind: $0, state: .unknown) }
             setup.jit = .checking
             defer { jitTesting = false }
             do {
@@ -247,7 +249,7 @@
         }
 
         /// The step that failed in the last JIT test, for the next-step hint.
-        public var failedJITStep: JITStep.Kind? {
+        public var failedJITStep: JITStatusStep.Kind? {
             jitSteps.first { $0.state.isFailed }?.kind
         }
 

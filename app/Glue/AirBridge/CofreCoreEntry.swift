@@ -17,7 +17,7 @@ public final class CofreCoreEntry: NSObject {
             }
         }
         return RendererPolicy.resolve(profile: profile, metadata: metadata, globalSetting: globalSetting,
-            fallbackLoader: fallback, metalVersions: ModCompatibility.metalVersions)
+            fallbackLoader: fallback, metalVersions: ModCompatibility.metalVersions).rawValue
     }
     @objc(startWithBridge:)
     @MainActor public static func start(withBridge bridge: Any) {
@@ -29,6 +29,20 @@ public final class CofreCoreEntry: NSObject {
         bridge.ensureAutomaticMemoryDefault()
         CofreUIKitTheme.apply()
         root = CofreRootViewController(bridge: bridge)
+        Task { await CofreVPN.startIfInstalled() }
+    }
+    @objc(handleOpenURL:)
+    @MainActor public static func handleOpenURL(_ url: URL) {
+        if url.isFileURL, url.pathExtension.lowercased() == "plist" {
+            do {
+                try PairingFileStore.importFile(at: url)
+                NSLog("[Cofre] pairing imported")
+            } catch {
+                NSLog("[Cofre] pairing import rejected: %@", error.localizedDescription)
+            }
+            return
+        }
+        NotificationCenter.default.post(name: Notification.Name("CofreOpenURL"), object: url)
     }
     /// Minecraft exited (patch 0004 via CofreHandleGameExit): keep the user in Cofre's recovery view.
     @objc(handleGameExit:)

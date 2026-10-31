@@ -324,7 +324,7 @@
         var body: some View {
             if case .failed(let msg) = store.setup.jit {
                 Banner(msg, icon: .cross, tone: .danger)
-                Text(JITStep.Kind.hint(for: store.failedJITStep)).cofreFont(.secondary).foregroundStyle(
+                Text(JITStatusStep.Kind.hint(for: store.failedJITStep)).cofreFont(.secondary).foregroundStyle(
                     Color.cofre.inkSoft
                 )
                 .fixedSize(horizontal: false, vertical: true)
@@ -338,7 +338,7 @@
         var body: some View {
             let steps =
                 store.jitSteps.isEmpty
-                ? JITStep.Kind.allCases.map { JITStep(kind: $0, state: store.setup.jit.isReady ? .ready : .unknown) }
+                ? JITStatusStep.Kind.allCases.map { JITStatusStep(kind: $0, state: store.setup.jit.isReady ? .ready : .unknown) }
                 : store.jitSteps
             ListSection(spacing: 4) {
                 ForEach(steps, id: \.kind) { s in
@@ -356,7 +356,7 @@
         }
     }
 
-    extension JITStep.Kind {
+    extension JITStatusStep.Kind {
         var title: LocalizedStringKey {
             switch self {
             case .pairing: "Pairing"

@@ -43,7 +43,7 @@ public struct Instance: Identifiable, Codable, Hashable, Sendable {
     public var restartSession: String?
     public var restartRequired: Bool { restartSession == Self.currentSession }
     /// Air's real `lastVersionId` (e.g. `fabric-loader-0.16.9-1.21.1`, `1.20.1-forge-47.2.0`, `neoforge-21.1.77`).
-    public var renderer: String?
+    public var renderer: RendererID?
     public var versionID: String?
 
     public init(id: String, name: String, gameDirectory: URL, gameVersion: String,
@@ -355,7 +355,8 @@ public final class InstanceStore: @unchecked Sendable {
             lastGoodJVMArguments: p["lastGoodJavaArgs"] as? String, notes: meta?.notes ?? "", group: meta?.group,
             favorite: meta?.favorite ?? false, icon: meta?.icon, restartSession: document["cofreJVMUseSession"] as? String)
         instance.versionID = version
-        instance.renderer = (p["cofreRendererPicked"] as? Bool) == true ? "auto" : p["renderer"] as? String
+        instance.renderer = (p["cofreRendererPicked"] as? Bool) == true
+            ? .auto : (p["renderer"] as? String).map(RendererID.init(rawValue:))
         return instance
     }
     private func refresh(_ id: String) throws -> Instance { try loadProfiles(); guard let i = makeInstance(id: id, profile: profiles[id] ?? [:]) else { throw StoreError.missingProfile }; return i }

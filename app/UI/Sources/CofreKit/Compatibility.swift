@@ -14,7 +14,7 @@ public struct RendererManifest: Codable, Sendable, Hashable {
 /// One decision for engine launch, compatibility checks, and renderer display.
 public enum RendererPolicy {
     public static func resolve(profile: [String: Any], metadata: [String: Any], globalSetting: String,
-                               fallbackLoader: Instance.Loader? = nil, metalVersions: Set<String>) -> String {
+                               fallbackLoader: Instance.Loader? = nil, metalVersions: Set<String>) -> RendererID {
         let versionID = profile["lastVersionId"] as? String ?? metadata["id"] as? String ?? ""
         let libraries = (metadata["libraries"] as? [[String: Any]] ?? []).compactMap { $0["name"] as? String }
         let loader = Instance.Loader.resolve(requested: profile[Instance.Loader.requestedProfileKey] as? String,
@@ -22,17 +22,18 @@ public enum RendererPolicy {
             versionID: versionID, libraries: libraries, fallback: fallbackLoader)
         let game = metadata["inheritsFrom"] as? String ?? profile["cofreGameVersion"] as? String ?? metadata["id"] as? String ?? ""
         let picked = profile["cofreRendererPicked"] as? Bool ?? false
-        return airIdentifier(resolve(setting: picked ? "auto" : profile["renderer"] as? String ?? "auto",
-            globalSetting: globalSetting, gameVersion: game, loader: loader, metalVersions: metalVersions))
+        return airIdentifier(resolve(setting: picked ? .auto : RendererID(rawValue: profile["renderer"] as? String ?? "auto"),
+            globalSetting: RendererID(rawValue: globalSetting), gameVersion: game, loader: loader,
+            metalVersions: metalVersions))
     }
 
-    public static func resolve(setting: String, globalSetting: String = "auto", gameVersion: String,
-                               loader: Instance.Loader, metalVersions: Set<String>) -> String {
-        if !setting.isEmpty && setting.lowercased() != "auto" { return setting }
-        if !globalSetting.isEmpty && globalSetting.lowercased() != "auto" { return globalSetting }
+    public static func resolve(setting: RendererID, globalSetting: RendererID = .auto, gameVersion: String,
+                               loader: Instance.Loader, metalVersions: Set<String>) -> RendererID {
+        if setting != .auto { return setting }
+        if globalSetting != .auto { return globalSetting }
         // Air only attaches the bundled Metallum agent for Minecraft 26+.
         let major = Int(gameVersion.prefix(while: { $0.isNumber })) ?? 0
-        if major >= 26 && metalVersions.contains(gameVersion) { return "metallum" }
+        if major >= 26 && metalVersions.contains(gameVersion) { return .metallum }
         // Air's `auto` path is ANGLE. That is a poor default for current
         // Minecraft on iOS: it is the path that produced
         // GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT on the iPhone 17 Pro. Use the
@@ -42,16 +43,26 @@ public enum RendererPolicy {
         let modern = (numbers.first ?? 0) >= 26 ||
             (numbers.count >= 3 && numbers[0] == 1 &&
                 (numbers[1] > 20 || (numbers[1] == 20 && numbers[2] >= 5)))
-        return modern || loader == .forge || loader == .neoforge ? "mobileglues" : "air"
+        return modern || loader == .forge || loader == .neoforge ? .mobileglues : .air
+    }
+
+    public static func resolve(setting: String, globalSetting: String = "auto", gameVersion: String,
+                               loader: Instance.Loader, metalVersions: Set<String>) -> String {
+        resolve(setting: RendererID(rawValue: setting), globalSetting: RendererID(rawValue: globalSetting),
+                 gameVersion: gameVersion, loader: loader, metalVersions: metalVersions).rawValue
+    }
+
+    public static func airIdentifier(_ renderer: RendererID) -> RendererID {
+        switch renderer {
+        case .metallum: .custom("libmetallum.dylib")
+        case .mobileglues: .custom("libmobileglues.dylib")
+        case .air, .auto: .auto
+        default: renderer
+        }
     }
 
     public static func airIdentifier(_ renderer: String) -> String {
-        switch renderer.lowercased() {
-        case "metallum", "metal": "libmetallum.dylib"
-        case "mobileglues": "libmobileglues.dylib"
-        case "air", "auto": "auto"
-        default: renderer
-        }
+        airIdentifier(RendererID(rawValue: renderer)).rawValue
     }
 }
 

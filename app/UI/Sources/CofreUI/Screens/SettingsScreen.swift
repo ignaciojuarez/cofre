@@ -104,7 +104,11 @@
                     "Memory", value: Binding(get: { Double(ram.wrappedValue) }, set: { ram.wrappedValue = Int($0) }),
                     in: 1024...Double(p.deviceRAMMB), step: 256, note: "Closes while loading? Lower this.",
                     accessibilityValue: { "\(Int($0)) megabytes" }
-                ) { "\(Fmt.mb(Int($0))) of \(p.deviceRAMMB / 1024) GB" }
+                ) {
+                    // Auto sizes each instance at launch from its loader and mods, so the global page has no one number.
+                    p.autoRAM && instanceID == nil
+                        ? String(localized: "Auto · sized per instance") : "\(Fmt.mb(Int($0))) of \(p.deviceRAMMB / 1024) GB"
+                }
                 .disabled(p.autoRAM)
             }
             ListSection("Graphics", spacing: 4) {
@@ -113,11 +117,10 @@
                     nav.settingsPane = .renderer
                 } label: {
                     ValueRow(
-                        "Renderer", value: store.renderers.first { $0.id == p.renderer }?.name ?? p.renderer,
+                        "Renderer", value: store.renderers.first { $0.id == p.renderer }?.name ?? p.renderer.rawValue,
                         accent: true)
                 }.buttonStyle(RowButtonStyle())
                 ResolutionRow(scale: prefBinding(store, instanceID, \.resolution))
-                ToggleRow("FPS overlay", isOn: prefBinding(store, instanceID, \.fpsOverlay))
                 Text("VSync and Max Framerate are in the game: Options › Video Settings.")
                     .cofreFont(.caption).foregroundStyle(Color.cofre.muted).padding(.horizontal, 2)
             }
@@ -232,7 +235,7 @@
             ListSection("Java", spacing: 4) {
                 Row(
                     "Runtime",
-                    trailing: { Meta(store.preferences.java == "auto" ? "Auto per version" : store.preferences.java) })
+                    trailing: { Meta(store.preferences.java == .auto ? "Auto per version" : store.preferences.java.rawValue) })
                 Row(
                     "Installed",
                     trailing: {

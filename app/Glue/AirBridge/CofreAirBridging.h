@@ -1,5 +1,6 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
+#define COFRE_DOWNLOAD_SOURCE_DEFAULTED_KEY @"cofre.download_source_defaulted"
 NS_ASSUME_NONNULL_BEGIN
 typedef NS_ENUM(NSInteger, CofreLaunchEvent) {
     CofreLaunchEventPreparing = 0,

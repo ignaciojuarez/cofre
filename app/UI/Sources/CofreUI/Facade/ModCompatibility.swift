@@ -7,17 +7,33 @@ public typealias ModCompatibilityIssue = CompatibilityIssue
 /// source-compatible.
 public struct ModCompatibility: Hashable, Sendable {
     /// The renderer an instance runs, using the same policy as the launch path.
-    public static func renderer(instanceSetting: String? = nil, globalSetting: String, gameVersion: String, loader: String, javaVersion: Int = 21) -> String {
-        let setting = instanceSetting ?? "auto"
-        if !setting.isEmpty && setting.lowercased() != "auto" { return setting }
-        if !globalSetting.isEmpty && globalSetting.lowercased() != "auto" { return globalSetting }
+    public static func renderer(
+        instanceSetting: RendererID? = nil, globalSetting: RendererID = .auto, gameVersion: String,
+        loader: Instance.Loader, javaVersion: Int = 21
+    ) -> RendererID {
+        if let instanceSetting, instanceSetting != .auto { return instanceSetting }
+        if globalSetting != .auto { return globalSetting }
         let metal = javaVersion >= 21 ? metalVersions : []
-        return RendererPolicy.resolve(setting: "auto", globalSetting: "auto", gameVersion: gameVersion,
-            loader: Instance.Loader(rawValue: loader.lowercased()) ?? .unknown, metalVersions: metal)
+        return RendererPolicy.resolve(setting: .auto, globalSetting: .auto, gameVersion: gameVersion,
+            loader: loader, metalVersions: metal)
+    }
+
+    public static func renderer(
+        instanceSetting: String? = nil, globalSetting: String, gameVersion: String, loader: String,
+        javaVersion: Int = 21
+    ) -> String {
+        renderer(
+            instanceSetting: instanceSetting.map(RendererID.init(rawValue:)), globalSetting: RendererID(rawValue: globalSetting),
+            gameVersion: gameVersion, loader: Instance.Loader(rawValue: loader.lowercased()) ?? .unknown,
+            javaVersion: javaVersion
+        ).rawValue
     }
     /// Compatibility overload for callers that only have one setting.
     public static func renderer(setting: String, gameVersion: String, loader: String) -> String {
         renderer(instanceSetting: setting, globalSetting: "auto", gameVersion: gameVersion, loader: loader)
+    }
+    public static func renderer(setting: RendererID, gameVersion: String, loader: Instance.Loader) -> RendererID {
+        renderer(instanceSetting: setting, globalSetting: .auto, gameVersion: gameVersion, loader: loader)
     }
     /// The exact shipped Metallum manifest, read once. Previews and tests may replace it.
     nonisolated(unsafe) public static var manifest: RendererManifest =
@@ -28,6 +44,9 @@ public struct ModCompatibility: Hashable, Sendable {
     public static func issue(id: String, name: String, kind: ContentKind, gameVersion: String, renderer: String) -> ModCompatibilityIssue? {
         ContentCompatibility.issue(id: id, name: name, kind: kind, gameVersion: gameVersion, renderer: renderer, manifest: manifest)
     }
+    public static func issue(id: String, name: String, kind: ContentKind, gameVersion: String, renderer: RendererID) -> ModCompatibilityIssue? {
+        issue(id: id, name: name, kind: kind, gameVersion: gameVersion, renderer: renderer.rawValue)
+    }
     public let id: String, name: String
     private let supportedMetalVersions: Set<String>?
     private let reason: String
@@ -37,6 +56,9 @@ public struct ModCompatibility: Hashable, Sendable {
         guard ContentCompatibility.rendererName(renderer) == "Metal" else { return nil }
         if let versions = supportedMetalVersions, versions.contains(gameVersion) { return nil }
         return ModCompatibilityIssue(modID:id, modName:name, gameVersion:gameVersion, reason:reason)
+    }
+    public func issue(gameVersion: String, renderer: RendererID) -> ModCompatibilityIssue? {
+        issue(gameVersion: gameVersion, renderer: renderer.rawValue)
     }
     public static func entry(for id: String, name: String? = nil) -> ModCompatibility? {
         guard let found = ContentCompatibility.integration(for: name ?? id, manifest) else { return nil }
@@ -53,6 +75,9 @@ public enum ModCompatibilityChecker {
             ModCompatibility.issue(id: item.projectID ?? item.id, name: item.name, kind: item.kind, gameVersion: gameVersion, renderer: renderer)
         }
         return issues.isEmpty ? .play : .warn(issues)
+    }
+    public static func decision(items: [InstalledItem], gameVersion: String, renderer: RendererID) -> ModLaunchDecision {
+        decision(items: items, gameVersion: gameVersion, renderer: renderer.rawValue)
     }
 }
 #endif

@@ -1,11 +1,11 @@
 import Foundation
 import NetworkExtension
+import CofreKit
 
 public enum CofreJITStatus: Equatable {
     case unavailable, needsPairing, needsVPN, enabling
     case enabled(String)
-    /// `step`: the `JITStep.Kind` raw value that failed (vpn, diskImage, debugger), when the tunnel knows it.
-    case failed(String, step: String? = nil)
+    case failed(String, step: JITStep.Kind? = nil)
 }
 extension CofreJITStatus {
     public var isEnabled: Bool {
@@ -38,21 +38,19 @@ public final class CofreJIT: @unchecked Sendable {
         status = .enabling
         do {
             let pairing = try Data(contentsOf: pairingURL())
-            let body = try JSONSerialization.data(withJSONObject: [
-                "cmd": "enableJIT", "pid": pid, "pairing": pairing.base64EncodedString(),
-            ])
+            let body = try JSONEncoder().encode(JITMessage.enableJIT(pid: pid, pairing: pairing))
             let reply = try await withCheckedThrowingContinuation { (c: CheckedContinuation<Data?, Error>) in
                 do { try session.sendProviderMessage(body) { c.resume(returning: $0) } } catch {
                     c.resume(throwing: error)
                 }
             }
-            let dict = (reply.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }) ?? [:]
-            if dict["state"] as? String == "enabled", let mode = dict["mode"] as? String, !mode.isEmpty {
+            let message = reply.flatMap { try? JSONDecoder().decode(JITMessage.self, from: $0) }
+            if message?.state == .enabled, let mode = message?.mode, !mode.isEmpty {
                 status = .enabled(mode)
                 return status
             }
             status = .failed(
-                dict["reason"] as? String ?? "The VPN extension didn't enable JIT.", step: dict["step"] as? String)
+                message?.reason ?? "The VPN extension didn't enable JIT.", step: message?.step)
             return status
         } catch {
             status = .failed(error.localizedDescription)

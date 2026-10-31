@@ -55,6 +55,17 @@ enum Loader {
     case vanilla, forge, neoforge, unknown
     func isInstalled(in versionID: String, root: URL, minecraftVersion: String) -> Bool { true }
 }
+public enum JITStep { public enum Kind: String { case pairing, vpn, diskImage, debugger, region, detach } }
+enum PreferenceKey {
+    case setupJIT, launchStarted(String), optionsBefore(String)
+    var rawValue: String {
+        switch self {
+        case .setupJIT: return "cofre.setup.jit"
+        case .launchStarted(let id): return "cofre.launch.started.\\(id)"
+        case .optionsBefore(let id): return "cofre.options.before.\\(id)"
+        }
+    }
+}
 struct Instance {
     let loader = Loader.vanilla, restartRequired = false
     let versionID = "1.21", gameVersion = "1.21", gameDirectory = URL(fileURLWithPath: "/test/instance")
@@ -115,6 +126,10 @@ enum FMLConfig { static func disableEarlyWindow(in directory: URL) throws {} }
     func repairLibraries() {}
     func applyJavaHeap(instanceID: String) {}
     func checkDiskBeforeLaunch(_ instance: Instance, root: URL) async throws {}
+    enum SetupStatus { case ready }
+    struct SetupState { var jit = SetupStatus.ready }
+    var setup = SetupState()
+    func publishSetup() {}
 ${launch}
 }
 @main struct Tests {
@@ -161,7 +176,7 @@ ${launch}
         let jit = LaunchFailure.jitUnavailable.localizedDescription
         await run(.needsPairing, jitError: "This device isn't paired yet. Pair it in Settings.", expectedError: jit)
         await run(.needsVPN, jitError: "The VPN isn't on", expectedError: jit)
-        await run(.failed("attach failed", step: "debugger"), jitError: "JIT failed at debugger: attach failed", expectedError: jit)
+        await run(.failed("attach failed", step: .debugger), jitError: "JIT failed at debugger: attach failed", expectedError: jit)
         await run(.failed("VPN denied"), jitError: "VPN denied", expectedError: jit)
         await run(.unavailable, jitError: "JIT didn't turn on", expectedError: jit)
         await run(.enabling, jitError: "JIT didn't turn on", expectedError: jit)

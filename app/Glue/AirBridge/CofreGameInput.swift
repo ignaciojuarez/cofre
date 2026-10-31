@@ -1,4 +1,5 @@
 import CofreUI
+import CofreKit
 import GameController
 import UIKit
 
@@ -19,9 +20,9 @@ public final class CofreGameInput: NSObject, GameInputService {
 
     public var inputMode: CofreInputMode { effectiveMode }
     public var inputModeOverride: CofreInputMode {
-        get { CofreInputMode(rawValue: defaults.string(forKey: "cofre.input.mode") ?? "auto") ?? .auto }
+        get { CofreInputMode(rawValue: defaults.string(forKey: PreferenceKey.inputMode.rawValue) ?? CofreInputMode.auto.rawValue) ?? .auto }
         set {
-            defaults.set(newValue.rawValue, forKey: "cofre.input.mode")
+            defaults.set(newValue.rawValue, forKey: PreferenceKey.inputMode.rawValue)
             recomputeMode()
         }
     }

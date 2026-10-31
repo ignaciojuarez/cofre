@@ -10,14 +10,12 @@ diff --git a/Natives/CMakeLists.txt b/Natives/CMakeLists.txt
 index 179bb64..6a582c3 100644
 --- a/Natives/CMakeLists.txt
 +++ b/Natives/CMakeLists.txt
-@@ -384,6 +384,11 @@ add_executable(AngelAuraAmethyst
+@@ -384,6 +384,9 @@ add_executable(AngelAuraAmethyst
    dyld_patch_platform.m
    main.m
    main_hook.m
 +  CofreGlue/AirBridgeAdapter.m
 +  CofreGlue/CofreStartup.m
-+  CofreGlue/CofreTunnelService.m
-+  CofreGlue/CofrePairingImport.m
 +  CofreGlue/CofreGameInput.m
    # ★ [LINK511] 换底 5.1.0 时漏掉的 fork 独有源(上游 5.1.0 的 add_executable 里有):
    #   sdl3_hook.m 定义 ame_hook_getEmbeddedSDLView / ame_sdlVulkanWindowActive /

@@ -2,7 +2,7 @@ import Foundation
 import NetworkExtension
 
 /// Cofre's loopback VPN (the PacketTunnel extension). `connect()` creates the configuration the first time, which is
-/// when iOS asks to allow it. Launch only starts one the user already allowed (`CofreTunnelService.startIfInstalled`).
+/// when iOS asks to allow it. Launch only starts one the user already allowed.
 enum CofreVPN {
     struct Failure: LocalizedError {
         let errorDescription: String?
@@ -16,6 +16,22 @@ enum CofreVPN {
     }
 
     static func isAllowed() async -> Bool { (try? await manager())?.isEnabled == true }
+
+    /// Starts an existing, user-approved configuration without prompting.
+    static func startIfInstalled() async {
+        do {
+            guard let m = try await manager(), m.isEnabled,
+                  let session = m.connection as? NETunnelProviderSession else {
+                NSLog("[Cofre] tunnel not allowed yet")
+                return
+            }
+            guard session.status != .connected, session.status != .connecting else { return }
+            try session.startVPNTunnel()
+            NSLog("[Cofre] tunnel starting")
+        } catch {
+            NSLog("[Cofre] tunnel start failed %@", error.localizedDescription)
+        }
+    }
 
     /// Creates or re-enables the configuration, then waits up to 15 s for the tunnel to connect.
     @discardableResult
@@ -47,7 +63,6 @@ enum CofreVPN {
                 throw Failure(errorDescription: "The VPN didn't connect. Turn off other VPNs, then try again.")
             }
         }
-        NSLog("[Cofre] tunnel up")
         return session
     }
 }

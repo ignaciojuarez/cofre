@@ -222,7 +222,7 @@ import Foundation
     // MARK: GAP-07 · JIT test steps (S06, X04)
     public protocol JITTester: AnyObject {
         /// pairing → VPN → disk image → debugger → region → detach. Throw with the failing step's message.
-        func testJIT() -> AsyncThrowingStream<JITStep, Error>
+        func testJIT() -> AsyncThrowingStream<JITStatusStep, Error>
         /// "TXM · iPhone 17 Pro · iOS 26.1" for the S06 banner and X04.
         func deviceInfo() async -> DeviceInfo?
     }
@@ -319,7 +319,7 @@ import Foundation
     }
 
 // MARK: GAP-12 · Extended preferences (addition, not in §4.2)
-// `GamePreferences` has more fields than `CofrePreferences` (autoRAM, fpsOverlay, vsync, fpsCap,
+// `GamePreferences` has more fields than `CofrePreferences` (autoRAM, vsync, fpsCap,
 // mute, mic, gyro, virtual mouse, hotbar swipe, TouchController, button scale, layouts, download source,
 // verify files). Map each to its Air pref key in `LibraryService.preferences`.
 #endif

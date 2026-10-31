@@ -1,6 +1,7 @@
 #if canImport(UIKit)
     import SwiftUI
     import UniformTypeIdentifiers
+    import CofreKit
 
     // P03 Instances list · I02 Instance detail · P04 New instance. AdaptiveListDetail: push on compact, columns on regular.
 
@@ -332,7 +333,7 @@
                     nav.settingsPane = .renderer
                 } label: {
                     ValueRow(
-                        "Renderer", value: store.renderers.first { $0.id == prefs.renderer }?.name ?? prefs.renderer,
+                        "Renderer", value: store.renderers.first { $0.id == prefs.renderer }?.name ?? prefs.renderer.rawValue,
                         accent: true)
                 }.buttonStyle(RowButtonStyle())
                 Button {

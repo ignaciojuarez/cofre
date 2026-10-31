@@ -93,6 +93,24 @@ public enum PairingFileValidator {
 }
 
 public enum PairingFileStore {
+    public static func importFile(at source: URL) throws {
+        guard source.isFileURL else { throw PairingFileValidationError.invalid("file") }
+        let scoped = source.startAccessingSecurityScopedResource()
+        defer { if scoped { source.stopAccessingSecurityScopedResource() } }
+        guard let size = try FileManager.default.attributesOfItem(atPath: source.path)[.size] as? NSNumber,
+              size.uint64Value <= UInt64(PairingFileValidator.maxFileSize) else {
+            throw PairingFileValidationError.tooLarge("file")
+        }
+        let handle = try FileHandle(forReadingFrom: source)
+        defer { try? handle.close() }
+        let data = try handle.read(upToCount: PairingFileValidator.maxFileSize + 1) ?? Data()
+        guard data.count <= PairingFileValidator.maxFileSize else {
+            throw PairingFileValidationError.tooLarge("file")
+        }
+        try write(data, to: FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent(CofreConstants.pairingRelativePath))
+    }
+
     public static func write(_ data: Data, to destination: URL) throws {
         _ = try PairingFileValidator.validate(data)
         let fm = FileManager.default
@@ -107,19 +125,5 @@ public enum PairingFileStore {
             try? fm.removeItem(at: temporary)
             throw error
         }
-    }
-}
-
-@_cdecl("CofreImportPairingData")
-public func CofreImportPairingData(_ bytes: UnsafeRawPointer?, _ length: Int) -> Bool {
-    guard let bytes, length >= 0, length <= PairingFileValidator.maxFileSize else { return false }
-    let data = Data(bytes: bytes, count: length)
-    let destination = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent(CofreConstants.pairingRelativePath)
-    do {
-        try PairingFileStore.write(data, to: destination)
-        return true
-    } catch {
-        return false
     }
 }

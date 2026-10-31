@@ -45,8 +45,45 @@ final class ModrinthTests: XCTestCase {
         XCTAssertEqual(hits[0].pageURL?.absoluteString, "https://modrinth.com/mod/badoptimizations")
     }
 
+    func testVersionByIDCarriesItsChangelog() async throws {
+        let client = Modrinth(session: FixtureProtocol.session(["/v2/version/OihdIimA": fixture("modrinth-version")]))
+        let version = try await client.version(id: "OihdIimA")
+        XCTAssertEqual(version.projectID, "AANobbMI")
+        XCTAssertEqual(version.versionNumber, "mc1.21.1-0.6.13-fabric")
+        XCTAssertTrue(version.changelog?.hasPrefix("## Fixes") == true)
+    }
+
+    func testPageByIDAsksForTheProject() async throws {
+        let client = Modrinth(
+            session: FixtureProtocol.session(["/v2/project/AANobbMI": fixture("modrinth-project-sodium")]))
+        let page = try await client.page(id: "AANobbMI")
+        XCTAssertEqual(page.title, "Sodium")
+        XCTAssertFalse(page.gallery.isEmpty)
+    }
+
     private func fixture(_ name: String) -> Data {
         let url = Bundle.module.url(forResource: name, withExtension: "json", subdirectory: "Fixtures")!
         return try! Data(contentsOf: url)
     }
+}
+
+/// Serves fixture bodies by URL path, so the client's requests run without a network.
+final class FixtureProtocol: URLProtocol {
+    nonisolated(unsafe) static var bodies: [String: Data] = [:]
+    static func session(_ bodies: [String: Data]) -> URLSession {
+        Self.bodies.merge(bodies) { $1 }
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [FixtureProtocol.self]
+        return URLSession(configuration: config)
+    }
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        let body = request.url.flatMap { Self.bodies[$0.path] }
+        let response = HTTPURLResponse(url: request.url!, statusCode: body == nil ? 404 : 200, httpVersion: nil, headerFields: nil)!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: body ?? Data())
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
 }

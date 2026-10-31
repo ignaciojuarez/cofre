@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import CofreKit
 
 // In-game touch controls: settings, layout and gesture rules (plan/touch-controls.md). Pure values, so the
 // overlay view stays thin and tests cover the rules.
@@ -60,7 +61,7 @@ public struct TouchControlSettings: Codable, Equatable, Sendable {
     public static let idleDelay: TimeInterval = 3
     public static let restoreDuration: TimeInterval = 0.15
 
-    static let key = "cofre.touch.settings"
+    static var key: String { PreferenceKey.touchSettings.rawValue }
 
     public static func load(_ defaults: UserDefaults = .standard) -> Self {
         defaults.data(forKey: key).flatMap { try? JSONDecoder().decode(Self.self, from: $0) } ?? Self()

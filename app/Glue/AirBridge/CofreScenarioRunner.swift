@@ -50,7 +50,7 @@ final class CofreScenarioRunner {
             var existing = try store.list().first { $0.name == scenario.name }
             if scenario.fresh, let old = existing { try store.remove(old.id); existing = nil }
             if existing == nil {
-                let loader = Loader(rawValue: scenario.loader.lowercased()) ?? .unknown
+                let loader = scenario.loader
                 let made = try store.create(name: scenario.name, version: scenario.version ?? "1.21.1", loader: loader)
                 createdIDs.append(made.id)
                 existing = made
@@ -58,7 +58,8 @@ final class CofreScenarioRunner {
             guard let instance = existing else { throw CofreBackendError.unavailable("instance") }
             targetID = instance.id
 
-            if instance.loader != .vanilla, let loader = Loader(rawValue: scenario.loader.lowercased()) {
+            let scenarioLoader: Loader? = scenario.loader == .unknown ? nil : scenario.loader
+            if instance.loader != .vanilla, let loader = scenarioLoader {
                 let availableLoaderVersions = try await backend.loaderVersions(loader: loader, game: instance.gameVersion)
                 let loaderVersion = scenario.loaderVersion ?? availableLoaderVersions.first
                 guard let loaderVersion else { throw CofreBackendError.unavailable("no loader version") }

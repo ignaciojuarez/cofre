@@ -1,4 +1,5 @@
 import Foundation
+import CofreKit
 
 public enum ServerJoinError: Error, Equatable, Sendable {
     case invalidCard(String)
@@ -21,7 +22,8 @@ public struct ServerAddress: Codable, Equatable, Sendable {
         self.port = port
     }
 }
-public enum CardLoader: String, Codable, Sendable { case vanilla, fabric, quilt, forge, neoforge }
+/// Kept as an API spelling for older callers; the card now uses CofreKit's one loader type.
+public typealias CardLoader = Instance.Loader
 public struct LoaderRequirement: Codable, Equatable, Sendable {
     public let type: CardLoader
     public let version: String

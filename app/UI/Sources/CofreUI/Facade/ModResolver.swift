@@ -6,32 +6,6 @@
     // project's versions, newest first; it returns an `ModInstallPlan`. Modrinth and CurseForge differ only in how the
     // backend reads their version rows into `ModCandidate`.
 
-    /// Release, beta or alpha. Get takes the most stable build that fits; an update never moves to a less stable one.
-    public enum VersionChannel: Int, Comparable, CaseIterable, Sendable {
-        case release, beta, alpha
-        /// Modrinth's `version_type`, CurseForge's mapped one, or a capitalized label. Unknown reads as release.
-        public init(_ raw: String?) {
-            switch raw?.lowercased() {
-            case "beta": self = .beta
-            case "alpha": self = .alpha
-            default: self = .release
-            }
-        }
-        public var raw: String { ["release", "beta", "alpha"][rawValue] }
-        public var label: String {
-            switch self {
-            case .release: String(localized: "Release")
-            case .beta: String(localized: "Beta")
-            case .alpha: String(localized: "Alpha")
-            }
-        }
-        public static func < (a: Self, b: Self) -> Bool { a.rawValue < b.rawValue }
-        /// Release only to a newer release; beta to a beta or release; alpha to anything.
-        public func allowsUpdate(to newer: VersionChannel) -> Bool { newer <= self }
-        /// Channels an update from this one may land on.
-        public var updateChannels: [VersionChannel] { Self.allCases.filter { allowsUpdate(to: $0) } }
-    }
-
     /// Version numbers as people read them: "mc26.3-0.9.3-beta.1-fabric" → "0.9.3 beta 1". The raw number stays
     /// for Details.
     public enum VersionLabel {
@@ -75,16 +49,15 @@
         public var projectID: String, versionID: String
         /// The project's title ("Cloth Config"), not the version's.
         public var title: String, version: String
-        public var gameVersions: [String], loaders: [String]
-        /// "release", "beta" or "alpha".
-        public var channel: String
+        public var gameVersions: [String], loaders: [Loader]
+        public var channel: VersionChannel
         public var sizeBytes: Int64?
         public var dependencies: [Dependency]
         /// CurseForge authors can forbid downloads outside their app; those files have no URL.
         public var downloadable: Bool
         public init(
             projectID: String, versionID: String, title: String, version: String, gameVersions: [String],
-            loaders: [String], channel: String = "release", sizeBytes: Int64? = nil, dependencies: [Dependency] = [],
+            loaders: [Loader], channel: VersionChannel = .release, sizeBytes: Int64? = nil, dependencies: [Dependency] = [],
             downloadable: Bool = true
         ) {
             self.projectID = projectID
@@ -92,11 +65,21 @@
             self.title = title
             self.version = version
             self.gameVersions = gameVersions
-            self.loaders = loaders.map { $0.lowercased() }
-            self.channel = channel.lowercased()
+            self.loaders = loaders
+            self.channel = channel
             self.sizeBytes = sizeBytes
             self.dependencies = dependencies
             self.downloadable = downloadable
+        }
+
+        public init(
+            projectID: String, versionID: String, title: String, version: String, gameVersions: [String],
+            loaders: [String], channel: String, sizeBytes: Int64? = nil, dependencies: [Dependency] = [],
+            downloadable: Bool = true
+        ) {
+            self.init(projectID: projectID, versionID: versionID, title: title, version: version,
+                      gameVersions: gameVersions, loaders: loaders.compactMap { Loader(rawValue: $0.lowercased()) }, channel: VersionChannel(channel),
+                      sizeBytes: sizeBytes, dependencies: dependencies, downloadable: downloadable)
         }
 
         /// Exact game version, and the instance's loader. Quilt runs Fabric mods; shaders and packs list no loader
@@ -104,14 +87,14 @@
         public func fits(game: String, loader: Loader, kind: ContentKind = .mods) -> Bool {
             guard gameVersions.contains(game) else { return false }
             guard kind == .mods else { return true }
-            return loaders.isEmpty || loaders.contains(loader.rawValue)
-                || (loader == .quilt && loaders.contains(Loader.fabric.rawValue))
+            return loaders.isEmpty || loaders.contains(loader)
+                || (loader == .quilt && loaders.contains(.fabric))
         }
 
         var planned: PlannedMod {
             PlannedMod(
                 id: projectID, name: title, versionID: versionID, version: VersionLabel.clean(version),
-                sizeBytes: sizeBytes, channel: VersionChannel(channel))
+                sizeBytes: sizeBytes, channel: channel)
         }
     }
 
@@ -224,7 +207,7 @@
         func pick(_ all: [ModCandidate], pinned: String?) -> ModCandidate? {
             let fits = all.filter { $0.fits(game: game, loader: loader, kind: kind) }
             if let pinned, let exact = fits.first(where: { $0.versionID == pinned }) { return exact }
-            return Self.mostStable(fits, channel: { VersionChannel($0.channel) })
+            return Self.mostStable(fits, channel: { $0.channel })
         }
 
         /// The newest of the most stable channel present (lists are newest first).
@@ -239,7 +222,7 @@
         func missing(_ name: String, in all: [ModCandidate]) -> String {
             let sameGame = all.filter { $0.gameVersions.contains(game) }
             let label = "\(loader.displayName) \(game)"
-            if kind == .mods, let other = sameGame.lazy.flatMap(\.loaders).compactMap(Loader.init(rawValue:)).first {
+            if kind == .mods, let other = sameGame.lazy.flatMap(\.loaders).first {
                 return String(localized: "\(name) has no \(label) version, only \(other.displayName).")
             }
             return String(localized: "\(name) has no \(kind == .mods ? label : game) version yet.")

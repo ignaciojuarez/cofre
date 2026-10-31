@@ -33,12 +33,14 @@
         var launchingGameDirectory: URL?
         var loaderInstallInProgress = false
         let modCatalog = CofreModCatalog()
+        /// The one Modrinth client (and its 30 s cache), shared with CofreUI's project pages.
+        public var modrinth: Modrinth { modCatalog.modrinth }
         private lazy var accountStore: AccountStore = {
             // Air keeps accounts in $POJAV_HOME/accounts (Documents, or Caches when Documents isn't writable).
             AccountStore(directory: ProcessInfo.processInfo.environment["POJAV_HOME"].map { URL(fileURLWithPath: $0) }
                              ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0],
-                         readSelected: { [weak self] in self?.air.preferenceObject("internal.selected_account", profile: nil) as? String },
-                         writeSelected: { [weak self] id in self?.air.setPreferenceObject("internal.selected_account", value: id ?? "", profile: nil) })
+                         readSelected: { [weak self] in self?.air.preferenceObject(CofrePreferenceStore.Key.selectedAccount.rawValue, profile: nil) as? String },
+                         writeSelected: { [weak self] id in self?.air.setPreferenceObject(CofrePreferenceStore.Key.selectedAccount.rawValue, value: id ?? "", profile: nil) })
         }()
         public init(bridge: any CofreAirBridging) {
             self.air = bridge
@@ -74,7 +76,7 @@
         }
         private func loadPersistedSetup() {
             // Only the JIT test result is remembered; every other check is recomputed by `recheckSetup()`.
-            if UserDefaults.standard.bool(forKey: "cofre.setup.jit") { setup.jit = .ready }
+            if UserDefaults.standard.bool(forKey: PreferenceKey.setupJIT.rawValue) { setup.jit = .ready }
         }
 
         public func setupState() async -> SetupState {
@@ -100,11 +102,12 @@
             setup.pairing = pairingReady ? .ready : (setup.pairing.isReady ? .unknown : setup.pairing)
             await refreshVPNStatus()
             if await CofreVPN.isAllowed() { setup.vpn = .ready } else if setup.vpn.isReady { setup.vpn = .unknown }
+            // The debugger attaches only at launch, so a passed JIT test stays ready until the pairing goes away.
             if pairingReady && isJITEnabled {
                 setup.jit = .ready
-            } else if setup.jit.isReady {
+            } else if !pairingReady && setup.jit.isReady {
                 // A remembered JIT test means nothing without a complete pairing key: launches would fail.
-                UserDefaults.standard.removeObject(forKey: "cofre.setup.jit"); setup.jit = .unknown
+                UserDefaults.standard.removeObject(forKey: PreferenceKey.setupJIT.rawValue); setup.jit = .unknown
             }
             let accountReady = accountStore.list().contains { $0.state == .ready }
             if accountReady { setup.account = .ready } else if setup.account.isReady { setup.account = .unknown }
@@ -249,9 +252,9 @@
             return launch(instanceID: instanceID, accountID: accountID, gameArguments: [])
         }
         func launch(instanceID: String, accountID: String?, gameArguments: [String]) -> AsyncThrowingStream<LaunchProgress, Error> {
-            UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "cofre.launch.started.\(instanceID)")
+                UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: PreferenceKey.launchStarted(instanceID).rawValue)
             if let dir = air.gameDirectory(forProfile: instanceID), let options = try? String(contentsOf: dir.appendingPathComponent("options.txt"), encoding: .utf8) {
-                UserDefaults.standard.set(options, forKey: "cofre.options.before.\(instanceID)")
+                UserDefaults.standard.set(options, forKey: PreferenceKey.optionsBefore(instanceID).rawValue)
             }
             CofreBreadcrumb.log("play", details: "instance=\(instanceID)")
             return AsyncThrowingStream { continuation in
@@ -397,10 +400,10 @@
         public func exportLog(_ kind: LogKind) async throws -> URL { try logStore().export(kitSource(kind)) }
         public func exportReport() async throws -> URL {
             let url = FileManager.default.temporaryDirectory.appendingPathComponent("report-\(UUID().uuidString).zip")
-            return try ReportBundle(store: logStore(), context: .init()).make(at: url)
+            return try ReportBundle(store: logStore(), context: .current()).make(at: url)
         }
         public func reportPreview() async -> ReportPreviewData {
-            let p = ReportBundle(store: logStore(), context: .init()).preview()
+            let p = ReportBundle(store: logStore(), context: .current()).preview()
             return ReportPreviewData(fields: p.fields.map { "\($0.name): \($0.value)" }, files: p.files)
         }
         /// Turns on JIT through the built-in VPN, as the game and the Forge/NeoForge installers need it.
@@ -414,13 +417,16 @@
             case .needsPairing: throw CofreBackendError.jit("This device isn't paired yet. Pair it in Settings.")
             case .needsVPN: throw CofreBackendError.jit("The VPN isn't on")
             case .failed(let message, let step):
-                throw CofreBackendError.jit(step.map { "JIT failed at \($0): \(message)" } ?? message)
+                throw CofreBackendError.jit(step.map { "JIT failed at \($0.rawValue): \(message)" } ?? message)
             case .unavailable, .enabling: throw CofreBackendError.jit("JIT didn't turn on")
             }
             guard isJITEnabled else { throw CofreBackendError.jit("JIT didn't turn on") }
+            UserDefaults.standard.set(true, forKey: PreferenceKey.setupJIT.rawValue)
+            setup.jit = .ready
+            publishSetup()
         }
 
-        public func testJIT() -> AsyncThrowingStream<JITStep, Error> {
+        public func testJIT() -> AsyncThrowingStream<JITStatusStep, Error> {
             AsyncThrowingStream { continuation in
                 Task { @MainActor in
                     let result = await CofreJIT.enable(pid: Int32(getpid()), pairingURL: { self.pairingURL })
@@ -430,20 +436,20 @@
                         case .enabled: (.debugger, "")
                         case .needsPairing: (.pairing, "This device isn't paired yet")
                         case .needsVPN: (.vpn, "The VPN isn't on")
-                        case .failed(let m, let step): (step.flatMap(JITStep.Kind.init) ?? .debugger, m)
+                        case .failed(let m, let step): (step ?? .debugger, m)
                         case .unavailable, .enabling: (.debugger, "JIT didn't turn on")
                         }
                     guard result.isEnabled else {
                         // Steps before the one that failed passed.
                         for passed in JITStep.Kind.allCases.prefix(while: { $0 != kind }) {
-                            continuation.yield(JITStep(kind: passed, state: .ready))
+                            continuation.yield(JITStatusStep(kind: passed, state: .ready))
                         }
-                        continuation.yield(JITStep(kind: kind, state: .failed(message)))
+                        continuation.yield(JITStatusStep(kind: kind, state: .failed(message)))
                         continuation.finish(throwing: CofreBackendError.jit(message))
                         return
                     }
-                    for kind in JITStep.Kind.allCases { continuation.yield(JITStep(kind: kind, state: .ready)) }
-                    UserDefaults.standard.set(true, forKey: "cofre.setup.jit")
+                    for kind in JITStatusStep.Kind.allCases { continuation.yield(JITStatusStep(kind: kind, state: .ready)) }
+                    UserDefaults.standard.set(true, forKey: PreferenceKey.setupJIT.rawValue)
                     self.setup.jit = .ready
                     self.publishSetup()
                     continuation.finish()

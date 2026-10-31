@@ -1,4 +1,5 @@
 import Foundation
+import CofreKit
 
 public struct RejoinIntent: Codable, Hashable, Sendable {
     public enum Kind: String, Codable, Sendable { case world, server }
@@ -13,7 +14,7 @@ public struct RejoinIntent: Codable, Hashable, Sendable {
 }
 
 public enum RejoinIntentStore {
-    public static let key = "cofre.rejoin.intent"
+    private static var key: String { PreferenceKey.rejoinIntent.rawValue }
     public static func load(defaults: UserDefaults = .standard, now: Date = .now) -> RejoinIntent? {
         guard let data = defaults.data(forKey: key), let intent = try? JSONDecoder().decode(RejoinIntent.self, from: data), now.timeIntervalSince(intent.createdAt) < 600 else {
             if defaults.data(forKey: key) != nil { defaults.removeObject(forKey: key) }

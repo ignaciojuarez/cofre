@@ -103,7 +103,7 @@
         public var sizeBytes: Int64?
         public var lastPlayed: Date?
         public var updatesAvailable: Int
-        public var renderer: String? = nil
+        public var renderer: RendererID? = nil
         public var javaVersion: String?
         public var ownFolder: Bool
         public var icon: InstanceIcon
@@ -310,10 +310,10 @@
     public struct GamePreferences: Equatable, Sendable {
         /// `autoRAM` is on by default: Cofre (the backend) picks a safe amount. `ramMB` applies only when it's off.
         public var ramMB = 4096, autoRAM = true, deviceRAMMB = 8192
-        public var renderer = "auto", resolution = 1.0, graphicsApi = "auto"
-        public var java = "auto", jvmArgs = ""
+        public var renderer: RendererID = .auto, resolution = 1.0, graphicsApi: GraphicsAPI = .auto
+        public var java: JavaRuntimeID = .auto, jvmArgs = ""
         /// Zero means Auto: follow the display's maximum refresh rate.
-        public var fpsOverlay = true, muteWithSwitch = true, microphone = false
+        public var muteWithSwitch = true, microphone = false
         public var gyroAim = true, virtualMouse = false, hotbarSwipe = true, touchControllerMod = true,
             buttonScale = 1.0
         public var controllerLayout = "Default", touchLayout = "Default"
@@ -445,11 +445,13 @@
     public struct ProjectVersion: Identifiable, Hashable, Sendable {
         public let id: String
         /// `name` is the readable label ("0.9.3 beta 1"); `number` the raw one, for Details.
-        public var name: String, gameVersions: String, channel: String, fits: Bool
+        public var name: String, gameVersions: String, channel: VersionChannel, fits: Bool
         public var number: String
         public var games: [String], loaders: [Loader]
+        /// "What's new". Only versions from the filtered request carry one; the full list skips them.
+        public var changelog: ProjectPage.Body?
         public init(
-            id: String, name: String, gameVersions: String, channel: String = "Release", fits: Bool,
+            id: String, name: String, gameVersions: String, channel: VersionChannel = .release, fits: Bool,
             number: String? = nil, games: [String]? = nil, loaders: [Loader] = []
         ) {
             self.id = id
@@ -461,7 +463,14 @@
             self.games = games ?? gameVersions.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
             self.loaders = loaders
         }
-        public var versionChannel: VersionChannel { VersionChannel(channel) }
+        public init(
+            id: String, name: String, gameVersions: String, channel: String, fits: Bool,
+            number: String? = nil, games: [String]? = nil, loaders: [Loader] = []
+        ) {
+            self.init(id: id, name: name, gameVersions: gameVersions, channel: VersionChannel(channel), fits: fits,
+                      number: number, games: games, loaders: loaders)
+        }
+        public var versionChannel: VersionChannel { channel }
     }
 
     public struct ProjectDependency: Identifiable, Hashable, Sendable {
@@ -560,8 +569,8 @@
     }
 
     /// S06 / X04 step stream: pairing, VPN, DDI, debugger, region, detach.
-    public struct JITStep: Equatable, Sendable {
-        public enum Kind: String, CaseIterable, Sendable { case pairing, vpn, diskImage, debugger, region, detach }
+    public struct JITStatusStep: Equatable, Sendable {
+        public typealias Kind = CofreKit.JITStep.Kind
         public var kind: Kind, state: CheckState, detail: String?
         public init(kind: Kind, state: CheckState, detail: String? = nil) {
             self.kind = kind
@@ -569,7 +578,6 @@
             self.detail = detail
         }
     }
-
     public struct SigningInfo: Equatable, Sendable {
         public var team: String, expires: Date, deviceRegistered: Bool, installed: Bool
         public init(team: String, expires: Date, deviceRegistered: Bool, installed: Bool = true) {
@@ -581,23 +589,29 @@
     }
 
     public struct RendererOption: Identifiable, Hashable, Sendable {
-        public let id: String
+        public let id: RendererID
         public var name: String, detail: String, recommended: Bool
-        public init(id: String, name: String, detail: String, recommended: Bool = false) {
+        public init(id: RendererID, name: String, detail: String, recommended: Bool = false) {
             self.id = id
             self.name = name
             self.detail = detail
             self.recommended = recommended
         }
+        public init(id: String, name: String, detail: String, recommended: Bool = false) {
+            self.init(id: RendererID(rawValue: id), name: name, detail: detail, recommended: recommended)
+        }
     }
 
     public struct JavaRuntime: Identifiable, Hashable, Sendable {
-        public let id: String
+        public let id: JavaRuntimeID
         public var major: Int, installed: Bool
-        public init(id: String, major: Int, installed: Bool) {
+        public init(id: JavaRuntimeID, major: Int, installed: Bool) {
             self.id = id
             self.major = major
             self.installed = installed
+        }
+        public init(id: String, major: Int, installed: Bool) {
+            self.init(id: JavaRuntimeID(rawValue: id), major: major, installed: installed)
         }
     }
 

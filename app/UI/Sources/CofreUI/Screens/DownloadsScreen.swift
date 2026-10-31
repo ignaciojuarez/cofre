@@ -11,9 +11,9 @@ final class DownloadsModel {
     /// Big downloads the user chose to keep waiting for Wi‑Fi: the ask doesn't come back for them.
     var declined: Set<UUID> = []
     /// On cellular, downloads over 200 MB ask first unless this is on.
-    var cellular = UserDefaults.standard.bool(forKey: "cofre.downloads.cellular") {
+    var cellular = UserDefaults.standard.bool(forKey: PreferenceKey.downloadsCellular.rawValue) {
         didSet {
-            UserDefaults.standard.set(cellular, forKey: "cofre.downloads.cellular")
+            UserDefaults.standard.set(cellular, forKey: PreferenceKey.downloadsCellular.rawValue)
             DownloadQueue.shared.allowCellularForLargeDownloads = cellular
         }
     }

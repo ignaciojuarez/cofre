@@ -19,7 +19,7 @@ extension CofreBackendAdapter {
     private func summary(_ record: CofreServerRecord, index: Int, instanceID: String) -> ServerSummary {
         let host = MinecraftServerAddress.parse(record.ip)?.host ?? record.ip
         return ServerSummary(id: CofreServersStore.id(index: index, record: record), name: record.name, address: record.ip,
-            hasServerCard: UserDefaults.standard.bool(forKey: "cofre.server-card.\(host)"), instanceID: instanceID, iconPNG: record.icon)
+            hasServerCard: UserDefaults.standard.bool(forKey: PreferenceKey.serverCard(host).rawValue), instanceID: instanceID, iconPNG: record.icon)
     }
     public func servers(instanceID: String) async throws -> [ServerSummary] {
         let store = try serverStore(instanceID)

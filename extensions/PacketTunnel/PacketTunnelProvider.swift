@@ -37,19 +37,15 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         }
     }
     override func handleAppMessage(_ messageData: Data, completionHandler: ((Data?) -> Void)? = nil) {
-        func reply(_ state: String, _ reason: String? = nil, mode: String? = nil, step: String? = nil) -> Data {
-            var object: [String: Any] = ["state": state]
-            if let reason { object["reason"] = reason }
-            if let mode { object["mode"] = mode }
-            if let step { object["step"] = step }
-            return (try? JSONSerialization.data(withJSONObject: object)) ?? Data("{\"state\":\"failed\",\"reason\":\"response encoding failed\"}".utf8)
+        func reply(_ message: JITMessage) -> Data {
+            (try? JSONEncoder().encode(message)) ?? Data("{\"state\":\"failed\",\"reason\":\"response encoding failed\"}".utf8)
         }
-        guard let object = try? JSONSerialization.jsonObject(with: messageData) as? [String: Any],
-            object["cmd"] as? String == "enableJIT", let pid = object["pid"] as? Int, pid > 0,
-            let encoded = object["pairing"] as? String, let pairing = Data(base64Encoded: encoded),
+        guard let message = try? JSONDecoder().decode(JITMessage.self, from: messageData),
+            message.command == .enableJIT, let pid = message.pid, pid > 0,
+            let encoded = message.pairing, let pairing = Data(base64Encoded: encoded),
             pairing.count < 262144
         else {
-            completionHandler?(reply("failed", "invalid message"))
+            completionHandler?(reply(.failed("invalid message")))
             return
         }
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(
@@ -58,32 +54,32 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             try pairing.write(to: url, options: .completeFileProtection)
             pairingURL = url
         } catch {
-            completionHandler?(reply("failed", "pairing write failed: \(error.localizedDescription)"))
+            completionHandler?(reply(.failed("pairing write failed: \(error.localizedDescription)")))
             return
         }
         guard let scriptURL = Bundle.main.url(forResource: "CofreTXM", withExtension: "js") else {
             try? FileManager.default.removeItem(at: url)
             pairingURL = nil
-            completionHandler?(reply("failed", "TXM script missing"))
+            completionHandler?(reply(.failed("TXM script missing")))
             return
         }
         jitTask?.cancel()
         let once = ReplyOnce(completionHandler)
         let task = Task.detached { [weak self] in
             // The step that failed, for the app's checklist: reaching the phone, then the disk image, then the debugger.
-            var step = "vpn"
+            var step: JITStep.Kind = .vpn
             do {
                 guard #available(iOS 17.4, *) else { throw TunnelError("JIT needs iOS 17.4 or later.") }
                 let configuration = StikJIT.Configuration(deviceAddress: CofreConstants.tunnelAddress, rsdPort: 49152)
                 if try !StikJIT.isDDIMounted(pairingFile: url, configuration: configuration) {
-                    step = "diskImage"
+                    step = .diskImage
                     let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
                     let paths = DDIPaths.default(in: caches)
                     try await StikJIT.downloadDDIIfNeeded(to: paths)
                     try StikJIT.mountDDI(pairingFile: url, configuration: configuration, paths: paths)
                     NSLog("[Cofre] JIT disk image mounted")
                 }
-                step = "debugger"
+                step = .debugger
                 // Blocks until CofreTXM.js detaches (right after the game's code region) or the game exits. Reply once
                 // it has attached.
                 try StikJIT.enableJIT(
@@ -93,12 +89,12 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
                         NSLog("[Cofre] JIT %@", message)
                         guard message == "COFRE_ATTACHED" else { return }
                         NSLog("[Cofre] JIT enabled pid=%ld mode=txm peakMB=%.1f", pid, peakMegabytes())
-                        once.send(reply("enabled", mode: "txm"))
+                        once.send(reply(.enabled(mode: "txm")))
                     })
-                once.send(reply("enabled", mode: "txm"))
+                once.send(reply(.enabled(mode: "txm")))
             } catch {
-                NSLog("[Cofre] JIT failed pid=%ld step=%@ %@", pid, step, error.localizedDescription)
-                once.send(reply("failed", error.localizedDescription, step: step))
+                NSLog("[Cofre] JIT failed pid=%ld step=%@ %@", pid, step.rawValue, error.localizedDescription)
+                once.send(reply(.failed(error.localizedDescription, step: step)))
             }
             try? FileManager.default.removeItem(at: url)
             self?.pairingURL = nil
