@@ -62,6 +62,10 @@
         public var installed: [ContentKind: [InstalledItem]] = [:]
         /// Gets in flight or waiting to be read, by project ID (planning, confirming, installing, done, failed).
         public var modInstalls: [String: ModInstall] = [:]
+        /// Gets waiting their turn (the Downloads sheet lists them under what's downloading).
+        public var waitingModInstalls: [ModInstall] {
+            modInstalls.values.filter { $0.phase == .queued }.sorted { $0.title < $1.title }
+        }
         /// The Get sheet: which `modInstalls` entry it shows.
         public var modInstallSheet: String?
         /// Installs run one at a time, so two Gets never write the same dependency twice.

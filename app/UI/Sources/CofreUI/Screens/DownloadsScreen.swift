@@ -36,10 +36,12 @@ final class DownloadsModel {
 /// download asks first instead (it never fails for it).
 struct CofreDownloadsStrip: View {
     @Environment(NavModel.self) private var nav
+    @Environment(CofreStore.self) private var store
     @Bindable private var model = DownloadsModel.shared
     var body: some View {
         let s = model.summary
         let asking = model.asking
+        let waiting = store.waitingModInstalls
         if !asking.isEmpty {
             let bytes = asking.compactMap(\.totalBytes).reduce(0, +)
             Banner("\(Fmt.bytes(bytes) ?? "A big") download on cellular", icon: .chest) {
@@ -50,18 +52,20 @@ struct CofreDownloadsStrip: View {
                 }
             }
         }
-        if !s.visible.isEmpty {
+        if !s.visible.isEmpty || !waiting.isEmpty {
             Button { nav.sheet = .downloads } label: {
                 HStack(spacing: 10) {
-                    if s.active.isEmpty { PixelIcon(.chest, size: 18) } else { Spinner() }
+                    if s.active.isEmpty && waiting.isEmpty { PixelIcon(.chest, size: 18) } else { Spinner() }
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
-                            Text(verbatim: s.title).cofreFont(.rowTitle).foregroundStyle(Color.cofre.ink)
+                            Text(verbatim: s.visible.isEmpty ? String(localized: "\(waiting.count) waiting") :
+                                    waiting.isEmpty ? s.title : "\(s.title) · \(waiting.count) waiting")
+                                .cofreFont(.rowTitle).foregroundStyle(Color.cofre.ink)
                             Spacer()
                             if !s.stopped.isEmpty { Meta("Stopped", tone: .danger) }
                         }
                         if !s.active.isEmpty { ProgressView(value: s.fraction).progressViewStyle(.xp(small: true)) }
-                        Text(s.active.isEmpty ? (s.stopped.isEmpty ? "Starts on Wi‑Fi" : "Tap to resume or retry") : "Keeps going if you leave Cofre")
+                        Text(s.active.isEmpty && waiting.isEmpty ? (s.stopped.isEmpty ? "Starts on Wi‑Fi" : "Tap to resume or retry") : "Keeps going if you leave Cofre")
                             .cofreFont(.caption).foregroundStyle(Color.cofre.muted)
                     }
                     Chevron()
@@ -73,16 +77,22 @@ struct CofreDownloadsStrip: View {
 }
 
 struct CofreDownloadsSheet: View {
+    @Environment(CofreStore.self) private var store
     @Bindable private var model = DownloadsModel.shared
     var body: some View {
+        let waiting = store.waitingModInstalls
         VStack(spacing: 0) {
             SheetHeader("Downloads")
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
-                    if model.summary.visible.isEmpty {
+                    if model.summary.visible.isEmpty && waiting.isEmpty {
                         Text("Nothing downloading.").cofreFont(.body).foregroundStyle(Color.cofre.muted)
                     } else {
-                        ListSection(spacing: 4) { ForEach(model.summary.visible) { item in downloadRow(item) } }
+                        ListSection(spacing: 4) {
+                            ForEach(model.summary.visible) { item in downloadRow(item) }
+                            // Gets wait their turn in Cofre before their files reach the download queue.
+                            ForEach(waiting) { job in waitingRow(job) }
+                        }
                     }
                     ListSection("While downloading", spacing: 4) {
                         ToggleRow("Use cellular data", subtitle: "Otherwise Cofre asks before downloads over 200 MB on cellular", isOn: $model.cellular)
@@ -116,6 +126,20 @@ struct CofreDownloadsSheet: View {
                 ProgressView(value: item.fraction).progressViewStyle(.xp(small: true))
             }
         }.padding(.horizontal, 11).padding(.vertical, 8).frame(minHeight: 44).block(.panel)
+    }
+
+    private func waitingRow(_ job: ModInstall) -> some View {
+        HStack(spacing: 10) {
+            PixelIcon(.chest, size: 22)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(verbatim: job.title).cofreFont(.rowTitle).foregroundStyle(Color.cofre.ink).lineLimit(1)
+                Text("Waiting · \(store.instances.first { $0.id == job.instanceID }?.name ?? job.instanceID)")
+                    .cofreFont(.caption).foregroundStyle(Color.cofre.muted).lineLimit(1)
+            }.frame(maxWidth: .infinity, alignment: .leading)
+            Meta("Next")
+        }
+        .padding(.horizontal, 11).padding(.vertical, 8).frame(minHeight: 44).block(.panel)
+        .accessibilityElement(children: .combine)
     }
 
     private func detail(_ item: DownloadQueue.Item) -> String {
