@@ -14,17 +14,24 @@ public enum GameOptions {
             : ["renderDistance": "6", "simulationDistance": "5"]
     }
 
-    /// Fills missing distances. With `replacingEngineDefaults`, also replaces values equal to Air's defaults
-    /// (used once per instance, for instances Air already launched). Returns whether the file changed.
+    /// Filled only when missing: the game's 120/260 FPS cap on a 60 Hz screen only adds heat (an iPad mini hit
+    /// "serious" thermal state on Metal), and the menu blur cost a +650 MB spike on a 4 GB iPad.
+    static func comfort(displayHz: Int) -> [String: String] {
+        ["maxFps": String(max(30, displayHz)), "menuBackgroundBlurriness": "0"]
+    }
+
+    /// Fills missing distances and comfort settings. With `replacingEngineDefaults`, also replaces distances equal to
+    /// Air's defaults (used once per instance, for instances Air already launched). Returns whether the file changed.
     @discardableResult
     public static func seedDistances(
-        in gameDirectory: URL, physicalMB: Int, replacingEngineDefaults: Bool
+        in gameDirectory: URL, physicalMB: Int, displayHz: Int = 60, replacingEngineDefaults: Bool
     ) throws -> Bool {
         let url = gameDirectory.appendingPathComponent("options.txt")
         let text = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
         var lines = text.isEmpty ? [] : text.components(separatedBy: "\n")
         var changed = false
-        for (key, value) in distances(physicalMB: physicalMB).sorted(by: { $0.key < $1.key }) {
+        let values = distances(physicalMB: physicalMB).merging(comfort(displayHz: displayHz)) { a, _ in a }
+        for (key, value) in values.sorted(by: { $0.key < $1.key }) {
             if let i = lines.firstIndex(where: { $0.hasPrefix(key + ":") }) {
                 guard replacingEngineDefaults, lines[i] == "\(key):\(engineDefaults[key] ?? "")" else { continue }
                 lines[i] = "\(key):\(value)"

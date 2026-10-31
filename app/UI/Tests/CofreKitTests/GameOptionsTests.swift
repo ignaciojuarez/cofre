@@ -16,27 +16,28 @@ final class GameOptionsTests: XCTestCase {
     private func write(_ text: String) throws { try text.write(to: file, atomically: true, encoding: .utf8) }
 
     func testNewInstanceGetsPlayableDistances() throws {
-        XCTAssertTrue(try GameOptions.seedDistances(in: dir, physicalMB: 12000, replacingEngineDefaults: true))
-        XCTAssertEqual(try options(), "renderDistance:10\nsimulationDistance:8")
+        XCTAssertTrue(try GameOptions.seedDistances(in: dir, physicalMB: 12000, displayHz: 120, replacingEngineDefaults: true))
+        XCTAssertEqual(try options(), "maxFps:120\nmenuBackgroundBlurriness:0\nrenderDistance:10\nsimulationDistance:8")
     }
 
     func testSmallDevicesGetShorterDistances() throws {
         try write("lang:en_us\n")
         try GameOptions.seedDistances(in: dir, physicalMB: 3862, replacingEngineDefaults: false)
-        XCTAssertEqual(try options(), "lang:en_us\nrenderDistance:6\nsimulationDistance:5\n")
+        XCTAssertEqual(try options(), "lang:en_us\nmaxFps:60\nmenuBackgroundBlurriness:0\nrenderDistance:6\nsimulationDistance:5\n")
     }
 
     func testEngineDefaultsAreReplacedOnlyWhenAsked() throws {
-        try write("renderDistance:2\nsimulationDistance:5")
+        try write("maxFps:120\nmenuBackgroundBlurriness:5\nrenderDistance:2\nsimulationDistance:5")
         XCTAssertFalse(try GameOptions.seedDistances(in: dir, physicalMB: 12000, replacingEngineDefaults: false))
         XCTAssertTrue(try GameOptions.seedDistances(in: dir, physicalMB: 12000, replacingEngineDefaults: true))
-        XCTAssertEqual(try options(), "renderDistance:10\nsimulationDistance:8")
+        // A player's FPS cap and blur are theirs; only Air's distance defaults are replaced.
+        XCTAssertEqual(try options(), "maxFps:120\nmenuBackgroundBlurriness:5\nrenderDistance:10\nsimulationDistance:8")
     }
 
     func testPlayerChoiceIsKept() throws {
-        try write("renderDistance:16\nsimulationDistance:12")
+        try write("maxFps:260\nmenuBackgroundBlurriness:5\nrenderDistance:16\nsimulationDistance:12")
         XCTAssertFalse(try GameOptions.seedDistances(in: dir, physicalMB: 12000, replacingEngineDefaults: true))
-        XCTAssertEqual(try options(), "renderDistance:16\nsimulationDistance:12")
+        XCTAssertEqual(try options(), "maxFps:260\nmenuBackgroundBlurriness:5\nrenderDistance:16\nsimulationDistance:12")
     }
 
     func testPresetSeedsSettingsWithoutReplacingExistingOptions() throws {

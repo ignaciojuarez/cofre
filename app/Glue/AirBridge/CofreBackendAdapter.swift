@@ -213,7 +213,8 @@
             let firstTime = !UserDefaults.standard.bool(forKey: key)
             do {
                 let changed = try GameOptions.seedDistances(in: instance.gameDirectory,
-                    physicalMB: Int(ProcessInfo.processInfo.physicalMemory >> 20), replacingEngineDefaults: firstTime)
+                    physicalMB: Int(ProcessInfo.processInfo.physicalMemory >> 20),
+                    displayHz: UIScreen.main.maximumFramesPerSecond, replacingEngineDefaults: firstTime)
                 UserDefaults.standard.set(true, forKey: key)
                 if changed { NSLog("[Cofre] view distances seeded instance=%@", instanceID) }
             } catch {
