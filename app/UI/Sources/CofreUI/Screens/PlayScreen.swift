@@ -36,6 +36,16 @@
                         UpdateBanner(update: update, dismiss: { dismissedUpdate = update.version })
                     }
                     if store.libraryLoaded { CofreDownloadsStrip().environment(nav) }
+                    if let session = store.unexpectedGameExit {
+                        let instance = store.instances.first { $0.id == session.instanceID }?.name ?? session.instanceID
+                        Banner(
+                            "Minecraft closed unexpectedly while running \(instance), likely because iOS ran out of memory. Try a lower render distance or fewer mods.",
+                            icon: .cross,
+                            tone: .warn
+                        ) {
+                            BlockButton("Dismiss", size: .small) { store.dismissUnexpectedGameExit() }
+                        }
+                    }
                     if store.libraryLoaded && !store.accounts.contains(where: { $0.state == .ready }) { Banner("Sign in to play Java Edition", icon: .head, tone: .warn) { BlockButton("Accounts", size: .small) { nav.section = .settings; nav.settingsPane = .accounts } } }
                     if store.setupCompleted, store.setup.pairing.isFailed {
                         // Setup finished once: a live failure is a banner here, never the wizard again.

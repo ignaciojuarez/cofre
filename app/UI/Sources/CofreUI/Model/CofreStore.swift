@@ -93,6 +93,8 @@
         }
         @ObservationIgnored private var launchRejoin: RejoinIntent?
         public var launchLog: [LogLine] = []
+        /// A one-time notice when the previous game process disappeared before Cofre saw its exit.
+        public private(set) var unexpectedGameExit: GameSession?
         public var logs: [LogKind: [LogLine]] = [:]
         public var pendingModCompatibility: [ModCompatibilityIssue]?
 
@@ -137,10 +139,13 @@
             setupCompleted = defaults.bool(forKey: PreferenceKey.setupCompleted.rawValue)
             setupStep = defaults.object(forKey: PreferenceKey.setupStep.rawValue) as? Int
             modsInstanceID = defaults.string(forKey: PreferenceKey.modsInstance.rawValue)
+            unexpectedGameExit = GameSessionMarker.consume(defaults: defaults)
         }
 
         public var capabilities: BackendCapabilities { backend.capabilities }
         public func can(_ c: BackendCapabilities) -> Bool { capabilities.contains(c) }
+
+        public func dismissUnexpectedGameExit() { unexpectedGameExit = nil }
 
         public var activeInstance: InstanceSummary? { instances.first { $0.id == activeInstanceID } ?? instances.first }
         public var activeAccount: Account? { accounts.first { $0.isActive } ?? accounts.first }
@@ -363,6 +368,7 @@
                             backend.joinServer(instanceID: id, address: $0.address, accountID: activeAccount?.id)
                         } ?? backend.launch(instanceID: id, accountID: activeAccount?.id)
                     for try await p in stream {
+                        if p.finished { GameSessionMarker.begin(instanceID: id, defaults: defaults) }
                         launch = p
                         if p.finished { UINotificationFeedbackGenerator().notificationOccurred(.success) }
                     }

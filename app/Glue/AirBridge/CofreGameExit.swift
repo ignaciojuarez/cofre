@@ -25,6 +25,7 @@ extension ReportBundle.Context {
 
     static func handle(code: Int, root: UIViewController?, bridge: (any CofreAirBridging)?) {
         NSLog("[Cofre] launch exit code=%d", code)
+        GameSessionMarker.clear()
         // Shown before the first frame too: the launch screen closes when the game exits, and Java can't start
         // again in this process, so this screen (Play again reopens Cofre) is the only way on.
         guard window == nil,
