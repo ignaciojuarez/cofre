@@ -28,6 +28,8 @@ public final class TouchOverlayModel {
     var knob = CGSize.zero
     var stickKeys: Set<CofreInputKey> = []
     var world: WorldTouch?
+    /// Independent button gestures let camera look and movement continue while Attack or Use is held.
+    var actionTouches: [TouchControl: WorldTouch] = [:]
     /// This finger started on the hotbar: it picked a slot and does nothing else until it lifts.
     @ObservationIgnored var touchOnHotbar = false
     var hapticTick = 0
@@ -39,6 +41,7 @@ public final class TouchOverlayModel {
     @ObservationIgnored private var tasks: [Task<Void, Never>] = []
     @ObservationIgnored private var idleTask: Task<Void, Never>?
     @ObservationIgnored private var holdTask: Task<Void, Never>?
+    @ObservationIgnored private var actionHoldTasks: [TouchControl: Task<Void, Never>] = [:]
     @ObservationIgnored private var settingsObserver: NSObjectProtocol?
     @ObservationIgnored private var keyboardObservers: [NSObjectProtocol] = []
     @ObservationIgnored private var trayTapTasks: [QuickTrayActionID: Task<Void, Never>] = [:]
@@ -104,7 +107,9 @@ public final class TouchOverlayModel {
     // MARK: Derived
 
     public var controls: [TouchControl] {
-        TouchLayout.controls(style: settings.style, screen: screen, mode: mode, hudHidden: hudHidden)
+        TouchLayout.controls(
+            style: settings.style, screen: screen, mode: mode, hudHidden: hudHidden,
+            actionButtons: settings.actionButtons)
     }
 
     var holding: Bool { !pressed.isEmpty || stickCenter != nil || world != nil }
@@ -118,7 +123,7 @@ public final class TouchOverlayModel {
         TouchLayout.frames(
             style: settings.style, size: size, insets: insets,
             scale: TouchLayout.scale(for: size, buttonScale: settings.buttonScale), leftHanded: settings.leftHanded,
-            hotbar: hotbar(in: size))
+            hotbar: hotbar(in: size), actionButtons: settings.actionButtons)
     }
 
     func hotbar(in size: CGSize) -> CGRect {
@@ -215,6 +220,12 @@ public final class TouchOverlayModel {
         down.forEach { input?.release($0) }
         down = []
         if world?.attacking == true { input?.mouseButton(.left, down: false) }
+        for (control, touch) in actionTouches where touch.attacking {
+            input?.mouseButton(control == .attack ? .left : .right, down: false)
+        }
+        actionHoldTasks.values.forEach { $0.cancel() }
+        actionHoldTasks.removeAll()
+        actionTouches.removeAll()
         world = nil
         stickCenter = nil
         knob = .zero
@@ -229,15 +240,29 @@ public final class TouchOverlayModel {
     // MARK: Buttons
 
     func buttonDown(_ c: TouchControl) {
+        if (c == .attack || c == .use) && !settings.actionButtons { return }
         guard pressed.insert(c).inserted else { return }
         touched()
-        buzz()
+        if c != .attack && c != .use { buzz() }
         let now = ProcessInfo.processInfo.systemUptime
         switch c {
         case .jump: press(.jump)
         case .sneak:
             sneakPressedAt = now
             if sneak.press(time: now) { press(.sneak) }
+        case .attack, .use:
+            let mouse: CofreMouseButton = c == .attack ? .left : .right
+            let hold = min(max(settings.holdToBreak, 0.1), 0.5)
+            actionTouches[c] = WorldTouch(at: .zero, time: now, holdAfter: hold)
+            actionHoldTasks[c]?.cancel()
+            actionHoldTasks[c] = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(hold))
+                guard !Task.isCancelled, let self, var touch = self.actionTouches[c] else { return }
+                let actions = touch.tick(time: ProcessInfo.processInfo.systemUptime)
+                self.actionTouches[c] = touch
+                self.perform(actions, mouseButton: mouse)
+                self.actionHoldTasks[c] = nil
+            }
         default: break
         }
     }
@@ -263,6 +288,13 @@ public final class TouchOverlayModel {
         case .inventory: tap(.inventory)
         case .keyboard: toggleKeyboard()
         case .close: tap(.escape)
+        case .attack, .use:
+            actionHoldTasks[c]?.cancel()
+            actionHoldTasks[c] = nil
+            guard var touch = actionTouches.removeValue(forKey: c) else { return }
+            // If release races the hold task at the threshold, classify it from the final timestamp first.
+            let hold = touch.tick(time: now)
+            perform(hold + touch.end(time: now), mouseButton: c == .attack ? .left : .right)
         case .stick: break
         }
     }
@@ -355,8 +387,10 @@ public final class TouchOverlayModel {
             release(.tab)
         }
         let hold = min(max(settings.holdToBreak, 0.1), 0.5)
-        world = WorldTouch(at: p, time: ProcessInfo.processInfo.systemUptime, holdAfter: hold)
+        world = WorldTouch(
+            at: p, time: ProcessInfo.processInfo.systemUptime, holdAfter: hold, lookOnly: settings.actionButtons)
         holdTask?.cancel()
+        guard !settings.actionButtons else { return }
         holdTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(hold))
             guard !Task.isCancelled, let self, var w = self.world else { return }
@@ -383,19 +417,20 @@ public final class TouchOverlayModel {
         scheduleIdle()
     }
 
-    private func perform(_ actions: [WorldTouch.Action]) {
+    private func perform(_ actions: [WorldTouch.Action], mouseButton: CofreMouseButton? = nil) {
         for a in actions {
             switch a {
             case .look(let dx, let dy):
                 let d = settings.lookDelta(dx: dx, dy: dy, pixelsPerPoint: pixelsPerPoint)
                 input?.look(deltaX: d.x, deltaY: d.y)
             case .use:
-                input?.mouseButton(.right, down: true)
-                input?.mouseButton(.right, down: false)
+                let button = mouseButton ?? .right
+                input?.mouseButton(button, down: true)
+                input?.mouseButton(button, down: false)
             case .attackDown:
                 buzz()
-                input?.mouseButton(.left, down: true)
-            case .attackUp: input?.mouseButton(.left, down: false)
+                input?.mouseButton(mouseButton ?? .left, down: true)
+            case .attackUp: input?.mouseButton(mouseButton ?? .left, down: false)
             }
         }
     }
@@ -508,6 +543,8 @@ public struct TouchOverlayView: View {
         switch c {
         case .jump: OverlayGlyph(TouchLayout.jumpGlyph(model.context))
         case .sneak: OverlayGlyph(TouchLayout.sneakGlyph(model.context))
+        case .attack: .attack
+        case .use: .use
         case .pause: .moreVertical
         case .chat: .chat
         case .inventory: .dots
@@ -522,6 +559,8 @@ public struct TouchOverlayView: View {
         switch c {
         case .jump: Text("Jump")
         case .sneak: model.sneak.locked ? Text("Sneak, locked") : Text("Sneak")
+        case .attack: Text("Attack")
+        case .use: Text("Use")
         case .pause: Text("Menu")
         case .chat: Text("Chat")
         case .inventory: Text("Inventory")

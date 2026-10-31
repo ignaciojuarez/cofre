@@ -148,7 +148,11 @@ Controller and keyboard-and-mouse options (bindings, deadzone) stay in their own
 | Review renders | `TouchOverlayPreview.swift`, PreviewHost `-screen touch -touch c\|a\|b\|ipad\|settings\|sheet` |
 | Air hosting | `CofreGameOverlayHost` asks `CofreCoreEntry.touchOverlay` for the controller; R's debug buttons are gone |
 
-**Touch ownership:** in the world, the overlay takes every touch except the game's hotbar. Drag = `look` (points × screen scale × sensitivity, Invert Y), tap = right click, hold 250 ms = left button held, which keeps breaking while dragging. On game screens it takes only ⌨ and ✕, and Air handles the pointer. The hotbar always falls through to Air's own slot taps, and the host forces `control.gesture_hotbar` on. Air's touch look ignores `mouse_speed` and has no Invert Y, which is why the overlay owns look.
+The optional **Action buttons** setting adds Bedrock-style Attack (left mouse) and Use (right mouse) controls beside
+the jump/sneak column. World gestures remain look-only in this mode; each button keeps its own tap/hold state so
+camera look and the movement stick continue while either mouse button is held.
+
+**Touch ownership:** in the default layout, the overlay takes every world touch except the game's hotbar. Drag = `look` (points × screen scale × sensitivity, Invert Y), tap = right click, hold 250 ms = left button held, which keeps breaking while dragging. With Action buttons enabled, world touches are look-only and the two buttons send the mouse clicks. On game screens it takes only ⌨ and ✕, and Air handles the pointer. The hotbar always falls through to Air's own slot taps, and the host forces `control.gesture_hotbar` on. Air's touch look ignores `mouse_speed` and has no Invert Y, which is why the overlay owns look.
 
 **Facade gaps (§5):**
 | Gap | Status |

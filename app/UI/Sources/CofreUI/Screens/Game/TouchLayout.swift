@@ -38,6 +38,8 @@ public struct TouchControlSettings: Codable, Equatable, Sendable {
     public var stickArea = 0.4
     /// Seconds a finger rests on the world before it breaks (0.1–0.5). Shorter touches place or use.
     public var holdToBreak = WorldTouch.defaultHold
+    /// Bedrock-style Attack and Use buttons replace world taps and holds.
+    public var actionButtons = false
 
     public init() {}
 
@@ -55,6 +57,7 @@ public struct TouchControlSettings: Codable, Equatable, Sendable {
         invertY = try c.decodeIfPresent(Bool.self, forKey: .invertY) ?? d.invertY
         stickArea = try c.decodeIfPresent(Double.self, forKey: .stickArea) ?? d.stickArea
         holdToBreak = try c.decodeIfPresent(Double.self, forKey: .holdToBreak) ?? d.holdToBreak
+        actionButtons = try c.decodeIfPresent(Bool.self, forKey: .actionButtons) ?? d.actionButtons
     }
 
     public static let idleOpacity = 0.35
@@ -85,7 +88,7 @@ public struct TouchControlSettings: Codable, Equatable, Sendable {
 }
 
 public enum TouchControl: String, CaseIterable, Sendable {
-    case stick, jump, sneak, pause, chat, inventory, menu, keyboard, close
+    case stick, jump, sneak, attack, use, pause, chat, inventory, menu, keyboard, close
 }
 
 /// What the player is doing, when a state source exists. Only changes glyphs (rule U3).
@@ -98,14 +101,19 @@ public enum TouchGlyph: Equatable, Sendable {
 public enum TouchLayout {
     /// Rule U1: what's on screen for this style, screen and input mode. Hardware modes hide everything.
     public static func controls(
-        style: TouchLayoutStyle, screen: GameScreenState, mode: CofreInputMode, hudHidden: Bool = false
+        style: TouchLayoutStyle, screen: GameScreenState, mode: CofreInputMode, hudHidden: Bool = false,
+        actionButtons: Bool = false
     ) -> [TouchControl] {
         guard mode == .touch || mode == .auto else { return [] }
         guard screen.inWorld else { return [.keyboard, .close] }
         if hudHidden { return [style == .minimal ? .menu : .pause] }
         switch style {
-        case .dock, .classic: return [.stick, .jump, .sneak, .pause, .chat, .inventory]
-        case .minimal: return [.stick, .jump, .menu]
+        case .dock, .classic:
+            return actionButtons
+                ? [.stick, .jump, .sneak, .attack, .use, .pause, .chat, .inventory]
+                : [.stick, .jump, .sneak, .pause, .chat, .inventory]
+        case .minimal:
+            return actionButtons ? [.stick, .jump, .attack, .use, .menu] : [.stick, .jump, .menu]
         }
     }
 
@@ -156,7 +164,7 @@ public enum TouchLayout {
     /// the hotbar dock stays put because the game's hotbar doesn't mirror.
     public static func frames(
         style: TouchLayoutStyle, size: CGSize, insets: EdgeInsetsValue, scale k: CGFloat, leftHanded: Bool,
-        hotbar: CGRect
+        hotbar: CGRect, actionButtons: Bool = false
     ) -> [TouchControl: CGRect] {
         let left = insets.left + 16, right = size.width - insets.right - 16
         let bottom = size.height - insets.bottom - 14, top = insets.top + 10
@@ -177,6 +185,26 @@ public enum TouchLayout {
             f[.chat] = CGRect(x: right - 88 * k, y: top, width: 40 * k, height: 40 * k)
         case .minimal:
             f[.menu] = CGRect(x: right - 36 * k, y: top, width: 36 * k, height: 36 * k)
+        }
+        if actionButtons {
+            let action = 52 * k
+            let gap = 8 * k
+            switch style {
+            case .dock:
+                let sneak = f[.sneak]!
+                f[.attack] = CGRect(x: sneak.minX - gap - action, y: sneak.minY, width: action, height: action)
+                f[.use] = CGRect(x: sneak.minX, y: sneak.maxY + gap, width: action, height: action)
+            case .classic:
+                let sneak = f[.sneak]!
+                let y = max(top, sneak.minY - gap - action)
+                f[.attack] = CGRect(x: sneak.minX - gap - action, y: y, width: action, height: action)
+                f[.use] = CGRect(x: sneak.minX, y: y, width: action, height: action)
+            case .minimal:
+                let jump = f[.jump]!
+                let y = max(top, jump.minY - gap - action)
+                f[.attack] = CGRect(x: jump.minX - gap - action, y: y, width: action, height: action)
+                f[.use] = CGRect(x: jump.minX, y: y, width: action, height: action)
+            }
         }
         let kb = 40 * k
         f[.close] = CGRect(x: right - kb, y: top, width: kb, height: kb)
@@ -266,14 +294,19 @@ public struct WorldTouch: Equatable, Sendable {
     let start: CGPoint, startTime: TimeInterval
     /// How long the finger rests before the hold breaks; a shorter touch is a tap (use).
     let holdAfter: TimeInterval
+    /// Action buttons keep world gestures for camera look only.
+    let lookOnly: Bool
     var last: CGPoint
     public private(set) var looking = false, attacking = false
 
-    public init(at p: CGPoint, time: TimeInterval, holdAfter: TimeInterval = defaultHold) {
+    public init(
+        at p: CGPoint, time: TimeInterval, holdAfter: TimeInterval = defaultHold, lookOnly: Bool = false
+    ) {
         start = p
         last = p
         startTime = time
         self.holdAfter = holdAfter
+        self.lookOnly = lookOnly
     }
 
     public mutating func move(to p: CGPoint, time: TimeInterval) -> [Action] {
@@ -288,12 +321,13 @@ public struct WorldTouch: Equatable, Sendable {
 
     /// Call while the finger rests; starts the hold once it has stayed put long enough.
     public mutating func tick(time: TimeInterval) -> [Action] {
-        guard !looking, !attacking, time - startTime >= holdAfter else { return [] }
+        guard !lookOnly, !looking, !attacking, time - startTime >= holdAfter else { return [] }
         attacking = true
         return [.attackDown]
     }
 
     public mutating func end(time: TimeInterval) -> [Action] {
+        if lookOnly { return [] }
         if attacking { return [.attackUp] }
         if !looking, time - startTime <= holdAfter { return [.use] }
         return []

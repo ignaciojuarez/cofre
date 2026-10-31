@@ -31,6 +31,7 @@ final class TouchControlsTests: XCTestCase {
         XCTAssertFalse(s.leftHanded)
         XCTAssertFalse(s.invertY)
         XCTAssertEqual(s.lookSensitivity, 1)
+        XCTAssertFalse(s.actionButtons)
     }
 
     func testSettingsRoundTrip() throws {
@@ -41,6 +42,7 @@ final class TouchControlsTests: XCTestCase {
         s.style = .minimal
         s.leftHanded = true
         s.opacity = 0.5
+        s.actionButtons = true
         s.save(defaults)
         XCTAssertEqual(TouchControlSettings.load(defaults), s)
     }
@@ -61,6 +63,9 @@ final class TouchControlsTests: XCTestCase {
             TouchLayout.controls(style: .dock, screen: world, mode: .touch),
             [.stick, .jump, .sneak, .pause, .chat, .inventory])
         XCTAssertEqual(TouchLayout.controls(style: .minimal, screen: world, mode: .touch), [.stick, .jump, .menu])
+        XCTAssertEqual(
+            TouchLayout.controls(style: .dock, screen: world, mode: .touch, actionButtons: true),
+            [.stick, .jump, .sneak, .attack, .use, .pause, .chat, .inventory])
         XCTAssertEqual(TouchLayout.controls(style: .dock, screen: menu, mode: .touch), [.keyboard, .close])
         XCTAssertEqual(TouchLayout.controls(style: .dock, screen: world, mode: .controller), [])
         XCTAssertEqual(TouchLayout.controls(style: .dock, screen: menu, mode: .keyboardMouse), [])
@@ -130,6 +135,17 @@ final class TouchControlsTests: XCTestCase {
         }
     }
 
+    func testActionButtonsSitBesideJumpAndSneak() {
+        let hotbar = TouchLayout.hotbar(in: phone, screen: .world, defaultPixelsPerPoint: 3)
+        let f = TouchLayout.frames(
+            style: .dock, size: phone, insets: phoneInsets, scale: 1, leftHanded: false,
+            hotbar: hotbar, actionButtons: true)
+        XCTAssertLessThan(f[.attack]!.maxX, f[.sneak]!.minX)
+        XCTAssertGreaterThanOrEqual(f[.use]!.minY, f[.sneak]!.maxY)
+        XCTAssertTrue(CGRect(x: 62, y: 0, width: phone.width - 124, height: phone.height).contains(f[.attack]!))
+        XCTAssertTrue(CGRect(x: 62, y: 0, width: phone.width - 124, height: phone.height).contains(f[.use]!))
+    }
+
     func testLeftHandedMirrorsEverythingButTheHotbarDock() {
         let hotbar = TouchLayout.hotbar(in: phone, screen: .world, defaultPixelsPerPoint: 3)
         let right = TouchLayout.frames(
@@ -175,6 +191,7 @@ final class TouchControlsTests: XCTestCase {
         XCTAssertEqual(s.lookSensitivity, 2)
         XCTAssertTrue(s.leftHanded)
         XCTAssertEqual(s.stickArea, 0.4)
+        XCTAssertFalse(s.actionButtons)
     }
 
     func testHitTargetsAreAtLeast44Points() {
@@ -217,6 +234,11 @@ final class TouchControlsTests: XCTestCase {
         XCTAssertEqual(drag.move(to: CGPoint(x: 12, y: 0), time: 0.1), [.look(dx: 12, dy: 0)])
         XCTAssertEqual(drag.tick(time: 1), [], "a look never turns into a break")
         XCTAssertEqual(drag.end(time: 1.2), [])
+
+        var lookOnly = WorldTouch(at: .zero, time: 0, lookOnly: true)
+        XCTAssertEqual(lookOnly.tick(time: 1), [])
+        XCTAssertEqual(lookOnly.end(time: 1), [])
+        XCTAssertEqual(lookOnly.move(to: CGPoint(x: 20, y: 0), time: 1), [.look(dx: 20, dy: 0)])
     }
 
     func testSneakDoubleTapLocksAndNextTapUnlocks() {
@@ -251,6 +273,32 @@ final class TouchControlsTests: XCTestCase {
         m.buttonDown(.pause)
         m.buttonUp(.pause)
         XCTAssertFalse(m.trayOpen)
+    }
+
+    @MainActor
+    func testActionButtonsLookOnlyWorldAndMapTapAndHoldToMouseButtons() async {
+        var settings = TouchControlSettings()
+        settings.actionButtons = true
+        settings.holdToBreak = 0.1
+        let spy = SpyInput()
+        let m = TouchOverlayModel(input: spy, settings: settings)
+
+        m.worldBegan(at: CGPoint(x: 500, y: 100), size: phone)
+        m.worldMoved(to: CGPoint(x: 520, y: 100))
+        m.worldEnded()
+        XCTAssertEqual(spy.mouseEvents, [])
+        XCTAssertEqual(spy.lookEvents, ["look(60.0,0.0)"])
+
+        m.buttonDown(.attack)
+        m.buttonUp(.attack)
+        XCTAssertEqual(spy.mouseEvents, ["left+", "left-"])
+        XCTAssertEqual(m.hapticTick, 0, "a tap does not use the hold-start haptic")
+
+        m.buttonDown(.use)
+        try? await Task.sleep(for: .milliseconds(200))
+        m.buttonUp(.use)
+        XCTAssertEqual(spy.mouseEvents, ["left+", "left-", "right+", "right-"])
+        XCTAssertEqual(m.hapticTick, 1, "a hold uses the existing break haptic when it starts")
     }
 
     @MainActor
@@ -367,7 +415,19 @@ final class TouchControlsTests: XCTestCase {
 
 private final class SpyInput: GameInputService {
     var events: [String] = []
+    var mouseEvents: [String] = []
+    var lookEvents: [String] = []
     func press(_ key: CofreInputKey) { events.append("+\(key.rawValue)") }
     func release(_ key: CofreInputKey) { events.append("-\(key.rawValue)") }
     func noteTouchInput() { events.append("touch") }
+    func mouseButton(_ button: CofreMouseButton, down: Bool) {
+        let name: String
+        switch button {
+        case .left: name = "left"
+        case .right: name = "right"
+        case .middle: name = "middle"
+        }
+        mouseEvents.append(name + (down ? "+" : "-"))
+    }
+    func look(deltaX: Float, deltaY: Float) { lookEvents.append("look(\(deltaX),\(deltaY))") }
 }

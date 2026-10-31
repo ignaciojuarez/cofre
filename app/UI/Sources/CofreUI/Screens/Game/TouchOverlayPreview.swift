@@ -22,18 +22,22 @@ public struct TouchOverlayPreview: View {
 
     public init(
         style: TouchLayoutStyle = .dock, state: TouchPreviewState = .rest, device: TouchPreviewDevice = .phone,
-        leftHanded: Bool = false
+        leftHanded: Bool = false, actionButtons: Bool = false
     ) {
         self.device = device
-        _model = State(initialValue: Self.model(style: style, state: state, device: device, leftHanded: leftHanded))
+        _model = State(
+            initialValue: Self.model(
+                style: style, state: state, device: device, leftHanded: leftHanded, actionButtons: actionButtons))
     }
 
     @MainActor static func model(
-        style: TouchLayoutStyle, state: TouchPreviewState, device: TouchPreviewDevice, leftHanded: Bool
+        style: TouchLayoutStyle, state: TouchPreviewState, device: TouchPreviewDevice, leftHanded: Bool,
+        actionButtons: Bool = false
     ) -> TouchOverlayModel {
         var s = TouchControlSettings()
         s.style = style
         s.leftHanded = leftHanded
+        s.actionButtons = actionButtons
         let m = TouchOverlayModel(input: nil, settings: s)
         m.insets = device.insets
         m.pixelsPerPoint = device.pixelsPerPoint
@@ -202,6 +206,7 @@ struct DeviceChrome: View {
                 switch name {
                 case "sheet": TouchControlsSheet()
                 case "settings": ControlsSettingsPage()
+                case "actions": TouchOverlayPreview(style: .dock, state: .rest, actionButtons: true)
                 case "ipad": TouchOverlayPreview(style: .dock, state: .active, device: .pad, leftHanded: true)
                 case "a": strip([(.classic, .rest, "Classic · at rest"), (.classic, .flying, "Classic · flying")])
                 case "b": strip([(.minimal, .rest, "Minimal · at rest"), (.minimal, .active, "Minimal · touching")])

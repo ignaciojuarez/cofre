@@ -3,7 +3,7 @@ import SwiftUI
 // Visual pieces of the in-game overlay: Cofre's square block in dark glass, pixel glyphs (plan/touch-controls.md).
 
 enum OverlayGlyph {
-    case jump, sneak, flyUp, flyDown, swimUp, swimDown, chat, pause, dots, moreVertical, menu, close, keyboard, dismount, eye,
+    case jump, sneak, attack, use, flyUp, flyDown, swimUp, swimDown, chat, pause, dots, moreVertical, menu, close, keyboard, dismount, eye,
         players, drop, swap, hide, edit
 
     init(_ g: TouchGlyph) {
@@ -22,6 +22,8 @@ enum OverlayGlyph {
         switch self {
         case .jump: ["...W...", "..WWW..", ".WWWWW.", "WWWWWWW", "..WWW..", "..WWW..", "..WWW.."]
         case .sneak: ["..WWW..", "..WWW..", "..WWW..", "WWWWWWW", ".WWWWW.", "..WWW..", "WWWWWWW"]
+        case .attack: ["....W..", "...WW..", "..WWW..", ".WWWW..", "WWWWW..", "...W...", "...W..."]
+        case .use: ["...W...", "...W...", "W..W..W", ".WWWWW.", "W..W..W", "...W...", "...W..."]
         case .flyUp: ["...W...", "..WWW..", ".WW.WW.", "WW...WW", "...W...", "..WWW..", ".WW.WW.", "WW...WW"]
         case .flyDown: ["WW...WW", ".WW.WW.", "..WWW..", "...W...", "WW...WW", ".WW.WW.", "..WWW..", "...W..."]
         case .swimUp: ["...W...", "..WWW..", ".WWWWW.", "..WWW..", ".......", "W.W.W.W", ".W.W.W."]
