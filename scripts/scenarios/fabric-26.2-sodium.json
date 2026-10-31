@@ -1,0 +1,11 @@
+{
+  "name": "fabric-26.2-sodium",
+  "loader": "fabric",
+  "mods": [
+    "sodium"
+  ],
+  "renderer": "auto",
+  "resolution": 1.0,
+  "launch": true,
+  "version": "26.2"
+}
