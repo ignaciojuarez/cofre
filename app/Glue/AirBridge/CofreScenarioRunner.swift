@@ -74,6 +74,12 @@ final class CofreScenarioRunner {
             if existing == nil {
                 let loader = scenario.loader
                 let made = try store.create(name: scenario.name, version: scenario.version ?? "1.21.1", loader: loader)
+                if scenario.fresh {
+                    // An older run's folder can outlive its profile; its options.txt would force OpenGL.
+                    let fm = FileManager.default
+                    for item in (try? fm.contentsOfDirectory(at: made.gameDirectory, includingPropertiesForKeys: nil)) ?? []
+                    where item.lastPathComponent != "cofre.json" { try? fm.removeItem(at: item) }
+                }
                 createdIDs.append(made.id)
                 existing = made
             }
@@ -155,6 +161,11 @@ final class CofreScenarioRunner {
             if scenario.launch, let targetID {
                 NotificationCenter.default.post(name: .cofreScenarioStep, object: "Scenario: \(scenario.name) · launch")
                 for try await _ in backend.launch(instanceID: targetID, accountID: nil) {}
+                // The stream ends at the first frame, while the game keeps running from this folder.
+                // Deleting it now pulls Fabric's jar-in-jar mods (.fabric/processedMods) out from under
+                // the game (blank title) and leaves a profile-less folder whose startup marker forces
+                // OpenGL on the next run. `fresh` removes it before the next scenario instead.
+                keepInstances = true
             }
         } catch {
             if let failure = error as? LaunchFailure, failure == .restartRequired {
