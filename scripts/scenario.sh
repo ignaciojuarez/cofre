@@ -34,7 +34,8 @@ since=$(date -v-5S "+%Y-%m-%d %H:%M:%S")  # ignore the previous run's log until 
 launch_scenario
 log="$out/latestlog.txt"; verdict="FAIL timeout"
 restarted=0
-for ((i=0; i<timeout; i++)); do
+deadline=$((SECONDS + timeout))
+while ((SECONDS < deadline)); do
   timeout 20 xcrun devicectl device copy from --device "$device" --domain-type appDataContainer --domain-identifier "$bundle" --source Documents/latestlog.txt --destination "$log" >/dev/null 2>&1 || true
   first=$(grep -m1 -oE '^20[0-9]{2}-[0-9]{2}-[0-9]{2} [0-9:]{8}' "$log" 2>/dev/null || true)
   if [[ -s "$log" && ! "$first" < "$since" ]]; then
