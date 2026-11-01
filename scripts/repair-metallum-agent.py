@@ -16,12 +16,19 @@ Three gaps crash vanilla Metal (plan/reviews/metal-mods.md):
     Cofre compiles its own (app/Glue/MetallumAgent) into the jar root.
   * 1.21.11: Metallum calls `new NopLogger()`, but the root NopLogger has a private constructor.
     Root members a class set uses that are private are made public.
+  * vanilla 26.2: Air registers its Spv access transformer from premain, after its own startup can
+    load the package-private Spv records. The executable entry points are routed through a Cofre
+    premain shim that registers first, before delegating to Air.
 """
 import os, struct, subprocess, sys, tempfile, zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BUMP_SOURCE = os.path.join(ROOT, 'app/Glue/MetallumAgent/com/metallum/agent/ShaderVersionBump.java')
 BUMP_CLASS = 'com/metallum/agent/ShaderVersionBump.class'
+SHIM_SOURCE = os.path.join(ROOT, 'app/Glue/MetallumAgent/com/metallum/agent/CofreMetallumAgent.java')
+SHIM_CLASS = 'com/metallum/agent/CofreMetallumAgent.class'
+SHIM_INNER_CLASS = 'com/metallum/agent/CofreMetallumAgent$AccessTransformer.class'
+MANIFEST = 'META-INF/MANIFEST.MF'
 STUB_SOURCE = 'classes263/'
 STUB_PREFIX = 'net/fabricmc/'
 OWN = 'com/metallum/'
@@ -128,7 +135,7 @@ class Jar:
         return found
 
 
-def compile_bump(out_dir):
+def compile_owned(out_dir, jar_path):
     """Compile with the first JDK 21+ found (Air's BOOTJDK is JDK 8, so it cannot be the default)."""
     homes = [os.environ.get('JAVA_HOME', '')]
     try:
@@ -137,12 +144,39 @@ def compile_bump(out_dir):
         pass
     for javac in [os.path.join(h, 'bin', 'javac') for h in homes if h] + ['javac']:
         try:
-            if subprocess.run([javac, '--release', '21', '-nowarn', '-d', out_dir, BUMP_SOURCE]).returncode == 0:
-                with open(os.path.join(out_dir, BUMP_CLASS), 'rb') as f:
-                    return f.read()
+            command = [javac, '--release', '21', '-nowarn', '-cp', jar_path, '-d', out_dir,
+                       BUMP_SOURCE, SHIM_SOURCE]
+            if subprocess.run(command).returncode == 0:
+                compiled = {}
+                for directory, _, names in os.walk(out_dir):
+                    for name in names:
+                        if not name.endswith('.class'):
+                            continue
+                        entry = os.path.relpath(os.path.join(directory, name), out_dir)
+                        with open(os.path.join(directory, name), 'rb') as class_file:
+                            compiled[entry] = class_file.read()
+                return compiled
         except OSError:
             continue
     sys.exit('repair-metallum-agent: needs a JDK 21+ javac (set JAVA_HOME)')
+
+
+def shim_manifest(data):
+    """Route the executable agent entry points through Cofre's preload shim."""
+    text = data.decode('utf-8').replace('\r\n', '\n').rstrip('\n')
+    lines = text.split('\n')
+    values = {'Premain-Class': 'com.metallum.agent.CofreMetallumAgent',
+              'Agent-Class': 'com.metallum.agent.CofreMetallumAgent'}
+    seen = set()
+    for i, line in enumerate(lines):
+        key, separator, _ = line.partition(': ')
+        if separator and key in values:
+            lines[i] = key + ': ' + values[key]
+            seen.add(key)
+    for key, value in values.items():
+        if key not in seen:
+            lines.append(key + ': ' + value)
+    return ('\r\n'.join(lines) + '\r\n').encode('utf-8')
 
 
 def repair(path):
@@ -162,9 +196,16 @@ def repair(path):
                 widened.setdefault(entry, set()).update(members)
         for entry, members in widened.items():
             replaced[entry] = widen(z.read(entry), members)
-        if BUMP_CLASS not in jar.entries:
+        missing_owned = [name for name in (BUMP_CLASS, SHIM_CLASS, SHIM_INNER_CLASS)
+                         if name not in jar.entries]
+        if missing_owned:
             with tempfile.TemporaryDirectory(prefix='cofre-metallum-') as tmp:
-                added[BUMP_CLASS] = compile_bump(tmp)
+                owned = compile_owned(tmp, path)
+                added.update({name: owned[name] for name in missing_owned})
+        manifest = z.read(MANIFEST)
+        rewritten_manifest = shim_manifest(manifest)
+        if rewritten_manifest != manifest:
+            replaced[MANIFEST] = rewritten_manifest
         if not added and not replaced:
             return
         temporary = path + '.repair'
@@ -180,6 +221,8 @@ def repair(path):
         print(f'metallum_agent.jar: made public {name[:-6]}.' + ', '.join(m + d for m, d in sorted(widened[name])))
     for name in sorted(added):
         print(f'metallum_agent.jar: added {name}')
+    if MANIFEST in replaced:
+        print('metallum_agent.jar: installed Cofre premain shim (before Air premain)')
 
 
 def main(argv):

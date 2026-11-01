@@ -6,6 +6,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import zipfile
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts/repair-metallum-agent.py"
@@ -47,6 +48,27 @@ public class Probe {
 }
 '''
 
+SHIM_FIXTURE = r'''
+package com.mojang.blaze3d.vulkan.glsl;
+final class SpvUniformBuffer { }
+final class SpvSampler { }
+final class SpvVariable { }
+'''
+
+SHIM_PROBE = r'''
+import java.lang.reflect.Modifier;
+public final class ShimProbe {
+  public static void main(String[] args) throws Exception {
+    for (String name : new String[]{"SpvUniformBuffer", "SpvSampler", "SpvVariable"}) {
+      Class<?> type = Class.forName("com.mojang.blaze3d.vulkan.glsl." + name);
+      if (!Modifier.isPublic(type.getModifiers())) throw new AssertionError(name + " is not public");
+    }
+    System.out.println("PASS: Cofre premain shim widens all Spv classes before definition");
+    System.exit(0);
+  }
+}
+'''
+
 
 def java25():
     """Air's class sets are Java 25 class files, like the game's runtime on the device."""
@@ -76,6 +98,10 @@ with tempfile.TemporaryDirectory(prefix="cofre-metallum-test-") as directory:
     first = run("python3", SCRIPT, jar)
     assert first.returncode == 0, first.stdout + first.stderr
     repaired = jar.read_bytes()
+    with zipfile.ZipFile(jar) as repaired_jar:
+        manifest = repaired_jar.read("META-INF/MANIFEST.MF").decode()
+        assert "Premain-Class: com.metallum.agent.CofreMetallumAgent" in manifest
+        assert "Agent-Class: com.metallum.agent.CofreMetallumAgent" in manifest
     again = run("python3", SCRIPT, jar)
     assert again.returncode == 0 and not again.stdout and jar.read_bytes() == repaired, "repair is not idempotent"
     java = java25()
@@ -84,3 +110,17 @@ with tempfile.TemporaryDirectory(prefix="cofre-metallum-test-") as directory:
     probe = run(java, "-cp", jar, tree / "Probe.java", jar)
     assert probe.returncode == 0, probe.stdout + probe.stderr
     print(probe.stdout.strip())
+
+    classes = tree / "classes"
+    classes.mkdir()
+    fixture = tree / "SpvUniformBuffer.java"
+    fixture.write_text(SHIM_FIXTURE)
+    shim_probe = tree / "ShimProbe.java"
+    shim_probe.write_text(SHIM_PROBE)
+    javac = java.with_name("javac")
+    compiled = run(javac, "-d", classes, fixture, shim_probe)
+    assert compiled.returncode == 0, compiled.stdout + compiled.stderr
+    shim = run(java, "-javaagent:" + str(jar), "-cp", str(classes), "ShimProbe")
+    assert shim.returncode == 0, shim.stdout + shim.stderr
+    assert "PASS: Cofre premain shim widens all Spv classes" in shim.stdout
+    print(shim.stdout.strip())
