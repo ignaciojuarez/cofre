@@ -348,8 +348,11 @@
                             case .surfaceShown:
                                 awaitingFirstFrame = true
                                 NSLog("[Cofre] launch state=surfaceShown")
+                                // NeoForge draws nothing while it builds mods: 100 mods took ~95 s on an iPad mini.
+                                // Load failures and JVM exits still end the launch early.
+                                let firstFrameLimit = instance.loader == .vanilla ? 60 : 600
                                 watchdog = Task { @MainActor in
-                                    try? await Task.sleep(for: .seconds(60))
+                                    try? await Task.sleep(for: .seconds(firstFrameLimit))
                                     guard !Task.isCancelled, awaitingFirstFrame else { return }
                                     self.recordJVMUse()
                                     finish("failed reason=launchTimeout", error: LaunchFailure.unknown("Minecraft took too long to show its first frame"))
