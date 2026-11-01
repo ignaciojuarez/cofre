@@ -13,6 +13,7 @@ final class ScenarioWorldTests: XCTestCase {
             XCTAssertEqual(level["Data"]?["DataVersion"]?.integer, version == "26.2" ? 4903 : 4671)
             XCTAssertEqual(level["Data"]?["RandomSeed"]?.integer, 1234)
             XCTAssertEqual(level["Data"]?["Version"]?["Name"]?.string, version)
+            XCTAssertNotNil(level["Data"]?["DataPacks"]?["Disabled"])
             if version == "26.2" {
                 let settings = try NBT.read(
                     Data(contentsOf: world.appendingPathComponent("data/minecraft/world_gen_settings.dat")))

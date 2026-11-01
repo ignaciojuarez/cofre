@@ -87,6 +87,14 @@ public enum ScenarioWorld {
             ("allowCommands", .byte(0)),
             ("initialized", .byte(1)),
             ("version", .int(19133)),
+            // Without this list the client calls the world experimental and stops on a warning screen.
+            (
+                "DataPacks",
+                .compound([
+                    ("Enabled", .strings(["vanilla"])),
+                    ("Disabled", .strings(["minecart_improvements", "redstone_experiments", "trade_rebalance"])),
+                ])
+            ),
         ]
         if gameVersion == "1.21.11" { dataFields.append(("WorldGenSettings", worldGeneration)) }
         let data = compound([("Data", .compound(dataFields))])
@@ -118,6 +126,7 @@ public enum ScenarioWorld {
         case int(Int32)
         case long(Int64)
         case string(String)
+        case strings([String])
         case compound([(String, Value)])
     }
 
@@ -143,6 +152,10 @@ public enum ScenarioWorld {
         case .int(let value): append(UInt32(bitPattern: value), to: &data)
         case .long(let value): append(UInt64(bitPattern: value), to: &data)
         case .string(let value): appendString(value, to: &data)
+        case .strings(let values):
+            data.append(8)
+            append(UInt32(values.count), to: &data)
+            for value in values { appendString(value, to: &data) }
         case .compound(let values):
             for (name, value) in values {
                 data.append(value.type)
@@ -232,6 +245,7 @@ extension ScenarioWorld.Value {
         case .int: 3
         case .long: 4
         case .string: 8
+        case .strings: 9
         case .compound: 10
         }
     }
