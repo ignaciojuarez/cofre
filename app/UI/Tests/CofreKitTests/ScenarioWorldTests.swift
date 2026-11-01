@@ -18,6 +18,10 @@ final class ScenarioWorldTests: XCTestCase {
                 let settings = try NBT.read(
                     Data(contentsOf: world.appendingPathComponent("data/minecraft/world_gen_settings.dat")))
                 XCTAssertEqual(settings["data"]?["seed"]?.integer, 1234)
+                XCTAssertEqual(
+                    settings["data"]?["dimensions"]?["minecraft:the_nether"]?["generator"]?["settings"]?.string,
+                    "minecraft:nether")
+                XCTAssertNotNil(settings["data"]?["dimensions"]?["minecraft:the_end"])
                 XCTAssertNil(level["Data"]?["WorldGenSettings"])
             } else {
                 XCTAssertEqual(level["Data"]?["WorldGenSettings"]?["seed"]?.integer, 1234)

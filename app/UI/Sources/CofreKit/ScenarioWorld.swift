@@ -40,27 +40,30 @@ public enum ScenarioWorld {
             throw Failure.unsupportedVersion(gameVersion)
         }
         try fileManager.createDirectory(at: world, withIntermediateDirectories: true)
-        let dimensions: Value = .compound([
+        // All three vanilla dimensions: any other set reads as a custom (experimental) world and stops on a warning.
+        func noise(_ name: String, biomes: Value) -> (String, Value) {
             (
-                "minecraft:overworld",
+                "minecraft:\(name)",
                 .compound([
-                    ("type", .string("minecraft:overworld")),
+                    ("type", .string("minecraft:\(name)")),
                     (
                         "generator",
                         .compound([
                             ("type", .string("minecraft:noise")),
-                            (
-                                "biome_source",
-                                .compound([
-                                    ("type", .string("minecraft:multi_noise")),
-                                    ("preset", .string("minecraft:overworld")),
-                                ])
-                            ),
-                            ("settings", .string("minecraft:overworld")),
+                            ("biome_source", biomes),
+                            ("settings", .string("minecraft:\(name == "the_nether" ? "nether" : name == "the_end" ? "end" : name)")),
                         ])
                     ),
                 ])
             )
+        }
+        func preset(_ name: String) -> Value {
+            .compound([("type", .string("minecraft:multi_noise")), ("preset", .string("minecraft:\(name)"))])
+        }
+        let dimensions: Value = .compound([
+            noise("overworld", biomes: preset("overworld")),
+            noise("the_nether", biomes: preset("nether")),
+            noise("the_end", biomes: .compound([("type", .string("minecraft:the_end"))])),
         ])
         let worldGeneration: Value = .compound([
             ("seed", .long(seed)),
