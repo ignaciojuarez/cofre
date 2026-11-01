@@ -16,6 +16,19 @@ final class LogStoreTests: XCTestCase {
         try "ok\nWARN hi\nERROR bad\n".write(to: d.appendingPathComponent("latestlog.txt"), atomically: true, encoding: .utf8)
         XCTAssertEqual(LogStore(documents: d).search("bad", levels: [.error]).count, 1)
     }
+
+    func testExportRedactsSensitiveLogData() throws {
+        let d = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: d) }
+        try "server=play.example.com path=/Users/alice/game id=00008110ABCDEF1234567890\n".write(
+            to: d.appendingPathComponent("latestlog.txt"), atomically: true, encoding: .utf8)
+        let exported = try LogStore(documents: d).export(.launcher)
+        defer { try? FileManager.default.removeItem(at: exported) }
+        let text = try String(contentsOf: exported, encoding: .utf8)
+        XCTAssertFalse(text.contains("play.example.com") || text.contains("/Users/alice") || text.contains("00008110ABCDEF1234567890"))
+    }
+
     func testRedaction() { let r = ReportBundle.redact("token=abc me@example.com player=Alex"); XCTAssertFalse(r.contains("abc") || r.contains("me@example.com") || r.contains("Alex")) }
 
     func testRedactionCoversDevicePathsAndHosts() {

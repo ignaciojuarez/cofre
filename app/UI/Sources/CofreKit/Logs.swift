@@ -37,7 +37,12 @@ public final class LogStore: @unchecked Sendable {
         }.max { $0.1 < $1.1 }?.0
     }
     public func export(_ source: LogFile) throws -> URL {
-        guard let url = source == .launcher ? latestLog : source == .game ? gameLog : newestCrashReport(), FileManager.default.fileExists(atPath: url.path) else { throw CocoaError(.fileNoSuchFile) }; return url
+        guard let url = source == .launcher ? latestLog : source == .game ? gameLog : newestCrashReport(), FileManager.default.fileExists(atPath: url.path) else { throw CocoaError(.fileNoSuchFile) }
+        let clean = Data(ReportBundle.redact(String(decoding: try Data(contentsOf: url), as: UTF8.self)).utf8)
+        let ext = url.pathExtension.isEmpty ? "log" : url.pathExtension
+        let output = FileManager.default.temporaryDirectory.appendingPathComponent("cofre-\(source.rawValue)-redacted-\(UUID().uuidString).\(ext)")
+        try clean.write(to: output, options: .atomic)
+        return output
     }
     private func makeEntry(_ id: Int, _ text: String, source: LogFile) -> LogEntry? {
         let lower = text.lowercased()

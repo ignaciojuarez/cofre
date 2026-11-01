@@ -1,5 +1,6 @@
 #if canImport(UIKit)
     import SwiftUI
+    import CofreKit
 
     // P02 Launch. FullScreenTakeover + AdaptiveSplit(.stack): scene and XP bar beside the stages and live log;
     // stacked on compact with the log behind a button.
@@ -156,9 +157,10 @@
                             BlockButton("Log") { showLog = true }.keyboardShortcut("l", modifiers: .command)
                         } else {
                             BlockButton("Copy log") {
-                                UIPasteboard.general.string = store.launchLog.map {
+                                let raw = store.launchLog.map {
                                     "\($0.time) [\($0.tag)] \($0.text)"
                                 }.joined(separator: "\n")
+                                UIPasteboard.general.string = ReportBundle.redact(raw)
                             }
                         }
                         if store.launchRecovery == .reopen || (store.launchError != nil && gameStarted) {
