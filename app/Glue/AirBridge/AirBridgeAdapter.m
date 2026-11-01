@@ -408,6 +408,30 @@ static void CofreFinishSurface(UIWindow *window) {
   });
 }
 
+// Air refreshes the Microsoft token (24 h) only when its own launcher screen
+// loads, which Cofre never shows; without this the game starts with an expired
+// token (401 on skins, chat signing, Realms and servers). Air's callback: a
+// non-nil status with success is progress; nil status ends it. Offline, Air
+// keeps the old token and finishes with (nil, YES).
+static void CofreRefreshAccount(void (^then)(void)) {
+  BaseAuthenticator *account = BaseAuthenticator.current;
+  if (![account isKindOfClass:MicrosoftAuthenticator.class]) {
+    then();
+    return;
+  }
+  __block BOOL finished = NO;
+  [account refreshTokenWithCallback:^(id status, BOOL success) {
+    if (status && success) return;
+    dispatch_async(dispatch_get_main_queue(), ^{
+      if (finished) return;
+      finished = YES;
+      NSLog(@"[Cofre] account refresh ok=%d%@", status == nil && success,
+            status ? [NSString stringWithFormat:@" error=%@", [status description]] : @"");
+      then();
+    });
+  }];
+}
+
 // Air fills remoteVersionList from its own launcher screens, which Cofre never
 // shows; load it the same way once. Offline it stays empty and Air falls back
 // to local files.
@@ -1151,7 +1175,7 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
   }
   NSString *versionID = _profiles.selectedProfile[@"lastVersionId"];
   NSLog(@"[Cofre] launch profile=%@ version=%@", profile, versionID);
-  CofreLoadVersionList(^{
+  CofreRefreshAccount(^{ CofreLoadVersionList(^{
     NSDictionary *version =
         [remoteVersionList
             filteredArrayUsingPredicate:[NSPredicate
@@ -1208,7 +1232,7 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
       metadata[@"arguments"] = arguments;
       CofrePresentSurface(window, metadata);
     }];
-  });
+  }); });
 }
 // Swift owns the renderer decision; ObjC only applies the Air preference.
 - (BOOL)pickRendererForProfile:(NSString *)name metadata:(NSMutableDictionary *)metadata {
