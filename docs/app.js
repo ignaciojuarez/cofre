@@ -18,13 +18,13 @@ const HELP_PROMPT = `I'm setting up Cofre, a Minecraft: Java Edition launcher fo
 
 The steps, what the command does, and troubleshooting are here: ${LINKS.pairingGuide}
 
-Please read that page and tell me what to do next, one step at a time, in plain words. You can only explain; the command does the work. Never ask me for my pairing file or what's inside it.
+Please read that page and tell me what to do next, one step at a time, in plain words. You can only explain; the command does the work. Never ask me for my pairing file or what's inside it. Before I paste anything, I will remove email addresses, account IDs, server addresses, tokens, logs, and file paths.
 
 Here's what I see: `;
 
 const COPIED = {
   command: "Copied. Paste it into Terminal and press Return.",
-  help: "Copied. Paste it into ChatGPT or Claude, then add what you see.",
+  help: "Copied. Remove personal data, then paste it into ChatGPT or Claude.",
 };
 
 for (const a of document.querySelectorAll("[data-link]")) {

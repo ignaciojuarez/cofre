@@ -1,5 +1,6 @@
 #import "AirBridgeAdapter.h"
 #import "CofreConstants.h"
+#import "CofreOAuthConfig.h"
 #import "CofreGameInput.h"
 #import "DownloadTaskManager.h"
 #import "JavaLauncher.h"
@@ -1033,17 +1034,22 @@ static NSData *CofreDownloadInstaller(NSString *urlString, NSError **error) {
 - (void)signInMicrosoftWithProgress:(void (^)(NSString *))progress
                          completion:(void (^)(NSDictionary *_Nullable,
                                               NSError *_Nullable))completion {
+  NSString *clientID = @COFRE_MICROSOFT_CLIENT_ID;
+  if (clientID.length == 0) {
+    NSLog(@"[Cofre] Microsoft sign-in unavailable: client ID is not configured");
+    completion(nil, CofreAirError(@"Microsoft sign-in isn't configured for this build."));
+    return;
+  }
   // Same request as Air's account screen (AccountListViewController).
   NSURL *url = [NSURL
       URLWithString:
-          @"https://login.live.com/"
-          @"oauth20_authorize.srf?client_id=00000000402b5328&response_type="
-          @"code&scope=service%3A%3Auser.auth.xboxlive.com%3A%3AMBI_SSL&"
-          @"redirect_url=https%3A%2F%2Flogin.live.com%2Foauth20_desktop.srf"];
+          [NSString stringWithFormat:
+                       @"https://login.live.com/oauth20_authorize.srf?client_id=%@&response_type=code&scope=service%%3A%%3Auser.auth.xboxlive.com%%3A%%3AMBI_SSL&redirect_url=https%%3A%%2F%%2Flogin.live.com%%2Foauth20_desktop.srf",
+                       clientID]];
   __weak typeof(self) weakSelf = self;
   self.authSession = [[ASWebAuthenticationSession alloc]
             initWithURL:url
-      callbackURLScheme:@"ms-xal-00000000402b5328"
+      callbackURLScheme:[NSString stringWithFormat:@"ms-xal-%@", clientID]
       completionHandler:^(NSURL *callbackURL, NSError *error) {
         weakSelf.authSession = nil;
         NSString *code = nil;

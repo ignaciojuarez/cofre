@@ -68,7 +68,7 @@ Cofre keeps the key on your iPhone. It's never uploaded or logged.
 
 ### Ask ChatGPT or Claude
 
-The site has a **Stuck? Ask ChatGPT or Claude** button that copies this text. AI can only explain; the command does the work. **Never give it your pairing file.**
+The site has a **Stuck? Ask ChatGPT or Claude** button that copies this text. AI can only explain; the command does the work. **Never give it your pairing file.** Remove email addresses, account IDs, server addresses, tokens, logs, and file paths before pasting anything.
 
 ```text
 I'm setting up Cofre, a Minecraft: Java Edition launcher for iPhone. I'm stuck on Step 3: with my iPhone plugged into my Mac, I run one command in Terminal, and a Cofre window puts my pairing key into Cofre over the cable.

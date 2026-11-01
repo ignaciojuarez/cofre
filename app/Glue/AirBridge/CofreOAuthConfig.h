@@ -1,0 +1,3 @@
+#ifndef COFRE_MICROSOFT_CLIENT_ID
+#define COFRE_MICROSOFT_CLIENT_ID ""
+#endif

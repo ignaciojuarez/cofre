@@ -90,7 +90,7 @@ Guided Access, Single App Mode and Autonomous Single App Mode (ASAM): **don't us
 
 ```sh
 D=COFRE_DEVICE_UDID; B=com.ignacio.cofre
-AD="node <local-home>/.t3/tools/agent-device/0.21.31/node_modules/agent-device/dist/src/cli.js"
+AD="node $AGENT_DEVICE_CLI"
 export AGENT_DEVICE_IOS_TEAM_ID=… AGENT_DEVICE_IOS_RUNNER_APP_BUNDLE_ID=… AGENT_DEVICE_IOS_RUNNER_TEST_BUNDLE_ID=…
 
 # Health check (every loop)

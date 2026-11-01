@@ -10,7 +10,7 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 | B-009 | 2026-10-31 | Installed mods | Bountiful badge names Kotlin for Forge | S3 | fixed | bea1c8b |
 
 ### B-001 · Onboarding · iPad background filled without enlarging the moon
-- Date: 2026-10-30 · Device: iPad C51DB8A8… · Build: a85dfba
+- Date: 2026-10-30 · Device: iPad SIMULATOR_UDID… · Build: a85dfba
 - Steps: Open Cofre on an empty iPad container and wait for onboarding artwork.
 - Expected: The full background is painted and the moon remains at its designed size.
 - Actual: Before the fix, the background did not fill the iPad layout; the fix uses a fill layer without scaling the moon.
@@ -28,7 +28,7 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 - Retest: CurseForge path now creates the parent directory ✅ · Modrinth staging path unchanged and tests green ✅
 
 ### B-003 · Launcher UX · Simulator launcher pass shows clear first-run states; no blocking UX defect found
-- Date: 2026-10-30 · Devices: iPad C51DB8A8… and iPhone 4EC427DF… · Build: a5a2159
+- Date: 2026-10-30 · Devices: iPad SIMULATOR_UDID… and iPhone SIMULATOR_UDID… · Build: a5a2159
 - Steps: Launch with the retained empty simulator containers; inspect Play, Worlds, account banner, instance picker, JIT status, and compact layout.
 - Expected: A first-time player can tell what is unavailable and where to go next.
 - Actual: Account banner has a direct Accounts action; Worlds has an honest empty state; the iPhone and iPad layouts remain readable. No dead button or misleading FSR control observed (FSR removal is intentional).
@@ -41,7 +41,7 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 - The disposable simulator payload required retagging and ad-hoc signing; this is test infrastructure only and is not a release build.
 
 
-## Round 3 overnight test cases (2026-10-30 · iPad C51DB8A8… · simulator payload probe)
+## Round 3 overnight test cases (2026-10-30 · iPad SIMULATOR_UDID… · simulator payload probe)
 
 | Area | Test case | Result | Evidence |
 |---|---|---|---|
@@ -68,7 +68,7 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 | Lifecycle | Mid-download/mid-install kill, rotate, Split View | BLOCKED: no active long download; orientation controls unavailable through current agent session | — |
 
 ### B-004 · Instances · Edit menu has no visible effect on the already-selected instance
-- Date: 2026-10-30 · Device: iPad C51DB8A8… · Build: 9c564de
+- Date: 2026-10-30 · Device: iPad SIMULATOR_UDID… · Build: 9c564de
 - Steps: 1. Open Instances. 2. Open ⋯ for the selected instance. 3. Tap Edit twice.
 - Expected: An edit/rename surface opens, or the action is clearly disabled when already selected.
 - Actual: Menu closes and the same detail view remains with no edit affordance or feedback.
@@ -76,7 +76,7 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 - Severity: S3 · Status: handoff · Commit: —
 
 ### B-005 · Mods · Metal-incompatible Sodium installs without a confirmation
-- Date: 2026-10-30 · Device: iPad C51DB8A8… · Build: 9c564de
+- Date: 2026-10-30 · Device: iPad SIMULATOR_UDID… · Build: 9c564de
 - Steps: 1. Select Fabric 1.21.1. 2. Search Sodium. 3. Tap Get on the row labelled “Not supported · Metal · 1.21.1”.
 - Expected: A warning sheet explains the incompatibility and requires an explicit “Get anyway”.
 - Actual: Sodium downloads immediately; the row becomes Installed with no confirmation.
@@ -84,7 +84,7 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 - Severity: S2 · Status: handoff · Commit: —
 
 ### B-006 · Content · Data tab gives a generic search empty state
-- Date: 2026-10-30 · Device: iPad C51DB8A8… · Build: 9c564de
+- Date: 2026-10-30 · Device: iPad SIMULATOR_UDID… · Build: 9c564de
 - Steps: Open Mods → Data on an instance with no worlds.
 - Expected: Explain that data packs belong to a world and offer the world picker/import path.
 - Actual: “No results / Try another name.”
@@ -92,7 +92,7 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 - Severity: S3 · Status: handoff · Commit: —
 
 ### B-007 · Settings · Auto renderer still exposes FSR controls
-- Date: 2026-10-30 · Device: iPad C51DB8A8… · Build: 9c564de
+- Date: 2026-10-30 · Device: iPad SIMULATOR_UDID… · Build: 9c564de
 - Steps: Open Settings → Game with renderer Auto.
 - Expected: FSR row is hidden unless MobileGlues is selected.
 - Actual: Resolution slider and “FSR 1.0 upscale” segmented controls are visible under Auto.
@@ -100,7 +100,7 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 - Severity: S3 · Status: handoff · Commit: —
 
 ### B-008 · Servers · `cofre://join` falls back to clipboard warning
-- Date: 2026-10-30 · Device: iPad C51DB8A8… · Build: 9c564de
+- Date: 2026-10-30 · Device: iPad SIMULATOR_UDID… · Build: 9c564de
 - Steps: Open `cofre://join?server=example.com:25565` and accept the iOS “Open in Cofre?” prompt.
 - Expected: Add/open the server join flow for the supplied address.
 - Actual: Cofre shows “Copy a server address first.” and remains on the empty Servers view.
@@ -138,7 +138,7 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 | Area | Test case | Result | Evidence |
 |---|---|---|---|
 | Build | `scripts/sim.sh` HEAD build and install | PASS; `CofreBuild 95bf202`, installed on C51 | `/tmp/cofre-round5-build.log` |
-| Instances | B-004 ⋯ → Edit → rename emoji/60-char/duplicate | BLOCKED: C51 was held by session `t3-6333a8e35e03854c7b9c2a19`; fallback EF held by `t3-f28e9bedc5ff0ebd7a8f7615` | — |
+| Instances | B-004 ⋯ → Edit → rename emoji/60-char/duplicate | BLOCKED: C51 was held by session `session-id`; fallback EF held by `session-id` | — |
 | Mods | B-005 Fabric 1.21.1 Sodium/Iris renderer badge and Get anyway/Cancel | BLOCKED: both permitted iPads in use | — |
 | Content | B-006 Mods → Data world-owned explanation | BLOCKED: both permitted iPads in use | — |
 | Servers | B-008 valid and empty `cofre://join` links | BLOCKED: both permitted iPads in use | — |
@@ -155,7 +155,7 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 - No interactive screenshots or UX findings were produced because the shared-device ownership constraint prevented a valid session. No bug status was changed; B-004/B-005/B-006/B-008 remain handoff pending interactive retest.
 - No physical device was used, no credentials were read, and no files were changed outside this log.
 
-## Round 6 hands-on (2026-10-30 · HEAD ea522ee · iPad Pro 1 C51DB8A8…)
+## Round 6 hands-on (2026-10-30 · HEAD ea522ee · iPad Pro 1 SIMULATOR_UDID…)
 
 | Area | Test case | Result | Evidence |
 |---|---|---|---|
@@ -313,7 +313,7 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 
 | Step | Result | Evidence |
 |---|---|---|
-| Install `com.ignacio.cofre` (`scripts/run.sh local fast --device=00008110-…`) | PASS: `[Cofre] UI root installed`, `tunnel not allowed yet` | device `latestlog.txt` |
+| Install `com.ignacio.cofre` (`scripts/run.sh local fast --device=COFRE_DEVICE_UDID`) | PASS: `[Cofre] UI root installed`, `tunnel not allowed yet` | device `latestlog.txt` |
 | Pair with Llave CLI (`llave-pair pair --udid … --place`) | PASS after Ignacio tapped Trust: `paired → wifi_enabled → validated → placed` | event names only; pairing not printed |
 | agent-device runner | FIXED: "certificate not trusted" came from a stale runner install. `devicectl device uninstall app` both runner bundles, `open` again (first try races SpringBoard registration: "Unknown application display identifier"), then `snapshot` works | `~/.agent-device/sessions/cofre-ipad/runner.log` |
 | Play `(Default)` vanilla latest (26.3) | PASS: Play screen said "JIT ready · Auto at launch" before Play. VPN came up with no prompt, JIT ✓, game files downloaded, `renderer resolved -> libmetallum.dylib`, JIT mapping 0x143fac000, `Setting user`, `first-frame source=metal`, Mojang screen | `/tmp/cofre-device/s1.png`, `/tmp/cofre-device/s2.png` |
@@ -325,7 +325,7 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 - Build/log: pending simulator build and UI pass.
 
 ### B-009 · Installed mods · Bountiful missing dependency badge names Fabric API
-- Date: 2026-10-31 01:55 · Device: iPhone 18 Pro `4EC427DF…` · Build: c41c3f4 → bea1c8b · PreviewHost MockBackend
+- Date: 2026-10-31 01:55 · Device: iPhone 18 Pro `SIMULATOR_UDID…` · Build: c41c3f4 → bea1c8b · PreviewHost MockBackend
 - Steps: 1. Launch PreviewHost with `-screen installed`. 2. Inspect Bountiful row. 3. Relaunch the same screen and inspect again.
 - Expected: The Bountiful 8.0.0-beta.2 sample shows `Needs Kotlin for Forge · Get`.
 - Actual: Both runs showed `NEEDS FABRIC API` with a `Get` button.
@@ -334,7 +334,7 @@ How to test and what each field means: [TESTING.md](TESTING.md). Newest entries 
 - Retest: rebuilt PreviewHost and relaunched twice; AX now shows `NEEDS KOTLIN FOR FORGE` and `Get` ✅. iOS `CofreUITests` 145 tests / 1 skipped ✅
 - Follow-up evidence: `/tmp/cofre-test/shots/overnight-iphone-installed-kotlin-fixed.png`
 
-### iPhone overnight pass results (2026-10-31 · iPhone 18 Pro `4EC427DF…` · PreviewHost)
+### iPhone overnight pass results (2026-10-31 · iPhone 18 Pro `SIMULATOR_UDID…` · PreviewHost)
 | Area | Test | Result | Evidence |
 |---|---|---|---|
 | Mods | Scroll to end and repeat; inspect Filters sheet labels | PASS: next rows loaded without duplicates; sheet exposes Version, Loader, Side, Category, Sort with AX labels | `/tmp/cofre-test/shots/overnight-iphone-mods-initial.png`, `/tmp/cofre-test/shots/overnight-iphone-mod-filters.png` |
@@ -407,8 +407,8 @@ Bugs found: none. Fixes: none. No commit beyond this test log update.
 | 5 | NeoForge1211 | 1.21.1 NeoForge | Auto | Bountiful | BLOCKED: dependency/loader work exceeded active attempt; no title frame; app process terminated after timeout | no | — | setup log incomplete; no Cofre crash screen | `/tmp/cofre-scenarios/neoforge-1.21.1-bountiful-20261031-104234/` |
 | 6 | NeoForge1211-RenderScale | 1.21.1 NeoForge | MobileGlues | RenderScale (Va8PJBFX intent) | BLOCKED: instance and loader setup completed; Play attempted; VPN JIT enable failed | no | — | `The VPN extension didn't enable JIT.` | `/tmp/cofre-scenarios/neoforge-1.21.1-renderscale-20261031-104206/latestlog.txt` |
 | 7 | Modrinth pack | small pack flows | configured | pack contents | BLOCKED: pack flow attempted; Fabulously Optimized failed installing Fabric (`Fabric didn't install, so the pack wasn't kept`); small NeoForge reached Play then VPN JIT failed | no | — | exact scenario details in logs | `/tmp/cofre-scenarios/pack-fabulously-optimized-20261031-103918/latestlog.txt`, `/tmp/cofre-scenarios/pack-small-neoforge-20261031-103907/latestlog.txt` |
-| 8 | Default | 26.3 Vanilla | Metal | none | BLOCKED: runner could not connect (`Runner did not accept connection (xcodebuild exited early)`); no UI tap possible | — | — | runner failure | `<local-home>/.agent-device/sessions/cofre-ipad/runner.log`, `/tmp/cofre-device/day2-2026-10-31/current.png` |
-| 9 | Launcher flows | — | — | Mods/search/gallery/downloads | BLOCKED: same agent-device runner failure prevented interaction; no duplicate/navigation claim | — | — | runner failure | `<local-home>/.agent-device/sessions/cofre-ipad/runner.log` |
+| 8 | Default | 26.3 Vanilla | Metal | none | BLOCKED: runner could not connect (`Runner did not accept connection (xcodebuild exited early)`); no UI tap possible | — | — | runner failure | `$AGENT_DEVICE_HOME/sessions/cofre-ipad/runner.log`, `/tmp/cofre-device/day2-2026-10-31/current.png` |
+| 9 | Launcher flows | — | — | Mods/search/gallery/downloads | BLOCKED: same agent-device runner failure prevented interaction; no duplicate/navigation claim | — | — | runner failure | `$AGENT_DEVICE_HOME/sessions/cofre-ipad/runner.log` |
 
 Bugs: none confirmed as clear Cofre app-layer defects. The repeated JIT failure is device/VPN infrastructure; pack Fabric installation failure and NeoForge dependency timeout require separate investigation.
 Fixes: none.

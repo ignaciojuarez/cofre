@@ -1,1 +1,1 @@
-TEST ONLY. This keypair signs the example cards in this folder. It is public, so never trust it for real servers.
+TEST ONLY. The public key is included so the example envelopes can be inspected. The private key is generated locally with `cd tools/server-card && swift run server-card keygen plan/server-join/examples/signed/test-keypair`; never trust this fixture for real servers.

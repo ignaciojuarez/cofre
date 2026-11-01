@@ -82,6 +82,11 @@ if (( BUILD )); then
   fi
   rm -rf "$AIR/Natives/CofreGlue" && mkdir -p "$AIR/Natives/CofreGlue"
   cp "$ROOT"/app/Glue/CofreConstants.h "$ROOT"/app/Glue/AirBridge/*.[hm] "$AIR/Natives/CofreGlue/"
+  if [[ -n "${COFRE_MICROSOFT_CLIENT_ID:-}" ]]; then
+    [[ "$COFRE_MICROSOFT_CLIENT_ID" =~ ^[A-Za-z0-9._-]+$ ]] || bt_die "invalid COFRE_MICROSOFT_CLIENT_ID"
+    printf '#ifndef COFRE_MICROSOFT_CLIENT_ID\n#define COFRE_MICROSOFT_CLIENT_ID "%s"\n#endif\n' \
+      "$COFRE_MICROSOFT_CLIENT_ID" > "$AIR/Natives/CofreGlue/CofreOAuthConfig.h"
+  fi
   rm -rf "$ROOT/artifacts/Payload/PlugIns" "$ROOT/artifacts/Payload/Cofre.app/PlugIns" 2>/dev/null || true
   cp -R "$ROOT"/app/Resources/AppIcon/*.appiconset "$AIR/Natives/Assets.xcassets/"
   (cd -P "$AIR" && eval "gmake -j4 dsym package PLATFORM=2 BOOTJDK=\"$BOOTJDK\" JOBS=4 $MAKE_ARGS")

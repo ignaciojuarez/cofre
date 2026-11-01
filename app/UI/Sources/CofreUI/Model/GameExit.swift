@@ -15,7 +15,7 @@ public struct GameExitReport: Hashable, Sendable {
     public var clue: String?
     /// "Survival+ · Fabric 1.21.1".
     public var instance: String?
-    /// Files for Share log: latestlog.txt, then the crash report when there is one.
+    /// Source files used to build the redacted report bundle.
     public var files: [URL]
     /// Last lines of the log, for Details.
     public var logTail: [String]

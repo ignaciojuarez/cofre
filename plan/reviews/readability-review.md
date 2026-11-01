@@ -8,7 +8,7 @@ Overlaps with `logic-review.md` are noted, not repeated.
 | Check | Result |
 |---|---|
 | `swift test` in `app/CofreKit/ServerJoin` | ✅ 27 tests, 0 failures |
-| CofreUI `xcodebuild test` on shared sim `0A1B03AF…` (reused, not erased) | ✅ 28 of 28 passed |
+| CofreUI `xcodebuild test` on shared sim `SIMULATOR_UDID…` (reused, not erased) | ✅ 28 of 28 passed |
 | `cargo test --offline` in `tools/llave/core` | ✅ 1 test |
 | `node tests/jit/txm.test.js` | ✅ |
 | `python3 plan/server-join/validate_examples.py` | ✅ valid pass, malicious fail |

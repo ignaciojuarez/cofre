@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd -P "$(dirname "$0")/.." && pwd)"
-UDID="${1:-SIMULATOR_UDID}"
+UDID="${1:-${COFRE_SIM_UDID:-}}"
+[[ -n "$UDID" ]] || { echo "usage: scripts/sim.sh SIMULATOR_UDID (or set COFRE_SIM_UDID)" >&2; exit 2; }
 SHA="$(git -C "$ROOT" rev-parse --short HEAD)"
 OUT="${COFRE_SIM_OUT:-${TMPDIR:-/tmp}/cofre-sim-${SHA}-$$}"
 APP="$OUT/Cofre.app"

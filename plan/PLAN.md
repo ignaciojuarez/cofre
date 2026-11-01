@@ -92,7 +92,7 @@ Ignacio ──private install link (Sqim, or GitHub Release + itms-services mani
 | Expires after 1 year | Expiry banner, a calendar reminder, reinstall over the old app | ✅ |
 | Memory (increased-memory-limit, extended-VA) | Already in the paid profile. Older 4–6 GB iPhones use Auto RAM, keep packs to about 150 mods or fewer, use resolution 50–70% | ✅ profile |
 | iOS 27 | TXM on every device except iPad8,11/12, so the debugger protocol is mandatory. Apple could patch it in any update | ✅ `ProcessInfo+TXM.swift` |
-| Microsoft login | Air uses `00000000402b5328` (believed to be the official launcher's ID; reuse is against MS terms). Our own Azure app needs Mojang's allowlist ([form](https://aka.ms/mce-reviewappid), ~1–2 weeks) | ❓ decide |
+| Microsoft login | Configure a Cofre-owned client ID through `COFRE_MICROSOFT_CLIENT_ID` in the local build config, then request Mojang's allowlist ([form](https://aka.ms/mce-reviewappid), ~1–2 weeks) | ⚠️ required before public release |
 | Minecraft EULA | Never bundle game files (Air downloads them from Mojang). Require Microsoft accounts that own the game, and hide offline/demo accounts | ❓ decide |
 | Licenses | Air GPL-3.0 + StikJIT MPL-2.0 (compatible) + idevice. **Don't copy StikDebug's AGPL code.** Write our own tunnel because StosVPN's license forbids rebranding. Give friends the source (a public fork plus a link in About) | ✅ |
 | CurseForge key | Never embed one. Each user pastes their own key (stored in Keychain). Modrinth is the default (official, has hashes). The keyless mcimirror.top fallback is a third party, so make it opt-in and keep "Verify files" on | ❓ decide |
@@ -108,7 +108,7 @@ Ignacio ──private install link (Sqim, or GitHub Release + itms-services mani
 
 1. **One app or two first?** Ship the proven 2-app version (Cobble + StikDebug) now, or wait for S1 to pass for the single app?
 2. **Apple team:** use the main team, or a separate $99 team so a ban can't touch your other apps?
-3. **Microsoft login:** reuse Air's client ID now, or register our own Azure app (1–2 weeks of waiting)?
+3. **Microsoft login:** register Cofre's own Azure app and request Mojang approval before enabling public sign-in.
 4. **Accounts:** Microsoft only (needs owning the game), or keep offline accounts?
 5. **CurseForge:** each person's own key / Modrinth only / allow the mirror?
 6. **IPA:** full (254 MB, every Java version) or slim with Java downloaded on demand?

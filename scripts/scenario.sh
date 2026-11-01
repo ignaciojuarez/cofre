@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 scenario=${1:?usage: scripts/scenario.sh scenario.json [--device UDID] [--timeout seconds]}
-device=COFRE_DEVICE_UDID; timeout=900
+device=${COFRE_DEVICE_UDID:-}; timeout=900
 shift
 while (($#)); do case "$1" in --device) device=$2; shift 2;; --timeout) timeout=$2; shift 2;; *) echo "unknown option: $1" >&2; exit 2;; esac; done
+[[ -n "$device" ]] || { echo "missing device; pass --device UDID or set COFRE_DEVICE_UDID" >&2; exit 2; }
 [[ -f "$scenario" ]] || { echo "missing scenario: $scenario" >&2; exit 2; }
 name=$(basename "$scenario" .json); stamp=$(date +%Y%m%d-%H%M%S); out="/tmp/cofre-scenarios/$name-$stamp"; mkdir -p "$out"
 bundle=com.ignacio.cofre; file=$(basename "$scenario")

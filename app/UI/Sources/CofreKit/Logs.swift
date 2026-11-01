@@ -70,8 +70,19 @@ public struct ReportBundle: Sendable {
         var files: [(String, Data)] = []
         let logs = LogFile.allCases.flatMap(store.read).map(\.text).joined(separator: "\n")
         let signature = Self.signature(logs + (context.clue ?? ""))
-        var json: [String: Any] = ["appVersion": context.appVersion as Any, "build": context.build as Any, "device": context.device as Any, "ios": context.iOS as Any, "exitReason": context.exitReason as Any, "clue": context.clue as Any, "crashSignature": signature]
-        if let i = context.instance { json["instance"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(i)) }
+        var json: [String: Any] = [
+            "appVersion": context.appVersion.map(Self.redact) as Any,
+            "build": context.build.map(Self.redact) as Any,
+            "device": context.device.map(Self.redact) as Any,
+            "ios": context.iOS.map(Self.redact) as Any,
+            "exitReason": context.exitReason.map(Self.redact) as Any,
+            "clue": context.clue.map(Self.redact) as Any,
+            "crashSignature": signature,
+        ]
+        if let i = context.instance {
+            let raw = try JSONSerialization.jsonObject(with: JSONEncoder().encode(i))
+            json["instance"] = Self.redactJSON(raw)
+        }
         let clean = json.compactMapValues { $0 is NSNull ? nil : $0 }
         files.append(("report.json", try JSONSerialization.data(withJSONObject: clean, options: [.sortedKeys, .prettyPrinted])))
         files.append(("logs.txt", Data(Self.redact(logs).utf8)))
@@ -83,10 +94,19 @@ public struct ReportBundle: Sendable {
     public static func redact(_ value: String) -> String {
         var s = value.replacingOccurrences(of: "(?i)(token|access_token|refresh_token)\\s*[=:]\\s*[^\\s,;]+", with: "$1=<redacted>", options: .regularExpression)
         s = s.replacingOccurrences(of: "(?i)[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}", with: "<redacted-email>", options: .regularExpression)
-        s = s.replacingOccurrences(of: "(?<![A-Za-z0-9])[0-9a-f]{8}-[0-9a-f-]{27,}(?![A-Za-z0-9])", with: "<redacted-uuid>", options: .regularExpression)
+        s = s.replacingOccurrences(of: "(?i)(?<![A-Za-z0-9])[0-9a-f]{8}-[0-9a-f-]{27,}(?![A-Za-z0-9])", with: "<redacted-uuid>", options: .regularExpression)
+        s = s.replacingOccurrences(of: "(?<![A-Za-z0-9])[0-9A-Fa-f]{24,40}(?![A-Za-z0-9])", with: "<redacted-device-id>", options: .regularExpression)
         s = s.replacingOccurrences(of: "(?<![\\d.])(?:\\d{1,3}\\.){3}\\d{1,3}(?::\\d+)?", with: "<redacted-address>", options: .regularExpression)
+        s = s.replacingOccurrences(of: "(?<![:A-Za-z0-9])/(?:Users|private/var|var/mobile|tmp|Volumes|home)/[^\\s,;\\\"]+", with: "<redacted-path>", options: .regularExpression)
+        s = s.replacingOccurrences(of: "(?i)(?<![A-Za-z0-9-])(?:[A-Za-z0-9-]+\\.)+(?:com|net|org|io|gg|dev|co|me|xyz|sh|ly|app|cloud|pro|eu|us|ca|uk)(?::\\d+)?(?![A-Za-z0-9-])", with: "<redacted-host>", options: .regularExpression)
         s = s.replacingOccurrences(of: "(?i)\\b(xuid|player(name)?|username)\\s*[=:]\\s*[^\\s,;]+", with: "player=player", options: .regularExpression)
         return s
+    }
+    private static func redactJSON(_ value: Any) -> Any {
+        if let string = value as? String { return redact(string) }
+        if let array = value as? [Any] { return array.map(redactJSON) }
+        if let object = value as? [String: Any] { return object.mapValues(redactJSON) }
+        return value
     }
     public static func signature(_ text: String) -> String { SHA256.hex(Data(redact(text).utf8)) }
 }

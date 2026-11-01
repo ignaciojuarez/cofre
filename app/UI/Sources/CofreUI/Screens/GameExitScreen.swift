@@ -1,10 +1,11 @@
 #if canImport(UIKit)
     import SwiftUI
+    import CofreKit
     import UIKit
     import UserNotifications
 
     // G01 Game stopped: Cofre's screen when Minecraft exits mid-game, in place of Air's crash screen. A card over the
-    // lake: what happened, one next step, Close Cofre. Share log and Details (with Copy) come after. Side by
+    // lake: what happened, one next step, Close Cofre. Share report and Details (with Copy) come after. Side by
     // side in iPhone landscape (where the game runs), stacked in portrait and on iPad.
 
     /// Java can't start twice in one process, and iOS has no relaunch (Air's Restart only exits), so closing goes to
@@ -207,7 +208,7 @@
                 if reportURL != nil {
                     BlockButton("Share report", icon: .paper) { showReportShare = true }
                 } else {
-                    ShareLink(items: report.files) { Text("Share log") }.buttonStyle(.block()).disabled(report.files.isEmpty)
+                    Text("Report unavailable").cofreFont(.caption).foregroundStyle(Color.cofre.muted)
                 }
                 BlockButton("Details") { showDetails = true }
             }
@@ -232,7 +233,7 @@
             VStack(alignment: .leading, spacing: 10) {
                 SheetHeader("Details") {
                     BlockButton(copied ? "Copied" : "Copy", size: .small, fullWidth: false) {
-                        UIPasteboard.general.string = report.detailsText
+                        UIPasteboard.general.string = ReportBundle.redact(report.detailsText)
                         copied = true
                         Task {
                             try? await Task.sleep(for: .seconds(2))
