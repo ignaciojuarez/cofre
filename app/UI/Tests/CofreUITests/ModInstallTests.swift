@@ -405,6 +405,12 @@
             XCTAssertEqual(s.installState(row(s, "sodium")), .notInstalled)
         }
 
+        func testInstalledRemovalOffersMockExclusiveDependencies() async {
+            let (s, mock) = await store()
+            let create = try! XCTUnwrap(mock.mods.first { $0.id == "create" })
+            XCTAssertEqual(s.removalOptions(for: create).map(\.name), ["GlitchCore", "TerraBlender"])
+        }
+
         func testUpdateInstallsTheOfferedBuild() async {
             let (s, mock) = await store()
             let i = mock.mods.firstIndex { $0.id == "lithium" }!

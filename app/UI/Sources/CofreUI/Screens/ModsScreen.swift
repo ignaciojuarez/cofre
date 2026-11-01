@@ -132,15 +132,14 @@
                                 endEditing()
                                 nav.mod = .project(p.id)
                             } label: {
-                                Row(p.title, subtitle: "\(p.summary) · \(Fmt.count(p.downloads))", isSelected: selected)
-                                {
-                                    ProjectIcon(project: p, size: 40)
-                                } trailing: {
-                                    HStack(spacing: 5) {
-                                        if !p.fits { Badge("Other version", tone: .warn) }
-                                        if let issue = store.compatibilityIssue(id: p.id, name: p.title, kind: store.query.kind) { Badge(issue.badge, tone: .warn) }
-                                        GetButton(project: p) { endEditing() }
-                                    }
+                                ModRow(
+                                    title: p.title, subtitle: "\(p.summary) · \(Fmt.count(p.downloads))",
+                                    icon: .remote(p.iconURL, tint: p.iconTintHex), isSelected: selected,
+                                    badges: (p.fits ? [] : [ModBadge("Other version", tone: .warn)])
+                                        + (store.compatibilityIssue(id: p.id, name: p.title, kind: store.query.kind)
+                                            .map { [ModBadge($0.badge, tone: .warn)] } ?? [])
+                                ) {
+                                    GetButton(project: p) { endEditing() }
                                 }
                             }
                             .buttonStyle(RowButtonStyle())
@@ -293,24 +292,84 @@
         }
     }
 
-    /// The project's own icon, drawn blocky. The tinted ore stands in while it loads, or when there's no icon.
-    struct ProjectIcon: View {
-        let project: ProjectSummary, size: CGFloat
+    enum ModIconSource {
+        case remote(URL?, tint: UInt32? = nil)
+        case local(Data, key: String)
+        case placeholder(UInt32? = nil)
+    }
+
+    struct ModBadge: Identifiable {
+        let id = UUID()
+        let title: String, tone: Tone
+        init(_ title: String, tone: Tone) { self.title = title; self.tone = tone }
+    }
+
+    /// One mod row for search and Installed. The trailing control is supplied by the caller so the row keeps one
+    /// visual voice while its action remains a page push or an isolated on/off switch.
+    struct ModRow<Trailing: View>: View {
+        let title: String, subtitle: String, icon: ModIconSource, isSelected: Bool, badges: [ModBadge]
+        let trailing: Trailing
+        init(
+            title: String, subtitle: String, icon: ModIconSource, isSelected: Bool = false, badges: [ModBadge] = [],
+            @ViewBuilder trailing: () -> Trailing
+        ) {
+            self.title = title; self.subtitle = subtitle; self.icon = icon; self.isSelected = isSelected
+            self.badges = badges; self.trailing = trailing()
+        }
+        var body: some View {
+            Row(title, isSelected: isSelected, subtitleView: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: subtitle).cofreFont(.caption).foregroundStyle(Color.cofre.muted).lineLimit(1)
+                    if !badges.isEmpty {
+                        HStack(spacing: 4) { ForEach(badges) { Badge($0.title, tone: $0.tone) } }
+                    }
+                }
+            }, leading: { ModIcon(source: icon, size: 40) }, trailing: { trailing })
+        }
+    }
+
+    struct ModIcon: View {
+        let source: ModIconSource, size: CGFloat
         var body: some View {
             Group {
-                if let url = project.iconURL {
-                    RemoteImage(url: url, maxPoints: size, contentMode: .fill, pixelated: true) { placeholder }
-                } else {
-                    placeholder
+                switch source {
+                case .remote(let url, let tint):
+                    if let url { RemoteImage(url: url, maxPoints: size, contentMode: .fill, pixelated: true) { placeholder(tint) } }
+                    else { placeholder(tint) }
+                case .local(let data, let key): LocalModImage(data: data, key: key, size: size) { placeholder(nil) }
+                case .placeholder(let tint): placeholder(tint)
                 }
             }
-            .frame(width: size, height: size)
-            .clipped()
+            .frame(width: size, height: size).clipped()
             .overlay { Rectangle().strokeBorder(Color.cofre.outline, lineWidth: 2) }
             .accessibilityHidden(true)
         }
-        private var placeholder: some View {
-            PixelIcon(.ore, size: size, tint: project.iconTintHex.map { Color(uiColor: UIColor(hex: $0)) })
+        private func placeholder(_ tint: UInt32?) -> some View {
+            PixelIcon(.ore, size: size, tint: tint.map { Color(uiColor: UIColor(hex: $0)) })
+        }
+    }
+
+    /// Compatibility wrapper for project pages and install sheets.
+    struct ProjectIcon: View {
+        let project: ProjectSummary, size: CGFloat
+        var body: some View {
+            ModIcon(source: .remote(project.iconURL, tint: project.iconTintHex), size: size)
+        }
+    }
+
+    private struct LocalModImage<Placeholder: View>: View {
+        let data: Data, key: String, size: CGFloat
+        @ViewBuilder let placeholder: () -> Placeholder
+        @Environment(\.displayScale) private var scale
+        @State private var image: UIImage?
+        var body: some View {
+            Group {
+                if let image { Image(uiImage: image).interpolation(.none).resizable().aspectRatio(contentMode: .fill) }
+                else { placeholder() }
+            }
+            .task(id: key) {
+                image = await ImagePipeline.shared.image(data, key: key, maxPixels: Int((size * scale).rounded(.up)))
+            }
         }
     }
 
@@ -323,6 +382,8 @@
         @State private var kind = ContentKind.mods
         @State private var filter = ""
         @State private var updating = false
+        @State private var removal: ModRemovalRequest?
+        @State private var localDetails: InstalledItem?
         public init() {}
 
         public var body: some View {
@@ -367,8 +428,8 @@
                 } else {
                     BlockList {
                         ForEach(items) { item in
-                            InstalledRows(items: [item])
-                                .swipeActions { Button("Delete", role: .destructive) { store.deleteItem(item) } }
+                            InstalledRows(items: [item], onRemove: requestRemoval, onOpenLocal: { localDetails = $0 })
+                                .swipeActions { Button("Delete", role: .destructive) { requestRemoval(item) } }
                                 .blockListRow(horizontal: width == .compact ? 16 : 20)
                         }
                     }
@@ -380,6 +441,96 @@
                 }
             }
             .task(id: "\(kind)-\(store.modsInstance?.id ?? "")") { await store.loadInstalled(kind) }
+            .blockSheet(item: $removal, hugsContent: true) { request in
+                ModRemovalSheet(request: request).environment(store)
+            }
+            .blockSheet(item: $localDetails, hugsContent: true) { item in
+                InstalledDetailsSheet(item: item)
+            }
+        }
+
+        private func requestRemoval(_ item: InstalledItem) {
+            let options = store.removalOptions(for: item)
+            if options.isEmpty { store.deleteItem(item) }
+            else { removal = ModRemovalRequest(item: item, options: options) }
+        }
+    }
+
+    struct ModRemovalRequest: Identifiable {
+        let id = UUID()
+        let item: InstalledItem
+        let options: [InstalledItem]
+    }
+
+    struct ModRemovalSheet: View {
+        let request: ModRemovalRequest
+        @Environment(CofreStore.self) private var store
+        @Environment(\.dismiss) private var dismiss
+        @State private var selected: Set<String>
+
+        init(request: ModRemovalRequest) {
+            self.request = request
+            _selected = State(initialValue: Set(request.options.map(\.id)))
+        }
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 12) {
+                SheetHeader("Remove \(request.item.name)?")
+                Text("Also remove \(request.options.count) mods only \(request.item.name) used? · \(request.options.map(\.name).joined(separator: ", "))")
+                    .cofreFont(.secondary).foregroundStyle(Color.cofre.muted)
+                VStack(spacing: 4) {
+                    ForEach(request.options) { item in
+                        Button {
+                            if selected.contains(item.id) { selected.remove(item.id) } else { selected.insert(item.id) }
+                        } label: {
+                            HStack(spacing: 10) {
+                                if selected.contains(item.id) { PixelIcon(.check, size: 18) }
+                                else { Rectangle().strokeBorder(Color.cofre.muted, lineWidth: 2).frame(width: 16, height: 16) }
+                                Text(verbatim: item.name).cofreFont(.rowTitle).foregroundStyle(Color.cofre.ink)
+                                Spacer()
+                            }
+                            .padding(10).contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(Text(item.name))
+                        .accessibilityValue(Text(selected.contains(item.id) ? "Selected" : "Not selected"))
+                    }
+                }
+                HStack(spacing: 8) {
+                    BlockButton("Keep them") { dismiss() }
+                    BlockButton("Remove", role: .destructive) {
+                        let chosen = store.removalItems(for: request.item, selectedIDs: selected)
+                        store.deleteItems([request.item] + chosen)
+                        dismiss()
+                    }
+                }
+            }
+            .padding(.horizontal, 16).padding(.bottom, 16)
+        }
+    }
+
+    struct InstalledDetailsSheet: View {
+        let item: InstalledItem
+        @Environment(\.dismiss) private var dismiss
+        var body: some View {
+            VStack(alignment: .leading, spacing: 10) {
+                SheetHeader("Mod details")
+                ListSection("Details", spacing: 4) {
+                    Row("Name", trailing: { Text(verbatim: item.name).cofreFont(.label) })
+                    Row("Version", trailing: { Text(verbatim: VersionLabel.clean(item.version)).cofreFont(.label) })
+                    Row("File", trailing: { Text(verbatim: item.id).cofreFont(.code).lineLimit(1) })
+                    if let loader = item.loader { Row("Loader", trailing: { Text(verbatim: loader).cofreFont(.label) }) }
+                    if let modID = item.modID { Row("Mod ID", trailing: { Text(verbatim: modID).cofreFont(.code) }) }
+                    let dependencies = item.dependencies.map(\.name) + item.needs.map(\.name)
+                    if !dependencies.isEmpty {
+                        Row("Needs", trailing: {
+                            Text(verbatim: Array(Set(dependencies)).sorted().joined(separator: ", ")).cofreFont(.label)
+                        })
+                    }
+                }
+                BlockButton("Done", role: .primary) { dismiss() }
+            }
+            .padding(.horizontal, 16).padding(.bottom, 16)
         }
     }
 

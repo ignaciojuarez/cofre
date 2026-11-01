@@ -266,10 +266,26 @@
         public var versionID: String?
         /// The build `updateTo` names. Never less stable than the installed one (`VersionChannel.allowsUpdate`).
         public var updateVersionID: String?
+        /// The project icon, when the installed file was identified, or the image embedded in its jar.
+        public var iconURL: URL?
+        public var iconPNG: Data?
+        /// Path/size/mtime key for the jar icon cache, useful to avoid decoding stale bytes in a preview host.
+        public var iconCacheKey: String?
+        public var projectSource: ProjectSource?
+        /// Loader and mod ID are filled from the instance and jar metadata for local details and dependency edges.
+        public var loader: String?
+        public var modID: String?
+        public var dependencies: [ModDependency]
+        /// Older files and files copied in by hand are direct installs by default. Only recorded dependencies can be
+        /// offered for cleanup.
+        public var installedDirectly: Bool
+        public var protectedFromRemoval: Bool
         public init(
             id: String, name: String, version: String, enabled: Bool, kind: ContentKind = .mods,
             updateTo: String? = nil, issue: String? = nil, projectID: String? = nil, versionID: String? = nil,
-            updateVersionID: String? = nil
+            updateVersionID: String? = nil, iconURL: URL? = nil, iconPNG: Data? = nil, iconCacheKey: String? = nil,
+            projectSource: ProjectSource? = nil, loader: String? = nil, modID: String? = nil,
+            dependencies: [ModDependency] = [], installedDirectly: Bool = true, protectedFromRemoval: Bool = false
         ) {
             self.id = id
             self.name = name
@@ -283,6 +299,15 @@
             self.projectID = projectID
             self.versionID = versionID
             self.updateVersionID = updateVersionID
+            self.iconURL = iconURL
+            self.iconPNG = iconPNG
+            self.iconCacheKey = iconCacheKey
+            self.projectSource = projectSource
+            self.loader = loader
+            self.modID = modID
+            self.dependencies = dependencies
+            self.installedDirectly = installedDirectly
+            self.protectedFromRemoval = protectedFromRemoval
         }
 
         /// The same project as a search row: its project ID, else the same name (files Cofre couldn't identify, or

@@ -69,36 +69,72 @@
     /// Installed content rows with a switch (M04, instance detail).
     struct InstalledRows: View {
         let items: [InstalledItem]
+        var onRemove: (InstalledItem) -> Void = { _ in }
+        var onOpenLocal: (InstalledItem) -> Void = { _ in }
         @Environment(CofreStore.self) private var store
+        @Environment(NavModel.self) private var nav
         var body: some View {
             ForEach(items) { item in
                 VStack(spacing: 6) {
-                    // Every kind turns on and off by its file; which pack is in use stays the game's choice.
-                    Toggle(isOn: Binding(get: { item.enabled }, set: { store.setEnabled($0, item: item) })) { row(item) }
+                    ZStack(alignment: .trailing) {
+                        Button { open(item) } label: {
+                            // Reserve the switch's slot in the shared row. The real Toggle is a sibling so its
+                            // block control is independent from the row button.
+                            ModRow(
+                                title: item.name, subtitle: subtitle(item), icon: icon(item),
+                                isSelected: nav.mod == .project(item.projectID ?? ""), badges: badges(item)
+                            ) { Color.clear.frame(width: 44, height: 44) }
+                        }
+                        .buttonStyle(RowButtonStyle())
+                        Toggle(isOn: Binding(get: { item.enabled }, set: { store.setEnabled($0, item: item) })) {
+                            EmptyView()
+                        }
                         .toggleStyle(.block)
+                        .frame(width: 44, height: 44)
+                        .padding(.trailing, 11)
+                        .accessibilityLabel(Text("\(item.name), \(item.enabled ? "on" : "off")"))
+                    }
                     // Outside the toggle: its whole row is one button.
                     if item.enabled, let need = item.needs.first { needs(need) }
                 }
-                .padding(.horizontal, 11).padding(.vertical, 6).frame(minHeight: 44).block(.panel).blockHover()
                 .opacity(item.enabled ? 1 : 0.6)
                 .contextMenu {
                     Button(item.enabled ? "Turn off" : "Turn on") { store.setEnabled(!item.enabled, item: item) }
-                    Button("Delete", role: .destructive) { store.deleteItem(item) }
+                    if item.updateTo != nil {
+                        Button("Update") {
+                            store.ensureProjectSummary(for: item)
+                            if let project = store.projectSummary(for: item) { store.update(project) }
+                        }
+                    }
+                    Button("Delete", role: .destructive) { onRemove(item) }
                 }
             }
         }
-        @ViewBuilder private func row(_ item: InstalledItem) -> some View {
-            HStack(spacing: 8) {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(verbatim: item.name).cofreFont(.rowTitle).foregroundStyle(Color.cofre.ink).lineLimit(1)
-                    if let issue = store.compatibilityIssue(for: item) { Badge(issue.badge, tone: .warn) }
-                    Text(verbatim: detail(item))
-                        .cofreFont(.caption).foregroundStyle(Color.cofre.muted).lineLimit(1)
-                }
-                Spacer(minLength: 4)
-                if item.updateTo != nil { Badge("Update", tone: .warn) }
-                if item.kind != .mods && item.inUse { Badge("In use", tone: .success) }
+        private func open(_ item: InstalledItem) {
+            guard item.kind == .mods else { return }
+            if let id = item.projectID {
+                store.ensureProjectSummary(for: item)
+                nav.mod = .project(id)
+            } else {
+                onOpenLocal(item)
             }
+        }
+        private func icon(_ item: InstalledItem) -> ModIconSource {
+            if let url = item.iconURL { return .remote(url) }
+            if let data = item.iconPNG { return .local(data, key: item.iconCacheKey ?? item.id) }
+            return .placeholder()
+        }
+        private func subtitle(_ item: InstalledItem) -> String {
+            guard item.enabled else { return String(localized: "Off") }
+            let version = VersionLabel.clean(item.version)
+            return [version, item.loader].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
+        }
+        private func badges(_ item: InstalledItem) -> [ModBadge] {
+            var out: [ModBadge] = []
+            if let issue = store.compatibilityIssue(for: item) { out.append(ModBadge(issue.badge, tone: .warn)) }
+            if item.updateTo != nil { out.append(ModBadge("Update", tone: .warn)) }
+            if item.kind != .mods && item.inUse { out.append(ModBadge("In use", tone: .success)) }
+            return out
         }
         /// "Needs Kotlin for Forge · Get": the jar declares it, Modrinth didn't, and the game won't load without it.
         private func needs(_ need: ProjectDependency) -> some View {
@@ -109,14 +145,6 @@
                     "Get", role: .primary, size: .small, fullWidth: false,
                     isLoading: store.modInstalls[need.id].map { !$0.isFinished } ?? false
                 ) { store.get(need.id, kind: .mods) }
-            }
-        }
-        private func detail(_ item: InstalledItem) -> String {
-            if !item.enabled { return String(localized: "Off") }
-            switch item.kind {
-            case .mods: return VersionLabel.clean(item.version)
-            case .dataPacks: return item.world ?? ""
-            default: return item.inUse ? String(localized: "Change in game") : String(localized: "Pick it in game")
             }
         }
     }

@@ -9,6 +9,7 @@
     @MainActor final class ImagePipeline {
         static let shared = ImagePipeline()
         private let cache = NSCache<NSString, UIImage>()
+        private let localCache = NSCache<NSString, UIImage>()
         private var running: [NSString: Task<UIImage?, Never>] = [:]
         private let session: URLSession = {
             let config = URLSessionConfiguration.default
@@ -17,7 +18,10 @@
             return URLSession(configuration: config)
         }()
 
-        private init() { cache.totalCostLimit = 96 << 20 }
+        private init() {
+            cache.totalCostLimit = 96 << 20
+            localCache.totalCostLimit = 32 << 20
+        }
 
         func cached(_ url: URL, maxPixels: Int) -> UIImage? { cache.object(forKey: key(url, maxPixels)) }
 
@@ -36,6 +40,16 @@
             running[key] = nil
             if let image, let cg = image.cgImage {
                 cache.setObject(image, forKey: key, cost: cg.bytesPerRow * cg.height)
+            }
+            return image
+        }
+
+        func image(_ data: Data, key: String, maxPixels: Int) async -> UIImage? {
+            let cacheKey = "local|\(maxPixels)|\(key)" as NSString
+            if let hit = localCache.object(forKey: cacheKey) { return hit }
+            let image = await Task.detached(priority: .userInitiated) { Self.decode(data, maxPixels: maxPixels) }.value
+            if let image, let cg = image.cgImage {
+                localCache.setObject(image, forKey: cacheKey, cost: cg.bytesPerRow * cg.height)
             }
             return image
         }

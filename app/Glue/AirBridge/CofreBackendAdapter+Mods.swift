@@ -263,6 +263,7 @@ struct CofreModVersion {
                     do {
                         try fm.createDirectory(at: staging, withIntermediateDirectories: true)
                         var staged: [(mod: PlannedMod, version: CofreModVersion, file: URL)] = []
+                        var dependencyIDs = Set(plan.required.map(\.id))
                         for (i, mod) in files.enumerated() {
                             stages[i].state = .checking
                             stages[i].detail = mod.turnsOn ? "Turning on" : nil
@@ -281,6 +282,7 @@ struct CofreModVersion {
                         var turnOn = files.filter(\.turnsOn)
                         if plan.kind == .mods {
                             for mod in await requiredByJars(staged.map(\.file), plan: plan, instanceID: instanceID) {
+                                dependencyIDs.insert(mod.id)
                                 stages.append(InstallProgress.Stage(title: mod.name, state: .checking))
                                 send()
                                 if mod.turnsOn {
@@ -299,7 +301,7 @@ struct CofreModVersion {
                                     InstallProgress(title: plan.target.name, fraction: fraction, stages: stages))
                             }
                         } else {
-                            try await commit(staged, turningOn: turnOn, kind: plan.kind,
+                            try await commit(staged, dependencyIDs: dependencyIDs, turningOn: turnOn, kind: plan.kind,
                                 instanceID: instanceID, world: world, backup: staging.appendingPathComponent(".replaced"))
                         }
                         NSLog("[Cofre] mods installed instance=%@ files=%ld", instanceID, files.count)
@@ -336,7 +338,8 @@ struct CofreModVersion {
 
         /// Moves staged files in, turns disabled dependencies back on, and drops older files of the same projects.
         private func commit(
-            _ staged: [(mod: PlannedMod, version: CofreModVersion, file: URL)], turningOn: [PlannedMod],
+            _ staged: [(mod: PlannedMod, version: CofreModVersion, file: URL)], dependencyIDs: Set<String>,
+            turningOn: [PlannedMod],
             kind: ContentKind, instanceID: String, world: String?, backup: URL
         ) async throws {
             let fm = FileManager.default
@@ -372,7 +375,9 @@ struct CofreModVersion {
                     // config) still finds it; Cofre never writes those.
                     let name = kind == .mods ? fresh : old.first(where: \.inUse).map(file) ?? fresh
                     try move(downloaded, folder.appendingPathComponent(name))
-                    index[world.map { "\($0)/\(name)" } ?? name] = "\(version.source)|\(mod.id)|\(version.id)"
+                    let installedAsDependency = dependencyIDs.contains(mod.id)
+                    index[world.map { "\($0)/\(name)" } ?? name] =
+                        "\(version.source)|\(mod.id)|\(version.id)|\(installedAsDependency ? "dependency" : "direct")"
                 }
                 UserDefaults.standard.set(index, forKey: Self.indexKey(instanceID))
             } catch {
@@ -405,6 +410,7 @@ struct CofreModVersion {
             }
             let paths = Dictionary(files.map { ($0.id, store.url(of: $0)) }) { a, _ in a }
             if identify { await self.identify(&items, kind: kind, paths: paths, instanceID: instanceID, online: online) }
+            if kind == .mods { await self.enrichInstalledMods(&items, paths: paths, instanceID: instanceID, online: online) }
             return items
         }
 
@@ -429,16 +435,99 @@ struct CofreModVersion {
                     modCatalog.identities.filter { !$0.value.isEmpty }, forKey: PreferenceKey.modsIdentities.rawValue)
             }
             for i in items.indices {
-                if let entry = index[items[i].id]?.split(separator: "|").map(String.init), entry.count == 3 {
+                if let entry = index[items[i].id]?.split(separator: "|").map(String.init), entry.count >= 3 {
                     items[i].projectID = entry[1]
                     items[i].versionID = entry[2]
+                    items[i].projectSource = entry[0] == "2" ? .curseforge : .modrinth
+                    items[i].installedDirectly = entry.count < 4 || entry[3] != "dependency"
                     modCatalog.titles[entry[1]] = modCatalog.titles[entry[1]] ?? items[i].name
                 } else if let sha = hashOf[items[i].id], let id = identity(sha) {
                     items[i].projectID = id.project
                     items[i].versionID = id.version
+                    items[i].projectSource = .modrinth
                 }
             }
             await markUpdates(&items, kind: kind, hashOf: hashOf, instanceID: instanceID, online: online)
+        }
+
+        /// Adds jar metadata and the icon URL/data used by Installed. The expensive jar reads happen in detached
+        /// tasks; rows remain lazy on the UI side and the scanner cache is keyed by path, size and mtime.
+        private func enrichInstalledMods(
+            _ items: inout [InstalledItem], paths: [String: URL], instanceID: String, online: Bool
+        ) async {
+            let target = modTarget(instanceID)
+            let results = await withTaskGroup(of: (String, ModJarMetadata?).self, returning: [(String, ModJarMetadata?)].self) { group in
+                for item in items {
+                    guard let path = paths[item.id] else { continue }
+                    group.addTask {
+                        let found = await Task.detached(priority: .utility) {
+                            ModJarMetadata.read(jar: path, loader: target.loader)
+                        }.value
+                        return (item.id, found)
+                    }
+                }
+                var out: [(String, ModJarMetadata?)] = []
+                for await result in group { out.append(result) }
+                return out
+            }
+            let metadata: [String: ModJarMetadata?] = Dictionary(uniqueKeysWithValues: results)
+            for i in items.indices {
+                items[i].loader = target.loader.displayName
+                guard let jar = metadata[items[i].id] ?? nil else { continue }
+                items[i].modID = jar.modIDs.first
+                items[i].dependencies = jar.dependencies
+                items[i].iconPNG = jar.icon
+                items[i].iconCacheKey = jar.cacheKey
+                if let name = jar.name, !name.isEmpty, items[i].name.isEmpty { items[i].name = name }
+                if let version = jar.version, !version.isEmpty, items[i].version.isEmpty { items[i].version = version }
+            }
+
+            var projectIDs = Set<String>()
+            for item in items where item.projectID != nil { projectIDs.insert(item.projectID!) }
+            if online {
+                let modrinthIDs = projectIDs.filter { id in
+                    items.first(where: { $0.projectID == id })?.projectSource == .modrinth
+                        && (modCatalog.projects[id]?["imageUrl"] as? String)?.isEmpty != false
+                }
+                if !modrinthIDs.isEmpty, let projects = try? await modCatalog.modrinth.projects(ids: Array(modrinthIDs)) {
+                    for project in projects {
+                        let id = project.id
+                        modCatalog.projects[id] = [
+                            "id": id, "title": project.title, "description": project.description ?? "",
+                            "imageUrl": project.iconURL?.absoluteString ?? "", "projectType": "mod", "apiSource": 1,
+                        ]
+                    }
+                }
+                for id in projectIDs where items.first(where: { $0.projectID == id })?.projectSource == .curseforge {
+                    let image = modCatalog.projects[id]?["imageUrl"] as? String
+                    if image?.isEmpty != false { _ = await projectTitle(id, source: 2) }
+                }
+            }
+            for i in items.indices {
+                if let id = items[i].projectID {
+                    items[i].iconURL = modURL(modCatalog.projects[id]?["imageUrl"])
+                    if items[i].projectSource == nil { items[i].projectSource = .modrinth }
+                    if let versionID = items[i].versionID, let version = modCatalog.versions[versionID] {
+                        items[i].dependencies += version.dependencies.filter { $0.required }.map {
+                            ModDependency(id: $0.projectID.isEmpty ? ($0.versionID ?? "unknown") : $0.projectID)
+                        }
+                    }
+                }
+                items[i].dependencies = items[i].dependencies.reduce(into: []) {
+                    let key = $1.id.lowercased().filter { $0.isLetter || $0.isNumber }
+                    if !$0.contains(where: { $0.id.lowercased().filter { $0.isLetter || $0.isNumber } == key }) {
+                        $0.append($1)
+                    }
+                }
+                let kitEnabled = paths.values.first.map {
+                    MetalMod.supports(gameVersion: target.game, loader: target.loader)
+                        && MetalMod.isEnabled(in: $0.deletingLastPathComponent().deletingLastPathComponent(), loader: target.loader)
+                } == true
+                if kitEnabled, let modID = items[i].modID?.lowercased() {
+                    let kitIDs = Set([MetalMod.modID, "fabric_api", "fabric-api", "forgified_fabric_api", "forgified-fabric-api", "connector", "launchpad"])
+                    items[i].protectedFromRemoval = kitIDs.contains(modID)
+                }
+            }
         }
 
         /// What Modrinth said a file is: project, version, channel. Entries saved before channels read as release,
@@ -575,8 +664,10 @@ struct CofreModVersion {
         }
 
         private func projectTitle(_ id: String, source: Int) async -> String {
-            if let t = modCatalog.projects[id]?["title"] as? String ?? modCatalog.titles[id] { return t }
-            var title: String?
+            let cached = modCatalog.projects[id]?["title"] as? String ?? modCatalog.titles[id]
+            let image = modCatalog.projects[id]?["imageUrl"] as? String
+            if source != 2 || image?.isEmpty == false { return cached ?? id }
+            var title: String? = cached
             if source == 2 {
                 if let key = curseForgeKey(), let url = URL(string: "https://api.curseforge.com/v1/mods/\(id)") {
                     var request = URLRequest(url: url)
@@ -585,7 +676,16 @@ struct CofreModVersion {
                     if let (data, _) = try? await URLSession.shared.data(for: request),
                         let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
                     {
-                        title = (json["data"] as? [String: Any])?["name"] as? String
+                        if let payload = json["data"] as? [String: Any] {
+                            title = payload["name"] as? String ?? title
+                            var project = modCatalog.projects[id] ?? [:]
+                            project["id"] = id
+                            project["title"] = title ?? id
+                            project["imageUrl"] = (payload["logo"] as? [String: Any])?["url"] as? String ?? ""
+                            project["projectType"] = project["projectType"] ?? "mod"
+                            project["apiSource"] = 2
+                            modCatalog.projects[id] = project
+                        }
                     }
                 }
             } else {

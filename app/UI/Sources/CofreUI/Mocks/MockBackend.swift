@@ -82,9 +82,26 @@
             mods = [
                 InstalledItem(
                     id: "sodium", name: "Sodium", version: "0.6.13+mc1.21.1", enabled: true, projectID: "sodium",
-                    versionID: "sodium-0613"),
+                    versionID: "sodium-0613",
+                    iconURL: URL(string: "https://cdn.modrinth.com/data/AANobbMI/295862f4724dc3f78df3447ad6072b2dcd3ef0c9_96.webp"),
+                    projectSource: .modrinth, loader: "Fabric", modID: "sodium"),
                 InstalledItem(id: "iris", name: "Iris Shaders", version: "1.8.8", enabled: true),
-                InstalledItem(id: "create", name: "Create", version: "6.0.4", enabled: true, updateTo: "6.0.6"),
+                InstalledItem(
+                    id: "create", name: "Create", version: "6.0.4", enabled: true, updateTo: "6.0.6", projectID: "create",
+                    iconURL: URL(string: "https://cdn.modrinth.com/data/LNytGWDc/61d716699bcf1ec42ed4926a9e1c7311be6087e2_96.webp"),
+                    projectSource: .modrinth, loader: "Fabric", modID: "create",
+                    dependencies: [
+                        ModDependency(id: "terrablender", name: "TerraBlender"),
+                        ModDependency(id: "glitchcore", name: "GlitchCore"),
+                    ]),
+                InstalledItem(
+                    id: "terrablender", name: "TerraBlender", version: "4.1.0", enabled: true,
+                    projectID: "terrablender", iconURL: URL(string: "https://cdn.modrinth.com/data/kkmrDlKT/icon.png"),
+                    projectSource: .modrinth, loader: "Fabric", modID: "terrablender", installedDirectly: false),
+                InstalledItem(
+                    id: "glitchcore", name: "GlitchCore", version: "2.3.0", enabled: false,
+                    projectID: "glitchcore", iconURL: URL(string: "https://cdn.modrinth.com/data/O7RBXm3n/icon.png"),
+                    projectSource: .modrinth, loader: "Fabric", modID: "glitchcore", installedDirectly: false),
                 InstalledItem(id: "xaero", name: "Xaero's Minimap", version: "25.2.0", enabled: false),
                 InstalledItem(id: "jei", name: "JEI", version: "19.21.0", enabled: true, updateTo: "19.21.2"),
                 InstalledItem(
