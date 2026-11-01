@@ -10,7 +10,7 @@ The maintained list of known renderer and iOS compatibility problems is [known-m
 |---|---|---|---|---|---|---|
 | 1 | **26.2** | **Fabric** | MetalUniversal 1.0.4 + Sodium 0.9.0 | ~57 | 13.6k Fabric | ✅ in app: one-tap "Use Metal" (499f665) |
 | 2 | **26.2** | **NeoForge** | Sinytra Connector + Launchpad + Forgified Fabric API + MetalUniversal | ~55 | 7.1k NeoForge | ✅ device-verified; one-tap install in progress. EvilCraft runs here |
-| 3 | **1.21.11** | **Fabric** | Graft 1.1.1, Cofre iOS port (no Sodium yet) | ~51 | 18k Fabric | ✅ device-verified; not in the app yet |
+| 3 | **1.21.11** | **Fabric** | Graft 1.1.1, Cofre iOS port (Sodium crashes: needs OpenGL) | ~51 | 18k Fabric | ✅ device-verified; not in the app yet |
 | — | 26.3 | Vanilla | Air's built-in Metal agent | — | — | ✅ |
 
 \* Modrinth counts, 2026-10-31.

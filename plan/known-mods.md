@@ -11,7 +11,7 @@ This table is generated from [`known-mods.json`](../app/UI/Sources/CofreKit/Reso
 | Embeddium | Metal (neoforge) | This NeoForge renderer uses OpenGL; the 26.2 Metal kit has not validated it. | expected |
 | Sodium | Metal (neoforge) | This NeoForge renderer uses OpenGL; the 26.2 Metal kit has not validated it. | expected |
 | Sodium | Metal (unknown; 1.21.11) | Metal runs this mod only in the validated 26.2 kit for now. | expected |
-| Sodium | Metal (fabric; 1.21.11) | Sodium may not render with Graft yet. | expected |
+| Sodium | Metal (fabric; 1.21.11) | Graft on iOS crashes at startup with Sodium: Sodium needs an OpenGL context that Metal doesn't have. | device ([evidence](../plan/reviews/renderer-benchmarks.md)) |
 | OptiFine / OptiFabric | Metal | OptiFine uses OpenGL; the Metal renderer has no integration for it. | expected |
 | ImmediatelyFast | Metal | ImmediatelyFast changes OpenGL render buffers; Metal has no integration for it. | expected |
 | Voxy | Metal | Voxy owns an OpenGL renderer; the Metal renderer has no integration for it. | expected |

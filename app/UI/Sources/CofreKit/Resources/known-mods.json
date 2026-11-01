@@ -97,10 +97,10 @@
       "scope": "metal",
       "loaders": ["fabric"],
       "gameVersions": ["1.21.11"],
-      "severity": "slow",
-      "reason": "Sodium may not render with Graft yet.",
-      "evidence": "expected",
-      "evidenceRef": "plan/reviews/metal-mods.md"
+      "severity": "broken",
+      "reason": "Graft on iOS crashes at startup with Sodium: Sodium needs an OpenGL context that Metal doesn't have.",
+      "evidence": "device",
+      "evidenceRef": "plan/reviews/renderer-benchmarks.md"
     },
     {
       "ids": ["optifine", "optifabric"],

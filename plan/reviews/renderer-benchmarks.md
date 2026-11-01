@@ -37,6 +37,11 @@ Measured results only: what launched, what rendered, frame rate, memory, limits.
 | 10-31 | 1.21.1 | NeoForge + JEI + Sodium + ModernFix | MobileGlues | ✅ | ✅ | ~30 (mod-warning screen) | 1236 | ModernFix warns FerriteCore missing |
 | 10-31 | 26.2 | NeoForge 26.2.0.93, no mods (Air agent route D) | Metal requested | ✅ | ❌ crash | — | — | Air skips its agent (`manifest has no support for neoforge-26.2.0.93`), falls back to ANGLE GL, clouds shaders fail to link → crash. Route D/noearly can't work without an Air change |
 | 10-31 | 26.2 | **NeoForge 26.2.0.93 + Sinytra Connector 3.1.0-beta.4 + Launchpad + FFAPI + MetalUniversal 1.0.4** (no Sodium) | Metal (MetalUniversal via Connector) | ✅ | ✅ world | ~20 first 30 s in world (chunk gen, server tick ~80 ms, thermal serious); steady value not measured yet | 2044 | `Using graphics backend Metal, using drivers: iOS 27.0`; F3 `Metal iOS 27.0`; first NeoForge on Metal |
+| 10-31 | 26.2 | NeoForge 26.2.0.93 + Connector kit + MetalUniversal + **Sodium 0.9.0 (NeoForge build)** | Metal (MetalUniversal via Connector) | ✅ | ✅ title | ~58 title, later ~28.6 (thermal serious) | 1477 | Sodium's NeoForge build loads and renders through MetalUniversal; Connector logs harmless `Failed to remove URL from classloader` (PojavClassLoader). In-world not measured |
+| 10-31 | 26.2 | NeoForge 26.2.0.93 + Connector kit + **EvilCraft + Cyclops Core** | Metal | ✅ | ✅ title | ~29 title (thermal serious) | 1548 | |
+| 10-31 | 1.21.11 | vanilla | Metal (Air agent, repaired) | ✅ | ✅ title | ~30 title | 1355 | Steady after the 9e678ca agent repair |
+| 10-31 | 1.21.11 | Fabric + Graft iOS port + **Sodium** | Metal (Graft) | ✅ | ❌ crash | — | 811 | `There is no OpenGL context current` in `MetalGpuDevice.createIdleGlContext`: Graft makes an idle GL context for Sodium, iOS has none. Marked broken in known-mods.json |
+| 10-31 | 26.2 | vanilla | Metal (Air agent) | ✅ | ❌ crash | — | 789 | After Cofre's Spv preload (59dd735 → f0bde51): starts on Metal, then `NoClassDefFoundError IrisMetalTerrainBridge` in the first GUI frame (Air picked `classes262iris/`). b847d19 forces `classes262/`; device run pending |
 
 ## iPhone 17 Pro (A19 Pro, 12 GB)
 
