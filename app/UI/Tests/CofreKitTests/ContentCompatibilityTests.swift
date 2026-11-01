@@ -182,4 +182,41 @@ final class ContentCompatibilityTests: XCTestCase {
                 loader: .neoforge
             ).isEmpty)
     }
+
+    func testKnownModsCatalogLoadsAndEveryEntryHasCopyAndEvidence() throws {
+        XCTAssertGreaterThan(KnownModsCatalog.entries.count, 10)
+        try KnownModsCatalog.validate(.init(schema: 1, mods: KnownModsCatalog.entries))
+        XCTAssertTrue(KnownModsCatalog.entries.allSatisfy { !$0.reason.isEmpty })
+        XCTAssertTrue(KnownModsCatalog.entries.allSatisfy { [.device, .expected].contains($0.evidence) })
+    }
+
+    func testKnownModsMatchIDsSlugsAndFilePrefixes() throws {
+        XCTAssertNil(
+            ContentCompatibility.issue(
+                id: "sodium", name: "Sodium", kind: .mods, gameVersion: "26.2", renderer: "metallum",
+                manifest: manifest, loader: .fabric),
+            "validated Fabric 26.2 Sodium stays allowed on Metal")
+        let graft = try XCTUnwrap(issue("sodium-fabric-0.9.0+mc1.21.11.jar", .mods, "1.21.11", "metallum", .fabric))
+        XCTAssertEqual(graft.severity, .slow)
+        XCTAssertTrue(graft.reason.contains("Graft"))
+        let neo = try XCTUnwrap(issue("sodium-neoforge-0.9.2.jar", .mods, "26.2", "metallum", .neoforge))
+        XCTAssertEqual(neo.severity, .broken)
+        let slug = try XCTUnwrap(
+            KnownModsCatalog.match(
+                id: "sodium", name: "Sodium", gameVersion: "1.21.11", renderer: "metallum", loader: .fabric))
+        XCTAssertEqual(slug.name, "Sodium")
+        let file = try XCTUnwrap(
+            issue("DistantHorizons-3.3.3-26.2-fabric-neoforge.jar", .mods, "26.2", "metallum", .neoforge))
+        XCTAssertEqual(file.modName, "Distant Horizons")
+        XCTAssertEqual(KnownModsCatalog.name(for: "iris-flywheel-compat-1.0.jar"), "Iris addon")
+    }
+
+    func testKnownModRendererAndLoaderConditions() throws {
+        let neo = try XCTUnwrap(issue("sodium", .mods, "26.2", "metallum", .neoforge))
+        XCTAssertEqual(neo.severity, .broken)
+        let black = try XCTUnwrap(issue("iris", .mods, "26.3", "libtinygl4angle.dylib", .fabric))
+        XCTAssertEqual(black.reason, "On ANGLE, Iris keeps Minecraft 26.3 on a black screen.")
+        let pc = try XCTUnwrap(issue("replaymod", .mods, "1.21.1", "mobileglues", .fabric))
+        XCTAssertEqual(pc.badge, "PC-only")
+    }
 }

@@ -261,6 +261,7 @@ public enum RendererPolicy {
 
 /// A mod or shader pack that won't run with the renderer an instance uses.
 public struct CompatibilityIssue: Hashable, Sendable {
+    public let severity: KnownMod.Severity
     public let modID: String, modName: String, gameVersion: String, reason: String
     public var kind: ContentKind
     /// The renderer as people know it: "Metal" or "MobileGlues".
@@ -268,8 +269,8 @@ public struct CompatibilityIssue: Hashable, Sendable {
     /// The file to turn off, when the issue came from the instance's folder.
     public var file: String?
     public init(modID: String, modName: String, gameVersion: String, reason: String, kind: ContentKind = .mods,
-                renderer: String = "Metal", file: String? = nil) {
-        self.modID = modID; self.modName = modName; self.gameVersion = gameVersion; self.reason = reason
+                renderer: String = "Metal", file: String? = nil, severity: KnownMod.Severity = .broken) {
+        self.modID = modID; self.modName = modName; self.gameVersion = gameVersion; self.reason = reason; self.severity = severity
         self.kind = kind; self.renderer = renderer; self.file = file
     }
     public var title: String { kind == .shaders ? "Shaders don't run here" : "\(modName) doesn't run here" }
@@ -293,49 +294,32 @@ public enum ContentCompatibility {
     /// The Metallum integration a mod needs (`iris`, `sodium`) and the versions it ships for. `mixin` is
     /// Metallum's own package, not a mod.
     public static func integration(for name: String, _ manifest: RendererManifest) -> (name: String, versions: Set<String>)? {
-        let key = normalized(name)
+        let key = KnownMod.normalized(name)
         guard !key.isEmpty else { return nil }
         return manifest.integrations.filter { $0.key != "mixin" }.sorted { $0.key < $1.key }
-            .first { key.contains(normalized($0.key)) }.map { ($0.key, $0.value) }
+            .first { key.contains(KnownMod.normalized($0.key)) }.map { ($0.key, $0.value) }
     }
 
     public static func issue(id: String, name: String, kind: ContentKind, gameVersion: String, renderer: String,
                              manifest: RendererManifest, loader: Instance.Loader = .unknown) -> CompatibilityIssue? {
         let label = name.isEmpty ? id : name
-        if kind == .mods, let known = pcOnly(id: id, name: name) {
-            return CompatibilityIssue(modID: id, modName: known, gameVersion: gameVersion, reason: pcOnlyReason,
-                                      kind: kind, renderer: pcOnlyRenderer)
+        if kind == .mods, let known = KnownModsCatalog.match(
+            id: id, name: name, fileName: name, gameVersion: gameVersion, renderer: renderer, loader: loader) {
+            let shown = known.scope == .anyRenderer ? pcOnlyRenderer : (rendererName(renderer) ?? renderer)
+            return CompatibilityIssue(
+                modID: id, modName: known.name, gameVersion: gameVersion,
+                reason: known.renderedReason(renderer: shown, gameVersion: gameVersion), kind: kind,
+                renderer: shown, severity: known.severity)
         }
         guard let shown = rendererName(renderer) else { return nil }
         func make(_ reason: String, as name: String = label) -> CompatibilityIssue {
             CompatibilityIssue(modID: id, modName: name, gameVersion: gameVersion, reason: reason, kind: kind, renderer: shown)
         }
         switch (kind, shown) {
-        case (.mods, "Metal"):
-            if [id, name].map(normalized).contains(where: { $0.contains("distanthorizons") }) {
-                return make(distantHorizonsOnMetal, as: "Distant Horizons")
-            }
-            if loader == .neoforge && gameVersion == "26.2" {
-                let key = normalized(id + name)
-                if ["iris", "oculus", "embeddium", "sodium"].contains(where: { key.contains($0) }) {
-                    return make(neoForgeMetalGL, as: key.contains("oculus") ? "Oculus" : key.contains("embeddium") ? "Embeddium" : key.contains("sodium") ? "Sodium" : "Iris")
-                }
-            }
-            guard let found = integration(for: name, manifest) ?? integration(for: id, manifest) else { return nil }
-            // Sodium rendered with MetalUniversal on the iPad (plan/reviews/renderer-benchmarks.md).
-            if found.name == "sodium", MetalMod.gameVersions.contains(gameVersion), loader != .neoforge { return nil }
-            // Named after the integration: a file name like "iris-fabric-1.8.0+mc26.3" reads badly in a title.
-            return make(found.name == "iris" ? irisOnMetal : "Metal runs this mod only in the validated "
-                + MetalMod.gameVersions.sorted().joined(separator: ", ") + " kit for now.", as: found.name.capitalized)
         case (.shaders, "Metal"):
             return make(irisOnMetal)
         case (.shaders, "MobileGlues"):
             return make("On MobileGlues, shader packs fail to start and Iris turns them off.")
-        case (.mods, "MobileGlues"), (.mods, "ANGLE"):
-            // iPad mini, Fabric 26.2 + Sodium + Iris: the game runs but the screen stays black on both GL paths.
-            guard (Int(gameVersion.split(separator: ".").first ?? "") ?? 0) >= 26,
-                  normalized(name).contains("iris") || normalized(id).contains("iris") else { return nil }
-            return make("On \(shown), Iris keeps Minecraft \(gameVersion) on a black screen.", as: "Iris")
         default: return nil
         }
     }
@@ -352,7 +336,7 @@ public enum ContentCompatibility {
         }
         // A pack only runs with a shader mod on; if that mod is already flagged, turning it off covers the pack.
         let shaderMods = (ShaderSwitch.files.map { ($0 as NSString).deletingPathExtension } + ["optifine"])
-        let shaderMod = mods.first { m in shaderMods.contains { normalized(m.name).hasPrefix($0) } }
+        let shaderMod = mods.first { m in shaderMods.contains { KnownMod.normalized(m.name).hasPrefix(KnownMod.normalized($0)) } }
         if let shaderMod, !out.contains(where: { $0.file == shaderMod.id }),
             let pack = ((try? store.list(.shaders)) ?? []).first(where: \.inUse),
             var i = issue(id: pack.id, name: pack.name, kind: .shaders, gameVersion: gameVersion, renderer: renderer,
@@ -374,24 +358,16 @@ public enum ContentCompatibility {
     }
 
     /// Stock Iris fails on Metal with "No GLCapabilities instance set".
-    public static let irisOnMetal = "Iris needs OpenGL; Metal runs without shaders for now."
-    public static let neoForgeMetalGL = "This NeoForge renderer uses OpenGL; the 26.2 Metal kit has not validated it."
-
-    public static let distantHorizonsOnMetal = "Distant Horizons draws with OpenGL; turns Metal black."
-    public static let pcOnlyReason = "PC-only: doesn't run on iPhone/iPad."
+    public static var irisOnMetal: String { reason(for: "Iris", scope: .metal) }
+    public static var neoForgeMetalGL: String { reason(for: "Sodium", scope: .metal, loader: .neoforge) }
+    public static var distantHorizonsOnMetal: String { reason(for: "Distant Horizons", scope: .metal) }
+    public static var pcOnlyReason: String { reason(for: "Simple Voice Chat", scope: .anyRenderer) }
     /// `CompatibilityIssue.renderer` for a mod that runs on no renderer here; its badge reads "PC-only".
     public static let pcOnlyRenderer = "PC"
 
-    /// Mods with desktop native code (README's PC-only list), by file name, mod ID, slug or title.
-    static func pcOnly(id: String, name: String) -> String? {
-        let keys = [id, name].map(normalized)
-        func has(_ test: (String) -> Bool) -> Bool { keys.contains(where: test) }
-        if has({ $0.contains("soundphysics") }) { return "Sound Physics Remastered" }
-        // Simple Voice Chat's mod ID and files are "voicechat"; its add-ons need its native audio too.
-        if has({ $0.contains("simplevoicechat") || $0.hasPrefix("voicechat") }) { return "Simple Voice Chat" }
-        if has({ $0.contains("plasmovoice") }) { return "Plasmo Voice" }
-        return nil
+    private static func reason(for name: String, scope: KnownMod.Scope, loader: Instance.Loader? = nil) -> String {
+        KnownModsCatalog.entries.first {
+            $0.name == name && $0.scope == scope && (loader == nil || $0.loaders?.contains(loader!) == true)
+        }?.reason ?? ""
     }
-
-    private static func normalized(_ s: String) -> String { s.lowercased().filter { $0.isLetter || $0.isNumber } }
 }

@@ -27,6 +27,7 @@ check "pairing engine" bash -c "cd '$ROOT/tools/llave/core' && cargo test"
 check "Llave dry run" sh "$ROOT/tools/llave/test-pair.sh"
 check "JIT script" bash -c "for t in '$ROOT'/tests/jit/*.test.js; do node \"\$t\" || exit 1; done"
 check "server cards" bash -c "cd '$ROOT/plan/server-join' && python3 validate_examples.py"
+check "known mods docs" python3 "$ROOT/scripts/check-known-mods.py"
 if [[ -n "${COFRE_SIM_UDID:-}" ]]; then
     check "CofreUI (iOS)" bash -c "cd '$ROOT/app/UI' && xcodebuild test -scheme CofreUI -destination 'platform=iOS Simulator,id=$COFRE_SIM_UDID' -quiet"
 fi

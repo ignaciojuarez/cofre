@@ -22,7 +22,7 @@ let package = Package(
                 .product(name: "cmark-gfm", package: "swift-cmark"),
                 .product(name: "cmark-gfm-extensions", package: "swift-cmark"),
             ],
-            resources: [.copy("Resources/protocolVersions.json"), .copy("Resources/presets.json")]
+            resources: [.copy("Resources/protocolVersions.json"), .copy("Resources/presets.json"), .copy("Resources/known-mods.json")]
         ),
         .target(
             name: "CofreUI",

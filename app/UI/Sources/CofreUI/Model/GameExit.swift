@@ -1,4 +1,5 @@
 import Foundation
+import CofreKit
 
 // Why Minecraft stopped, in plain words. Diagnosed from the exit code, the newest crash report and the log tail;
 // the glue reads the files, this only reads text, so it's tested on the Mac too.
@@ -187,12 +188,14 @@ public struct GameExitReport: Hashable, Sendable {
             for token in line.split(whereSeparator: { $0 == " " || $0 == "(" }) {
                 let parts = token.replacingOccurrences(of: "knot//", with: "").split(separator: ".")
                 if (token.contains("net.") || token.contains("com.")), let mod = parts.dropLast().last(where: { $0.allSatisfy({ $0.isLowercase || $0.isNumber || $0 == "_" }) }) {
-                    return mod.replacingOccurrences(of: "_", with: " ").capitalized
+                    let id = String(mod)
+                    return KnownModsCatalog.name(for: id) ?? id.replacingOccurrences(of: "_", with: " ").capitalized
                 }
             }
             return nil
         }
-        return packages.first { line.contains($0.package) }?.name
+        guard let package = packages.first(where: { line.contains($0.package) }) else { return nil }
+        return KnownModsCatalog.name(for: package.name, fileName: package.name) ?? package.name
     }
     private static func scanMods(at url: URL) -> [(package: String, name: String)] {
         guard let files = try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil) else { return [] }
@@ -231,11 +234,7 @@ public struct GameExitReport: Hashable, Sendable {
 
     /// How a mod reads on the screen: known names, else its ID ("distanthorizons" → "Distant Horizons").
     public static func modName(_ id: String) -> String {
-        let known = [
-            "distanthorizons": "Distant Horizons", "iris": "Iris", "oculus": "Oculus", "sodium": "Sodium",
-            "embeddium": "Embeddium", "voxy": "Voxy",
-        ]
-        return known[id] ?? id.replacingOccurrences(of: "_", with: " ").capitalized
+        KnownModsCatalog.name(for: id) ?? id.replacingOccurrences(of: "_", with: " ").capitalized
     }
 
     static let needsGL = "needs OpenGL, which the Metal renderer doesn't have on this Minecraft version."

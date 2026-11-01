@@ -2,6 +2,8 @@
 
 Only native Metal is playable with mods; every OpenGL path translates on the CPU (<20 FPS on an iPhone 17 Pro with <20 mods). Numbers: iPad mini 6 (A15, 4 GB), in a world, steady. Details: [reviews/renderer-benchmarks.md](reviews/renderer-benchmarks.md), routes: [reviews/metal-mods.md](reviews/metal-mods.md).
 
+The maintained list of known renderer and iOS compatibility problems is [known-mods.md](known-mods.md).
+
 ## Recommended (Metal)
 
 | # | Minecraft | Loader | Metal through | FPS | Fabric/NeoForge mods* | State |

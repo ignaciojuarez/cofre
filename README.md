@@ -104,7 +104,7 @@ From then on, just tap Play. JIT and the VPN turn on by themselves.
 | ✅ Works | ⚠️ Limits |
 |---|---|
 | **Play with PC friends.** It's real Java Edition, so you join the same servers as PC players. Bedrock players (consoles, phones) can join only if the server runs Geyser. | **Memory.** Phones have less RAM than PCs. Cofre picks a safe amount automatically. If a pack closes while loading, lower Memory or Resolution in **Settings → Game**. |
-| **Modded servers.** Fabric, Quilt, Forge and NeoForge. Install the server's modpack or the same mods from Modrinth or CurseForge. | **PC-only mods.** Mods with desktop native code don't work, such as Simple Voice Chat, Plasmo Voice and Sound Physics Remastered. |
+| **Modded servers.** Fabric, Quilt, Forge and NeoForge. Install the server's modpack or the same mods from Modrinth or CurseForge. | **PC-only mods.** Mods with desktop native code don't work, such as Simple Voice Chat, Plasmo Voice, Sound Physics Remastered, ReplayMod and Physics Mod. |
 | **Coming: one-tap Join.** Servers will be able to publish a card so Cofre installs the right mods and joins for you. | **iOS updates** can break JIT. Turn off automatic updates and wait for our OK. |
 
 ## Best versions for mods
