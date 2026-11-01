@@ -44,6 +44,13 @@ final class GameOptionsTests: XCTestCase {
             try options(), "maxFps:260\nmenuBackgroundBlurriness:5\nrenderDistance:16\nsimulationDistance:12")
     }
 
+    func testMetalLaunchClearsMinecraftsForcedOpenGL() throws {
+        try write("lang:en_us\npreferredGraphicsBackend:\"opengl\"\ngraphicsPreset:\"fancy\"\n")
+        XCTAssertTrue(try GameOptions.clearForcedOpenGL(in: dir))
+        XCTAssertEqual(try options(), "lang:en_us\ngraphicsPreset:\"fancy\"\n")
+        XCTAssertFalse(try GameOptions.clearForcedOpenGL(in: dir))
+    }
+
     func testPresetSeedsSettingsWithoutReplacingExistingOptions() throws {
         let preset = try XCTUnwrap(PresetCatalog.presets.first)
         XCTAssertTrue(try GameOptions.seedPreset(preset.options(forPhysicalMemoryMB: 3862), in: dir, physicalMB: 3862))

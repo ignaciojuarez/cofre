@@ -51,8 +51,12 @@ public final class CofreCoreEntry: NSObject {
                 .flatMap { try? JSONDecoder().decode(Instance.self, from: $0) }?.loader
         }
         // A Fabric instance with MetalUniversal in its mods folder runs Metal (RendererPolicy).
-        return RendererPolicy.resolve(profile: profile, metadata: metadata, globalSetting: globalSetting,
-            fallbackLoader: fallback, gameDirectory: directory, metalVersions: ModCompatibility.metalVersions).rawValue
+        let renderer = RendererPolicy.resolve(profile: profile, metadata: metadata, globalSetting: globalSetting,
+            fallbackLoader: fallback, gameDirectory: directory, metalVersions: ModCompatibility.metalVersions)
+        if RendererPolicy.isMetal(renderer), let directory, (try? GameOptions.clearForcedOpenGL(in: directory)) == true {
+            NSLog("[Cofre] options: cleared forced OpenGL for a Metal launch")
+        }
+        return renderer.rawValue
     }
     @objc(startWithBridge:)
     @MainActor public static func start(withBridge bridge: Any) {

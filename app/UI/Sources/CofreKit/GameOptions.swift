@@ -47,6 +47,20 @@ public enum GameOptions {
         return true
     }
 
+    /// Minecraft forces `preferredGraphicsBackend:"opengl"` after a startup that didn't finish (any crash before the
+    /// first world). On iOS a Metal instance then starts on ANGLE OpenGL and shows a black screen, so a Metal launch
+    /// removes the forced value. Returns whether the file changed.
+    @discardableResult
+    public static func clearForcedOpenGL(in gameDirectory: URL) throws -> Bool {
+        let url = gameDirectory.appendingPathComponent("options.txt")
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return false }
+        let lines = text.components(separatedBy: "\n")
+        let kept = lines.filter { $0.trimmingCharacters(in: .whitespaces) != "preferredGraphicsBackend:\"opengl\"" }
+        guard kept.count != lines.count else { return false }
+        try kept.joined(separator: "\n").write(to: url, atomically: true, encoding: .utf8)
+        return true
+    }
+
     /// Fills the first-create settings for a preset without replacing an existing player's choices.
     @discardableResult
     public static func seedPreset(
