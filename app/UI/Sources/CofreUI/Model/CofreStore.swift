@@ -130,7 +130,7 @@
         private var lastTrash: InstanceStore.TrashToken?
         /// Deleted instances that can still be restored (their files sit in the instances' trash).
         public private(set) var recentlyDeleted: [InstanceStore.Deleted] = []
-        @ObservationIgnored private let defaults: UserDefaults
+        @ObservationIgnored let defaults: UserDefaults
 
         /// `defaults` holds the setup progress; tests and the preview host pass their own suite.
         public init(services: CofreServices, defaults: UserDefaults = .standard) {

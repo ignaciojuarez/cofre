@@ -46,6 +46,16 @@
             XCTAssertEqual(plan.blocked, "A needs Lib. Lib has no Fabric 1.21.1 version, only Forge.")
         }
 
+        func testMultiLoaderModSkipsAnotherLoadersDependency() async throws {
+            let plan = try await resolver([
+                "lights": [candidate("lights", loaders: ["fabric", "neoforge", "quilt"],
+                    deps: [.init(projectID: "fabric-api", relation: .required)])],
+                "fabric-api": [candidate("fabric-api", loaders: ["fabric"])],
+            ], loader: .neoforge).plan(projectID: "lights")
+            XCTAssertNil(plan.blocked)
+            XCTAssertTrue(plan.required.isEmpty)
+        }
+
         func testDependencyWithNoVersionForThisGameBlocks() async throws {
             let plan = try await resolver([
                 "a": [candidate("a", deps: [.init(projectID: "lib", relation: .required)])],

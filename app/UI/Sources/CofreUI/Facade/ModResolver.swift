@@ -172,6 +172,15 @@
                             continue
                         }
                         guard let found = pick(options, pinned: dep.versionID) else {
+                            // One jar for several loaders lists every loader's dependencies together (e.g.
+                            // LambDynamicLights needs Fabric API only on Fabric). A dependency with no build for this
+                            // loader at all, made for another loader the mod also supports, isn't needed here.
+                            if Set(mod.loaders).count > 1, !options.isEmpty,
+                                !options.contains(where: { $0.loaders.contains(loader) }),
+                                options.contains(where: { !Set($0.loaders).isDisjoint(with: mod.loaders) })
+                            {
+                                continue
+                            }
                             let name = options.first?.title ?? dep.projectID
                             plan.blocked = String(
                                 localized: "\(mod.title) needs \(name). \(missing(name, in: options))")
