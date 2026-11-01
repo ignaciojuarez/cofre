@@ -197,7 +197,7 @@ final class ContentCompatibilityTests: XCTestCase {
                 manifest: manifest, loader: .fabric),
             "validated Fabric 26.2 Sodium stays allowed on Metal")
         let graft = try XCTUnwrap(issue("sodium-fabric-0.9.0+mc1.21.11.jar", .mods, "1.21.11", "metallum", .fabric))
-        XCTAssertEqual(graft.severity, .slow)
+        XCTAssertEqual(graft.severity, .broken)
         XCTAssertTrue(graft.reason.contains("Graft"))
         let neo = try XCTUnwrap(issue("sodium-neoforge-0.9.2.jar", .mods, "26.2", "metallum", .neoforge))
         XCTAssertEqual(neo.severity, .broken)
