@@ -55,13 +55,32 @@ final class SpvSampler { }
 final class SpvVariable { }
 '''
 
+SIGNED_CLIENT_CLASS = r'''
+package com.mojang.blaze3d.vulkan.glsl;
+public final class ShaderCompileException extends RuntimeException { }
+'''
+
 SHIM_PROBE = r'''
+import java.io.File;
 import java.lang.reflect.Modifier;
+import java.net.URL;
+import java.net.URLClassLoader;
 public final class ShimProbe {
   public static void main(String[] args) throws Exception {
     for (String name : new String[]{"SpvUniformBuffer", "SpvSampler", "SpvVariable"}) {
       Class<?> type = Class.forName("com.mojang.blaze3d.vulkan.glsl." + name);
       if (!Modifier.isPublic(type.getModifiers())) throw new AssertionError(name + " is not public");
+      if (args.length > 0 && (type.getProtectionDomain().getCodeSource().getCodeSigners() == null
+          || type.getProtectionDomain().getCodeSource().getCodeSigners().length != 1))
+        throw new AssertionError(name + " did not keep the client signer");
+    }
+    if (args.length == 0) {
+      Class.forName("com.mojang.blaze3d.vulkan.glsl.ShaderCompileException");
+    } else {
+      try (URLClassLoader client = new URLClassLoader(new URL[]{new File(args[0]).toURI().toURL()},
+          ClassLoader.getSystemClassLoader())) {
+        Class.forName("com.mojang.blaze3d.vulkan.glsl.ShaderCompileException", true, client);
+      }
     }
     System.out.println("PASS: Cofre premain shim widens all Spv classes before definition");
     System.exit(0);
@@ -82,8 +101,8 @@ def java25():
     return None
 
 
-def run(*args):
-    return subprocess.run([str(a) for a in args], capture_output=True, text=True)
+def run(*args, env=None):
+    return subprocess.run([str(a) for a in args], capture_output=True, text=True, env=env)
 
 
 with tempfile.TemporaryDirectory(prefix="cofre-metallum-test-") as directory:
@@ -120,11 +139,45 @@ with tempfile.TemporaryDirectory(prefix="cofre-metallum-test-") as directory:
     javac = java.with_name("javac")
     compiled = run(javac, "-d", classes, fixture, shim_probe)
     assert compiled.returncode == 0, compiled.stdout + compiled.stderr
+    signed_source = tree / "ShaderCompileException.java"
+    signed_source.write_text(SIGNED_CLIENT_CLASS)
+    client_classes = tree / "client-classes"
+    client_classes.mkdir()
+    signed_compile = run(javac, "-d", client_classes, signed_source)
+    assert signed_compile.returncode == 0, signed_compile.stdout + signed_compile.stderr
+    keytool = java.with_name("keytool")
+    keystore = tree / "cofre.p12"
+    generated = run(keytool, "-genkeypair", "-alias", "cofre", "-keyalg", "RSA", "-keysize", "2048",
+                    "-validity", "1", "-dname", "CN=Cofre", "-keystore", keystore,
+                    "-storetype", "PKCS12", "-storepass", "changeit", "-keypass", "changeit", "-noprompt")
+    assert generated.returncode == 0, generated.stdout + generated.stderr
+    signed_jar = tree / "minecraft-client-signed.jar"
+    jar_tool = java.with_name("jar")
+    packed = run(jar_tool, "cf", signed_jar, "-C", client_classes, ".")
+    assert packed.returncode == 0, packed.stdout + packed.stderr
+    jarsigner = java.with_name("jarsigner")
+    signed = run(jarsigner, "-keystore", keystore, "-storetype", "PKCS12", "-storepass", "changeit",
+                 "-keypass", "changeit", signed_jar, "cofre")
+    assert signed.returncode == 0, signed.stdout + signed.stderr
+    classpath = str(jar) + os.pathsep + str(signed_jar) + os.pathsep + str(classes)
     shim = run(java, "--add-opens=java.base/java.lang=ALL-UNNAMED", "-Dmetallum.mc.version=26.2",
-               "-javaagent:" + str(jar), "-cp", str(classes), "ShimProbe")
+               "-javaagent:" + str(jar), "-cp", classpath, "ShimProbe")
     assert shim.returncode == 0, shim.stdout + shim.stderr
+    assert "Cofre Spv preload code source:" in shim.stdout and "signers=1" in shim.stdout
     assert "Cofre Spv preload defined: com/mojang/blaze3d/vulkan/glsl/SpvUniformBuffer" in shim.stdout
     assert "Cofre Spv preload defined: com/mojang/blaze3d/vulkan/glsl/SpvSampler" in shim.stdout
     assert "Cofre Spv preload defined: com/mojang/blaze3d/vulkan/glsl/SpvVariable" in shim.stdout
     assert "PASS: Cofre premain shim widens all Spv classes" in shim.stdout
     print(shim.stdout.strip())
+
+    game_root = tree / "game"
+    game_jar = game_root / "versions" / "26.2" / "26.2.jar"
+    game_jar.parent.mkdir(parents=True)
+    shutil.copy(signed_jar, game_jar)
+    path_env = dict(os.environ, POJAV_GAME_DIR=str(game_root))
+    path_shim = run(java, "--add-opens=java.base/java.lang=ALL-UNNAMED", "-Dmetallum.mc.version=26.2",
+                    "-javaagent:" + str(jar), "-cp", str(jar) + os.pathsep + str(classes),
+                    "ShimProbe", signed_jar, env=path_env)
+    assert path_shim.returncode == 0, path_shim.stdout + path_shim.stderr
+    assert "signers=1" in path_shim.stdout
+    print(path_shim.stdout.strip())

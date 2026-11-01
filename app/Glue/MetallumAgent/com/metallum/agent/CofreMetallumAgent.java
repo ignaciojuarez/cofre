@@ -1,5 +1,6 @@
 package com.metallum.agent;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.instrument.ClassFileTransformer;
@@ -7,8 +8,16 @@ import java.lang.instrument.IllegalClassFormatException;
 import java.lang.instrument.Instrumentation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.net.JarURLConnection;
+import java.net.URI;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.security.CodeSigner;
+import java.security.CodeSource;
 import java.security.ProtectionDomain;
 import java.util.Set;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 
 /**
  * Installs Cofre's Spv access widener before Air's agent starts.
@@ -28,6 +37,8 @@ public final class CofreMetallumAgent {
             "com/mojang/blaze3d/vulkan/glsl/SpvUniformBuffer",
             "com/mojang/blaze3d/vulkan/glsl/SpvSampler",
             "com/mojang/blaze3d/vulkan/glsl/SpvVariable"};
+    private static final String SHADER_COMPILE_EXCEPTION =
+            "com/mojang/blaze3d/vulkan/glsl/ShaderCompileException.class";
 
     private CofreMetallumAgent() {
     }
@@ -78,6 +89,11 @@ public final class CofreMetallumAgent {
                     + " owns class definition");
             return;
         }
+        ProtectionDomain minecraftDomain = minecraftProtectionDomain(loader);
+        if (minecraftDomain == null) {
+            System.out.println("[MetallumAgent] Cofre Spv preload skipped: Minecraft code source not found");
+            return;
+        }
         try {
             Method defineClass = ClassLoader.class.getDeclaredMethod("defineClass", String.class,
                     byte[].class, int.class, int.class, ProtectionDomain.class);
@@ -95,7 +111,8 @@ public final class CofreMetallumAgent {
                     continue;
                 }
                 try {
-                    defineClass.invoke(loader, internalName.replace('/', '.'), widened, 0, widened.length, null);
+                    defineClass.invoke(loader, internalName.replace('/', '.'), widened, 0, widened.length,
+                            minecraftDomain);
                     System.out.println("[MetallumAgent] Cofre Spv preload defined: " + internalName
                             + " loader=" + loader);
                 } catch (InvocationTargetException failure) {
@@ -111,6 +128,101 @@ public final class CofreMetallumAgent {
             }
         } catch (Throwable failure) {
             System.err.println("[MetallumAgent] Cofre Spv preload unavailable: " + failure);
+        }
+    }
+
+    private static ProtectionDomain minecraftProtectionDomain(ClassLoader loader) {
+        ProtectionDomain gameJar = domainFromGameJarPath(loader);
+        if (gameJar != null) {
+            return gameJar;
+        }
+        if (loader instanceof URLClassLoader urlLoader) {
+            for (URL source : urlLoader.getURLs()) {
+                if (!"file".equals(source.getProtocol())) {
+                    continue;
+                }
+                try {
+                    File file = new File(new URI(source.toString()));
+                    if (file.isFile()) {
+                        ProtectionDomain domain = domainFromJar(loader, source, file);
+                        if (domain != null) {
+                            return domain;
+                        }
+                    }
+                } catch (Throwable ignored) {
+                    // Pojav can expose a URL that is no longer present; keep scanning the class path.
+                }
+            }
+        }
+        try {
+            URL resource = loader.getResource("com/mojang/blaze3d/vulkan/glsl/ShaderCompileException.class");
+            if (resource != null && resource.openConnection() instanceof JarURLConnection connection) {
+                JarFile jar = connection.getJarFile();
+                try {
+                    JarEntry entry = connection.getJarEntry();
+                    if (entry != null) {
+                        readEntry(jar, entry);
+                        return domain(loader, connection.getJarFileURL(), entry.getCodeSigners());
+                    }
+                } finally {
+                    jar.close();
+                }
+            }
+        } catch (Throwable ignored) {
+            // Fall through to the explicit diagnostic below.
+        }
+        return null;
+    }
+
+    private static ProtectionDomain domainFromGameJarPath(ClassLoader loader) {
+        String version = System.getProperty("metallum.mc.version", "");
+        if (version.isEmpty()) {
+            return null;
+        }
+        String[] roots = {System.getenv("POJAV_GAME_DIR"), System.getProperty("user.dir")};
+        for (String root : roots) {
+            if (root == null || root.isEmpty()) {
+                continue;
+            }
+            File jar = new File(root, "versions/" + version + "/" + version + ".jar");
+            if (jar.isFile()) {
+                try {
+                    ProtectionDomain domain = domainFromJar(loader, jar.toURI().toURL(), jar);
+                    if (domain != null) {
+                        return domain;
+                    }
+                } catch (Throwable ignored) {
+                    // Keep trying the loader's URLs and resource lookup below.
+                }
+            }
+        }
+        return null;
+    }
+
+    private static ProtectionDomain domainFromJar(ClassLoader loader, URL source, File file) {
+        try (JarFile jar = new JarFile(file, true)) {
+            JarEntry entry = jar.getJarEntry(SHADER_COMPILE_EXCEPTION);
+            if (entry != null) {
+                readEntry(jar, entry);
+                return domain(loader, source, entry.getCodeSigners());
+            }
+        } catch (Throwable ignored) {
+            // Keep scanning the remaining loader URLs.
+        }
+        return null;
+    }
+
+    private static ProtectionDomain domain(ClassLoader loader, URL source, CodeSigner[] signers) {
+        System.out.println("[MetallumAgent] Cofre Spv preload code source: " + source + " signers="
+                + (signers == null ? 0 : signers.length));
+        return new ProtectionDomain(new CodeSource(source, signers), null, loader, null);
+    }
+
+    private static void readEntry(JarFile jar, JarEntry entry) throws IOException {
+        try (InputStream stream = jar.getInputStream(entry)) {
+            while (stream.read() != -1) {
+                // Fully consume the entry so JarFile verifies its signatures before getCodeSigners().
+            }
         }
     }
 
