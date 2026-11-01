@@ -3,23 +3,23 @@ import XCTest
 @testable import CofreKit
 
 final class ProjectFiltersTests: XCTestCase {
-    private let client = ["client_side:required", "client_side:optional"]
 
-    // Defaults follow the instance: a Fabric 1.21.1 instance starts Mods at version, loader and client.
+    // Defaults follow the instance: a Fabric 1.21.1 instance starts Mods at version and loader. Server-side mods
+    // (Terralith, Dungeons and Taverns) stay visible: single-player runs them.
     func testModsDefaultToTheInstance() {
         let f = ProjectFilters()
         XCTAssertEqual(
             f.facets(.mods, game: "1.21.1", loader: .fabric),
-            [["versions:1.21.1"], ["categories:fabric"], client])
-        XCTAssertEqual(f.activeCount(.mods, source: .modrinth, game: "1.21.1", loader: .fabric), 3)
+            [["versions:1.21.1"], ["categories:fabric"]])
+        XCTAssertEqual(f.activeCount(.mods, source: .modrinth, game: "1.21.1", loader: .fabric), 2)
         // Packs filter the same way; resource packs only by version.
-        XCTAssertEqual(f.activeCount(.modpacks, source: .modrinth, game: "1.21.1", loader: .fabric), 3)
+        XCTAssertEqual(f.activeCount(.modpacks, source: .modrinth, game: "1.21.1", loader: .fabric), 2)
         XCTAssertEqual(f.facets(.resourcePacks, game: "1.21.1", loader: .fabric), [["versions:1.21.1"]])
     }
 
     func testNoInstanceOrVanillaFallsBackToAny() {
         let f = ProjectFilters()
-        XCTAssertEqual(f.facets(.mods, game: "", loader: .unknown), [client])
+        XCTAssertEqual(f.facets(.mods, game: "", loader: .unknown), [])
         XCTAssertNil(f.loader(.mods, .vanilla))
         XCTAssertEqual(f.activeCount(.mods, source: .curseforge, game: "", loader: .unknown), 0)
     }

@@ -51,7 +51,8 @@ public struct ProjectFilters: Hashable, Sendable {
     public var loader = FilterScope.instance
     /// `nil` follows the instance: Iris where it runs (Fabric, Quilt, NeoForge), else any.
     public var shaderLoader: ShaderLoader?
-    public var clientSide = true
+    /// Off: single-player runs server-side mods (world generation, structures) in its integrated server.
+    public var clientSide = false
     public var resolution: PackResolution?
     /// Modrinth category IDs from `ProjectFilters.categories(for:)`.
     public var categories: Set<String> = []
