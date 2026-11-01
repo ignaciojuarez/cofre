@@ -7,6 +7,12 @@ while (($#)); do case "$1" in --device) device=$2; shift 2;; --timeout) timeout=
 [[ -f "$scenario" ]] || { echo "missing scenario: $scenario" >&2; exit 2; }
 name=$(basename "$scenario" .json); stamp=$(date +%Y%m%d-%H%M%S); out="/tmp/cofre-scenarios/$name-$stamp"; mkdir -p "$out"
 bundle=com.ignacio.cofre; file=$(basename "$scenario")
+world_requested=$(python3 - "$scenario" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as f:
+    print("1" if json.load(f).get("world") else "0")
+PY
+)
 pushed=0
 for _ in 1 2 3; do
   timeout 60 xcrun devicectl device copy to --device "$device" --domain-type appDataContainer --domain-identifier "$bundle" --source "$scenario" --destination "Documents/$file" >/dev/null 2>&1 && { pushed=1; break; }
@@ -46,7 +52,9 @@ while ((SECONDS < deadline)); do
   if [[ -s "$log" && ! "$first" < "$since" ]]; then
     clean=$(sed -E 's/(accessToken|uuid|xuid)([[:space:]]*[:=][[:space:]]*)[^,}]*/\1\2<redacted>/Ig' "$log")
     printf '%s\n' "$clean" > "$log"
-    if grep -q 'launch state=inGame' "$log"; then verdict="PASS in-game"; break; fi
+    if ((world_requested)); then
+      if grep -q 'scenario .* step=world result=ok' "$log"; then verdict="PASS in-world"; break; fi
+    elif grep -q 'launch state=inGame' "$log"; then verdict="PASS in-game"; break; fi
     if grep -q 'scenario .*result=restart' "$log"; then
       if ((restarted)); then verdict="FAIL scenario step"; break; fi
       restarted=1

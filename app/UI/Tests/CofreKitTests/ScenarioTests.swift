@@ -7,6 +7,13 @@ final class ScenarioTests: XCTestCase {
         XCTAssertEqual(s.renderer, "auto"); XCTAssertTrue(s.launch)
     }
 
+    func testWorldAndSeedDecodeAndValidate() throws {
+        let s = try CofreScenario.load(Data(#"{"name":"bench","version":"26.2","world":"Bench","seed":1234}"#.utf8))
+        XCTAssertEqual(s.world, "Bench"); XCTAssertEqual(s.seed, 1234)
+        XCTAssertThrowsError(try CofreScenario(name: "bench", version: "26.2", seed: 1).validate())
+        XCTAssertThrowsError(try CofreScenario(name: "bench", version: "26.2", world: "../escape").validate())
+    }
+
     func testRejectsPackWithModsAndBadResolution() {
         let s = CofreScenario(name: "x", version: "1.21.1", mods: ["sodium"], pack: "pack", resolution: 2)
         XCTAssertThrowsError(try s.validate())

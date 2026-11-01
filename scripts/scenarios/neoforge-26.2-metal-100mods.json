@@ -27,6 +27,8 @@
   ],
   "renderer": "metallum",
   "resolution": 1.0,
+  "world": "Bench",
+  "seed": 1337,
   "launch": true,
   "fresh": true,
   "mods": [

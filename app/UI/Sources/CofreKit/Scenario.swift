@@ -30,8 +30,10 @@ public struct CofreScenario: Codable, Equatable, Sendable {
     public let memoryMB: Int?
     public let launch: Bool
     public let fresh: Bool
+    public let world: String?
+    public let seed: Int64?
 
-    enum CodingKeys: String, CodingKey { case name, version, loader, loaderVersion, mods, files, pack, packVersion, renderer, resolution, memoryMB, launch, fresh }
+    enum CodingKeys: String, CodingKey { case name, version, loader, loaderVersion, mods, files, pack, packVersion, renderer, resolution, memoryMB, launch, fresh, world, seed }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         name = try c.decode(String.self, forKey: .name); version = try c.decodeIfPresent(String.self, forKey: .version)
@@ -42,23 +44,27 @@ public struct CofreScenario: Codable, Equatable, Sendable {
         renderer = RendererID(rawValue: try c.decodeIfPresent(String.self, forKey: .renderer) ?? "auto")
         resolution = try c.decodeIfPresent(Double.self, forKey: .resolution) ?? 1
         memoryMB = try c.decodeIfPresent(Int.self, forKey: .memoryMB); launch = try c.decodeIfPresent(Bool.self, forKey: .launch) ?? true; fresh = try c.decodeIfPresent(Bool.self, forKey: .fresh) ?? false
+        world = try c.decodeIfPresent(String.self, forKey: .world); seed = try c.decodeIfPresent(Int64.self, forKey: .seed)
     }
 
     public init(name: String, version: String? = nil, loader: Instance.Loader = .vanilla, loaderVersion: String? = nil,
                 mods: [String] = [], files: [File] = [], pack: String? = nil, packVersion: String? = nil, renderer: RendererID = .auto,
-                resolution: Double = 1, memoryMB: Int? = nil, launch: Bool = true, fresh: Bool = false) {
+                resolution: Double = 1, memoryMB: Int? = nil, launch: Bool = true, fresh: Bool = false,
+                world: String? = nil, seed: Int64? = nil) {
         self.name = name; self.version = version; self.loader = loader; self.loaderVersion = loaderVersion
         self.mods = mods; self.files = files; self.pack = pack; self.packVersion = packVersion; self.renderer = renderer
         self.resolution = resolution; self.memoryMB = memoryMB; self.launch = launch; self.fresh = fresh
+        self.world = world; self.seed = seed
     }
 
     public init(name: String, version: String? = nil, loader: String, loaderVersion: String? = nil,
                 mods: [String] = [], files: [File] = [], pack: String? = nil, packVersion: String? = nil, renderer: String = "auto",
-                resolution: Double = 1, memoryMB: Int? = nil, launch: Bool = true, fresh: Bool = false) {
+                resolution: Double = 1, memoryMB: Int? = nil, launch: Bool = true, fresh: Bool = false,
+                world: String? = nil, seed: Int64? = nil) {
         self.init(name: name, version: version, loader: Instance.Loader(rawValue: loader.lowercased()) ?? .unknown,
                   loaderVersion: loaderVersion, mods: mods, files: files, pack: pack, packVersion: packVersion,
                   renderer: RendererID(rawValue: renderer), resolution: resolution, memoryMB: memoryMB,
-                  launch: launch, fresh: fresh)
+                  launch: launch, fresh: fresh, world: world, seed: seed)
     }
 
     public enum ValidationError: Error, LocalizedError, Equatable {
@@ -74,6 +80,13 @@ public struct CofreScenario: Codable, Equatable, Sendable {
         guard (0.1...1.0).contains(resolution) else { throw ValidationError.invalid("resolution must be between 0.1 and 1") }
         guard memoryMB == nil || (memoryMB! >= 512 && memoryMB! <= 16384) else { throw ValidationError.invalid("memoryMB is out of range") }
         guard mods.allSatisfy({ !$0.isEmpty && !$0.contains("/") && !$0.contains("\\") }) else { throw ValidationError.invalid("invalid mod slug") }
+        if let world {
+            guard !world.isEmpty, world != ".", world != "..", !world.contains("/"), !world.contains("\\"), !world.contains("\0") else {
+                throw ValidationError.invalid("invalid world folder")
+            }
+        } else if seed != nil {
+            throw ValidationError.invalid("seed requires world")
+        }
         for file in files {
             guard [file.url, file.from, file.text].compactMap({ $0 }).count == 1 else {
                 throw ValidationError.invalid("file needs one of url, from or text")

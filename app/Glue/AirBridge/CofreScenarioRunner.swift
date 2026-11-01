@@ -6,6 +6,18 @@ import CofreKit
 
 @MainActor
 final class CofreScenarioRunner {
+    private enum ScenarioError: LocalizedError {
+        case worldDirectory
+        case worldJoinTimeout(String)
+
+        var errorDescription: String? {
+            switch self {
+            case .worldDirectory: "scenario world directory is unavailable"
+            case .worldJoinTimeout(let world): "Minecraft did not join scenario world \(world)"
+            }
+        }
+    }
+
     private let backend: CofreBackendAdapter
     private let instances: InstanceStore?
     private let scenario: CofreScenario
@@ -92,6 +104,7 @@ final class CofreScenarioRunner {
             }
             guard let instance = existing else { throw CofreBackendError.unavailable("instance") }
             targetID = instance.id
+            var targetVersion = instance.gameVersion
 
             let scenarioLoader: Loader? = scenario.loader == .unknown ? nil : scenario.loader
             if instance.loader != .vanilla, let loader = scenarioLoader {
@@ -120,6 +133,7 @@ final class CofreScenarioRunner {
                 // A pack makes its own instance; launch that one, not whichever other instance lists first.
                 guard let made = try store.list().first(where: { !before.contains($0.id) }) else { throw CofreBackendError.unavailable("pack \(pack) made no instance") }
                 targetID = made.id
+                targetVersion = made.gameVersion
                 createdIDs.append(made.id)
                 log("[Cofre] scenario name=\(scenario.name) step=pack result=ok")
             } else {
@@ -166,13 +180,40 @@ final class CofreScenarioRunner {
             try await backend.setPreferences(prefs, instanceID: targetID)
             step("settings")
             if scenario.launch, let targetID {
+                var gameArguments: [String] = []
+                var worldDirectory: URL?
+                var worldLogBaseline = Data()
+                if let world = scenario.world {
+                    do {
+                        guard let directory = backend.air.gameDirectory(forProfile: targetID) else {
+                            throw ScenarioError.worldDirectory
+                        }
+                        try ScenarioWorld.ensure(in: directory, folder: world, seed: scenario.seed,
+                                                 gameVersion: targetVersion)
+                        gameArguments = MinecraftLaunchArguments.singleplayer(folder: world, gameVersion: targetVersion)
+                        guard !gameArguments.isEmpty else { throw ScenarioError.worldDirectory }
+                        worldDirectory = directory
+                        worldLogBaseline = (try? Data(contentsOf: directory.appendingPathComponent("logs/latest.log"))) ?? Data()
+                    } catch {
+                        fail("world", error)
+                        return
+                    }
+                }
                 NotificationCenter.default.post(name: .cofreScenarioStep, object: "Scenario: \(scenario.name) · launch")
-                for try await _ in backend.launch(instanceID: targetID, accountID: nil) {}
+                for try await _ in backend.launch(instanceID: targetID, accountID: nil, gameArguments: gameArguments) {}
                 // The stream ends at the first frame, while the game keeps running from this folder.
                 // Deleting it now pulls Fabric's jar-in-jar mods (.fabric/processedMods) out from under
                 // the game (blank title) and leaves a profile-less folder whose startup marker forces
                 // OpenGL on the next run. `fresh` removes it before the next scenario instead.
                 keepInstances = true
+                if let world = scenario.world, let worldDirectory {
+                    do {
+                        try await waitForWorldJoin(in: worldDirectory, baseline: worldLogBaseline, world: world)
+                        step("world")
+                    } catch {
+                        fail("world", error)
+                    }
+                }
             }
         } catch {
             if let failure = error as? LaunchFailure, failure == .restartRequired {
@@ -184,6 +225,26 @@ final class CofreScenarioRunner {
                 fail("run", error)
             }
         }
+    }
+
+    private func waitForWorldJoin(in gameDirectory: URL, baseline: Data, world: String) async throws {
+        let logURL = gameDirectory.appendingPathComponent("logs/latest.log")
+        let deadline = ContinuousClock.now + .seconds(120)
+        while ContinuousClock.now < deadline {
+            if let data = try? Data(contentsOf: logURL) {
+                let newData: Data
+                if data.starts(with: baseline) {
+                    newData = data.dropFirst(baseline.count)
+                } else {
+                    newData = data
+                }
+                if String(decoding: newData, as: UTF8.self).contains("joined the game") {
+                    return
+                }
+            }
+            try await Task.sleep(for: .milliseconds(500))
+        }
+        throw ScenarioError.worldJoinTimeout(world)
     }
 
     private func foundPack(_ slug: String, from rows: [ProjectSummary]) -> ProjectSummary? { rows.first }
