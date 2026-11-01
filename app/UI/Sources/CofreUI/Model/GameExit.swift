@@ -92,9 +92,10 @@ public struct GameExitReport: Hashable, Sendable {
             .prefix { !$0.hasPrefix("-- System Details --") }.map { $0 }
         let errors = logLines.filter(isError)
         // On Metal, Air's GLFW shutdown (pojavTerminate → gl_terminate) crashes after Minecraft has saved and stopped.
-        // The player quit; nothing was lost.
+        // The player quit; nothing was lost. The JVM can also die before Air logs anything after "Stopping!".
         if let stop = logLines.lastIndex(where: { $0.contains("]: Stopping!") }),
             logLines[stop...].contains(where: { $0.contains("gl_terminate") || $0.contains("pojavTerminate") })
+                || (crashReport == nil && !logLines[stop...].dropFirst().contains(where: isError))
         {
             return (.quit, nil)
         }

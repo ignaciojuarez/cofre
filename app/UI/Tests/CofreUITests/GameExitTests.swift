@@ -52,6 +52,19 @@ final class GameExitTests: XCTestCase {
         XCTAssertNotEqual(GameExitReport.diagnose(code: 1, crashReport: nil, logLines: Array(log.dropFirst())).0, .quit)
     }
 
+    // iPhone NeoForge 26.2: the JVM ended right after "Stopping!", earlier auth 401s must not make it a crash.
+    func testExitRightAfterStoppingIsAQuit() {
+        let log = [
+            "com.mojang.authlib.exceptions.InvalidCredentialsException: Status: 401",
+            "[18:02:53] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved",
+            "[18:02:54] [Render thread/INFO]: Stopping!",
+        ]
+        XCTAssertEqual(GameExitReport.diagnose(code: 1, crashReport: nil, logLines: log).0, .quit)
+        // An error after "Stopping!" is still a crash.
+        let failed = log + ["java.lang.IllegalStateException: boom"]
+        XCTAssertNotEqual(GameExitReport.diagnose(code: 1, crashReport: nil, logLines: failed).0, .quit)
+    }
+
     func testMetalDriverCrashIsTheRenderer() {
         let fatal = """
             [Render thread/INFO]: [metallum] createTexture 512x256 fmt=RGBA8_UNORM usage=0xf
