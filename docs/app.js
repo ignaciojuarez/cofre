@@ -1,11 +1,10 @@
-// Every download, invite, script and source URL on the site comes from here.
+// Every download, script and source URL on the site comes from here.
 // The site itself is GitHub Pages from docs/: https://ignaciojuarez.github.io/cofre/
 // The app shows its short pair link, ignaciojuarez.github.io/cofre/pair (docs/pair/ redirects to Step 3).
 // Keep README.md, PAIRING.md, CofreLinks (app/UI) and Llave's getCofre in sync when you change these.
 const LINKS = {
   site: "https://ignaciojuarez.github.io/cofre/",
   pair: "https://ignaciojuarez.github.io/cofre/pair/",
-  invite: "https://github.com/ignaciojuarez/cofre/issues/new?template=invite.yml",
   ipa: "https://github.com/ignaciojuarez/cofre/releases/latest/download/Cofre.ipa",
   pairScript: "https://github.com/ignaciojuarez/cofre/releases/latest/download/pair.sh",
   pairingGuide: "https://github.com/ignaciojuarez/cofre/blob/main/PAIRING.md",

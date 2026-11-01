@@ -2,10 +2,6 @@
   <img src="docs/assets/readme/banner.png" width="880" alt="Cofre: Minecraft: Java Edition, mods and all, on your iPhone. JIT and VPN built in.">
 </p>
 
-<p align="center">
-  <a href="https://github.com/ignaciojuarez/cofre/issues/new?template=invite.yml"><img src="docs/assets/readme/btn-invite.png" width="251" alt="Request an invite"></a>
-</p>
-
 <p align="center"><b>4 steps · about 10 minutes · one Mac visit</b></p>
 
 **Cofre** is a free, open-source Minecraft: Java Edition launcher for iPhone and iPad, with JIT (what makes Java fast on iPhone) and a local VPN built in. Setup takes one Terminal command on a Mac, once. The same steps are at [ignaciojuarez.github.io/cofre](https://ignaciojuarez.github.io/cofre/).
@@ -14,25 +10,22 @@
 
 <img src="docs/assets/readme/step-1.png" width="100%" alt="Step 1 · On your iPhone · Get Cofre · 3 min">
 
-1. Tap **Request an invite** and tell us who you are.
-2. We send you a link. Open it on your iPhone so we can add it to Cofre.
-3. When your install link arrives, open it on your iPhone and tap **Install**.
-
-<a href="https://github.com/ignaciojuarez/cofre/issues/new?template=invite.yml"><img src="docs/assets/readme/btn-invite.png" width="251" alt="Request an invite"></a>
+1. Download the IPA below and install it with your own Apple ID using AltStore, SideStore or another sideloader.
+2. Open Cofre. If your signer lacks VPN or JIT capabilities, Cofre explains the limitation.
 
 <details>
-<summary><b>Advanced: sideload the IPA</b></summary>
+<summary><b>Install the IPA yourself</b></summary>
 
-Not on the invite list, or have your own developer account? Install the IPA with your own Apple ID (for example AltStore or SideStore).
+Install the IPA with your own Apple ID (for example AltStore or SideStore).
 
 | | Free Apple ID | Paid account ($99/year) |
 |---|---|---|
 | App lasts | 7 days | 1 year |
 | Apps at once | 3 | No limit |
 | Built-in VPN | No (use a separate VPN app) | Yes |
-| JIT | Yes | Yes |
+| JIT | External only | Built-in* |
 
-Limits are Apple's: [free vs paid accounts](https://developer.apple.com/support/compare-memberships/) · [VPN needs a paid account](https://developer.apple.com/help/account/reference/supported-capabilities-ios).
+* Built-in VPN/JIT need a profile with the required Packet Tunnel and development entitlements; otherwise Cofre explains what is unavailable. Limits are Apple's: [free vs paid accounts](https://developer.apple.com/support/compare-memberships/) · [VPN needs a paid account](https://developer.apple.com/help/account/reference/supported-capabilities-ios).
 
 <a href="https://github.com/ignaciojuarez/cofre/releases/latest/download/Cofre.ipa"><img src="docs/assets/readme/btn-ipa.png" width="168" alt="Download IPA"></a>
 </details>
@@ -169,7 +162,7 @@ Turning on JIT needs Wi-Fi or Airplane Mode. No Wi-Fi? Open Cofre, turn on Airpl
 
 <details><summary><b>How long does Cofre last?</b></summary>
 
-Invite installs last 1 year. Cofre warns you 30 days before. Installing the new link keeps your worlds. Sideloaded with a free Apple ID: 7 days, then refresh.
+Paid developer signing lasts up to 1 year. Sideloaded with a free Apple ID: 7 days, then refresh. Reinstalling keeps your worlds.
 </details>
 
 ## Privacy & safety
@@ -199,13 +192,12 @@ Cofre is **GPL-3.0**, a fork of [Air](https://github.com/herbrine8403/Amethyst-i
 |---|---|---|
 | `site` | `https://ignaciojuarez.github.io/cofre/` | The setup site; Llave's "How to get Cofre" opens `#step-1` |
 | `pair` | `https://ignaciojuarez.github.io/cofre/pair/` | The short link the app shows; [`docs/pair/`](docs/pair/index.html) sends it to Step 3 |
-| `invite` | `https://github.com/ignaciojuarez/cofre/issues/new?template=invite.yml` | Request an invite (Step 1) |
-| `ipa` | `https://github.com/ignaciojuarez/cofre/releases/latest/download/Cofre.ipa` | Advanced: sideload the IPA |
+| `ipa` | `https://github.com/ignaciojuarez/cofre/releases/latest/download/Cofre.ipa` | Download the IPA |
 | `pairScript` | `https://github.com/ignaciojuarez/cofre/releases/latest/download/pair.sh` | The Step 3 command: `curl -fsSL <pairScript> \| sh` |
 | `pairingGuide` | `https://github.com/ignaciojuarez/cofre/blob/main/PAIRING.md` | "What the command does" and the ChatGPT/Claude prompt |
 | `source` | `https://github.com/ignaciojuarez/cofre` | Source links |
 
-To publish: make sure the release assets are named `Cofre.ipa` and `pair.sh`, and that `.github/ISSUE_TEMPLATE/invite.yml` exists (the invite link opens it).
+To publish: make sure the release assets are named `Cofre.ipa` and `pair.sh`.
 
 **README images** (`docs/assets/readme/*.png`) are rendered from [`site/tools/readme-art.html`](site/tools/readme-art.html) with the site's own CSS:
 

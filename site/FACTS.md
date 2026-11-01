@@ -26,7 +26,7 @@
 | ~~6 GB iPhones: about 150 mods~~ Removed 2026-10-29: nothing public backs it. The site now says "Cofre picks a safe amount automatically" (auto RAM is the default) | UI review fact-check |
 | JIT needs Wi-Fi or Airplane Mode; on cellular, turn on Airplane Mode, tap Play, turn it off once loading | UI review fact-check (2026-10-29): [StikDebug](https://stikdebug.org/), [Geode guide](https://github.com/geode-sdk/ios-launcher/blob/main/APPLE-DEV-CERT-INSTALL-GUIDE.md). ⚠️ Cofre uses its own tunnel: verify on the 17 Pro |
 | One VPN at a time; JIT needs internet once after a restart (DDI) | `PLAN.md` §5 |
-| Invite builds last 1 year, banner 30 days before, reinstall keeps data | `PLAN.md` §3 |
+| Paid developer-signed builds last up to 1 year; free Apple ID sideloads last 7 days | Apple signing limits |
 | Pairing file breaks after iOS update / reset | `PLAN.md` §5, [StikDebug guide](https://github.com/StikDebug/StikDebug-Guide/blob/main/pairing_file.md) |
 | Mods with desktop natives fail (Simple Voice Chat, Plasmo Voice, Sound Physics Remastered) | `launcher-plan/server-join/SPEC.md` §6.1 |
 | One-tap Join is "coming" | `server-join/SPEC.md` (spec only, not built) |

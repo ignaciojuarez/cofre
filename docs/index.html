@@ -28,7 +28,6 @@
 <symbol id="i-bolt" viewBox="0 0 8 8"><path d="M4 0h3v1h-3zM3 1h3v1h-3zM2 2h3v1h-3zM1 3h6v1h-6zM3 4h3v1h-3zM2 5h3v1h-3zM1 6h2v1h-2z"/></symbol>
 <symbol id="i-arrow" viewBox="0 0 8 8"><path d="M4 1h1v1h-1zM4 2h2v1h-2zM0 3h7v1h-7zM4 4h2v1h-2zM4 5h1v1h-1z"/></symbol>
 <symbol id="i-down" viewBox="0 0 8 8"><path d="M3 0h2v1h-2zM3 1h2v1h-2zM3 2h2v1h-2zM1 3h6v1h-6zM2 4h4v1h-4zM3 5h2v1h-2zM0 7h8v1h-8z"/></symbol>
-<symbol id="i-mail" viewBox="0 0 8 8"><path d="M0 1h8v1h-8zM0 2h2v1h-2zM6 2h2v1h-2zM0 3h1v1h-1zM2 3h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM0 4h1v1h-1zM3 4h2v1h-2zM7 4h1v1h-1zM0 5h1v1h-1zM7 5h1v1h-1zM0 6h8v1h-8z"/></symbol>
 <symbol id="i-phone" viewBox="0 0 8 8"><path d="M2 0h4v1h-4zM2 1h1v1h-1zM5 1h1v1h-1zM2 2h1v1h-1zM5 2h1v1h-1zM2 3h1v1h-1zM5 3h1v1h-1zM2 4h1v1h-1zM5 4h1v1h-1zM2 5h4v1h-4zM2 6h4v1h-4z"/></symbol>
 <symbol id="i-mac" viewBox="0 0 8 8"><path d="M0 0h8v1h-8zM0 1h1v1h-1zM7 1h1v1h-1zM0 2h1v1h-1zM7 2h1v1h-1zM0 3h1v1h-1zM7 3h1v1h-1zM0 4h8v1h-8zM3 5h2v1h-2zM2 6h4v1h-4z"/></symbol>
 <symbol id="i-people" viewBox="0 0 8 8"><path d="M1 1h2v1h-2zM5 1h2v1h-2zM1 2h2v1h-2zM5 2h2v1h-2zM0 4h3v1h-3zM5 4h3v1h-3zM0 5h3v1h-3zM5 5h3v1h-3z"/></symbol>
@@ -87,17 +86,16 @@
           <span class="badge"><svg aria-hidden="true" class="ico"><use href="#i-clock"/></svg>3 min</span>
         </div>
         <ol class="howto">
-          <li>Tap <b>Request an invite</b> and tell us who you are.</li>
-          <li>We send you a link. Open it on your iPhone so we can add it to Cofre.</li>
-          <li>When your install link arrives, open it on your iPhone and tap <b>Install</b>.</li>
+          <li>Download the IPA below and install it with your own Apple ID using AltStore, SideStore or another sideloader.</li>
+          <li>Open Cofre. If your signer lacks VPN or JIT capabilities, Cofre explains the limitation.</li>
         </ol>
         <div class="step-actions">
-          <a class="btn btn-primary btn-l" data-link="invite" href="#step-1"><svg aria-hidden="true" class="ico"><use href="#i-mail"/></svg>Request an invite</a>
+          <a class="btn btn-primary btn-l" data-link="ipa" href="#step-1"><svg aria-hidden="true" class="ico"><use href="#i-down"/></svg>Download IPA</a>
         </div>
         <details class="more">
-          <summary>Advanced: sideload the IPA</summary>
+          <summary>Signing details</summary>
           <div class="more-body">
-            <p>Not on the invite list, or have your own developer account? Install the IPA with your own Apple ID (for example AltStore or SideStore).</p>
+            <p>Install the IPA with your own Apple ID. Cofre adapts when the signer cannot provide its built-in VPN or JIT.</p>
             <div class="table-scroll">
             <table>
               <caption class="sr">What changes with your own Apple ID</caption>
@@ -106,12 +104,11 @@
                 <tr><th scope="row">App lasts</th><td>7 days</td><td>1 year</td></tr>
                 <tr><th scope="row">Apps at once</th><td>3</td><td>No limit</td></tr>
                 <tr><th scope="row">Built-in VPN</th><td><span class="no">No</span>*</td><td><span class="yes">Yes</span></td></tr>
-                <tr><th scope="row">JIT</th><td><span class="yes">Yes</span></td><td><span class="yes">Yes</span></td></tr>
+                <tr><th scope="row">JIT</th><td>External only</td><td>Built-in*</td></tr>
               </tbody>
             </table>
             </div>
-            <p class="fine">* Free accounts need a separate VPN app. Paid account: $99 a year. Limits are Apple's: <a href="https://developer.apple.com/support/compare-memberships/">free vs paid accounts</a> · <a href="https://developer.apple.com/help/account/reference/supported-capabilities-ios">VPN needs a paid account</a>.</p>
-            <a class="btn" data-link="ipa" href="#step-1"><svg aria-hidden="true" class="ico"><use href="#i-down"/></svg>Download IPA</a>
+            <p class="fine">* Built-in VPN/JIT need a profile with the required Packet Tunnel and development entitlements; otherwise Cofre explains what is unavailable. Free accounts need a separate VPN app. Paid account: $99 a year. Limits are Apple's: <a href="https://developer.apple.com/support/compare-memberships/">free vs paid accounts</a> · <a href="https://developer.apple.com/help/account/reference/supported-capabilities-ios">VPN needs a paid account</a>.</p>
           </div>
         </details>
       </div>
@@ -370,7 +367,7 @@
     <details class="block">
       <summary>How long does Cofre last?</summary>
       <div class="more-body">
-        <p>Invite installs last 1 year. Cofre warns you 30 days before. Installing the new link keeps your worlds. Sideloaded with a free Apple ID: 7 days, then refresh.</p>
+        <p>Paid developer signing lasts up to 1 year. Sideloaded with a free Apple ID: 7 days, then refresh. Reinstalling keeps your worlds.</p>
       </div>
     </details>
   </div>
