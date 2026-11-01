@@ -120,7 +120,11 @@ with tempfile.TemporaryDirectory(prefix="cofre-metallum-test-") as directory:
     javac = java.with_name("javac")
     compiled = run(javac, "-d", classes, fixture, shim_probe)
     assert compiled.returncode == 0, compiled.stdout + compiled.stderr
-    shim = run(java, "-javaagent:" + str(jar), "-cp", str(classes), "ShimProbe")
+    shim = run(java, "--add-opens=java.base/java.lang=ALL-UNNAMED", "-Dmetallum.mc.version=26.2",
+               "-javaagent:" + str(jar), "-cp", str(classes), "ShimProbe")
     assert shim.returncode == 0, shim.stdout + shim.stderr
+    assert "Cofre Spv preload defined: com/mojang/blaze3d/vulkan/glsl/SpvUniformBuffer" in shim.stdout
+    assert "Cofre Spv preload defined: com/mojang/blaze3d/vulkan/glsl/SpvSampler" in shim.stdout
+    assert "Cofre Spv preload defined: com/mojang/blaze3d/vulkan/glsl/SpvVariable" in shim.stdout
     assert "PASS: Cofre premain shim widens all Spv classes" in shim.stdout
     print(shim.stdout.strip())
