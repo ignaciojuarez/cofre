@@ -6,6 +6,7 @@ import java.io.InputStream;
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
 import java.lang.instrument.Instrumentation;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.JarURLConnection;
@@ -39,6 +40,7 @@ public final class CofreMetallumAgent {
             "com/mojang/blaze3d/vulkan/glsl/SpvVariable"};
     private static final String SHADER_COMPILE_EXCEPTION =
             "com/mojang/blaze3d/vulkan/glsl/ShaderCompileException.class";
+    private static volatile boolean vanillaClassSetConfigured;
 
     private CofreMetallumAgent() {
     }
@@ -234,6 +236,40 @@ public final class CofreMetallumAgent {
         return null;
     }
 
+    // The launcher adds Fabric/NeoForge libraries after premain. Wait for PreferredGraphicsApi so
+    // loader detection runs against the actual game loader instead of mistaking a modded session for vanilla.
+    private static void maybeForceVanillaClassSet(ClassLoader loader) {
+        if (vanillaClassSetConfigured) {
+            return;
+        }
+        String version = System.getProperty("metallum.mc.version", "");
+        if (!version.startsWith("26.2")) {
+            vanillaClassSetConfigured = true;
+            return;
+        }
+        String modLoader = detectedModLoader(loader);
+        if (modLoader != null) {
+            vanillaClassSetConfigured = true;
+            return;
+        }
+        System.setProperty("metallum.iris.bridge", "false");
+        forceAirIrisBridgeOff();
+        vanillaClassSetConfigured = true;
+        System.out.println("[MetallumAgent] Cofre vanilla 26.2: forcing classes262 (Iris bridge disabled)");
+    }
+
+    private static void forceAirIrisBridgeOff() {
+        try {
+            Field irisBridge = MetallumAgent.class.getDeclaredField("gIrisBridge");
+            irisBridge.setAccessible(true);
+            irisBridge.set(null, Boolean.FALSE);
+            System.out.println("[MetallumAgent] Cofre vanilla 26.2: Air gIrisBridge=false");
+        } catch (Throwable failure) {
+            System.err.println("[MetallumAgent] Cofre vanilla 26.2: could not set Air gIrisBridge: "
+                    + failure);
+        }
+    }
+
     private static String detectedModLoader(ClassLoader loader) {
         String[] candidates = {
                 "net.fabricmc.loader.api.FabricLoader",
@@ -263,6 +299,9 @@ public final class CofreMetallumAgent {
         public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined,
                 ProtectionDomain protectionDomain, byte[] classfileBuffer) throws IllegalClassFormatException {
             String normalizedName = className == null ? null : className.replace('.', '/');
+            if (loader != null && "net/minecraft/client/PreferredGraphicsApi".equals(normalizedName)) {
+                maybeForceVanillaClassSet(loader);
+            }
             if (normalizedName != null && normalizedName.contains("glsl/Spv")) {
                 System.out.println("[MetallumAgent] Cofre Spv transformer saw: " + className
                         + " normalized=" + normalizedName + " loader=" + loader

@@ -4,8 +4,8 @@
   scripts/repair-metallum-agent.py <jar>            repair in place (idempotent), then verify
   scripts/repair-metallum-agent.py --check <jar>    verify only; exit 1 on a dangling reference
 
-Air's agent picks one class set per Minecraft version (classes12111_1_21_11/, classes262iris/,
-classes263/, ...) and defines its com/metallum/client/, com/metallum/shims/, com/metallum/Metallum
+Air's agent picks one class set per Minecraft version (classes12111_1_21_11/, classes262/ or
+classes262iris/, classes263/, ...) and defines its com/metallum/client/, com/metallum/shims/, com/metallum/Metallum
 and Fabric API stubs into the game's class loader. Everything else, including com/metallum/agent/,
 comes from the jar root through the app class loader, which has no Minecraft libraries.
 Three gaps crash vanilla Metal (plan/reviews/metal-mods.md):
@@ -18,7 +18,8 @@ Three gaps crash vanilla Metal (plan/reviews/metal-mods.md):
     Root members a class set uses that are private are made public.
   * vanilla 26.2: Air registers its Spv access transformer from premain, after its own startup can
     load the package-private Spv records. The executable entry points are routed through a Cofre
-    premain shim that registers first, before delegating to Air.
+    premain shim that registers first, before delegating to Air. The shim also disables Air's
+    Iris/Sodium bridge for vanilla so it selects the dependency-free classes262 set.
 """
 import os, struct, subprocess, sys, tempfile, zipfile
 

@@ -67,6 +67,15 @@ import java.net.URL;
 import java.net.URLClassLoader;
 public final class ShimProbe {
   public static void main(String[] args) throws Exception {
+    Class<?> shim = Class.forName("com.metallum.agent.CofreMetallumAgent");
+    java.lang.reflect.Method forceVanilla = shim.getDeclaredMethod("maybeForceVanillaClassSet", ClassLoader.class);
+    forceVanilla.setAccessible(true);
+    forceVanilla.invoke(null, ShimProbe.class.getClassLoader());
+    Class<?> air = Class.forName("com.metallum.agent.MetallumAgent", false,
+        ShimProbe.class.getClassLoader());
+    java.lang.reflect.Field irisBridge = air.getDeclaredField("gIrisBridge");
+    irisBridge.setAccessible(true);
+    if (!Boolean.FALSE.equals(irisBridge.get(null))) throw new AssertionError("Air Iris bridge stayed enabled");
     for (String name : new String[]{"SpvUniformBuffer", "SpvSampler", "SpvVariable"}) {
       Class<?> type = Class.forName("com.mojang.blaze3d.vulkan.glsl." + name);
       if (!Modifier.isPublic(type.getModifiers())) throw new AssertionError(name + " is not public");
@@ -121,6 +130,10 @@ with tempfile.TemporaryDirectory(prefix="cofre-metallum-test-") as directory:
         manifest = repaired_jar.read("META-INF/MANIFEST.MF").decode()
         assert "Premain-Class: com.metallum.agent.CofreMetallumAgent" in manifest
         assert "Agent-Class: com.metallum.agent.CofreMetallumAgent" in manifest
+        vanilla_device = repaired_jar.read("classes262/com/metallum/client/metal/render/MetalDevice.class")
+        iris_device = repaired_jar.read("classes262iris/com/metallum/client/metal/render/MetalDevice.class")
+        assert b"IrisMetalTerrainBridge" not in vanilla_device
+        assert b"IrisMetalTerrainBridge" in iris_device
     again = run("python3", SCRIPT, jar)
     assert again.returncode == 0 and not again.stdout and jar.read_bytes() == repaired, "repair is not idempotent"
     java = java25()
