@@ -160,4 +160,56 @@ final class ModRequirementsTests: XCTestCase {
         XCTAssertTrue(LaunchFailure.modLoaderFailed(log))
         XCTAssertFalse(LaunchFailure.modLoaderFailed("[main/INFO]: Loading 35 mods"))
     }
+
+    func testNeoForge262JarMetadataFindsTerrablenderAndMidnightLib() throws {
+        let biomes = try XCTUnwrap(
+            ModsToml.read(
+                jar: try jar([
+                    (
+                        "META-INF/neoforge.mods.toml",
+                        Data(
+                            """
+                            modLoader="javafml"
+                            [[mods]]
+                            modId="biomesoplenty"
+                            [[dependencies.biomesoplenty]]
+                            modId="neoforge"
+                            required=true
+                            [[dependencies.biomesoplenty]]
+                            modId="glitchcore"
+                            required=true
+                            [[dependencies.biomesoplenty]]
+                            modId="terrablender"
+                            required=true
+                            """.utf8)
+                    )
+                ]), neoForge: true))
+        let cull = try XCTUnwrap(
+            ModsToml.read(
+                jar: try jar([
+                    (
+                        "META-INF/neoforge.mods.toml",
+                        Data(
+                            """
+                            modLoader = "javafml"
+                            [[mods]]
+                            modId = "cullleaves"
+                            [[dependencies.cullleaves]]
+                            modId = "neoforge"
+                            required = true
+                            side = "CLIENT"
+                            [[dependencies.cullleaves]]
+                            modId = "midnightlib"
+                            required = true
+                            side = "CLIENT"
+                            """.utf8)
+                    )
+                ]), neoForge: true))
+
+        let missing = ModRequirements.missing(in: [
+            ("BiomesOPlenty-neoforge.jar", biomes), ("cullleaves-neoforge.jar", cull),
+        ])
+        XCTAssertEqual(missing.map(\.modID), ["glitchcore", "terrablender", "midnightlib"])
+        XCTAssertEqual(missing.map(\.slugs), [["glitchcore"], ["terrablender"], ["midnightlib"]])
+    }
 }

@@ -141,8 +141,9 @@ final class CofreScenarioRunner {
                     NotificationCenter.default.post(name: .cofreScenarioStep, object: "Scenario: \(scenario.name) · mods")
                     let results = try await backend.search(ProjectQuery(text: mod, kind: .mods, instanceID: instance.id))
                     guard let project = results.first(where: { $0.id == mod }) ?? results.first else { throw CofreBackendError.unavailable("mod \(mod) not found") }
-                    let versions = try await backend.versions(projectID: project.id, instanceID: instance.id)
-                    for try await _ in backend.install(projectID: project.id, versionID: versions.first?.id ?? "latest", instanceID: instance.id) {}
+                    // Let the resolver choose the newest compatible build. The fast version list is normally filtered,
+                    // but passing an ID from it would make a stale or cross-loader row an unsafe explicit pin.
+                    for try await _ in backend.install(projectID: project.id, versionID: "latest", instanceID: instance.id) {}
                 }
                 if !scenario.mods.isEmpty { log("[Cofre] scenario name=\(scenario.name) step=mods result=ok") }
             }

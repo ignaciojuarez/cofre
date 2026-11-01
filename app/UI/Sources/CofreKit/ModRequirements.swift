@@ -24,7 +24,12 @@ public struct ModsToml: Hashable, Sendable {
         func flush() {
             if table == "mods", let id = entry["modId"] { modIDs.append(id) }
             if table.hasPrefix("dependencies."), let id = entry["modId"] {
-                let required = entry["type"]?.lowercased() == "required" || entry["mandatory"] == "true"
+                // NeoForge 26.2 uses `required = true`; older Forge metadata uses `mandatory = true` or
+                // `type = "required"`.
+                let required =
+                    entry["type"]?.lowercased() == "required"
+                    || entry["mandatory"]?.lowercased() == "true"
+                    || entry["required"]?.lowercased() == "true"
                 let side = entry["side"]?.uppercased() ?? "BOTH"
                 dependencies.append(
                     Dependency(owner: String(table.dropFirst(13)), modID: id, required: required && side != "SERVER"))

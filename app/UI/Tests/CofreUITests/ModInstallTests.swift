@@ -129,6 +129,22 @@
             XCTAssertEqual(r.pick(all, pinned: "a-2")?.versionID, "a-1")
         }
 
+        func testPlanRejectsPinnedVersionForAnotherLoader() async throws {
+            let plan = try await resolver([
+                "a": [candidate("a", loaders: ["forge"], version: "paper"), candidate("a", version: "fabric")]
+            ]).plan(projectID: "a", versionID: "a-paper")
+            XCTAssertEqual(plan.target.versionID, "a-fabric")
+        }
+
+        func testPlanIncludesNeoForgeDeclaredGlitchCoreDependency() async throws {
+            let plan = try await resolver([
+                "biomes-o-plenty": [candidate("biomes-o-plenty", loaders: ["neoforge"],
+                    deps: [.init(projectID: "s3dmwKy5", relation: .required)])],
+                "s3dmwKy5": [candidate("s3dmwKy5", loaders: ["neoforge"])]
+            ], loader: .neoforge).plan(projectID: "biomes-o-plenty")
+            XCTAssertEqual(plan.required.map(\.id), ["s3dmwKy5"])
+        }
+
         func testCurseForgeFileWithoutDownloadBlocks() async throws {
             let plan = try await resolver([
                 "a": [candidate("a", deps: [.init(projectID: "lib", relation: .required)])],

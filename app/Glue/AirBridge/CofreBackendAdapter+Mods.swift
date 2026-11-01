@@ -304,7 +304,7 @@ struct CofreModVersion {
                             try await commit(staged, dependencyIDs: dependencyIDs, turningOn: turnOn, kind: plan.kind,
                                 instanceID: instanceID, world: world, backup: staging.appendingPathComponent(".replaced"))
                         }
-                        NSLog("[Cofre] mods installed instance=%@ files=%ld", instanceID, files.count)
+                        NSLog("[Cofre] mods installed instance=%@ files=%ld", instanceID, staged.count + turnOn.count)
                         continuation.yield(InstallProgress(title: plan.target.name, fraction: 1, stages: stages))
                         continuation.finish()
                     } catch {

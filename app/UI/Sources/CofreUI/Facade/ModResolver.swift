@@ -119,9 +119,9 @@
         /// `versionID == nil` picks the newest fitting release (then beta, then alpha).
         public func plan(projectID: String, versionID: String? = nil) async throws -> ModInstallPlan {
             let all = try await versions(projectID)
-            let root =
-                versionID.flatMap { id in all.first { $0.versionID == id } }
-                ?? pick(all, pinned: nil)
+            // A caller may have an ID from an unfiltered catalog (or an old UI state). Never let that pin
+            // install a build for another game version or loader.
+            let root = pick(all, pinned: versionID)
             guard let root else {
                 let title = all.first?.title ?? projectID
                 return ModInstallPlan(
