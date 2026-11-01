@@ -115,6 +115,9 @@ static void CofreArmFirstDrawable(void) {
   atomic_store(&cofreAwaitingFirstDrawable, true);
 }
 
+// The renderer this launch resolved to (set by pickRendererForProfile:metadata:).
+static NSString *CofreLastRendererPick = nil;
+
 static BOOL CofrePerfLoggingRequested(void) {
 #if DEBUG
   BOOL enabled = YES;
@@ -1191,7 +1194,15 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
       // A JVM property belongs to this launch only; never persist it into a profile/version file.
       NSMutableDictionary *arguments = [metadata[@"arguments"] mutableCopy] ?: [NSMutableDictionary dictionary];
       NSMutableArray *jvm = [arguments[@"jvm_processed"] mutableCopy] ?: [NSMutableArray array];
-      NSData *json = [NSJSONSerialization dataWithJSONObject:gameArguments options:0 error:nil];
+      // After a crash in startup, Minecraft 26.x forces its saved graphics backend to OpenGL, which is black on a
+      // Metal instance. The launch argument overrides the saved choice (vanilla logs "in-game preferred graphics
+      // backend setting is ignored"); DEFAULT lets the Metal backend (Air's agent or MetalUniversal) take over.
+      NSArray<NSString *> *launchArguments = gameArguments;
+      NSString *base = metadata[@"inheritsFrom"] ?: metadata[@"id"];
+      if ([CofreLastRendererPick containsString:@"metallum"] && base.integerValue >= 26) {
+        launchArguments = [gameArguments arrayByAddingObjectsFromArray:@[ @"--graphicsBackend", @"default" ]];
+      }
+      NSData *json = [NSJSONSerialization dataWithJSONObject:launchArguments options:0 error:nil];
       [jvm addObject:[@"-Dcofre.gameArguments=" stringByAppendingString:[json base64EncodedStringWithOptions:0]]];
       arguments[@"jvm_processed"] = jvm;
       metadata[@"arguments"] = arguments;
@@ -1281,6 +1292,7 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
       return NO;
     }
   }
+  CofreLastRendererPick = pick;
   NSLog(@"[Cofre] renderer resolved -> %@ for %@ loader=%@", pick, metadata[@"id"],
         profile[CofreRequestedLoaderKey] ?: profile[@"loader"] ?: @"inferred");
   [self applyResolution];
