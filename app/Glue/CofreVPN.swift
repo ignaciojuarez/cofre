@@ -21,6 +21,10 @@ enum CofreVPN {
 
     /// Starts an existing, user-approved configuration without prompting.
     static func startIfInstalled() async {
+        guard ProvisioningProfile.current?.hasPacketTunnel == true else {
+            NSLog("[Cofre] tunnel unavailable: signer lacks Packet Tunnel entitlement")
+            return
+        }
         do {
             guard let m = try await manager(), m.isEnabled,
                   let session = m.connection as? NETunnelProviderSession else {
@@ -38,6 +42,9 @@ enum CofreVPN {
     /// Creates or re-enables the configuration, then waits up to 15 s for the tunnel to connect.
     @discardableResult
     static func connect() async throws -> NETunnelProviderSession {
+        guard ProvisioningProfile.current?.hasPacketTunnel == true else {
+            throw Failure(errorDescription: ProvisioningProfile.packetTunnelUnavailableMessage)
+        }
         let m = try await manager() ?? NETunnelProviderManager()
         if !m.isEnabled || m.protocolConfiguration == nil {
             let p = NETunnelProviderProtocol()

@@ -183,6 +183,13 @@
             XCTAssertEqual(SetupFlow.nextStep(7, setup: ready), 7)
         }
 
+        func testBlockedSignerDoesNotAdvertiseJITReady() {
+            let store = CofreStore(services: .mock(), defaults: freshDefaults())
+            store.setup = SetupState(
+                devMode: .blocked, trust: .ready, pairing: .ready, vpn: .blocked, jit: .blocked, account: .ready)
+            XCTAssertFalse(store.isJITReady)
+        }
+
         func testCompleteBackendSkipsWizard() async {
             let store = CofreStore(services: .mock(), defaults: freshDefaults())
             await store.start()

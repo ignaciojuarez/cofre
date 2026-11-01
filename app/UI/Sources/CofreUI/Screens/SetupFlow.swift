@@ -151,15 +151,21 @@
                     default: Badge("Off", tone: .danger)
                     }
                 })
-            ListSection(spacing: 4) {
-                Row("Open the Settings app", leading: { RowIndex(1) })
-                Row("Privacy & Security", leading: { RowIndex(2) })
-                Row("Developer Mode → On", leading: { RowIndex(3) })
-                Row("Restart → Turn On (or Enable)", leading: { RowIndex(4) })
+            if s == .blocked {
+                Banner("This signer doesn't provide Developer Mode support.", icon: .cross, tone: .danger)
+                Text("Re-sign Cofre with a development profile to use its built-in JIT and VPN.")
+                    .cofreFont(.secondary).foregroundStyle(Color.cofre.inkSoft)
+            } else {
+                ListSection(spacing: 4) {
+                    Row("Open the Settings app", leading: { RowIndex(1) })
+                    Row("Privacy & Security", leading: { RowIndex(2) })
+                    Row("Developer Mode → On", leading: { RowIndex(3) })
+                    Row("Restart → Turn On (or Enable)", leading: { RowIndex(4) })
+                }
             }
             if s.isReady {
                 BlockButton("Next", role: .primary, action: next).keyboardShortcut(.defaultAction)
-            } else {
+            } else if s != .blocked {
                 BlockButton("Open Settings", role: .primary) { store.backend.openDeveloperModeSettings() }
                 BlockButton("Check again") { Task { await store.backend.recheckSetup() } }
             }
@@ -188,6 +194,16 @@
                 Row(
                     "Works until", leading: { StatusMark(state: s == nil ? .unknown : .ready) },
                     trailing: { Meta(s.map { $0.expires.formatted(date: .abbreviated, time: .omitted) } ?? "—") })
+                Row(
+                    "Local VPN", leading: {
+                        StatusMark(state: s == nil ? .unknown : (s?.packetTunnel == true ? .ready : .blocked))
+                    },
+                    trailing: { Meta(s?.packetTunnel == true ? "Available" : "Missing") })
+                Row(
+                    "Built-in JIT", leading: {
+                        StatusMark(state: s == nil ? .unknown : (s?.builtInJIT == true ? .ready : .blocked))
+                    },
+                    trailing: { Meta(s?.builtInJIT == true ? "Available" : "Missing") })
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text("Asked to trust?").cofreFont(.rowTitle).foregroundStyle(Color.cofre.ink)
@@ -265,14 +281,18 @@
                 Row("Leaves device", trailing: { Meta("Never", tone: .success) })
                 Row("Browsing", trailing: { Meta("Untouched", tone: .success) })
             }
-            if case .failed(let msg) = s {
+            if s == .blocked {
+                Banner("This signer can't provide Cofre's local VPN.", icon: .cross, tone: .danger)
+                Text("Re-sign with a profile that includes the Packet Tunnel entitlement.")
+                    .cofreFont(.secondary).foregroundStyle(Color.cofre.inkSoft)
+            } else if case .failed(let msg) = s {
                 Banner(msg, icon: .cross, tone: .danger)
                 Text("Turn off other VPNs (work, ad blocker), then try again.").cofreFont(.secondary).foregroundStyle(
                     Color.cofre.inkSoft)
             }
             if s.isReady {
                 BlockButton("Next", role: .primary, action: next).keyboardShortcut(.defaultAction)
-            } else {
+            } else if s != .blocked {
                 BlockButton("Allow VPN", role: .primary, isLoading: s == .checking) { Task { await store.startVPN() } }
                 Text("When iOS asks, tap Allow and enter your passcode.").cofreFont(.secondary).foregroundStyle(
                     Color.cofre.muted)
@@ -295,13 +315,16 @@
             let s = store.setup.jit
             StepHeader(
                 index: 5, glyph: .bolt,
-                title: s.isReady ? "JIT works" : s.isFailed ? "JIT didn't turn on" : "Testing JIT",
+                title: s == .blocked
+                    ? "JIT unavailable" : s.isReady ? "JIT works" : s.isFailed ? "JIT didn't turn on" : "Testing JIT",
                 lede: "Runs by itself. Needs Wi-Fi, or Airplane Mode for a moment.", step: $step
             )
             .task {
                 // Starts by itself; the button below is only for retries.
                 // Unstructured, so leaving the step doesn't cancel a test halfway.
-                if !store.setup.jit.isReady && !store.jitTesting { Task { await store.testJIT() } }
+                if store.setup.jit != .blocked && !store.setup.jit.isReady && !store.jitTesting {
+                    Task { await store.testJIT() }
+                }
             }
             JITStepRows()
             if s.isReady, let d = store.device {
@@ -312,7 +335,7 @@
             JITFailure()
             if s.isReady {
                 BlockButton("Next", role: .primary, action: next).keyboardShortcut(.defaultAction)
-            } else if s.isFailed {
+            } else if s.isFailed && s != .blocked {
                 BlockButton("Try again", role: .primary, isLoading: store.jitTesting) { Task { await store.testJIT() } }
             }
         }
@@ -328,6 +351,10 @@
                     Color.cofre.inkSoft
                 )
                 .fixedSize(horizontal: false, vertical: true)
+            } else if store.setup.jit == .blocked {
+                Banner("This signer can't enable Cofre's built-in JIT.", icon: .cross, tone: .danger)
+                Text("Use a development-signed IPA with JIT and Packet Tunnel entitlements.")
+                    .cofreFont(.secondary).foregroundStyle(Color.cofre.inkSoft)
             }
         }
     }

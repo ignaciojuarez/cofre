@@ -154,7 +154,10 @@
         public var activeAccount: Account? { accounts.first { $0.isActive } ?? accounts.first }
         public var updateCount: Int { modsInstance?.updatesAvailable ?? 0 }
         /// JIT turns on by itself at Play, so it's ready once it can: a passed test, or a valid pairing with the VPN set up.
-        public var isJITReady: Bool { setup.jit.isReady || (setup.pairing.isReady && setup.vpn.isReady) }
+        /// A signer-blocked build must not advertise the optimistic pairing/VPN fallback.
+        public var isJITReady: Bool {
+            setup.jit.isReady || (setup.jit != .blocked && setup.pairing.isReady && setup.vpn.isReady)
+        }
         /// The wizard shows only for users who never finished it, once their state has loaded. It stays up through
         /// S08 Ready even when every check passes mid-flow; `finishSetup()` (Play) or a complete state at load ends it.
         public var showsSetup: Bool { setupLoaded && !setupCompleted }
@@ -247,6 +250,7 @@
         }
 
         public func testJIT() async {
+            guard setup.jit != .blocked else { return }
             jitTesting = true
             jitSteps = JITStatusStep.Kind.allCases.map { JITStatusStep(kind: $0, state: .unknown) }
             setup.jit = .checking

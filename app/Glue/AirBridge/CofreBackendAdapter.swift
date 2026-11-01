@@ -95,19 +95,37 @@
         }
         /// Checks not done yet stay `.unknown` (no error shown); `.failed` is only for an attempt that failed.
         public func recheckSetup() async {
-            // iOS opens a development build only with Developer Mode on and its signer trusted.
-            setup.devMode = ProvisioningProfile.current?.isDevelopment == true ? .ready : .blocked
+            let profile = ProvisioningProfile.current
+            let externallyJIT = isJITEnabled
+            // An external JIT service has already attached a debugger, so the local signing checks are satisfied for
+            // this launch even when the re-signer cannot carry Cofre's own entitlements.
+            setup.devMode = profile?.isDevelopment == true || externallyJIT ? .ready : .blocked
             setup.trust = .ready
             let pairingReady = hasPairing()
-            setup.pairing = pairingReady ? .ready : (setup.pairing.isReady ? .unknown : setup.pairing)
+            setup.pairing = externallyJIT || pairingReady ? .ready : (setup.pairing.isReady ? .unknown : setup.pairing)
             await refreshVPNStatus()
-            if await CofreVPN.isAllowed() { setup.vpn = .ready } else if setup.vpn.isReady { setup.vpn = .unknown }
+            if externallyJIT {
+                setup.vpn = .ready
+            } else if profile?.hasPacketTunnel != true {
+                setup.vpn = .blocked
+            } else if await CofreVPN.isAllowed() {
+                setup.vpn = .ready
+            } else if setup.vpn.isReady {
+                setup.vpn = .unknown
+            } else if setup.vpn == .blocked {
+                setup.vpn = .unknown
+            }
             // The debugger attaches only at launch, so a passed JIT test stays ready until the pairing goes away.
-            if pairingReady && isJITEnabled {
+            if externallyJIT {
                 setup.jit = .ready
+            } else if profile?.supportsBuiltInJIT != true {
+                UserDefaults.standard.removeObject(forKey: PreferenceKey.setupJIT.rawValue)
+                setup.jit = .blocked
             } else if !pairingReady && setup.jit.isReady {
                 // A remembered JIT test means nothing without a complete pairing key: launches would fail.
                 UserDefaults.standard.removeObject(forKey: PreferenceKey.setupJIT.rawValue); setup.jit = .unknown
+            } else if setup.jit == .blocked {
+                setup.jit = .unknown
             }
             let accountReady = accountStore.list().contains { $0.state == .ready }
             if accountReady { setup.account = .ready } else if setup.account.isReady { setup.account = .unknown }
@@ -529,7 +547,9 @@
         public func signingInfo() async -> SigningInfo? {
             ProvisioningProfile.current.map {
                 // Running at all means this device is in the profile.
-                SigningInfo(team: $0.team, expires: $0.expires, deviceRegistered: true)
+                SigningInfo(team: $0.team, expires: $0.expires, deviceRegistered: true,
+                            packetTunnel: $0.hasPacketTunnel, builtInJIT: $0.supportsBuiltInJIT,
+                            memoryEntitlements: $0.hasMemoryEntitlements)
             }
         }
         public func appInfo() -> AppInfo {

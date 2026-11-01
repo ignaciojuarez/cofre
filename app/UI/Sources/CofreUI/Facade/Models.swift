@@ -609,11 +609,16 @@
     }
     public struct SigningInfo: Equatable, Sendable {
         public var team: String, expires: Date, deviceRegistered: Bool, installed: Bool
-        public init(team: String, expires: Date, deviceRegistered: Bool, installed: Bool = true) {
+        public var packetTunnel: Bool, builtInJIT: Bool, memoryEntitlements: Bool
+        public init(team: String, expires: Date, deviceRegistered: Bool, installed: Bool = true,
+                    packetTunnel: Bool = true, builtInJIT: Bool = true, memoryEntitlements: Bool = true) {
             self.team = team
             self.expires = expires
             self.deviceRegistered = deviceRegistered
             self.installed = installed
+            self.packetTunnel = packetTunnel
+            self.builtInJIT = builtInJIT
+            self.memoryEntitlements = memoryEntitlements
         }
     }
 

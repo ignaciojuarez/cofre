@@ -26,6 +26,9 @@ public final class CofreJIT: @unchecked Sendable {
     /// A tunnel iOS killed (memory limit, reinstall, a debugger terminating the app) can still read as connected and
     /// drops the message without a reply. Restart it once and ask again.
     public static func enable(pid: Int32, pairingURL: @escaping () -> URL) async -> CofreJITStatus {
+        guard ProvisioningProfile.current?.supportsBuiltInJIT == true else {
+            return .failed(ProvisioningProfile.builtInJITUnavailableMessage)
+        }
         var session: NETunnelProviderSession
         do { session = try await CofreVPN.connect() } catch { return .failed(error.localizedDescription) }
         let first = await CofreJIT(tunnel: { session }, pairingURL: pairingURL).enable(pid: pid)
