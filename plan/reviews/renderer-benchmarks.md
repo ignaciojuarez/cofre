@@ -44,7 +44,7 @@ Measured results only: what launched, what rendered, frame rate, memory, limits.
 |---|---|---|---|---|---|---|---|---|
 | 10-30 | 1.21.x | Fabric, <20 mods | GL path | ✅ | ✅ | <20 | — | User report: CPU ~100%, GPU idle, ticks lagging |
 | 10-30 | 1.21.x | NeoForge, <20 mods | GL path | ✅ | ✅ | <20 | — | Same |
-| 10-31 | 26.2 | **NeoForge 26.2.0.93, 35 mods** (Connector kit + MetalUniversal 1.0.4, EvilCraft, Biomes O' Plenty, Waystones, JEI, Friends&Foes, Villages&Pillages, T&T, Naturalist, Paraglider…) | Metal (MetalUniversal via Connector) | ✅ | ✅ world | 50–58 when chunks settle; dips to 0–30 during worldgen | 3596 | After the forced-OpenGL fix (c76287d, 260f351): `Graphics backend forced to default by launch argument`, `Using graphics backend Metal`. World load 9.7 s; server 2–3.5 s behind early (CPU-bound worldgen). Thermal fair |
+| 10-31 | 26.2 | **NeoForge 26.2.0.93, 35 mods** (Connector kit + MetalUniversal 1.0.4, EvilCraft, Biomes O' Plenty, Waystones, JEI, Friends&Foes, Villages&Pillages, T&T, Naturalist, Paraglider…) | Metal (MetalUniversal via Connector) | ✅ | ✅ world | 50–58 when chunks settle; dips to 0–30 during worldgen | 3596 | Render 16, simulation 12, Fancy graphics. After the forced-OpenGL fix (c76287d, 260f351): `Graphics backend forced to default by launch argument`, `Using graphics backend Metal`. World load 9.7 s; server 2–3.5 s behind early (CPU-bound worldgen). Thermal fair |
 
 ## Can it run on Metal?
 
