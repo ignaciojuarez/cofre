@@ -97,6 +97,8 @@
         public private(set) var unexpectedGameExit: GameSession?
         public var logs: [LogKind: [LogLine]] = [:]
         public var pendingModCompatibility: [ModCompatibilityIssue]?
+        /// Play's requirements sheet over the launch screen: what the instance's mods need and don't have.
+        public var pendingRequirements: [ModRequirement]?
         public var dismissedSlowModsNotices: Set<String> = []
 
         // System
@@ -348,6 +350,7 @@
             joiningServer = server
             launchRejoin = rejoin
             launchFailure = nil
+            pendingRequirements = nil
             launchLog = []
             launch = LaunchProgress(stage: 1, of: 7, title: "JIT")
             guard instances.first(where: { $0.id == id })?.restartRequired != true else {
@@ -361,23 +364,68 @@
                 }
             }
             Task {
-                do {
-                    let stream =
-                        rejoin.map {
-                            backend.rejoin(instanceID: id, kind: $0.kind, target: $0.target, accountID: activeAccount?.id)
-                        } ?? server.map {
-                            backend.joinServer(instanceID: id, address: $0.address, accountID: activeAccount?.id)
-                        } ?? backend.launch(instanceID: id, accountID: activeAccount?.id)
-                    for try await p in stream {
-                        if p.finished { GameSessionMarker.begin(instanceID: id, defaults: defaults) }
-                        launch = p
-                        if p.finished { UINotificationFeedbackGenerator().notificationOccurred(.success) }
+                // Forge/NeoForge stop on a missing library before any frame; ask first, while the launch screen shows.
+                if let loader = instances.first(where: { $0.id == id })?.loader, [.forge, .neoforge].contains(loader) {
+                    launch = LaunchProgress(stage: 1, of: 7, title: "Checking mods")
+                    let missing = await backend.playRequirements(instanceID: id)
+                    guard launch != nil, launchFailure == nil else { return }
+                    if !missing.isEmpty {
+                        NSLog("[Cofre] play requirements missing instance=%@ mods=%@", id,
+                              missing.map(\.modID).joined(separator: ","))
+                        pendingRequirements = missing
+                        return
                     }
-                } catch is CancellationError {
-                    launch = nil
-                } catch {
-                    launchFailure = (error as? LaunchFailure) ?? .unknown(error.localizedDescription)
                 }
+                await runLaunch(id)
+            }
+        }
+
+        /// The requirements sheet: "Get and play" installs them first; "Play anyway" doesn't.
+        public func resolvePlayRequirements(get: Bool) {
+            guard let missing = pendingRequirements, let id = activeInstance?.id else {
+                pendingRequirements = nil
+                return
+            }
+            pendingRequirements = nil
+            CofreBreadcrumb.log("play-requirements", details: "get=\(get) mods=\(missing.map(\.modID).joined(separator: ","))")
+            Task {
+                if get {
+                    launch = LaunchProgress(stage: 1, of: 7, title: "Getting mods", detail: missing.map(\.name).formatted())
+                    do { try await backend.installRequirements(missing, instanceID: id) } catch {
+                        launchFailure = .unknown(error.localizedDescription)
+                        return
+                    }
+                    if id == modsInstance?.id { await loadInstalled(.mods) }
+                }
+                guard launch != nil else { return }
+                await runLaunch(id)
+            }
+        }
+
+        /// The requirements sheet closed without a choice: no launch.
+        public func cancelPlayRequirements() async {
+            pendingRequirements = nil
+            await cancelLaunch()
+        }
+
+        private func runLaunch(_ id: String) async {
+            let server = joiningServer, rejoin = launchRejoin
+            do {
+                let stream =
+                    rejoin.map {
+                        backend.rejoin(instanceID: id, kind: $0.kind, target: $0.target, accountID: activeAccount?.id)
+                    } ?? server.map {
+                        backend.joinServer(instanceID: id, address: $0.address, accountID: activeAccount?.id)
+                    } ?? backend.launch(instanceID: id, accountID: activeAccount?.id)
+                for try await p in stream {
+                    if p.finished { GameSessionMarker.begin(instanceID: id, defaults: defaults) }
+                    launch = p
+                    if p.finished { UINotificationFeedbackGenerator().notificationOccurred(.success) }
+                }
+            } catch is CancellationError {
+                launch = nil
+            } catch {
+                launchFailure = (error as? LaunchFailure) ?? .unknown(error.localizedDescription)
             }
         }
 

@@ -242,6 +242,14 @@
             }
         }
         public func cancelLaunch() async { launchTask?.cancel() }
+        /// What Play's preflight finds missing; Get and play installs (clears) it.
+        public var missingRequirements: [ModRequirement] = []
+        public private(set) var installedRequirements: [ModRequirement] = []
+        public func playRequirements(instanceID: String) async -> [ModRequirement] { missingRequirements }
+        public func installRequirements(_ requirements: [ModRequirement], instanceID: String) async throws {
+            installedRequirements += requirements
+            missingRequirements.removeAll { r in requirements.contains { $0.modID == r.modID } }
+        }
 
         // MARK: GAP-02 LogSource
         public static let sampleLog: [LogLine] = [

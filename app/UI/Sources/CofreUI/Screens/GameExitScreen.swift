@@ -29,14 +29,26 @@
         }
     }
 
+    /// "Turn off Distant Horizons": the mod the crash named, when its file is in the instance's mods folder.
+    public struct GameExitTurnOff {
+        public let name: String
+        public let turnOff: () throws -> Void
+        public init(name: String, turnOff: @escaping () throws -> Void) {
+            self.name = name
+            self.turnOff = turnOff
+        }
+    }
+
     /// The whole screen for a hosting controller: measures its window like `CofreRootView`.
     public struct GameExitView: View {
         let report: GameExitReport, intent: RejoinIntent?, reportURL: URL?, reportPreview: ReportPreviewData?, close: () -> Void, retry: () -> Void, showDetails: Bool
         let turnShadersOff: (() throws -> Void)?
         let fix: GameExitFix?
+        let turnModOff: GameExitTurnOff?
         /// `showDetails` opens Details right away (preview host). `turnShadersOff` is set when shaders likely caused the crash.
-        public init(report: GameExitReport, intent: RejoinIntent? = nil, reportURL: URL? = nil, reportPreview: ReportPreviewData? = nil, showDetails: Bool = false, close: @escaping () -> Void, retry: (() -> Void)? = nil, turnShadersOff: (() throws -> Void)? = nil, fix: GameExitFix? = nil) {
+        public init(report: GameExitReport, intent: RejoinIntent? = nil, reportURL: URL? = nil, reportPreview: ReportPreviewData? = nil, showDetails: Bool = false, close: @escaping () -> Void, retry: (() -> Void)? = nil, turnShadersOff: (() throws -> Void)? = nil, fix: GameExitFix? = nil, turnModOff: GameExitTurnOff? = nil) {
             self.turnShadersOff = turnShadersOff
+            self.turnModOff = turnModOff
             self.fix = fix
             self.report = report
             self.intent = intent
@@ -49,7 +61,7 @@
 
         public var body: some View {
             GeometryReader { g in
-                GameExitScreen(report: report, intent: intent, reportURL: reportURL, reportPreview: reportPreview, size: g.size, close: close, retry: retry, turnShadersOff: turnShadersOff, fix: fix, showDetails: showDetails).sizeClasses(
+                GameExitScreen(report: report, intent: intent, reportURL: reportURL, reportPreview: reportPreview, size: g.size, close: close, retry: retry, turnShadersOff: turnShadersOff, fix: fix, turnModOff: turnModOff, showDetails: showDetails).sizeClasses(
                     SizeClasses(g.size))
             }
             .preferredColorScheme(.dark)
@@ -61,15 +73,17 @@
         let report: GameExitReport, intent: RejoinIntent?, reportURL: URL?, reportPreview: ReportPreviewData?, size: CGSize, close: () -> Void, retry: () -> Void
         let turnShadersOff: (() throws -> Void)?
         var fix: GameExitFix? = nil
+        var turnModOff: GameExitTurnOff? = nil
         @State var showDetails = false
         @State private var fixState = FixState.idle
         @State private var shadersOff = false
+        @State private var modOff = false
         @State private var copied = false
         @State private var showReportShare = false
 
         enum FixState: Equatable { case idle, working, done, failed(String) }
-        /// Get comes first until the missing mod is in; then Play again does.
-        private var fixPending: Bool { fix != nil && fixState != .done }
+        /// Get (or Turn off) comes first until it's done; then Play again does.
+        private var fixPending: Bool { fix != nil && fixState != .done || turnModOff != nil && !modOff }
 
         /// iPhone landscape: short and wide, so text and actions sit side by side.
         private var sideBySide: Bool { size.width >= 600 && size.height < 500 }
@@ -128,7 +142,8 @@
                 .fixedSize(horizontal: false, vertical: true)
             VStack(alignment: .leading, spacing: 6) {
                 SectionLabel("Next step")
-                Text(verbatim: fix.map { "Get \($0.name) for this instance, then play again." } ?? report.nextStep).cofreFont(.body).foregroundStyle(Color.cofre.inkSoft)
+                Text(verbatim: fix.map { "Get \($0.name) for this instance, then play again." }
+                    ?? turnModOff.map { "Turn off \($0.name), then play again." } ?? report.nextStep).cofreFont(.body).foregroundStyle(Color.cofre.inkSoft)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(12)
@@ -143,6 +158,15 @@
                 } else {
                     BlockButton("Turn shaders off", size: .large) {
                         shadersOff = (try? turnShadersOff()) != nil
+                    }
+                }
+            }
+            if let turnModOff {
+                if modOff {
+                    Banner("\(turnModOff.name) is off. Play again to try without it.", icon: .check, tone: .success)
+                } else {
+                    BlockButton("Turn off \(turnModOff.name)", role: .primary, size: .large) {
+                        modOff = (try? turnModOff.turnOff()) != nil
                     }
                 }
             }
@@ -166,7 +190,7 @@
                     retry()
                 }
                 BlockButton("Close Cofre", role: .ghost, size: .large, action: close)
-            } else if fix != nil {
+            } else if fix != nil || turnModOff != nil {
                 // Play again closes Cofre too (Java runs once per launch); the name says what it's for.
                 BlockButton("Play again", role: fixPending ? .secondary : .primary, size: .large, action: retry)
                 BlockButton("Close Cofre", role: .ghost, size: .large, action: close)

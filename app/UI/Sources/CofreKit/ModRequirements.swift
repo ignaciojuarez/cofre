@@ -116,6 +116,14 @@ public struct ModRequirement: Hashable, Sendable {
     /// The file that needs it ("bountiful-neoforge-8.0.0-beta.2.jar"), when known.
     public var neededBy: String?
 
+    public init(modID: String, name: String, projectID: String? = nil, reason: String, neededBy: String? = nil) {
+        self.modID = modID
+        self.name = name
+        self.projectID = projectID
+        self.reason = reason
+        self.neededBy = neededBy
+    }
+
     /// Modrinth slugs to look up when `projectID` is nil: the alias first, then the mod ID as written and dashed.
     public var slugs: [String] {
         var out = [ModRequirements.aliases[modID], modID, modID.replacingOccurrences(of: "_", with: "-")].compactMap {
@@ -143,6 +151,8 @@ public enum ModRequirements {
         "bookshelf": "bookshelf-lib", "owo": "owo-lib", "yet_another_config_lib_v3": "yacl", "fabric": "fabric-api",
         "fabric_language_kotlin": "fabric-language-kotlin", "sophisticatedcore": "sophisticated-core",
     ]
+    /// How a library is written, for "Get TerraBlender, GlitchCore" before Modrinth has said.
+    static let names: [String: String] = ["terrablender": "TerraBlender", "glitchcore": "GlitchCore"]
 
     /// Required by a jar in `jars` (file name → its mods.toml) and provided by none of them, nor by a file whose name
     /// carries the mod ID (`otherFiles`: enabled jars without a mods.toml, like a provider jar). Language providers
@@ -174,10 +184,13 @@ public enum ModRequirements {
     /// What a mod-loading crash says is missing:
     /// - NeoForge: "Mod File mods/x.jar needs language provider kotlinforforge:4 or above to load"
     /// - NeoForge: "Mod bountiful requires kotlinforforge 4.0 or above" + "Currently, kotlinforforge is not installed"
-    /// - Forge: "Mod ID: 'kotlinforforge', Requested by: 'bountiful', Expected range: '[4,)', Actual version: '[MISSING]'"
+    /// - Forge, and NeoForge 26.2's "Missing or unsupported mandatory dependencies:" list: "Mod ID: 'kotlinforforge',
+    ///   Requested by: 'bountiful', Expected range: '[4,)', Actual version: '[MISSING]'"
     /// - Fabric: "… requires any version of fabric-language-kotlin, which is missing!"
     /// A version that's installed but too old isn't missing; that needs an update, not a Get.
     public static func fromCrash(_ text: String) -> [ModRequirement] {
+        // NeoForge colours its own copy of the message ("Mod §ebiomesoplenty§r requires §6terrablender§r").
+        let text = text.replacingOccurrences(of: "§[0-9a-fk-or]", with: "", options: .regularExpression)
         var out: [ModRequirement] = []
         func add(_ r: ModRequirement) {
             if !builtIn.contains(r.modID), !out.contains(where: { $0.modID == r.modID }) { out.append(r) }
@@ -210,7 +223,8 @@ public enum ModRequirements {
         let id = id.lowercased()
         let known = providers[id]
         return ModRequirement(
-            modID: id, name: known?.name ?? id, projectID: known?.project, reason: reason, neededBy: neededBy)
+            modID: id, name: known?.name ?? names[id] ?? id, projectID: known?.project, reason: reason,
+            neededBy: neededBy)
     }
 
     private static func key(_ s: String) -> String { s.lowercased().filter { $0.isLetter || $0.isNumber } }

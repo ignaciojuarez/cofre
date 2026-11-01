@@ -24,6 +24,19 @@
                 }
                 .keyboardShortcut(.cancelAction).opacity(0).allowsHitTesting(false).accessibilityHidden(true)
             }
+            .blockSheet(
+                item: Binding(
+                    get: { store.pendingRequirements.map(PlayRequirementsRoute.init) },
+                    set: { route in
+                        // Swiped away without a choice: no launch.
+                        guard route == nil, store.pendingRequirements != nil else { return }
+                        Task { await store.cancelPlayRequirements() }
+                        nav.showingLaunch = false
+                    }),
+                hugsContent: true
+            ) { route in
+                PlayRequirementsSheet(route: route).environment(store)
+            }
             .onChange(of: store.launch?.stage) { _, stage in
                 // VoiceOver hears progress at most every 2 s (spec §2 #13).
                 guard let p = store.launch, let stage, Date.now.timeIntervalSince(lastAnnouncement) >= 2 || p.finished

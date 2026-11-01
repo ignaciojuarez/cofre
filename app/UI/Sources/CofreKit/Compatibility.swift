@@ -273,7 +273,9 @@ public struct CompatibilityIssue: Hashable, Sendable {
         self.kind = kind; self.renderer = renderer; self.file = file
     }
     public var title: String { kind == .shaders ? "Shaders don't run here" : "\(modName) doesn't run here" }
-    public var badge: String { "Not on \(renderer) · \(gameVersion)" }
+    public var badge: String {
+        renderer == ContentCompatibility.pcOnlyRenderer ? "PC-only" : "Not on \(renderer) · \(gameVersion)"
+    }
 }
 
 /// Which mods and shader packs can't run with an instance's renderer. Metal
@@ -299,13 +301,20 @@ public enum ContentCompatibility {
 
     public static func issue(id: String, name: String, kind: ContentKind, gameVersion: String, renderer: String,
                              manifest: RendererManifest, loader: Instance.Loader = .unknown) -> CompatibilityIssue? {
-        guard let shown = rendererName(renderer) else { return nil }
         let label = name.isEmpty ? id : name
+        if kind == .mods, let known = pcOnly(id: id, name: name) {
+            return CompatibilityIssue(modID: id, modName: known, gameVersion: gameVersion, reason: pcOnlyReason,
+                                      kind: kind, renderer: pcOnlyRenderer)
+        }
+        guard let shown = rendererName(renderer) else { return nil }
         func make(_ reason: String, as name: String = label) -> CompatibilityIssue {
             CompatibilityIssue(modID: id, modName: name, gameVersion: gameVersion, reason: reason, kind: kind, renderer: shown)
         }
         switch (kind, shown) {
         case (.mods, "Metal"):
+            if [id, name].map(normalized).contains(where: { $0.contains("distanthorizons") }) {
+                return make(distantHorizonsOnMetal, as: "Distant Horizons")
+            }
             if loader == .neoforge && gameVersion == "26.2" {
                 let key = normalized(id + name)
                 if ["iris", "oculus", "embeddium", "sodium"].contains(where: { key.contains($0) }) {
@@ -367,6 +376,22 @@ public enum ContentCompatibility {
     /// Stock Iris fails on Metal with "No GLCapabilities instance set".
     public static let irisOnMetal = "Iris needs OpenGL; Metal runs without shaders for now."
     public static let neoForgeMetalGL = "This NeoForge renderer uses OpenGL; the 26.2 Metal kit has not validated it."
+
+    public static let distantHorizonsOnMetal = "Distant Horizons draws with OpenGL; turns Metal black."
+    public static let pcOnlyReason = "PC-only: doesn't run on iPhone/iPad."
+    /// `CompatibilityIssue.renderer` for a mod that runs on no renderer here; its badge reads "PC-only".
+    public static let pcOnlyRenderer = "PC"
+
+    /// Mods with desktop native code (README's PC-only list), by file name, mod ID, slug or title.
+    static func pcOnly(id: String, name: String) -> String? {
+        let keys = [id, name].map(normalized)
+        func has(_ test: (String) -> Bool) -> Bool { keys.contains(where: test) }
+        if has({ $0.contains("soundphysics") }) { return "Sound Physics Remastered" }
+        // Simple Voice Chat's mod ID and files are "voicechat"; its add-ons need its native audio too.
+        if has({ $0.contains("simplevoicechat") || $0.hasPrefix("voicechat") }) { return "Simple Voice Chat" }
+        if has({ $0.contains("plasmovoice") }) { return "Plasmo Voice" }
+        return nil
+    }
 
     private static func normalized(_ s: String) -> String { s.lowercased().filter { $0.isLetter || $0.isNumber } }
 }

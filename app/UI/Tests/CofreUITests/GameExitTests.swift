@@ -129,6 +129,25 @@ final class GameExitTests: XCTestCase {
         XCTAssertTrue(r.nextStep.hasPrefix("Turn that mod off"))
     }
 
+    /// NeoForge 26.2 + MetalUniversal + Distant Horizons (iPhone 17 Pro, crash-2026-10-31_17.08.36-client.txt).
+    func testOpenGLModHandedAMetalTextureNamesTheMod() {
+        let report = """
+            Description: Render Frame
+
+            java.lang.ClassCastException: class com.metallum.client.metal.render.MetalGpuTexture cannot be cast to class com.mojang.blaze3d.opengl.GlTexture (com.metallum.client.metal.render.MetalGpuTexture is in module metallum@1.0.4 of loader 'TRANSFORMER' @3d4d3fe7; com.mojang.blaze3d.opengl.GlTexture is in module minecraft@26.2 of loader 'TRANSFORMER' @3d4d3fe7)
+            	at TRANSFORMER/minecraft@26.2/net.minecraft.client.renderer.Lightmap.handler$zkf000$distanthorizons$render(Lightmap.java:620) ~[minecraft-client-patched-<redacted-address>.jar:?] {neoforge:mixin[APP:DistantHorizons.neoforge.mixins.json:client.MixinLightTexture from mod distanthorizons]}
+            	at TRANSFORMER/minecraft@26.2/net.minecraft.client.renderer.Lightmap.render(Lightmap.java:93) ~[minecraft-client-patched-<redacted-address>.jar:?] {neoforge:mixin[APP:DistantHorizons.neoforge.mixins.json:client.MixinLightTexture from mod distanthorizons]}
+            	at TRANSFORMER/minecraft@26.2/net.minecraft.client.renderer.GameRenderer.render(GameRenderer.java:427) ~[minecraft-client-patched-<redacted-address>.jar:?] {neoforge:access_transformer,neoforge:access_transformer,neoforge:mixin[APP:fabric-rendering-v1.mixins.json:GameRendererMixin from mod fabric_rendering_v1,APP:DistantHorizons.neoforge.mixins.json:client.MixinGameRenderer from mod distanthorizons]}
+            """
+        let r = diagnose(-1, report: report)
+        XCTAssertEqual(r.reason, .mods)
+        XCTAssertEqual(r.clue, "Distant Horizons " + GameExitReport.needsGL)
+        XCTAssertEqual(r.explanation, "Distant Horizons " + GameExitReport.needsGL)
+        XCTAssertTrue(r.nextStep.hasPrefix("Turn that mod off"))
+        XCTAssertEqual(GameExitReport.metalGLModID(in: report.components(separatedBy: "\n")), "distanthorizons")
+        XCTAssertNil(GameExitReport.metalGLModID(in: ["java.lang.ClassCastException: class a.B cannot be cast to class c.D"]))
+    }
+
     func testSystemDetailsAndInfoLinesDontCount() {
         let report = """
             Description: Ticking entity

@@ -137,4 +137,27 @@ final class ModRequirementsTests: XCTestCase {
         XCTAssertEqual(
             ModRequirements.fromCrash("Mod x requires minecraft 1.21\nCurrently, minecraft is not installed"), [])
     }
+
+    /// NeoForge 26.2 + Biomes O' Plenty without its libraries (iPhone 17 Pro, black screen on Play).
+    func testFromCrashReadsNeoForge262MandatoryDependencies() {
+        let log = """
+            [17:02:04] [ForkJoinPool.commonPool-worker-5/ERROR]: Missing or unsupported mandatory dependencies:
+            	Mod ID: 'terrablender', Requested by: 'biomesoplenty', Expected range: '[26.2.0.0.1,)', Actual version: '[MISSING]'
+            	Mod ID: 'glitchcore', Requested by: 'biomesoplenty', Expected range: '[26.2.0.0.0,)', Actual version: '[MISSING]'
+            [17:02:04] [main/ERROR]: Mod \u{00A7}ebiomesoplenty\u{00A7}r requires \u{00A7}6terrablender\u{00A7}r \u{00A7}o26.2.0.0.1 or above\u{00A7}r
+            \u{00A7}7Currently, \u{00A7}6terrablender\u{00A7}r\u{00A7}7 is \u{00A7}o\u{00A7}nnot installed\u{00A7}r
+            [17:02:04] [main/ERROR]: Failed to start FML: net.neoforged.fml.ModLoadingException: Loading errors encountered:
+            	- Mod biomesoplenty requires terrablender 26.2.0.0.1 or above
+            	  Currently, terrablender is not installed
+            	- Mod biomesoplenty requires glitchcore 26.2.0.0.0 or above
+            	  Currently, glitchcore is not installed
+            	at net.neoforged.fml.startup.Entrypoint.startup(Entrypoint.java:65)
+            """
+        let found = ModRequirements.fromCrash(log)
+        XCTAssertEqual(found.map(\.modID), ["terrablender", "glitchcore"])
+        XCTAssertEqual(found.map(\.name), ["TerraBlender", "GlitchCore"])
+        XCTAssertEqual(found.map(\.neededBy), ["biomesoplenty", "biomesoplenty"])
+        XCTAssertTrue(LaunchFailure.modLoaderFailed(log))
+        XCTAssertFalse(LaunchFailure.modLoaderFailed("[main/INFO]: Loading 35 mods"))
+    }
 }

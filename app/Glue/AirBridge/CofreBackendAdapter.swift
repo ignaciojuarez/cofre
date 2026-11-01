@@ -283,11 +283,13 @@
                     var finished = false
                     var awaitingFirstFrame = false
                     var watchdog: Task<Void, Never>?
+                    var loaderWatch: Task<Void, Never>?
                     func finish(_ reason: String, error: Error? = nil) {
                         guard !finished else { return }
                         finished = true
                         if reason != "inGame" { Task { @MainActor in self.launchingGameDirectory = nil } }
                         watchdog?.cancel()
+                        loaderWatch?.cancel()
                         NSLog("[Cofre] launch state=%@", reason)
                         if reason == "inGame" { Task { @MainActor in self.air.hideCofreLaunchOverlay() } }
                         if let error { continuation.finish(throwing: error) } else { continuation.finish() }
@@ -329,6 +331,13 @@
                         self.seedViewDistances(instance, instanceID: instanceID)
                         self.applyJavaHeap(instanceID: instanceID)
                         NSLog("[Cofre] launch JIT ready; starting Air")
+                        if instance.loader == .forge || instance.loader == .neoforge {
+                            let loader = instance.loader == .forge ? "Forge" : "NeoForge"
+                            loaderWatch = self.watchModLoaderFailure {
+                                finish("failed reason=modLoader",
+                                       error: LaunchFailure.unknown("\(loader) couldn't load the mods."))
+                            }
+                        }
                         self.air.launchProfile(instanceID, accountID: accountID, gameArguments: gameArguments) { event, fraction, message in
                             Task { @MainActor in
                             switch event {
@@ -376,6 +385,46 @@
                 continuation.onTermination = { _ in task.cancel() }
             }
         }
+        /// FML's own error screen can't draw on Metal and the JVM doesn't exit, so a mod-loading failure would sit on a
+        /// black screen: on "Failed to start FML" before the first frame, `failed` ends the launch and Cofre's exit
+        /// screen (with its "Get TerraBlender") shows. Cancel it once the first frame is up.
+        func watchModLoaderFailure(_ failed: @escaping @MainActor () -> Void) -> Task<Void, Never> {
+            let log = LogStore().latestLog
+            return Task { @MainActor in
+                let watch = Task.detached(priority: .utility) { await Self.modLoaderFailure(in: log) }
+                let text = await withTaskCancellationHandler { await watch.value } onCancel: { watch.cancel() }
+                guard let text, !Task.isCancelled else { return }
+                NSLog("[Cofre] launch mod loader failed before first frame; showing exit screen")
+                self.recordJVMUse()
+                failed()
+                CofreGameExit.handle(code: 1, root: nil, bridge: self.air, launcherLog: text)
+            }
+        }
+
+        /// Waits for `LaunchFailure.modLoaderFailed` in what the launch appends to `url`, then returns that text once
+        /// the rest of the error is written. Nil when cancelled (the first frame came, or the launch ended).
+        nonisolated static func modLoaderFailure(in url: URL) async -> String? {
+            var offset = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? NSNumber)?.uint64Value ?? 0
+            var seen = ""
+            func readNew() -> String {
+                guard let handle = try? FileHandle(forReadingFrom: url) else { return "" }
+                defer { try? handle.close() }
+                guard (try? handle.seek(toOffset: offset)) != nil, let data = try? handle.readToEnd() else { return "" }
+                offset += UInt64(data.count)
+                return String(decoding: data, as: UTF8.self)
+            }
+            while !Task.isCancelled {
+                seen += readNew()
+                if LaunchFailure.modLoaderFailed(seen) {
+                    try? await Task.sleep(for: .seconds(2))
+                    return Task.isCancelled ? nil : String((seen + readNew()).suffix(100_000))
+                }
+                if seen.count > 400_000 { seen = String(seen.suffix(2_000)) }
+                try? await Task.sleep(for: .seconds(1))
+            }
+            return nil
+        }
+
         public func rejoin(instanceID: String, kind: RejoinIntent.Kind, target: String, accountID: String?) -> AsyncThrowingStream<LaunchProgress, Error> {
             if kind == .server { return joinServer(instanceID: instanceID, address: target, accountID: accountID) }
             let version = (try? storedInstance(instanceID).gameVersion) ?? ""

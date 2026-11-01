@@ -127,6 +127,7 @@ enum FMLConfig { static func disableEarlyWindow(in directory: URL) throws {} }
     func applyJavaHeap(instanceID: String) {}
     func seedViewDistances(_ instance: Instance, instanceID: String) {}
     func checkDiskBeforeLaunch(_ instance: Instance, root: URL) async throws {}
+    func watchModLoaderFailure(_ failed: @escaping @MainActor () -> Void) -> Task<Void, Never> { Task {} }
     enum SetupStatus { case ready }
     struct SetupState { var jit = SetupStatus.ready }
     var setup = SetupState()

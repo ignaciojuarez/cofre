@@ -1,3 +1,4 @@
+import CofreKit
 import Foundation
 
 // MARK: Game input
@@ -120,10 +121,18 @@ import Foundation
         func rejoin(instanceID: String, kind: RejoinIntent.Kind, target: String, accountID: String?) -> AsyncThrowingStream<LaunchProgress, Error>
 
         func cancelLaunch() async
+        /// Play's preflight: mods the instance's enabled jars need (Forge/NeoForge mods.toml) that nothing installed
+        /// provides, with Modrinth's project and name filled in and `neededBy` as the needing mod's name. Fast when
+        /// nothing is missing (the reads are cached); empty when unknown.
+        func playRequirements(instanceID: String) async -> [ModRequirement]
+        /// "Get and play": installs them like Get on a mod page.
+        func installRequirements(_ requirements: [ModRequirement], instanceID: String) async throws
     }
 
     public extension LaunchControl {
         func rejoin(instanceID: String, kind: RejoinIntent.Kind, target: String, accountID: String?) -> AsyncThrowingStream<LaunchProgress, Error> { launch(instanceID: instanceID, accountID: accountID) }
+        func playRequirements(instanceID: String) async -> [ModRequirement] { [] }
+        func installRequirements(_ requirements: [ModRequirement], instanceID: String) async throws {}
     }
 
     // MARK: GAP-02 · Logs (P02, X06)

@@ -63,3 +63,15 @@ public enum LaunchFailure: Error, Equatable, Sendable, LocalizedError {
         }
     }
 }
+
+extension LaunchFailure {
+    /// Forge or NeoForge gave up loading mods ("Failed to start FML: …ModLoadingException"). Its error screen can't
+    /// draw on Metal and the JVM keeps running, so the launch watches the log for these before the first frame.
+    public static let modLoaderFailureSigns = [
+        "Failed to start FML", "ModLoadingException", "Missing or unsupported mandatory dependencies",
+    ]
+
+    public static func modLoaderFailed(_ log: some StringProtocol) -> Bool {
+        modLoaderFailureSigns.contains { log.contains($0) }
+    }
+}

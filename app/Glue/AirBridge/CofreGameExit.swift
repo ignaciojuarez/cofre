@@ -23,7 +23,9 @@ extension ReportBundle.Context {
 @MainActor enum CofreGameExit {
     private static var window: UIWindow?
 
-    static func handle(code: Int, root: UIViewController?, bridge: (any CofreAirBridging)?) {
+    /// `launcherLog`: what the launch saw before the first frame (Forge/NeoForge's "Failed to start FML"), for when the
+    /// game log has none of it.
+    static func handle(code: Int, root: UIViewController?, bridge: (any CofreAirBridging)?, launcherLog: String? = nil) {
         NSLog("[Cofre] launch exit code=%d", code)
         GameSessionMarker.clear()
         // Shown before the first frame too: the launch screen closes when the game exits, and Java can't start
@@ -37,7 +39,8 @@ extension ReportBundle.Context {
         }
         let logs = LogStore(instance: instanceURL)
         let crashURL = logs.newestCrashReport(since: .distantPast)
-        let logText = logs.tail(.game, limit: 512).map(\.text).joined(separator: "\n")
+        let logText = ([logs.tail(.game, limit: 512).map(\.text).joined(separator: "\n")] + [launcherLog].compactMap { $0 })
+            .joined(separator: "\n")
         let crashText = crashURL.flatMap { try? String(contentsOf: $0, encoding: .utf8) }
         // Settings changed in game: logged as breadcrumbs, and named on the screen when they caused the crash.
         let before = bridge.flatMap { UserDefaults.standard.string(forKey: PreferenceKey.optionsBefore($0.selectedProfileName()).rawValue) } ?? ""
@@ -54,7 +57,8 @@ extension ReportBundle.Context {
         let host = UIHostingController(rootView: GameExitView(report: report, intent: intent, reportURL: reportBundle, reportPreview: ReportPreviewData(fields: preview.fields.map { "\($0.name): \($0.value)" }, files: preview.files), close: AppExit.close, retry: { AppExit.close() },
             turnShadersOff: instanceURL.flatMap { dir in
                 ShaderSwitch.causedCrash((crashText ?? "") + logText, gameDirectory: dir) ? { try ShaderSwitch.turnOff(in: dir) } : nil
-            }, fix: report.reason == .mods ? bridge.flatMap { missingModFix(crashText: crashText, log: logText, bridge: $0) } : nil))
+            }, fix: report.reason == .mods ? bridge.flatMap { missingModFix(crashText: crashText, log: logText, bridge: $0) } : nil,
+            turnModOff: report.reason == .mods ? instanceURL.flatMap { glModTurnOff(crashText: crashText, log: logText, gameDirectory: $0) } : nil))
         host.view.backgroundColor = .cofre.page
         host.overrideUserInterfaceStyle = .dark
         let w = UIWindow(windowScene: scene)
@@ -75,6 +79,27 @@ extension ReportBundle.Context {
         NSLog("[Cofre] crash fix offered mods=%@ instance=%@", needs.map(\.modID).joined(separator: ","), id)
         return GameExitFix(name: needs.map(\.name).formatted()) {
             try await backend.installRequirements(needs, instanceID: id)
+        }
+    }
+
+    /// "Turn off Distant Horizons" when the crash is a mod's OpenGL code getting a Metal object and its jar is on.
+    private static func glModTurnOff(crashText: String?, log: String, gameDirectory: URL) -> GameExitTurnOff? {
+        let lines = ((crashText ?? "") + "\n" + log).components(separatedBy: .newlines)
+        guard let id = GameExitReport.metalGLModID(in: lines) else { return nil }
+        let store = ContentStore(gameDirectory: gameDirectory)
+        let mods = ((try? store.list(.mods)) ?? []).filter(\.enabled)
+        let key = { (s: String) in s.lowercased().filter { $0.isLetter || $0.isNumber } }
+        guard
+            let jar = mods.first(where: { key($0.name).contains(key(id)) })
+                ?? mods.first(where: { m in
+                    ModsToml.read(jar: store.url(of: m), neoForge: true)?.modIDs.contains { $0.lowercased() == id } == true
+                })
+        else { return nil }
+        let name = GameExitReport.modName(id)
+        NSLog("[Cofre] crash fix offered turnOff=%@ file=%@", id, jar.id)
+        return GameExitTurnOff(name: name) {
+            try store.setEnabled(false, jar)
+            NSLog("[Cofre] crash fix turned off file=%@", jar.id)
         }
     }
 

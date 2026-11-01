@@ -73,8 +73,28 @@
             return out
         }
 
-        /// The crash screen's Get: installs what the crash named into `instanceID`, like Get on a mod page.
-        func installRequirements(_ requirements: [ModRequirement], instanceID: String) async throws {
+        /// Play's preflight: what the enabled jars need, named for the sheet ("Biomes O' Plenty needs TerraBlender").
+        public func playRequirements(instanceID: String) async -> [ModRequirement] {
+            let have = (try? await scan(.mods, instanceID: instanceID, online: false)) ?? []
+            let found = await missingRequirements(instanceID: instanceID, have: have).map { r in
+                var m = r.requirement
+                m.projectID = r.projectID
+                m.name = r.name
+                // Modrinth's title when the file is identified ("Biomes O' Plenty"), else the file's name.
+                m.neededBy =
+                    have.first { $0.id == m.neededBy }.map { item in
+                        item.projectID.flatMap { modCatalog.titles[$0] } ?? item.name
+                    } ?? m.neededBy
+                return m
+            }
+            NSLog(
+                "[Cofre] play requirements instance=%@ missing=%@", instanceID,
+                found.map(\.modID).joined(separator: ","))
+            return found
+        }
+
+        /// The crash screen's Get, and Play's "Get and play": installs them into `instanceID`, like Get on a mod page.
+        public func installRequirements(_ requirements: [ModRequirement], instanceID: String) async throws {
             var installed = 0
             for requirement in requirements {
                 guard let r = await resolve(requirement) else { continue }

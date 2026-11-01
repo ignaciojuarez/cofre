@@ -131,4 +131,55 @@ final class ContentCompatibilityTests: XCTestCase {
             issue("embeddium", .mods, "26.2", "metallum", .neoforge)?.reason,
             ContentCompatibility.neoForgeMetalGL)
     }
+
+    func testDistantHorizonsIsFlaggedOnMetalOnly() throws {
+        let dh = try XCTUnwrap(
+            issue("DistantHorizons-3.3.3-26.2-fabric-neoforge", .mods, "26.2", "libmetallum.dylib", .neoforge))
+        XCTAssertEqual(dh.title, "Distant Horizons doesn't run here")
+        XCTAssertEqual(dh.reason, ContentCompatibility.distantHorizonsOnMetal)
+        XCTAssertEqual(dh.badge, "Not on Metal · 26.2")
+        XCTAssertNotNil(
+            ContentCompatibility.issue(
+                id: "uCdwusMi", name: "Distant Horizons", kind: .mods, gameVersion: "26.2", renderer: "metallum",
+                manifest: manifest, loader: .fabric))
+        XCTAssertNil(issue("DistantHorizons-3.3.3-26.2-fabric-neoforge", .mods, "26.2", "mobileglues", .neoforge))
+    }
+
+    func testDesktopNativeModsArePCOnlyOnAnyRenderer() throws {
+        for (file, name) in [
+            ("sound-physics-remastered-neoforge-1.5.2+26.2", "Sound Physics Remastered"),
+            ("voicechat-neoforge-26.2-2.6.6", "Simple Voice Chat"),
+            ("plasmovoice-neoforge-26.2-2.1.4", "Plasmo Voice"),
+        ] {
+            for renderer in ["libmetallum.dylib", "mobileglues", "zink", "auto"] {
+                let found = try XCTUnwrap(issue(file, .mods, "26.2", renderer, .neoforge), "\(file) on \(renderer)")
+                XCTAssertEqual(found.modName, name)
+                XCTAssertEqual(found.reason, "PC-only: doesn't run on iPhone/iPad.")
+                XCTAssertEqual(found.badge, "PC-only")
+            }
+        }
+        XCTAssertEqual(
+            ContentCompatibility.issue(
+                id: "9eGKb6K1", name: "Simple Voice Chat", kind: .mods, gameVersion: "1.21.1", renderer: "mobileglues",
+                manifest: manifest)?.badge, "PC-only")
+        XCTAssertNil(issue("Sound Physics Remastered", .resourcePacks, "26.2", "metallum"))
+        XCTAssertNil(issue("chatheads-neoforge", .mods, "26.2", "metallum", .neoforge))
+    }
+
+    func testPlayCheckFlagsTheReportedNeoForgeMetalFolder() throws {
+        try write("mods/metallum-1.0.4.jar")
+        try write("mods/DistantHorizons-3.3.3-26.2-fabric-neoforge.jar")
+        try write("mods/sound-physics-remastered-neoforge-1.5.2+26.2.jar")
+        try write("mods/waystones-neoforge-26.2.0.12.jar")
+        let issues = ContentCompatibility.playIssues(
+            gameDirectory: root, gameVersion: "26.2", renderer: "libmetallum.dylib", manifest: manifest,
+            loader: .neoforge)
+        XCTAssertEqual(issues.map(\.modName), ["Distant Horizons", "Sound Physics Remastered"])
+        try ContentCompatibility.turnOff(issues, gameDirectory: root)
+        XCTAssertTrue(
+            ContentCompatibility.playIssues(
+                gameDirectory: root, gameVersion: "26.2", renderer: "libmetallum.dylib", manifest: manifest,
+                loader: .neoforge
+            ).isEmpty)
+    }
 }

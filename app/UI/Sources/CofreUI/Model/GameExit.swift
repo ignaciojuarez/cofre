@@ -105,6 +105,8 @@ public struct GameExitReport: Hashable, Sendable {
         {
             return (.mods, "\(name) \(needsGL)")
         }
+        // A mod's OpenGL code handed Metallum's objects ("MetalGpuTexture cannot be cast to … opengl.GlTexture").
+        if let id = metalGLModID(in: report + logLines) { return (.mods, "\(modName(id)) \(needsGL)") }
         // NeoForge stops loading mods, then refuses every later event ("…RegisterShadersEvent to a broken mod state"),
         // so the client report reads like a shader crash. The loader's own failure line names the real cause.
         let loaderFailures = ["Failure message: ", "Error during pre-loading phase: "]
@@ -209,6 +211,33 @@ public struct GameExitReport: Hashable, Sendable {
             return packages.map { ($0, name) }
         }
     }
+    /// The mod whose OpenGL code got a Metal object: the first stack frame after the cast error that names a mixin
+    /// "from mod <id>" (Distant Horizons' `MixinLightTexture` on NeoForge 26.2 + MetalUniversal).
+    public static func metalGLModID(in lines: [String]) -> String? {
+        guard
+            let cast = lines.firstIndex(where: {
+                $0.range(of: #"Metal\w* cannot be cast to (class )?[\w.$]*\.opengl\.Gl"#, options: .regularExpression)
+                    != nil
+            })
+        else { return nil }
+        for line in lines[cast...].prefix(40) where line.trimmingCharacters(in: .whitespaces).hasPrefix("at ") {
+            for match in line.matches(of: #/from mod ([A-Za-z0-9_\-]+)/#) {
+                let id = String(match.1).lowercased()
+                if !["minecraft", "neoforge", "forge", "fabricloader", "metallum"].contains(id) { return id }
+            }
+        }
+        return nil
+    }
+
+    /// How a mod reads on the screen: known names, else its ID ("distanthorizons" → "Distant Horizons").
+    public static func modName(_ id: String) -> String {
+        let known = [
+            "distanthorizons": "Distant Horizons", "iris": "Iris", "oculus": "Oculus", "sodium": "Sodium",
+            "embeddium": "Embeddium", "voxy": "Voxy",
+        ]
+        return known[id] ?? id.replacingOccurrences(of: "_", with: " ").capitalized
+    }
+
     static let needsGL = "needs OpenGL, which the Metal renderer doesn't have on this Minecraft version."
 
     /// Changing Graphics or resource packs in game reloads every texture and shader; Metallum can crash there.
@@ -235,6 +264,7 @@ public struct GameExitReport: Hashable, Sendable {
         case .memory: "It ran out of memory."
         case .renderer: "The graphics renderer failed."
         case .missingLibrary: "A game file is missing or didn't load."
+        case .mods where clue?.hasSuffix(Self.needsGL) == true: clue!
         case .mods: "Some mods don't work together, or one needs another mod."
         case .java: "Minecraft hit a Java error."
         case .unknown: "It closed unexpectedly."
@@ -256,7 +286,7 @@ public struct GameExitReport: Hashable, Sendable {
         case .missingLibrary:
             "Play again to recheck the game files. If it happens again, this version may not run on iOS yet."
         case .mods where clue?.hasSuffix(Self.needsGL) == true:
-            "Turn that mod off in Mods › Installed, then play again. Shaders work on Minecraft 26.2 for now."
+            "Turn that mod off in Mods › Installed, then play again."
         case .mods: "Open Details to see which mod, then update or remove it, or add the mod it needs."
         case .java: "If you just changed mods, undo that. Otherwise share the log so someone can look."
         case .unknown: "Play again. If it keeps happening, share the log."
