@@ -7,7 +7,12 @@ while (($#)); do case "$1" in --device) device=$2; shift 2;; --timeout) timeout=
 [[ -f "$scenario" ]] || { echo "missing scenario: $scenario" >&2; exit 2; }
 name=$(basename "$scenario" .json); stamp=$(date +%Y%m%d-%H%M%S); out="/tmp/cofre-scenarios/$name-$stamp"; mkdir -p "$out"
 bundle=com.ignacio.cofre; file=$(basename "$scenario")
-timeout 60 xcrun devicectl device copy to --device "$device" --domain-type appDataContainer --domain-identifier "$bundle" --source "$scenario" --destination "Documents/$file" >/dev/null
+pushed=0
+for _ in 1 2 3; do
+  timeout 60 xcrun devicectl device copy to --device "$device" --domain-type appDataContainer --domain-identifier "$bundle" --source "$scenario" --destination "Documents/$file" >/dev/null 2>&1 && { pushed=1; break; }
+  sleep 20
+done
+((pushed)) || { echo "FAIL device copy (file service stalled) · logs: $out"; exit 1; }
 # COFRE_PUSH="a.jar b.jar": copy local files to Documents/<name> for scenario files with "from": "<name>".
 for extra in ${COFRE_PUSH:-}; do
   timeout 60 xcrun devicectl device copy to --device "$device" --domain-type appDataContainer --domain-identifier "$bundle" --source "$extra" --destination "Documents/$(basename "$extra")" >/dev/null
@@ -56,5 +61,14 @@ while ((SECONDS < deadline)); do
   fi
   sleep 1
 done
+# A 4 GB iPad can stop serving file copies while a game runs; stop it and fetch the log once copies work again.
+if [[ ! -s "$log" ]]; then
+  stop_app
+  for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+    timeout 20 xcrun devicectl device copy from --device "$device" --domain-type appDataContainer --domain-identifier "$bundle" --source Documents/latestlog.txt --destination "$log" >/dev/null 2>&1 && [[ -s "$log" ]] && break
+    sleep 10
+  done
+  [[ -s "$log" ]] && sed -E -i '' 's/(accessToken|uuid|xuid)([[:space:]]*[:=][[:space:]]*)[^,}]*/\1\2<redacted>/Ig' "$log"
+fi
 timeout 30 xcrun devicectl device copy from --device "$device" --domain-type appDataContainer --domain-identifier "$bundle" --source Documents/latestlog.old.txt --destination "$out/latestlog.old.txt" >/dev/null 2>&1 || true
 echo "$verdict · logs: $out"
