@@ -72,7 +72,12 @@ final class CofreScenarioRunner {
         do {
             try scenario.validate(); step("instance")
             var existing = try store.list().first { $0.name == scenario.name }
-            if scenario.fresh, let old = existing { try store.remove(old.id); existing = nil }
+            // A loader install ends in an app restart; the relaunch resumes that instance instead of reinstalling
+            // the loader (which would need yet another restart).
+            let resumeKey = "cofre.scenario.resume.\(scenario.name)"
+            let resuming = UserDefaults.standard.bool(forKey: resumeKey)
+            UserDefaults.standard.removeObject(forKey: resumeKey)
+            if scenario.fresh, !resuming, let old = existing { try store.remove(old.id); existing = nil }
             if existing == nil {
                 let loader = scenario.loader
                 let made = try store.create(name: scenario.name, version: scenario.version ?? "1.21.1", loader: loader)
@@ -172,6 +177,7 @@ final class CofreScenarioRunner {
         } catch {
             if let failure = error as? LaunchFailure, failure == .restartRequired {
                 keepInstances = true
+                UserDefaults.standard.set(true, forKey: "cofre.scenario.resume.\(scenario.name)")
                 log("[Cofre] scenario name=\(scenario.name) step=run result=restart")
                 NotificationCenter.default.post(name: .cofreScenarioStep, object: "Scenario: \(scenario.name) · restart")
             } else {
