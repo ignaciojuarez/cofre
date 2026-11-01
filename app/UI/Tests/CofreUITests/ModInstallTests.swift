@@ -136,6 +136,14 @@
             XCTAssertEqual(plan.target.versionID, "a-fabric")
         }
 
+        func testPlanPrefersLoaderBuildOverDataPackZip() async throws {
+            let plan = try await resolver([
+                "terralith": [candidate("terralith", loaders: ["datapack"], version: "zip"),
+                    candidate("terralith", loaders: ["neoforge"], version: "jar")]
+            ], loader: .neoforge).plan(projectID: "terralith")
+            XCTAssertEqual(plan.target.versionID, "terralith-jar")
+        }
+
         func testPlanIncludesNeoForgeDeclaredGlitchCoreDependency() async throws {
             let plan = try await resolver([
                 "biomes-o-plenty": [candidate("biomes-o-plenty", loaders: ["neoforge"],

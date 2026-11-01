@@ -214,7 +214,11 @@
         /// A pinned version when it fits (authors sometimes pin an old one), else the newest fitting release, then
         /// beta, then alpha.
         func pick(_ all: [ModCandidate], pinned: String?) -> ModCandidate? {
-            let fits = all.filter { $0.fits(game: game, loader: loader, kind: kind) }
+            var fits = all.filter { $0.fits(game: game, loader: loader, kind: kind) }
+            // A build tagged only with loaders Cofre doesn't know (Terralith's "datapack" zip) has no loaders and
+            // fits anything; prefer a build made for this loader when one exists.
+            let named = fits.filter { !$0.loaders.isEmpty }
+            if kind == .mods, !named.isEmpty { fits = named }
             if let pinned, let exact = fits.first(where: { $0.versionID == pinned }) { return exact }
             return Self.mostStable(fits, channel: { $0.channel })
         }
