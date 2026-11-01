@@ -29,7 +29,7 @@ check "JIT script" bash -c "for t in '$ROOT'/tests/jit/*.test.js; do node \"\$t\
 check "server cards" bash -c "cd '$ROOT/plan/server-join' && python3 validate_examples.py"
 check "known mods docs" python3 "$ROOT/scripts/check-known-mods.py"
 if [[ -n "${COFRE_SIM_UDID:-}" ]]; then
-    check "CofreUI (iOS)" bash -c "cd '$ROOT/app/UI' && xcodebuild test -scheme CofreUI -destination 'platform=iOS Simulator,id=$COFRE_SIM_UDID' -quiet"
+    check "CofreUI (iOS)" bash -c "cd '$ROOT/app/UI' && xcodebuild test -scheme CofreUI-Package -destination 'platform=iOS Simulator,id=$COFRE_SIM_UDID' -quiet"
 fi
 
 if ((${#failed[@]})); then
