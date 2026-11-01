@@ -44,6 +44,7 @@ Measured results only: what launched, what rendered, frame rate, memory, limits.
 | 10-31 | 26.2 | vanilla | Metal (Air agent) | ✅ | ❌ crash | — | 789 | After Cofre's Spv preload (59dd735 → f0bde51): starts on Metal, then `NoClassDefFoundError IrisMetalTerrainBridge` in the first GUI frame (Air picked `classes262iris/`). b847d19 forces `classes262/`; device run pending |
 | 11-01 | 26.2 | vanilla | Metal (Air agent, 87e07a2) | ✅ | ✅ title | ~54 title, ~28 once thermal serious | 1456 | Routing fixed: a single `classes262/` route, `Using graphics backend Metal`. Memory climbs ~3 MB/s while idle on the title screen (828 → 1456 MB in 210 s) |
 | 11-01 | 26.2 | Fabric + MetalUniversal + Sodium | Metal (mod) | ✅ | ✅ title | 57 → 28 → 10 (thermal serious, t≈650 s) | 2861 | Left on the title screen for 14 min: memory grew ~2 MB/s, FPS fell to 10. Same climb as vanilla, so it's likely in Metallum's title rendering |
+| 11-01 | 26.2 | Fabric + MetalUniversal + Sodium | Metal (mod) | ✅ | ✅ world | **28.6 steady in world** (60 Hz vsync half rate; ~19 avg during the first 15 s of chunk loading) | 2846 | First scripted in-world run (scenario world `Bench`, seed 1337, render 6). Joined 80 s after launch. Memory still climbs ~2.3 MB/s in world (1492 → 2846 MB in 500 s): a 4 GB iPad would run out after ~15–20 min |
 
 ## iPhone 17 Pro (A19 Pro, 12 GB)
 
