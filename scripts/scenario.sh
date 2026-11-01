@@ -53,7 +53,15 @@ while ((SECONDS < deadline)); do
     clean=$(sed -E 's/(accessToken|uuid|xuid)([[:space:]]*[:=][[:space:]]*)[^,}]*/\1\2<redacted>/Ig' "$log")
     printf '%s\n' "$clean" > "$log"
     if ((world_requested)); then
-      if grep -q 'scenario .* step=world result=ok' "$log"; then verdict="PASS in-world"; break; fi
+      # The game's own join line is the proof; the app's marker can lag behind it.
+      if grep -qE 'scenario .* step=world result=ok|]: [^ ]+ joined the game' "$log"; then
+        verdict="PASS in-world"
+        # Keep the game running so the log holds in-world frame rates (COFRE_WORLD_SECONDS, default 60).
+        sleep "${COFRE_WORLD_SECONDS:-60}"
+        timeout 20 xcrun devicectl device copy from --device "$device" --domain-type appDataContainer --domain-identifier "$bundle" --source Documents/latestlog.txt --destination "$log" >/dev/null 2>&1 || true
+        sed -E -i '' 's/(accessToken|uuid|xuid)([[:space:]]*[:=][[:space:]]*)[^,}]*/\1\2<redacted>/Ig' "$log"
+        break
+      fi
     elif grep -q 'launch state=inGame' "$log"; then verdict="PASS in-game"; break; fi
     if grep -q 'scenario .*result=restart' "$log"; then
       if ((restarted)); then verdict="FAIL scenario step"; break; fi

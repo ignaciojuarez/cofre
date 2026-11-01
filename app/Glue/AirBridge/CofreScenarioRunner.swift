@@ -193,7 +193,7 @@ final class CofreScenarioRunner {
                         gameArguments = MinecraftLaunchArguments.singleplayer(folder: world, gameVersion: targetVersion)
                         guard !gameArguments.isEmpty else { throw ScenarioError.worldDirectory }
                         worldDirectory = directory
-                        worldLogBaseline = (try? Data(contentsOf: directory.appendingPathComponent("logs/latest.log"))) ?? Data()
+                        worldLogBaseline = (try? Data(contentsOf: LogStore().latestLog)) ?? Data()
                     } catch {
                         fail("world", error)
                         return
@@ -227,9 +227,12 @@ final class CofreScenarioRunner {
         }
     }
 
+    /// Watches Cofre's own log, which carries the game's output as it happens; the game's logs/latest.log is
+    /// written too late to see the join.
     private func waitForWorldJoin(in gameDirectory: URL, baseline: Data, world: String) async throws {
-        let logURL = gameDirectory.appendingPathComponent("logs/latest.log")
-        let deadline = ContinuousClock.now + .seconds(120)
+        let logURL = LogStore().latestLog
+        // A big modpack can spend minutes generating spawn chunks.
+        let deadline = ContinuousClock.now + .seconds(600)
         while ContinuousClock.now < deadline {
             if let data = try? Data(contentsOf: logURL) {
                 let newData: Data
