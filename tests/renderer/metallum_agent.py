@@ -97,6 +97,27 @@ public final class ShimProbe {
 }
 '''
 
+PREFERRED_GRAPHICS_API = r'''
+package net.minecraft.client;
+public final class PreferredGraphicsApi { }
+'''
+
+ROUTE_PROBE = r'''
+public final class RouteProbe {
+  public static void main(String[] args) throws Exception {
+    Class.forName("net.minecraft.client.PreferredGraphicsApi");
+    Class<?> metalDevice = Class.forName("com.metallum.client.metal.render.MetalDevice", false,
+        RouteProbe.class.getClassLoader());
+    for (java.lang.reflect.Field field : metalDevice.getDeclaredFields()) {
+      if (field.getName().equals("genericVertexAttributeBuffer")) throw new AssertionError("Iris MetalDevice loaded");
+    }
+    System.out.println("METAL_DEVICE_VANILLA");
+    System.out.println("ROUTE_PROBE_DONE");
+    System.exit(0);
+  }
+}
+'''
+
 
 def java25():
     """Air's class sets are Java 25 class files, like the game's runtime on the device."""
@@ -152,6 +173,12 @@ with tempfile.TemporaryDirectory(prefix="cofre-metallum-test-") as directory:
     javac = java.with_name("javac")
     compiled = run(javac, "-d", classes, fixture, shim_probe)
     assert compiled.returncode == 0, compiled.stdout + compiled.stderr
+    preferred_graphics_api = tree / "PreferredGraphicsApi.java"
+    preferred_graphics_api.write_text(PREFERRED_GRAPHICS_API)
+    route_probe = tree / "RouteProbe.java"
+    route_probe.write_text(ROUTE_PROBE)
+    route_compiled = run(javac, "-d", classes, preferred_graphics_api, route_probe)
+    assert route_compiled.returncode == 0, route_compiled.stdout + route_compiled.stderr
     signed_source = tree / "ShaderCompileException.java"
     signed_source.write_text(SIGNED_CLIENT_CLASS)
     client_classes = tree / "client-classes"
@@ -181,6 +208,18 @@ with tempfile.TemporaryDirectory(prefix="cofre-metallum-test-") as directory:
     assert "Cofre Spv preload defined: com/mojang/blaze3d/vulkan/glsl/SpvSampler" in shim.stdout
     assert "Cofre Spv preload defined: com/mojang/blaze3d/vulkan/glsl/SpvVariable" in shim.stdout
     assert "PASS: Cofre premain shim widens all Spv classes" in shim.stdout
+
+    route = run(java, "--add-opens=java.base/java.lang=ALL-UNNAMED", "-Dmetallum.mc.version=26.2",
+                "-javaagent:" + str(jar), "-cp", str(jar) + os.pathsep + str(classes), "RouteProbe",
+                env=dict(os.environ, AMETHYST_RENDERER="metal"))
+    assert route.returncode == 0, route.stdout + route.stderr
+    routes = [line for line in route.stdout.splitlines() if "[CLASSSET-ROUTE]" in line]
+    assert len(routes) == 1 and "prefix='classes262/'" in routes[0], route.stdout
+    assert "prefix='classes262iris/'" not in route.stdout, route.stdout
+    assert "DEFINE-OK summary:" in route.stdout and "prefix=classes262/" in route.stdout, route.stdout
+    assert "METAL_DEVICE_VANILLA" in route.stdout, route.stdout
+    assert "ROUTE_PROBE_DONE" in route.stdout, route.stdout
+    print(route.stdout.strip())
     print(shim.stdout.strip())
 
     game_root = tree / "game"

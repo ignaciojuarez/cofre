@@ -50,6 +50,7 @@ public final class CofreMetallumAgent {
         logLoadedSpv(instrumentation, "before preload");
         preloadSpvClasses();
         logLoadedSpv(instrumentation, "after preload");
+        configureVanillaClassSetBeforeAir();
         MetallumAgent.premain(args, instrumentation);
     }
 
@@ -236,8 +237,15 @@ public final class CofreMetallumAgent {
         return null;
     }
 
-    // The launcher adds Fabric/NeoForge libraries after premain. Wait for PreferredGraphicsApi so
-    // loader detection runs against the actual game loader instead of mistaking a modded session for vanilla.
+    private static void configureVanillaClassSetBeforeAir() {
+        ClassLoader loader = ClassLoader.getSystemClassLoader();
+        if (loader == null) {
+            System.out.println("[MetallumAgent] Cofre vanilla class-set check skipped: system loader unavailable");
+            return;
+        }
+        maybeForceVanillaClassSet(loader);
+    }
+
     private static void maybeForceVanillaClassSet(ClassLoader loader) {
         if (vanillaClassSetConfigured) {
             return;
