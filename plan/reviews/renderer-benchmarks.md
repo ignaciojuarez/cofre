@@ -42,6 +42,8 @@ Measured results only: what launched, what rendered, frame rate, memory, limits.
 | 10-31 | 1.21.11 | vanilla | Metal (Air agent, repaired) | ✅ | ✅ title | ~30 title | 1355 | Steady after the 9e678ca agent repair |
 | 10-31 | 1.21.11 | Fabric + Graft iOS port + **Sodium** | Metal (Graft) | ✅ | ❌ crash | — | 811 | `There is no OpenGL context current` in `MetalGpuDevice.createIdleGlContext`: Graft makes an idle GL context for Sodium, iOS has none. Marked broken in known-mods.json |
 | 10-31 | 26.2 | vanilla | Metal (Air agent) | ✅ | ❌ crash | — | 789 | After Cofre's Spv preload (59dd735 → f0bde51): starts on Metal, then `NoClassDefFoundError IrisMetalTerrainBridge` in the first GUI frame (Air picked `classes262iris/`). b847d19 forces `classes262/`; device run pending |
+| 11-01 | 26.2 | vanilla | Metal (Air agent, 87e07a2) | ✅ | ✅ title | ~54 title, ~28 once thermal serious | 1456 | Routing fixed: a single `classes262/` route, `Using graphics backend Metal`. Memory climbs ~3 MB/s while idle on the title screen (828 → 1456 MB in 210 s) |
+| 11-01 | 26.2 | Fabric + MetalUniversal + Sodium | Metal (mod) | ✅ | ✅ title | 57 → 28 → 10 (thermal serious, t≈650 s) | 2861 | Left on the title screen for 14 min: memory grew ~2 MB/s, FPS fell to 10. Same climb as vanilla, so it's likely in Metallum's title rendering |
 
 ## iPhone 17 Pro (A19 Pro, 12 GB)
 
@@ -56,6 +58,6 @@ Measured results only: what launched, what rendered, frame rate, memory, limits.
 | MC | Vanilla | Fabric | Forge / NeoForge | Notes |
 |---|---|---|---|---|
 | 26.3 / 26.4 / 26.1 | ✅ Air's agent | ❓ Metallum mod (testing) | ❌ | |
-| 26.2 | ⚠️ Air agent crashed 10-31 (slf4j) | ✅ MetalUniversal 1.0.4 + Sodium 0.9.0 | ✅ NeoForge via Connector + MetalUniversal (10-31) | Upstream Metallum lists Sodium + Iris for 26.2; Iris still fails |
-| 1.21.11 | ❌ agent jar bug (fix in progress) | ✅ Graft iOS port (~51 FPS) | ❌ | |
+| 26.2 | ✅ Air agent (after 87e07a2) | ✅ MetalUniversal 1.0.4 + Sodium 0.9.0 | ✅ NeoForge via Connector + MetalUniversal (10-31) | Upstream Metallum lists Sodium + Iris for 26.2; Iris still fails |
+| 1.21.11 | ✅ Air agent (after 9e678ca) | ✅ Graft iOS port (~51 FPS) | ❌ | |
 | 1.20.1 | ❌ | ❌ | ❌ | Older than Minecraft's GPU-device layer (1.21.5+) that Metallum plugs into; would need a new backend |
