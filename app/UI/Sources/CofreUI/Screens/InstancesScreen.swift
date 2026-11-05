@@ -390,7 +390,7 @@
         @State private var versions: [GameVersion] = []
         @State private var versionsFailed = false
         @State private var versionsAttempt = 0
-        @State private var version = "1.21.1"
+        @State private var version = "26.2"
         @State private var loader = Loader.fabric
         @State private var loaderVersions: [String] = []
         @State private var loaderVersion = ""
@@ -474,7 +474,7 @@
                             VStack(alignment: .leading, spacing: 0) {
                                 Banner("Not recommended · no Metal, slow", icon: .cross, tone: .warn)
                                 Text(
-                                    "Runs on OpenGL translation (MobileGlues): ~11 FPS on iPhone 17 Pro. For mods, pick 26.2 (Fabric or NeoForge) or Fabric 1.21.11."
+                                    "Runs on OpenGL translation (MobileGlues): ~11 FPS on iPhone 17 Pro. For mods, pick 26.2 (Fabric or NeoForge)."
                                 )
                                 .cofreFont(.caption)
                                 .foregroundStyle(Color.cofre.muted)

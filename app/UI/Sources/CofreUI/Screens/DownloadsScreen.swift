@@ -152,7 +152,8 @@ struct CofreDownloadsSheet: View {
     }
 }
 
-/// Minecraft versions (releases, snapshots behind a switch) or, with `loader`, that loader's versions for `game`.
+/// Minecraft versions (releases, snapshots behind a switch, releases before 26.2 under "Not optimized") or, with
+/// `loader`, that loader's versions for `game`.
 struct VersionPickerSheet: View {
     let loader: Loader?
     /// When choosing a Minecraft version, annotate it for the loader selected in New Instance.
@@ -162,7 +163,9 @@ struct VersionPickerSheet: View {
     @Binding var selection: String
     @Environment(CofreStore.self) private var store
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var snapshots = false
+    @State private var showsOlder = false
     @State private var search = ""
     @State private var releases: [GameVersion] = []
     @State private var snapshotList: [GameVersion] = []
@@ -182,8 +185,13 @@ struct VersionPickerSheet: View {
                     }
                 }
                 if snapshots, loader == nil { section("Snapshots", snapshotList) }
-                section(loader == nil ? "Releases" : "Versions", releases)
-                if loader == nil { PreflightLine(version: selection) }
+                if loader == nil {
+                    section("Releases", releases.filter { VersionManifest.isOptimized($0.id) })
+                    notOptimized(releases.filter { !VersionManifest.isOptimized($0.id) })
+                    PreflightLine(version: selection)
+                } else {
+                    section("Versions", releases)
+                }
             }.padding(16) }
         }
         .task(id: "\(snapshots)-\(attempt)-\(loader?.rawValue ?? "game")-\(recommendationLoader?.rawValue ?? "")-\(game ?? "")") {
@@ -198,19 +206,39 @@ struct VersionPickerSheet: View {
                 failed = false
             } catch is CancellationError { return } catch { failed = true }
         }
+        .onAppear { showsOlder = !selection.isEmpty && !VersionManifest.isOptimized(selection) && loader == nil }
     }
 
-    @ViewBuilder private func section(_ title: String, _ versions: [GameVersion]) -> some View {
+    /// Releases before 26.2, folded away. A search shows its matches without opening the fold.
+    @ViewBuilder private func notOptimized(_ older: [GameVersion]) -> some View {
+        if !search.isEmpty {
+            section("Not optimized", older, annotated: false)
+        } else if !older.isEmpty {
+            Button {
+                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.12)) { showsOlder.toggle() }
+            } label: {
+                Row("Not optimized", subtitle: "\(older.count) older versions. Slower: they run on OpenGL translation",
+                    trailing: { Chevron().rotationEffect(.degrees(showsOlder ? 90 : 0)) })
+            }
+            .buttonStyle(RowButtonStyle())
+            .accessibilityValue(showsOlder ? Text("Shown") : Text("Hidden"))
+            .accessibilityHint(Text("Shows Minecraft versions before 26.2"))
+            if showsOlder { section(nil, older, annotated: false) }
+        }
+    }
+
+    /// `annotated`: mark the newest row and, for a loader, whether the version is recommended for mods.
+    @ViewBuilder private func section(_ title: String?, _ versions: [GameVersion], annotated: Bool = true) -> some View {
         let shown = versions.filter { search.isEmpty || $0.id.localizedCaseInsensitiveContains(search) }
         if !shown.isEmpty {
-            ListSection(title, spacing: 4) {
+            ListSection(title.map { LocalizedStringKey($0) }, spacing: 4) {
                 ForEach(shown) { version in
                     Button { selection = version.id; dismiss() } label: {
                         Row(version.id, isSelected: selection == version.id, leading: { Radio(isOn: selection == version.id) },
                             trailing: {
                                 HStack(spacing: 4) {
-                                    if version.id == versions.first?.id { Meta("Newest") }
-                                    if let recommendationLoader, recommendationLoader != .vanilla {
+                                    if annotated, version.id == versions.first?.id { Meta("Newest") }
+                                    if annotated, let recommendationLoader, recommendationLoader != .vanilla {
                                         let recommended = RendererPolicy.isRecommendedForMods(
                                             gameVersion: version.id, loader: recommendationLoader,
                                             metalVersions: ModCompatibility.metalVersions)

@@ -24,6 +24,14 @@ public struct VersionManifest: Decodable, Sendable {
     }
     public func versions(_ kind: Entry.Kind) -> [Entry] { versions.filter { $0.kind == kind } }
     public func entry(_ id: String) -> Entry? { versions.first { $0.id == id } }
+
+    /// Cofre's performance work covers Minecraft 26.2 and newer (`plan/ideal-engine.md`). Older releases still run,
+    /// but they need OpenGL translation, so the version picker files them under "Not optimized".
+    public static func isOptimized(_ id: String) -> Bool {
+        let parts = id.split(separator: ".").map { Int($0.prefix(while: \.isNumber)) ?? 0 }
+        guard parts.count > 1 else { return false }
+        return parts[0] > 26 || (parts[0] == 26 && parts[1] >= 2)
+    }
 }
 
 /// What a Minecraft version still has to download into a `.minecraft` folder: the client jar, its libraries
