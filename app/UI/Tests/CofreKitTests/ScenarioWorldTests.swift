@@ -35,6 +35,19 @@ final class ScenarioWorldTests: XCTestCase {
         }
     }
 
+    func testMinecraft26Point3GetsAWorldThatItUpgradesFrom26Point2() throws {
+        let world = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: world) }
+        try ScenarioWorld.write(to: world, folder: "Bench", seed: 7, gameVersion: "26.3")
+        let level = try NBT.read(Data(contentsOf: world.appendingPathComponent("level.dat")))
+        XCTAssertEqual(level["Data"]?["DataVersion"]?.integer, 4903)
+        XCTAssertEqual(level["Data"]?["Version"]?["Name"]?.string, "26.2")
+        let settings = try NBT.read(
+            Data(contentsOf: world.appendingPathComponent("data/minecraft/world_gen_settings.dat")))
+        XCTAssertEqual(settings["data"]?["seed"]?.integer, 7)
+        XCTAssertThrowsError(try ScenarioWorld.write(to: world, folder: "Bench", seed: 7, gameVersion: "1.20.1"))
+    }
+
     func testEnsureCreatesSavesFolderAndPreservesExistingWorld() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

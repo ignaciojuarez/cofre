@@ -33,11 +33,12 @@ public enum ScenarioWorld {
 
     /// Writes the smallest gzipped world files accepted by the scenario versions.
     public static func write(
-        to world: URL, folder: String, seed: Int64, gameVersion: String,
+        to world: URL, folder: String, seed: Int64, gameVersion requested: String,
         fileManager: FileManager = .default
     ) throws {
+        let gameVersion = layoutVersion(for: requested)
         guard validFolder(folder), let version = dataVersion(for: gameVersion) else {
-            throw Failure.unsupportedVersion(gameVersion)
+            throw Failure.unsupportedVersion(requested)
         }
         try fileManager.createDirectory(at: world, withIntermediateDirectories: true)
         // All three vanilla dimensions: any other set reads as a custom (experimental) world and stops on a warning.
@@ -113,6 +114,12 @@ public enum ScenarioWorld {
             try gzip(generation).write(
                 to: dataDirectory.appendingPathComponent("world_gen_settings.dat"), options: .atomic)
         }
+    }
+
+    /// The world format written for a game version. 26.3 keeps 26.2's world-generation file (`WorldGenSettings` is
+    /// unchanged) and upgrades 26.2 worlds with its DataFixer, so 26.3 scenarios start from a 26.2 world.
+    public static func layoutVersion(for gameVersion: String) -> String {
+        gameVersion == "26.3" ? "26.2" : gameVersion
     }
 
     /// Data versions published by Mojang for the two device scenario tracks.
