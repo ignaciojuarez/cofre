@@ -180,7 +180,7 @@ final class RendererPolicyTests: XCTestCase {
         let normal = RendererPolicy.pickerRenderers()
         XCTAssertEqual(
             normal.map(\.rawValue),
-            ["auto", "metallum", "mobileglues", "zink", "gl4es", "simplefpewrapper", "angle"])
+            ["auto", "metallum", "vulkan", "mobileglues", "zink", "gl4es", "simplefpewrapper", "angle"])
         XCTAssertFalse(normal.contains { RendererPolicy.sameRenderer($0, "ltw") })
         let saved = RendererPolicy.pickerRenderers(current: "libltw.dylib")
         XCTAssertTrue(saved.contains { RendererPolicy.sameRenderer($0, "libltw.dylib") })
@@ -191,13 +191,16 @@ final class RendererPolicyTests: XCTestCase {
         let manifest: Set<String> = ["1.21.11", "26.3"]
         let modern = RendererPolicy.pickerRenderers(
             gameVersion: "26.3", loader: .vanilla, metalVersions: manifest)
-        XCTAssertEqual(modern.map(\.rawValue), ["auto", "metallum", "mobileglues"])
+        XCTAssertEqual(modern.map(\.rawValue), ["auto", "metallum", "vulkan", "mobileglues"])
         XCTAssertFalse(modern.contains(.gl4es))
         XCTAssertFalse(modern.contains(.simpleFPEWrapper))
         let modded = RendererPolicy.pickerRenderers(
             gameVersion: "26.3", loader: .fabric, metalVersions: manifest)
-        XCTAssertFalse(modded.contains(.metallum))
-        XCTAssertTrue(modded.contains(.zink))
+        XCTAssertEqual(modded.map(\.rawValue), ["auto", "vulkan", "mobileglues"])
+        let notOptimized = RendererPolicy.pickerRenderers(
+            gameVersion: "1.21.1", loader: .fabric, metalVersions: manifest)
+        XCTAssertFalse(notOptimized.contains(.vulkan))
+        XCTAssertTrue(notOptimized.contains(.zink))
         let legacy = RendererPolicy.pickerRenderers(
             gameVersion: "1.16.5", loader: .vanilla, metalVersions: manifest)
         XCTAssertTrue(legacy.contains(.gl4es))

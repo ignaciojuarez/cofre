@@ -32,8 +32,10 @@ public struct CofreScenario: Codable, Equatable, Sendable {
     public let fresh: Bool
     public let world: String?
     public let seed: Int64?
+    /// Engine experiments for this run (`EngineOptions`); absent means today's defaults.
+    public let engine: EngineOptions?
 
-    enum CodingKeys: String, CodingKey { case name, version, loader, loaderVersion, mods, files, pack, packVersion, renderer, resolution, memoryMB, launch, fresh, world, seed }
+    enum CodingKeys: String, CodingKey { case name, version, loader, loaderVersion, mods, files, pack, packVersion, renderer, resolution, memoryMB, launch, fresh, world, seed, engine }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         name = try c.decode(String.self, forKey: .name); version = try c.decodeIfPresent(String.self, forKey: .version)
@@ -45,16 +47,17 @@ public struct CofreScenario: Codable, Equatable, Sendable {
         resolution = try c.decodeIfPresent(Double.self, forKey: .resolution) ?? 1
         memoryMB = try c.decodeIfPresent(Int.self, forKey: .memoryMB); launch = try c.decodeIfPresent(Bool.self, forKey: .launch) ?? true; fresh = try c.decodeIfPresent(Bool.self, forKey: .fresh) ?? false
         world = try c.decodeIfPresent(String.self, forKey: .world); seed = try c.decodeIfPresent(Int64.self, forKey: .seed)
+        engine = try c.decodeIfPresent(EngineOptions.self, forKey: .engine)
     }
 
     public init(name: String, version: String? = nil, loader: Instance.Loader = .vanilla, loaderVersion: String? = nil,
                 mods: [String] = [], files: [File] = [], pack: String? = nil, packVersion: String? = nil, renderer: RendererID = .auto,
                 resolution: Double = 1, memoryMB: Int? = nil, launch: Bool = true, fresh: Bool = false,
-                world: String? = nil, seed: Int64? = nil) {
+                world: String? = nil, seed: Int64? = nil, engine: EngineOptions? = nil) {
         self.name = name; self.version = version; self.loader = loader; self.loaderVersion = loaderVersion
         self.mods = mods; self.files = files; self.pack = pack; self.packVersion = packVersion; self.renderer = renderer
         self.resolution = resolution; self.memoryMB = memoryMB; self.launch = launch; self.fresh = fresh
-        self.world = world; self.seed = seed
+        self.world = world; self.seed = seed; self.engine = engine
     }
 
     public init(name: String, version: String? = nil, loader: String, loaderVersion: String? = nil,

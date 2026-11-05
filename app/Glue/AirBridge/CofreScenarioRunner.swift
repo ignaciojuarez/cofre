@@ -179,6 +179,8 @@ final class CofreScenarioRunner {
             prefs.renderer = scenario.renderer; prefs.resolution = scenario.resolution
             if let memory = scenario.memoryMB { prefs.autoRAM = false; prefs.ramMB = memory }
             try await backend.setPreferences(prefs, instanceID: targetID)
+            // Every scenario states its engine experiments; without them it runs today's defaults.
+            (scenario.engine ?? EngineOptions()).save()
             step("settings")
             if scenario.launch, let targetID {
                 var gameArguments: [String] = []

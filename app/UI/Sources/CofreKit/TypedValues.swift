@@ -41,6 +41,8 @@ public enum RendererID: Hashable, Codable, RawRepresentable, Sendable, Identifia
     }
     public var id: String { rawValue }
     public var description: String { rawValue }
+    /// Mojang's Vulkan backend through MoltenVK (Air's `libMoltenVK.dylib`).
+    public static let vulkan = Self.custom("vulkan")
     public static var allCases: [Self] {
         [.auto, .metallum, .mobileglues, .zink, .ltw, .krypton, .angle, .gl4es, .simpleFPEWrapper, .air]
     }

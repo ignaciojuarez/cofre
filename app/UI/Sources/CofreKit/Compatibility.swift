@@ -21,8 +21,11 @@ public enum RendererPolicy {
     /// The production picker. Other IDs remain valid for old profiles, but are
     /// only shown when one of them is already selected.
     public static let normalPickerRenderers: [RendererID] = [
-        .auto, .metallum, .mobileglues, .zink, .gl4es, .simpleFPEWrapper, .angle,
+        .auto, .metallum, .vulkan, .mobileglues, .zink, .gl4es, .simpleFPEWrapper, .angle,
     ]
+    /// Minecraft 26.2+ (Cofre's performance scope): Metal, Mojang's Vulkan through MoltenVK (the macOS route), and
+    /// OpenGL as the fallback.
+    public static let optimizedPickerRenderers: [RendererID] = [.auto, .metallum, .vulkan, .mobileglues]
 
     /// `gameDirectory` lets a validated Fabric or NeoForge kit run Metal.
     public static func resolve(profile: [String: Any], metadata: [String: Any], globalSetting: String,
@@ -110,6 +113,8 @@ public enum RendererPolicy {
                                        current: RendererID? = nil) -> [RendererID] {
         var ids = normalPickerRenderers
         if let gameVersion {
+            // Mojang's Vulkan backend exists from 26.2.
+            ids = VersionManifest.isOptimized(gameVersion) ? optimizedPickerRenderers : ids.filter { $0 != .vulkan }
             if !isLegacy(gameVersion) { ids.removeAll { $0 == .gl4es || $0 == .simpleFPEWrapper } }
             if let loader, !metalAvailable(gameVersion: gameVersion, loader: loader, metalVersions: metalVersions,
                                            metalMod: metalMod) {
@@ -175,7 +180,7 @@ public enum RendererPolicy {
         case "mobilegl": "Direct Vulkan OpenGL path; hidden until an iOS result is validated."
         case "mobilegles": "Direct GLES OpenGL path; hidden until an iOS result is validated."
         case "krypton": "Legacy shader translation; hidden until an iOS result is validated."
-        case "vulkan": "Direct Vulkan/MoltenVK path; hidden from the production picker."
+        case "vulkan": "Mojang's Vulkan renderer through MoltenVK, as on a Mac. Minecraft 26.2 and newer; experimental."
         case "vgpu": "Legacy shader path; hidden until an iOS result is validated."
         case "virgl": "Mesa compatibility path; hidden until an iOS result is validated."
         case "nggl4es": "Shader translation path; hidden until an iOS result is validated."

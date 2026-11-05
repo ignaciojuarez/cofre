@@ -3,10 +3,12 @@
 // SceneDelegate (patch 0002) asks CofreMakeRootViewController() for the root
 // screen; every path stays in Cofre UI.
 #import "AirBridgeAdapter.h"
+#import "CofreThreadQoS.h"
 #import "LauncherPreferences.h"
 #import "utils.h"
 #import <UIKit/UIKit.h>
 #import <dlfcn.h>
+#import <mach-o/dyld.h>
 #import <objc/message.h>
 #import <objc/runtime.h>
 
@@ -172,6 +174,61 @@ static void CofreWatchLifecycle(void) {
   }];
 }
 
+/// A library dyld maps from outside the app bundle (and the OS) needs the debugger's library-validation bypass, so
+/// it is what keeps the JIT debugger attached. Each one logged here is a candidate for the signed natives overlay
+/// (plan/ideal-engine.md, phase 1.1). The callback only copies the path; logging happens off dyld's lock.
+static void CofreLogOutsideImage(const struct mach_header *header, intptr_t slide) {
+  static const char *bundle;
+  static size_t bundleLength;
+  static dispatch_queue_t queue;
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    bundle = strdup(NSBundle.mainBundle.bundlePath.fileSystemRepresentation);
+    bundleLength = strlen(bundle);
+    queue = dispatch_queue_create("cofre.dylib-log", DISPATCH_QUEUE_SERIAL);
+  });
+  Dl_info info;
+  if (!dladdr(header, &info) || !info.dli_fname) return;
+  const char *path = info.dli_fname;
+  if (strncmp(path, bundle, bundleLength) == 0 || strncmp(path, "/usr/lib/", 9) == 0 ||
+      strncmp(path, "/System/", 8) == 0 || strncmp(path, "/Developer/", 11) == 0) {
+    return;
+  }
+  char *copy = strdup(path);
+  dispatch_async(queue, ^{
+    NSLog(@"[Cofre] dylib outside bundle path=%s", copy);
+    free(copy);
+  });
+}
+
+static void CofreLogThreadQoS(const char *name, qos_class_t qos) {
+  NSLog(@"[Cofre] thread qos name=%s class=%s", name,
+        qos == QOS_CLASS_UTILITY ? "utility" : qos == QOS_CLASS_USER_INITIATED ? "user-initiated" : "user-interactive");
+}
+
+static void *CofreThreadQoSWatchAndReport(void *unused) {
+  CofreThreadQoSWatch(unused);
+  NSLog(@"[Cofre] thread qos installed=%d", atomic_load(&CofreThreadQoSInstalled));
+  return NULL;
+}
+
+/// Engine experiment (EngineOptions.threadQoS): background Java threads run at utility QoS. Watches for Air's JVM
+/// from a utility thread and installs a JVMTI ThreadStart callback (CofreThreadQoS.h).
+void CofreThreadQoSStart(void) {
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    CofreThreadQoSLog = CofreLogThreadQoS;
+    pthread_attr_t attributes;
+    pthread_attr_init(&attributes);
+    pthread_attr_set_qos_class_np(&attributes, QOS_CLASS_UTILITY, 0);
+    pthread_attr_setdetachstate(&attributes, PTHREAD_CREATE_DETACHED);
+    pthread_t watcher;
+    int started = pthread_create(&watcher, &attributes, CofreThreadQoSWatchAndReport, NULL);
+    pthread_attr_destroy(&attributes);
+    NSLog(@"[Cofre] thread qos watching=%d", started == 0);
+  });
+}
+
 /// Starts CofreCore with the Air bridge exactly once. Safe to call from any
 /// launch path.
 static void CofreEnsureStarted(void) {
@@ -194,6 +251,7 @@ static void CofreEnsureStarted(void) {
     [bridge ensureAutomaticMemoryDefault];
     CofreConfigureAirJIT();
     CofreWatchLifecycle();
+    _dyld_register_func_for_add_image(CofreLogOutsideImage);
     // The game owns VSync and its frame limit in options.txt. With this Air setting on, Air's Java launcher
     // overwrites both (VSync off, 260 FPS) at every launch, undoing what the player picked in game.
     setPrefBool(@"video.disable_game_vsync", NO);

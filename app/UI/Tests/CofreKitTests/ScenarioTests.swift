@@ -14,6 +14,12 @@ final class ScenarioTests: XCTestCase {
         XCTAssertThrowsError(try CofreScenario(name: "bench", version: "26.2", world: "../escape").validate())
     }
 
+    func testEngineExperimentsDecode() throws {
+        let s = try CofreScenario.load(Data(#"{"name":"ab","version":"26.3","engine":{"codeCacheMB":256,"detachJIT":true}}"#.utf8))
+        XCTAssertEqual(s.engine, EngineOptions(codeCacheMB: 256, detachJIT: true))
+        XCTAssertNil(try CofreScenario.load(Data(#"{"name":"ab","version":"26.3"}"#.utf8)).engine)
+    }
+
     func testRejectsPackWithModsAndBadResolution() {
         let s = CofreScenario(name: "x", version: "1.21.1", mods: ["sodium"], pack: "pack", resolution: 2)
         XCTAssertThrowsError(try s.validate())

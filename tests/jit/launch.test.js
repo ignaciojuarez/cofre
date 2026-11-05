@@ -125,6 +125,7 @@ enum FMLConfig { static func disableEarlyWindow(in directory: URL) throws {} }
     func recordJVMUse() {}
     func repairLibraries() {}
     func applyJavaHeap(instanceID: String) {}
+    func applyJITMode() {}
     func seedViewDistances(_ instance: Instance, instanceID: String) {}
     func checkDiskBeforeLaunch(_ instance: Instance, root: URL) async throws {}
     func watchModLoaderFailure(_ failed: @escaping @MainActor () -> Void) -> Task<Void, Never> { Task {} }

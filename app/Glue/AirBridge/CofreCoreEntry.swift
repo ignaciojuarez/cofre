@@ -41,6 +41,17 @@ public final class CofreCoreEntry: NSObject {
                     "minimum": JavaRuntimePolicy.metalMinimumMajor]
         }
     }
+    /// Launch-only additions on top of Air's arguments: engine experiments as JVM flags (Air applies them after its
+    /// own) and the game argument that picks Minecraft's graphics backend for this renderer.
+    @objc(launchAdditionsForMetadata:renderer:gameDirectory:)
+    @MainActor public static func launchAdditions(metadata: [String: Any], renderer: String,
+                                                  gameDirectory: URL?) -> NSDictionary {
+        let base = metadata["inheritsFrom"] as? String ?? metadata["id"] as? String ?? ""
+        let options = EngineOptions.load()
+        let jvm = options.jvmFlags(javaMajor: requiredJava(from: metadata), gameDirectory: gameDirectory)
+        let game = GraphicsBackendArguments.arguments(renderer: RendererID(rawValue: renderer), gameVersion: base)
+        return ["jvm": jvm, "game": game, "threadQoS": options.threadQoS]
+    }
     /// The ObjC engine applies this value; all renderer decisions stay in Swift.
     @objc(rendererForProfile:metadata:globalSetting:)
     @MainActor public static func renderer(forProfile profile: [String: Any], metadata: [String: Any],

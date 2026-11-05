@@ -240,6 +240,15 @@
             }
         }
 
+        /// iOS 26+ JIT keeps the debugger attached so dyld can load unsigned libraries through it (CofreStartup.m sets
+        /// that at every app start). The detach experiment lets Air ask the JIT script to leave once the code region is
+        /// ready (CofreTXM.js, op 3); the next app start restores the attached default.
+        private func applyJITMode() {
+            guard EngineOptions.load().detachJIT else { return }
+            air.setPreferenceObject("debug.debug_always_attached_jit", value: NSNumber(value: false), profile: nil)
+            NSLog("[Cofre] JIT mode=detach (experiment)")
+        }
+
         /// Air reads AMETHYST_MEM_MB for -Xmx; NO_CLAMP skips its own clamp, which caches a stale reading.
         private func applyJavaHeap(instanceID: String) {
             let size = javaHeap(instanceID: instanceID, prefs: preferenceStore.load(instanceID: instanceID))
@@ -348,6 +357,7 @@
                         self.repairLibraries()
                         self.seedViewDistances(instance, instanceID: instanceID)
                         self.applyJavaHeap(instanceID: instanceID)
+                        self.applyJITMode()
                         NSLog("[Cofre] launch JIT ready; starting Air")
                         if instance.loader == .forge || instance.loader == .neoforge {
                             let loader = instance.loader == .forge ? "Forge" : "NeoForge"

@@ -31,6 +31,8 @@
 #include <mach/mach.h>
 #include <string.h>
 
+void CofreThreadQoSStart(void); // CofreStartup.m
+
 static NSError *CofreAirError(NSString *message) {
   return [NSError errorWithDomain:@"CofreAir"
                              code:1
@@ -1224,13 +1226,20 @@ static NSString *CofreProfileFieldForPreference(NSString *key) {
       // A JVM property belongs to this launch only; never persist it into a profile/version file.
       NSMutableDictionary *arguments = [metadata[@"arguments"] mutableCopy] ?: [NSMutableDictionary dictionary];
       NSMutableArray *jvm = [arguments[@"jvm_processed"] mutableCopy] ?: [NSMutableArray array];
-      // After a crash in startup, Minecraft 26.x forces its saved graphics backend to OpenGL, which is black on a
-      // Metal instance. The launch argument overrides the saved choice (vanilla logs "in-game preferred graphics
-      // backend setting is ignored"); DEFAULT lets the Metal backend (Air's agent or MetalUniversal) take over.
+      // Swift decides the launch-only additions: engine experiments (JVM flags, applied after Air's own, so they
+      // win) and the graphics backend argument (Metal plugs in as DEFAULT; Vulkan runs Mojang's backend on MoltenVK).
       NSArray<NSString *> *launchArguments = gameArguments;
-      NSString *base = metadata[@"inheritsFrom"] ?: metadata[@"id"];
-      if ([CofreLastRendererPick containsString:@"metallum"] && base.integerValue >= 26) {
-        launchArguments = [gameArguments arrayByAddingObjectsFromArray:@[ @"--graphicsBackend", @"default" ]];
+      Class entry = NSClassFromString(@"CofreCoreEntry");
+      SEL additionsSelector = NSSelectorFromString(@"launchAdditionsForMetadata:renderer:gameDirectory:");
+      if ([entry respondsToSelector:additionsSelector]) {
+        NSDictionary *additions = ((id (*)(id, SEL, id, id, id))objc_msgSend)(
+            entry, additionsSelector, metadata, CofreLastRendererPick ?: @"auto", [self gameDirectoryForProfile:profile]);
+        NSArray<NSString *> *engineFlags = additions[@"jvm"] ?: @[];
+        [jvm addObjectsFromArray:engineFlags];
+        launchArguments = [gameArguments arrayByAddingObjectsFromArray:additions[@"game"] ?: @[]];
+        if ([additions[@"threadQoS"] boolValue]) CofreThreadQoSStart();
+        NSLog(@"[Cofre] engine flags=%@ backend=%@", [engineFlags componentsJoinedByString:@" "],
+              [additions[@"game"] componentsJoinedByString:@" "]);
       }
       NSData *json = [NSJSONSerialization dataWithJSONObject:launchArguments options:0 error:nil];
       [jvm addObject:[@"-Dcofre.gameArguments=" stringByAppendingString:[json base64EncodedStringWithOptions:0]]];
