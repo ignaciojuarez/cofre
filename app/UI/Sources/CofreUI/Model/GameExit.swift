@@ -123,6 +123,9 @@ public struct GameExitReport: Hashable, Sendable {
         // is allowed to be refined by the fatal trace below.
         let signed = diagnoseSigns(report: report, errors: errors)
         if let signed, [.memory, .mods, .missingLibrary].contains(signed.0) { return signed }
+        // HotSpot stops compiling once the JIT code cache is full; the game slows to a crawl and can then crash
+        // (Air saw SIGILL in LWJGL's font code). Cofre's code cache size is an engine setting, not the player's.
+        if logLines.contains(where: { $0.contains("CodeCache is full") }) { return (.java, codeCacheFull) }
         // A JVM fatal signal plus a renderer library in the following frame/trace is a native renderer crash. The
         // renderer marker must follow the signal so an ordinary startup line cannot trigger this diagnosis.
         if let renderer = nativeRenderer(in: report + logLines) {
@@ -240,6 +243,9 @@ public struct GameExitReport: Hashable, Sendable {
 
     static let needsGL = "needs OpenGL, which the Metal renderer doesn't have on this Minecraft version."
 
+    /// HotSpot's "CodeCache is full. Compiler has been disabled."
+    static let codeCacheFull = "Java's code cache filled up (CodeCache is full), so it stopped compiling."
+
     /// Changing Graphics or resource packs in game reloads every texture and shader; Metallum can crash there.
     static let metalReload = "Metal crashed while reloading graphics (Graphics or resource packs changed in game)."
 
@@ -266,6 +272,7 @@ public struct GameExitReport: Hashable, Sendable {
         case .missingLibrary: "A game file is missing or didn't load."
         case .mods where clue?.hasSuffix(Self.needsGL) == true: clue!
         case .mods: "Some mods don't work together, or one needs another mod."
+        case .java where clue == Self.codeCacheFull: "Java ran out of room for compiled code."
         case .java: "Minecraft hit a Java error."
         case .unknown: "It closed unexpectedly."
         case .quit: "You quit the game."
@@ -288,6 +295,8 @@ public struct GameExitReport: Hashable, Sendable {
         case .mods where clue?.hasSuffix(Self.needsGL) == true:
             "Turn that mod off in Mods › Installed, then play again."
         case .mods: "Open Details to see which mod, then update or remove it, or add the mod it needs."
+        case .java where clue == Self.codeCacheFull:
+            "Remove a few mods and play again. Share the log so Cofre can give big mod packs more room."
         case .java: "If you just changed mods, undo that. Otherwise share the log so someone can look."
         case .unknown: "Play again. If it keeps happening, share the log."
         case .quit: "Open Cofre again whenever you want to play."

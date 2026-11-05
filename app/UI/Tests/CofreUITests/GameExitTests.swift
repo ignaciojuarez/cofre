@@ -8,6 +8,17 @@ final class GameExitTests: XCTestCase {
         GameExitReport(code: code, crashReport: report, log: log)
     }
 
+    func testFullCodeCacheIsNamed() {
+        let report = diagnose(
+            134, log: "[12:00:01] [Render thread/INFO]: Loaded\nOpenJDK 64-Bit Server VM warning: CodeCache is full. Compiler has been disabled.\nSIGILL")
+        XCTAssertEqual(report.reason, .java)
+        XCTAssertEqual(report.clue, GameExitReport.codeCacheFull)
+        XCTAssertEqual(report.explanation, "Java ran out of room for compiled code.")
+        // A mod error in the crash report still wins: it says what to change.
+        let mod = diagnose(1, report: "Description: Mod loading\njava.lang.NoSuchMethodError: foo", log: "CodeCache is full.")
+        XCTAssertEqual(mod.reason, .mods)
+    }
+
     func testEverySampleGetsItsReason() {
         for reason in GameExitReport.Reason.allCases {
             let s = MockGameExit.sample(reason)
