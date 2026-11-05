@@ -5,6 +5,26 @@ Status: 🎯 approved (2026-11-05, decisions in §8).
 - **Targets:** iPhone 17 Pro (A19 Pro, 12 GB) and the new iPad mini (A20). The 4 GB iPad mini 6 is best effort.
 - Facts were checked against primary sources (Mojang, GitHub, Mesa, LunarG, Apple) on 2026-11-05. ⚠️ marks unverified items.
 
+## Status (2026-11-05)
+
+✅ built and Mac/simulator-tested · 🔜 needs the iPhone 17 Pro bench (`scripts/bench.sh`) · ⏸ later
+
+| Item | State |
+|---|---|
+| Version picker: 26.2+ first, older under "Not optimized"; new instances default to 26.2 | ✅ `5dd44f5` |
+| Phase 0 bench: `scripts/bench.sh` (4 cases, `--only`, `--engine` A/B), `perf-summary.sh` (steady FPS, memory growth, thermals, GC, code cache, A/B), 26.3 scenario worlds | ✅ `eee0e08` `fae69bb` · 🔜 first device run |
+| Engine switches (`EngineOptions`, off by default): code cache size, compact headers, GC (`-XX:-UseG1GC` is required: a second collector next to Air's G1 stops the JVM), GC/code-cache logs, JFR, JIT detach, thread QoS | ✅ `1b6fd4d` (flags checked on a desktop JDK 25) · 🔜 A/B each |
+| JIT detach: `CofreTXM.js` already detaches after the region when Air asks (op 3); the switch flips Air's keep-attached pref for one launch | ✅ · 🔜 A/B, then make it the default |
+| Libraries loaded from outside the bundle are logged (`[Cofre] dylib outside bundle`) — the input for the signed natives overlay (1.1) | ✅ · 🔜 collect the list, then build the overlay |
+| Thread QoS: JVMTI ThreadStart hook, verified against a desktop JDK 25 (`tests/engine/thread-qos.sh`) | ✅ · 🔜 A/B |
+| Crash screen names a full JIT code cache | ✅ `dadaeaf` |
+| Vulkan on 26.2+: Settings lists Auto · Metal · Vulkan · MobileGlues; Vulkan forces `--graphicsBackend vulkan` | ✅ · 🔜 first run (must log `Using graphics backend Vulkan`) |
+| MoltenVK settings: Air's values are MoltenVK's defaults plus quieter logs; nothing to fix blind | 🔜 tune after the first numbers |
+| Cofre Metallum fork (`scripts/metallum.sh`, `patches/metallum/`) | see `plan/reviews/cofre-metallum.md` |
+| AOT cache (1.8): JDK 25's one-step cache starts a child JVM, which iOS can't; the two-step flow needs a separate training launch | ⏸ |
+| Own JDK 25 build (1.9) | ⏸ |
+| Game runs in the simulator: blocked by a real sign-in (no offline accounts) and Air's iOS 26 JIT path, which has no simulator mode | ⏸ would let renderers be tested without the phone |
+
 ## 1. Why 26.2+ is the right bet
 
 - Since 26.2 the game renders through Blaze3D: a GPU abstraction with an official **Vulkan** backend plus OpenGL. 26.3 moved it to `com.mojang.renderpearl`. 26.4 snapshots **prefer Vulkan by default**.
