@@ -130,11 +130,11 @@ Z's variations, recommended picks taken (Ignacio: "I like it all"):
 
 | Phase | What | Status |
 |---|---|---|
-| 0 | Bench on the iPhone 17 Pro: vanilla on Metal and on Vulkan, Fabric + Sodium + 30 mods, NeoForge + 100 mods; JFR, code cache, Metal HUD | 🎯 next |
-| 1 | JVM/JIT: signed natives overlay, detach the debugger after blessing (default once A/B passes), 192–256 MB code cache, compact object headers, GC and thread-QoS A/B, JDK 25 build we own | 🎯 |
-| 2 | Backends: **Cofre Metallum** fork (cut per-draw logging, memory climb, mid-game reload crash, pipeline cache, pacing, MetalFX) + **Mojang Vulkan → MoltenVK** co-primary + SDL3 for 26.3+ | 🎯 |
+| 0 | Bench on the iPhone 17 Pro: vanilla on Metal and on Vulkan, Fabric + Sodium + 30 mods, NeoForge + 100 mods; JFR, code cache, Metal HUD | ✅ `scripts/bench.sh` built · 🎯 next: the device run |
+| 1 | JVM/JIT: signed natives overlay, detach the debugger after blessing (default once A/B passes), 192–256 MB code cache, compact object headers, GC and thread-QoS A/B, JDK 25 build we own | 🚧 switches built (`EngineOptions`), outside-bundle libraries logged · A/B on device next |
+| 2 | Backends: **Cofre Metallum** fork (cut per-draw logging, memory climb, mid-game reload crash, pipeline cache, pacing, MetalFX) + **Mojang Vulkan → MoltenVK** co-primary + SDL3 for 26.3+ | 🚧 Cofre Metallum builds for 26.2/26.3 (macOS-verified); Vulkan in the picker · iOS runs next; pipeline cache, pacing, MetalFX after numbers |
 | 3 | Mods on 26.x: Sodium 0.9 / Distant Horizons 3.1 on both backends, NeoForge on Vulkan without the Connector kit | 🎯 |
-| 4 | Picker: Metal · Vulkan · OpenGL fallback; versions before 26.2 under a "Not optimized" disclosure | 🎯 |
+| 4 | Picker: Metal · Vulkan · OpenGL fallback; versions before 26.2 under a "Not optimized" disclosure | ✅ `5dd44f5` `1b6fd4d` |
 
 Done already: the frame rate is the game's (`0e18921`), and ProMotion's 30–120 Hz range is on.
 

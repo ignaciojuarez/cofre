@@ -20,7 +20,8 @@ Status: 🎯 approved (2026-11-05, decisions in §8).
 | Crash screen names a full JIT code cache | ✅ `dadaeaf` |
 | Vulkan on 26.2+: Settings lists Auto · Metal · Vulkan · MobileGlues; Vulkan forces `--graphicsBackend vulkan` | ✅ · 🔜 first run (must log `Using graphics backend Vulkan`) |
 | MoltenVK settings: Air's values are MoltenVK's defaults plus quieter logs; nothing to fix blind | 🔜 tune after the first numbers |
-| Cofre Metallum fork (`scripts/metallum.sh`, `patches/metallum/`) | see `plan/reviews/cofre-metallum.md` |
+| Cofre Metallum fork: `scripts/metallum.sh` + 3 patches, 26.2 and 26.3, pure FFM (no dylib), reproducible jars; reload use-after-free fixed; per-frame autorelease pool (likely cause of the memory climb, which doesn't reproduce on macOS); upstream never logged per draw (that spam was MetalUniversal/Air's agent) | ✅ `757ad06`, renders on macOS · 🔜 iOS first frame (`bench-fabric-26.x-cofre-metallum`), then replace the MetalUniversal pin |
+| Air's agent stands aside for Cofre Metallum on Fabric 26.3 (`-Dmetallum.route.family=262`) | ✅ `109a44f` · 🔜 log must say "skipping injection" |
 | AOT cache (1.8): JDK 25's one-step cache starts a child JVM, which iOS can't; the two-step flow needs a separate training launch | ⏸ |
 | Own JDK 25 build (1.9) | ⏸ |
 | Game runs in the simulator: blocked by a real sign-in (no offline accounts) and Air's iOS 26 JIT path, which has no simulator mode | ⏸ would let renderers be tested without the phone |
