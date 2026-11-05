@@ -124,18 +124,17 @@ Z's variations, recommended picks taken (Ignacio: "I like it all"):
   - crash-safe recovery: back up before loader or content changes, last-known-good profile, quarantine a bad mod;
   - auto-triage steps 3–4 (Mac mini routine, then agent PRs).
 
-## Performance (listed, not started; see the decision above)
+## Performance: Minecraft 26.2+ only ([ideal-engine](ideal-engine.md))
 
-1. Metal as the explicit renderer for 26.x, plus a renderer × version × device test matrix.
-2. Presets and heat-aware lowering. 🤔
-3. Opt-in, version-pinned Performance pack. 🤔
-4. Cut Metallum's per-frame logging.
-5. Shader/pipeline cache.
-6. Per-instance options.txt defaults on first create.
-7. Auto-RAM headroom for Metal.
-8. AppCDS for faster cold start.
-9. Asset prefetch.
-10. Game Mode Info.plist keys after validation.
+🎯 Approved 2026-11-05. Targets: iPhone 17 Pro and the A20 iPad mini. Versions before 26.2 get no performance work.
+
+| Phase | What | Status |
+|---|---|---|
+| 0 | Bench on the iPhone 17 Pro: vanilla on Metal and on Vulkan, Fabric + Sodium + 30 mods, NeoForge + 100 mods; JFR, code cache, Metal HUD | 🎯 next |
+| 1 | JVM/JIT: signed natives overlay, detach the debugger after blessing (default once A/B passes), 192–256 MB code cache, compact object headers, GC and thread-QoS A/B, JDK 25 build we own | 🎯 |
+| 2 | Backends: **Cofre Metallum** fork (cut per-draw logging, memory climb, mid-game reload crash, pipeline cache, pacing, MetalFX) + **Mojang Vulkan → MoltenVK** co-primary + SDL3 for 26.3+ | 🎯 |
+| 3 | Mods on 26.x: Sodium 0.9 / Distant Horizons 3.1 on both backends, NeoForge on Vulkan without the Connector kit | 🎯 |
+| 4 | Picker: Metal · Vulkan · OpenGL fallback; versions before 26.2 under a "Not optimized" disclosure | 🎯 |
 
 Done already: the frame rate is the game's (`0e18921`), and ProMotion's 30–120 Hz range is on.
 
