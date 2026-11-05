@@ -1,0 +1,190 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Cofre <cofre@example.invalid>
+Date: Thu, 5 Nov 2026 14:53:54 -0800
+Subject: [PATCH] [COFRE] Add Cofre Metallum's iOS host layer and notice
+
+Reason: Metallum has no iOS host: on Air there is no AppKit or SDL window, so the renderer must find the launcher's published UIView/CAMetalLayer (-Dmetallum.ios.view.pointer), detect iOS (the JVM reports "Mac OS X"), drain autoreleased objects per frame and point LWJGL at the launcher's signed SPIRV-Cross. Shared by the 26.2 and 26.3 builds; MIT needs the notice next to the license.
+Drop when: Metallum ships an iOS host-layer path upstream.
+---
+ COFRE-NOTICE.md                               |  18 +++
+ .../java/com/metallum/render/IosHost.java     | 146 ++++++++++++++++++
+ 2 files changed, 164 insertions(+)
+ create mode 100644 COFRE-NOTICE.md
+ create mode 100644 src/main/java/com/metallum/render/IosHost.java
+
+diff --git a/COFRE-NOTICE.md b/COFRE-NOTICE.md
+new file mode 100644
+index 0000000..4de7091
+--- /dev/null
++++ b/COFRE-NOTICE.md
+@@ -0,0 +1,18 @@
++# Cofre Metallum
++
++This jar is a modified build of Metallum (https://github.com/kokodio/metallum), licensed under the MIT License
++(LICENSE_metallum in this jar). It also nests metal-jvm (https://github.com/kokodio/metal-jvm, MIT, unmodified).
++
++Sources:
++- Minecraft 26.3: commit 467d312b8bc68ee3210697f01855244e8f2831a2 (v0.0.25 plus the getOrCompileFunction thread-safety fix)
++- Minecraft 26.2: commit a12ffb346c79d580de2e9565501205ec81c60025 (last 26.2 commit, already on metal-jvm)
++
++Modified by Cofre (2026-11-05) to run on iOS inside the Air launcher:
++- detect iOS and present through the launcher's published UIView/CAMetalLayer instead of an AppKit/SDL view;
++- never create Objective-C blocks (FFM upcall stubs crash on iOS): frame pacing polls command-buffer status;
++- drain a per-frame autorelease pool on iOS, where the render thread has no run loop;
++- translate shaders for the iOS Metal platform and use the launcher's signed SPIRV-Cross;
++- release render pipeline states after the GPU is done with them, and never rebuild a closed pipeline
++  (resource reload crash).
++
++The exact changes and build recipe are in the Cofre repository: patches/metallum/ and scripts/metallum.sh.
+diff --git a/src/main/java/com/metallum/render/IosHost.java b/src/main/java/com/metallum/render/IosHost.java
+new file mode 100644
+index 0000000..481d0b9
+--- /dev/null
++++ b/src/main/java/com/metallum/render/IosHost.java
+@@ -0,0 +1,146 @@
++package com.metallum.render;
++
++import com.metallum.Metallum;
++import io.github.kokodio.metaljvm.objc.AutoreleasePool;
++import io.github.kokodio.metaljvm.objc.ObjC;
++import io.github.kokodio.metaljvm.quartzcore.CAMetalLayer;
++
++import java.io.File;
++import java.lang.foreign.FunctionDescriptor;
++import java.lang.invoke.MethodHandle;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.util.Locale;
++
++import static java.lang.foreign.ValueLayout.JAVA_LONG;
++
++/**
++ * Cofre: iOS host integration (Air/Amethyst/PojavLauncher). There is no AppKit window and no usable SDL Metal view:
++ * the launcher owns a UIView whose backing layer is a CAMetalLayer and publishes its address as
++ * {@code -Dmetallum.ios.view.pointer=0x...}. Layer writes happen inline on the render thread: hopping to the main queue
++ * would need an FFM upcall stub, and creating one SIGBUSes on iOS (HotSpot writes the CodeBlob into the read-execute
++ * code cache). For the same reason this build never creates Objective-C blocks (see MetalCommandEncoder).
++ */
++public final class IosHost {
++    /** -Dmetallum.ios=true|false overrides detection. */
++    public static final boolean ACTIVE = detect();
++    private static final MethodHandle MSG = ObjC.msgSend(FunctionDescriptor.of(JAVA_LONG, JAVA_LONG, JAVA_LONG));
++    private static final MethodHandle MSG_1 = ObjC.msgSend(FunctionDescriptor.of(JAVA_LONG, JAVA_LONG, JAVA_LONG, JAVA_LONG));
++    private static long framePool;
++
++    private IosHost() {
++    }
++
++    private static boolean detect() {
++        String forced = System.getProperty("metallum.ios");
++        if (forced != null) {
++            return Boolean.parseBoolean(forced);
++        }
++        String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
++        if (os.contains("ios") || System.getProperty("metallum.ios.view.pointer") != null) {
++            return true;
++        }
++        // iOS JVMs report "Mac OS X". UIKit is loaded in every iOS app and never in a desktop JVM.
++        try {
++            return ObjC.clazz("UIApplication") != 0L;
++        } catch (IllegalStateException notRegistered) {
++            return false;
++        }
++    }
++
++    private static long send(final long receiver, final String selector) {
++        try {
++            return (long) MSG.invokeExact(receiver, ObjC.selector(selector));
++        } catch (Throwable t) {
++            throw new IllegalStateException(selector, t);
++        }
++    }
++
++    private static long send(final long receiver, final String selector, final long argument) {
++        try {
++            return (long) MSG_1.invokeExact(receiver, ObjC.selector(selector), argument);
++        } catch (Throwable t) {
++            throw new IllegalStateException(selector, t);
++        }
++    }
++
++    /** The launcher's game UIView: -Dmetallum.ios.view.pointer (Air), -Dpojav.view.pointer, then +[SurfaceViewController surface]. */
++    static long hostView() {
++        for (String key : new String[]{"metallum.ios.view.pointer", "pojav.view.pointer"}) {
++            String raw = System.getProperty(key);
++            if (raw != null && !raw.isBlank()) {
++                raw = raw.trim();
++                long view = Long.parseUnsignedLong(raw.startsWith("0x") || raw.startsWith("0X") ? raw.substring(2) : raw, 16);
++                if (view != 0L) {
++                    return view;
++                }
++            }
++        }
++        long view = 0L;
++        try {
++            view = send(ObjC.clazz("SurfaceViewController"), "surface");
++        } catch (IllegalStateException ignored) {
++            // No such class: not a Pojav-family launcher.
++        }
++        if (view == 0L) {
++            throw new IllegalStateException("Metallum: no iOS game view. The launcher must pass -Dmetallum.ios.view.pointer=<UIView address>.");
++        }
++        return view;
++    }
++
++    /** The host view's own CAMetalLayer, retained for the caller. Metallum never creates or replaces the layer on iOS. */
++    static CAMetalLayer hostLayer() {
++        long view = hostView();
++        long layer;
++        try (AutoreleasePool _ = AutoreleasePool.push()) {
++            layer = send(view, "layer");
++            if (layer == 0L || (send(layer, "isKindOfClass:", ObjC.clazz("CAMetalLayer")) & 0xFF) == 0) {
++                throw new IllegalStateException("Metallum: the iOS game view's layer is not a CAMetalLayer");
++            }
++            send(layer, "retain");
++        }
++        Metallum.LOGGER.info("Metallum: iOS host layer 0x{} from view 0x{}", Long.toHexString(layer), Long.toHexString(view));
++        return new CAMetalLayer(layer);
++    }
++
++    /**
++     * iOS: drains autoreleased Objective-C objects once per frame. Air's render thread is a plain JVM thread with no
++     * run loop, so anything Metal autoreleases outside Metallum's scoped pools otherwise lives until the thread exits
++     * (on macOS the SDL/GLFW event pump drains them). Call on the render thread only.
++     */
++    static void drainFramePool() {
++        if (!ACTIVE) {
++            return;
++        }
++        if (framePool != 0L) {
++            ObjC.autoreleasePoolPop(framePool);
++        }
++        framePool = ObjC.autoreleasePoolPush();
++    }
++
++    /**
++     * Points LWJGL's SPIRV-Cross at the launcher's signed iOS library (app Frameworks, on java.library.path) unless the
++     * launcher already chose one. Must run before Spvc is first initialized.
++     */
++    static void prepareNatives() {
++        if (!ACTIVE) {
++            return;
++        }
++        String property = "org.lwjgl.spvc.libname";
++        if (System.getProperty(property) != null) {
++            Metallum.LOGGER.info("Metallum: iOS {}={} (launcher)", property, System.getProperty(property));
++            return;
++        }
++        for (String dir : System.getProperty("java.library.path", "").split(File.pathSeparator)) {
++            for (String file : new String[]{"libspirv-cross-c-shared.0.dylib", "libspvc.dylib"}) {
++                Path path = Path.of(dir, file);
++                if (!dir.isEmpty() && Files.isRegularFile(path)) {
++                    System.setProperty(property, path.toString());
++                    Metallum.LOGGER.info("Metallum: iOS {}={}", property, path);
++                    return;
++                }
++            }
++        }
++        Metallum.LOGGER.warn("Metallum: iOS {} not found on java.library.path; LWJGL default lookup", property);
++    }
++}

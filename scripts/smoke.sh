@@ -7,7 +7,7 @@ ok() { echo "✓ $1"; }
 no() { echo "✗ $1"; fail=1; }
 for n in air stikjit stikdebug; do [[ -d upstream/$n/.git || -f upstream/$n/.git ]] && ok "upstream/$n" || no "missing upstream/$n"; done
 for f in app/Glue/AirBridge/CofreBackendAdapter.swift app/Glue/AirBridge/AirBridgeAdapter.m extensions/PacketTunnel/PacketTunnelProvider.swift; do [[ -f $f ]] && ok "$f" || no "missing $f"; done
-for n in air stikjit stikdebug; do c=$(find patches/$n -name '*.patch' 2>/dev/null | wc -l); ((c<=5)) && ok "$n patch budget $c" || no "$n patch budget"; done
+for n in air stikjit stikdebug graft metallum; do c=$(find patches/$n -name '*.patch' 2>/dev/null | wc -l); ((c<=5)) && ok "$n patch budget $c" || no "$n patch budget"; done
 [[ $(grep -c '^air\t' UPSTREAM.lock) -eq 1 ]] && ok 'UPSTREAM.lock' || no 'UPSTREAM.lock'
 expected_app=com.ignacio.cofre
 expected_tunnel=com.ignacio.cofre.tunnel

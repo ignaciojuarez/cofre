@@ -1,0 +1,333 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Cofre <cofre@example.invalid>
+Date: Thu, 5 Nov 2026 14:56:38 -0800
+Subject: [PATCH] [COFRE] Run Metallum on iOS for Minecraft 26.2
+
+Reason: The 26.2 Metallum (a12ffb3) installs its CAMetalLayer on the GLFW Cocoa NSView, waits for frames with Objective-C completion blocks (FFM upcall stubs, which SIGBUS on iOS), calls the macOS-only displaySyncEnabled and targets the macOS MSL platform. On iOS (Air) it must use the launcher's published CAMetalLayer, poll command-buffer status, drain a per-frame autorelease pool, target iOS MSL and use the launcher's signed SPIRV-Cross. It also releases render pipeline states immediately on close and can rebuild a closed pipeline from its released descriptor (resource reload use-after-free), and compiles shader functions without the lock 26.3 added (5bee03e).
+Drop when: Cofre stops shipping Metal for Minecraft 26.2, or Metallum ships these fixes on a 26.2 branch.
+---
+ build.gradle                                  |  4 ++
+ .../com/metallum/render/MetalBackend.java     | 56 ++++++++++++-------
+ .../metallum/render/MetalCommandEncoder.java  | 50 ++++++++++-------
+ .../render/MetalCompiledRenderPipeline.java   | 19 ++++++-
+ .../render/MetalCrossShaderCompiler.java      |  9 ++-
+ .../java/com/metallum/render/MetalDevice.java |  2 +-
+ .../com/metallum/render/MetalSurface.java     |  5 +-
+ src/main/resources/fabric.mod.json            |  2 +-
+ 8 files changed, 99 insertions(+), 48 deletions(-)
+
+diff --git a/build.gradle b/build.gradle
+index ae57c59..e2671ec 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -5,6 +5,8 @@ plugins {
+ 
+ version = project.mod_version
+ group = project.maven_group
++// Cofre: one jar per Minecraft version (scripts/metallum.sh passes -Pmod_version=<upstream>-cofre.N).
++base.archivesName = "metallum-cofre-mc${project.minecraft_version}"
+ 
+ loom {
+ 	accessWidenerPath = file("src/main/resources/metallum.accesswidener")
+@@ -46,6 +48,8 @@ jar {
+ 	from("LICENSE") {
+ 		rename { "${it}_${project.name}"}
+ 	}
++	// MIT: the license above plus Cofre's modification notice ship in the jar.
++	from("COFRE-NOTICE.md")
+ }
+ 
+ // configure the maven publication
+diff --git a/src/main/java/com/metallum/render/MetalBackend.java b/src/main/java/com/metallum/render/MetalBackend.java
+index 4a1c5d3..c654431 100644
+--- a/src/main/java/com/metallum/render/MetalBackend.java
++++ b/src/main/java/com/metallum/render/MetalBackend.java
+@@ -50,32 +50,46 @@ public class MetalBackend implements GpuBackend {
+         String deviceName = metalDevice.name();
+         if (deviceName.isBlank()) deviceName = "<unknown Metal device>";
+ 
+-        NSWindow nsWindow = new NSWindow(GLFWNativeCocoa.glfwGetCocoaWindow(window));
+-        if (ObjC.isNil(nsWindow.handle())) {
+-            throw new BackendCreationException("NSWindow handle is null", BackendCreationException.Reason.GLFW_ERROR);
+-        }
+-        NSView nsView = new NSView(GLFWNativeCocoa.glfwGetCocoaView(window));
+-        if (ObjC.isNil(nsView.handle())) {
+-            throw new BackendCreationException("NSView handle is null", BackendCreationException.Reason.GLFW_ERROR);
+-        }
+-
+         CAMetalLayer metalLayer;
+-        try {
+-            metalLayer = CAMetalLayer.alloc().init();
++        if (IosHost.ACTIVE) {
++            // Cofre: no AppKit window on iOS; Air owns the game UIView and its CAMetalLayer (frame, scale).
++            Metallum.LOGGER.info("Metallum: iOS host detected; presenting through the launcher's CAMetalLayer");
++            IosHost.prepareNatives();
++            try {
++                metalLayer = IosHost.hostLayer();
++            } catch (IllegalStateException e) {
++                throw new BackendCreationException(e.getMessage(), BackendCreationException.Reason.OTHER);
++            }
+             metalLayer.setDevice(metalDevice);
+             metalLayer.setFramebufferOnly(false);
+             metalLayer.setOpaque(true);
+-            double backingScaleFactor = nsWindow.backingScaleFactor();
+-            metalLayer.setContentsScale(backingScaleFactor > 0.0 ? backingScaleFactor : 1.0);
+-            long colorspace = CGColorSpace.CGColorSpaceCreateWithName(MetallumConfig.INSTANCE.displayP3 ? CGColorSpace.kCGColorSpaceDisplayP3 : CGColorSpace.kCGColorSpaceSRGB);
+-            metalLayer.setColorspace(colorspace);
+-            CGColorSpace.CGColorSpaceRelease(colorspace);
+-        } catch (IllegalStateException e) {
+-            throw new BackendCreationException(e.getMessage(), BackendCreationException.Reason.OTHER);
+-        }
++        } else {
++            NSWindow nsWindow = new NSWindow(GLFWNativeCocoa.glfwGetCocoaWindow(window));
++            if (ObjC.isNil(nsWindow.handle())) {
++                throw new BackendCreationException("NSWindow handle is null", BackendCreationException.Reason.GLFW_ERROR);
++            }
++            NSView nsView = new NSView(GLFWNativeCocoa.glfwGetCocoaView(window));
++            if (ObjC.isNil(nsView.handle())) {
++                throw new BackendCreationException("NSView handle is null", BackendCreationException.Reason.GLFW_ERROR);
++            }
++
++            try {
++                metalLayer = CAMetalLayer.alloc().init();
++                metalLayer.setDevice(metalDevice);
++                metalLayer.setFramebufferOnly(false);
++                metalLayer.setOpaque(true);
++                double backingScaleFactor = nsWindow.backingScaleFactor();
++                metalLayer.setContentsScale(backingScaleFactor > 0.0 ? backingScaleFactor : 1.0);
++                long colorspace = CGColorSpace.CGColorSpaceCreateWithName(MetallumConfig.INSTANCE.displayP3 ? CGColorSpace.kCGColorSpaceDisplayP3 : CGColorSpace.kCGColorSpaceSRGB);
++                metalLayer.setColorspace(colorspace);
++                CGColorSpace.CGColorSpaceRelease(colorspace);
++            } catch (IllegalStateException e) {
++                throw new BackendCreationException(e.getMessage(), BackendCreationException.Reason.OTHER);
++            }
+ 
+-        nsView.setLayer(metalLayer);
+-        nsView.setWantsLayer(true);
++            nsView.setLayer(metalLayer);
++            nsView.setWantsLayer(true);
++        }
+ 
+         Metallum.LOGGER.info("Metal device: {}", deviceName);
+ 
+diff --git a/src/main/java/com/metallum/render/MetalCommandEncoder.java b/src/main/java/com/metallum/render/MetalCommandEncoder.java
+index edd9420..511a331 100644
+--- a/src/main/java/com/metallum/render/MetalCommandEncoder.java
++++ b/src/main/java/com/metallum/render/MetalCommandEncoder.java
+@@ -9,7 +9,6 @@ import com.mojang.blaze3d.textures.GpuTextureView;
+ import io.github.kokodio.metaljvm.metal.*;
+ import io.github.kokodio.metaljvm.objc.AutoreleasePool;
+ import io.github.kokodio.metaljvm.objc.ObjC;
+-import io.github.kokodio.metaljvm.objc.ObjCBlock;
+ import io.github.kokodio.metaljvm.quartzcore.CAMetalLayer;
+ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+ import net.fabricmc.api.EnvType;
+@@ -22,8 +21,8 @@ import org.jspecify.annotations.Nullable;
+ import java.nio.ByteBuffer;
+ import java.nio.ByteOrder;
+ import java.util.*;
+-import java.util.concurrent.Semaphore;
+ import java.util.concurrent.TimeUnit;
++import java.util.concurrent.locks.LockSupport;
+ 
+ @Environment(EnvType.CLIENT)
+ final class MetalCommandEncoder implements CommandEncoderBackend {
+@@ -31,8 +30,6 @@ final class MetalCommandEncoder implements CommandEncoderBackend {
+     private final MetalDevice device;
+     private long currentSubmitIndex = MAX_SUBMITS_IN_FLIGHT;
+     private final InFlight[] inFlight = new InFlight[MAX_SUBMITS_IN_FLIGHT];
+-    private final Semaphore[] submitSemaphores = new Semaphore[MAX_SUBMITS_IN_FLIGHT];
+-    private final long[] submitSignalBlocks = new long[MAX_SUBMITS_IN_FLIGHT];
+     private final MetalDestructionQueue destroyQueue = new MetalDestructionQueue(MAX_SUBMITS_IN_FLIGHT);
+     private final MetalTransientMemory transientMemory;
+     private final Map<MetalGpuTexture, Vector4fc> pendingColorClears = new IdentityHashMap<>();
+@@ -54,11 +51,8 @@ final class MetalCommandEncoder implements CommandEncoderBackend {
+         this.device = device;
+         this.transientMemory = new MetalTransientMemory(device, this);
+         fence = MetalUtilities.nonNil(device.metalDevice().newFence(), "newFence");
+-        for (int slot = 0; slot < MAX_SUBMITS_IN_FLIGHT; slot++) {
+-            Semaphore semaphore = new Semaphore(0);
+-            submitSemaphores[slot] = semaphore;
+-            submitSignalBlocks[slot] = ObjCBlock.withRunnable(semaphore::release);
+-        }
++        // Cofre: no completion-handler blocks. An Objective-C block needs an FFM upcall stub, and creating one
++        // SIGBUSes on iOS; awaitSubmitCompletion polls the retained command buffer's status instead.
+     }
+ 
+     MTLCommandBuffer commandBuffer() {
+@@ -119,8 +113,6 @@ final class MetalCommandEncoder implements CommandEncoderBackend {
+             endEncoder();
+ 
+             int slot = (int) (currentSubmitIndex % MAX_SUBMITS_IN_FLIGHT);
+-            submitSemaphores[slot].drainPermits();
+-            commandBuffer.addCompletedHandler(submitSignalBlocks[slot]);
+             commandBuffer.commit();
+ 
+             toClose = inFlight[slot];
+@@ -139,6 +131,7 @@ final class MetalCommandEncoder implements CommandEncoderBackend {
+ 
+         transientMemory.rotate();
+         destroyQueue.rotate();
++        IosHost.drainFramePool();
+     }
+ 
+     MTLRenderCommandEncoder renderCommandEncoder(
+@@ -625,16 +618,33 @@ final class MetalCommandEncoder implements CommandEncoderBackend {
+         int slot = (int) (submitIndex % MAX_SUBMITS_IN_FLIGHT);
+         InFlight f = inFlight[slot];
+         if (f != null && f.index == submitIndex) {
+-            Semaphore semaphore = submitSemaphores[slot];
+-            try {
+-                if (!semaphore.tryAcquire(Math.max(timeoutMs, 0L), TimeUnit.MILLISECONDS)) {
+-                    return false;
+-                }
+-                semaphore.release();
+-                return true;
+-            } catch (InterruptedException e) {
+-                throw new IllegalStateException("Render thread interrupted while waiting for Metal submit completion", e);
++            return awaitCompleted(f.buffer, timeoutMs);
++        }
++        return true;
++    }
++
++    private static boolean isDone(final MTLCommandBuffer buffer) {
++        return buffer.status().value >= MTLCommandBufferStatus.Completed.value;
++    }
++
++    private static boolean awaitCompleted(final MTLCommandBuffer buffer, final long timeoutMs) {
++        if (isDone(buffer)) {
++            return true;
++        }
++        if (timeoutMs <= 0L) {
++            return false;
++        }
++        if (timeoutMs >= 1000L) {
++            // The per-frame wait. Metal's GPU watchdog ends a hung command buffer with an error, so this returns.
++            buffer.waitUntilCompleted();
++            return true;
++        }
++        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs);
++        while (!isDone(buffer)) {
++            if (System.nanoTime() >= deadline) {
++                return false;
+             }
++            LockSupport.parkNanos(50_000L);
+         }
+         return true;
+     }
+diff --git a/src/main/java/com/metallum/render/MetalCompiledRenderPipeline.java b/src/main/java/com/metallum/render/MetalCompiledRenderPipeline.java
+index 914e9d5..b12fd12 100644
+--- a/src/main/java/com/metallum/render/MetalCompiledRenderPipeline.java
++++ b/src/main/java/com/metallum/render/MetalCompiledRenderPipeline.java
+@@ -52,9 +52,10 @@ final class MetalCompiledRenderPipeline implements CompiledRenderPipeline, AutoC
+     private final MTLDepthStencilState depthStencilState;
+     private final MetalDevice device;
+     @Nullable
+-    private final MTLRenderPipelineDescriptor descriptor;
++    private MTLRenderPipelineDescriptor descriptor;
+     private final int fullLayout;
+     private final Int2ObjectOpenHashMap<MTLRenderPipelineState> pipelinesByLayout = new Int2ObjectOpenHashMap<>();
++    private boolean closed;
+ 
+     MetalCompiledRenderPipeline(
+             final MetalDevice device,
+@@ -226,6 +227,10 @@ final class MetalCompiledRenderPipeline implements CompiledRenderPipeline, AutoC
+ 
+     @Nullable
+     MTLRenderPipelineState getNativePipeline(final int passLayout) {
++        if (this.closed) {
++            // Cofre: a closed pipeline's descriptor is released; building a variant from it is a use-after-free.
++            return null;
++        }
+         int layout = passLayout & this.fullLayout;
+         MTLRenderPipelineState pipeline = this.pipelinesByLayout.get(layout);
+         if (pipeline == null && !this.pipelinesByLayout.containsKey(layout)) {
+@@ -309,14 +314,22 @@ final class MetalCompiledRenderPipeline implements CompiledRenderPipeline, AutoC
+ 
+     @Override
+     public void close() {
++        if (this.closed) {
++            return;
++        }
++        this.closed = true;
++        // Cofre: resource reloads (Graphics, mipmaps, resource packs) close pipelines mid-frame. The open encoder and
++        // up to MAX_SUBMITS_IN_FLIGHT committed command buffers may still use these states, so release them through
++        // the destruction queue like every other Metal object instead of immediately.
+         for (MTLRenderPipelineState pipeline : this.pipelinesByLayout.values()) {
+             if (pipeline != null) {
+-                pipeline.release();
++                this.device.queueResourceRelease(pipeline);
+             }
+         }
+         this.pipelinesByLayout.clear();
+         if (this.descriptor != null) {
+-            this.descriptor.release();
++            this.device.queueResourceRelease(this.descriptor);
++            this.descriptor = null;
+         }
+     }
+ }
+diff --git a/src/main/java/com/metallum/render/MetalCrossShaderCompiler.java b/src/main/java/com/metallum/render/MetalCrossShaderCompiler.java
+index a6cefda..8761fc5 100644
+--- a/src/main/java/com/metallum/render/MetalCrossShaderCompiler.java
++++ b/src/main/java/com/metallum/render/MetalCrossShaderCompiler.java
+@@ -316,9 +316,16 @@ final class MetalCrossShaderCompiler {
+                 checkSpvc(Spvc.spvc_compiler_create_compiler_options(compiler, pOptions), "spvc_compiler_create_compiler_options");
+                 long options = pOptions.get(0);
+                 checkSpvc(
+-                        Spvc.spvc_compiler_options_set_uint(options, Spvc.SPVC_COMPILER_OPTION_MSL_PLATFORM, Spvc.SPVC_MSL_PLATFORM_MACOS),
++                        Spvc.spvc_compiler_options_set_uint(options, Spvc.SPVC_COMPILER_OPTION_MSL_PLATFORM, IosHost.ACTIVE ? Spvc.SPVC_MSL_PLATFORM_IOS : Spvc.SPVC_MSL_PLATFORM_MACOS),
+                         "spvc_compiler_options_set_uint(MSL_PLATFORM)"
+                 );
++                if (IosHost.ACTIVE) {
++                    // Metallum draws with baseVertex/baseInstance; on iOS SPIRV-Cross honors them only when told the GPU can (A9+).
++                    checkSpvc(
++                            Spvc.spvc_compiler_options_set_bool(options, Spvc.SPVC_COMPILER_OPTION_MSL_IOS_SUPPORT_BASE_VERTEX_INSTANCE, true),
++                            "spvc_compiler_options_set_bool(MSL_IOS_SUPPORT_BASE_VERTEX_INSTANCE)"
++                    );
++                }
+                 checkSpvc(
+                         Spvc.spvc_compiler_options_set_uint(options, Spvc.SPVC_COMPILER_OPTION_MSL_VERSION, MSL_VERSION_4_0),
+                         "spvc_compiler_options_set_uint(MSL_VERSION)"
+diff --git a/src/main/java/com/metallum/render/MetalDevice.java b/src/main/java/com/metallum/render/MetalDevice.java
+index dcac7ea..4f3e35b 100644
+--- a/src/main/java/com/metallum/render/MetalDevice.java
++++ b/src/main/java/com/metallum/render/MetalDevice.java
+@@ -251,7 +251,7 @@ final class MetalDevice implements GpuDeviceBackend {
+     }
+ 
+     @Nullable
+-    MTLFunction getOrCompileFunction(final String msl, final String entryPoint, final String name) {
++    synchronized MTLFunction getOrCompileFunction(final String msl, final String entryPoint, final String name) {
+         return this.functionCache.computeIfAbsent(new MslFunctionKey(msl, entryPoint), key -> this.compileFunction(key, name));
+     }
+ 
+diff --git a/src/main/java/com/metallum/render/MetalSurface.java b/src/main/java/com/metallum/render/MetalSurface.java
+index 5c24ffe..b8490a0 100644
+--- a/src/main/java/com/metallum/render/MetalSurface.java
++++ b/src/main/java/com/metallum/render/MetalSurface.java
+@@ -36,7 +36,10 @@ final class MetalSurface implements GpuSurfaceBackend {
+         this.metalLayer.setDrawableSize(new CGSize(config.width(), config.height()));
+         this.metalLayer.setAllowsNextDrawableTimeout(false);
+         this.metalLayer.setPresentsWithTransaction(false);
+-        this.metalLayer.setDisplaySyncEnabled(config.presentMode() != GpuSurface.PresentMode.MAILBOX);
++        if (!IosHost.ACTIVE) {
++            // displaySyncEnabled is macOS-only (an unrecognized selector on iOS, which always syncs).
++            this.metalLayer.setDisplaySyncEnabled(config.presentMode() != GpuSurface.PresentMode.MAILBOX);
++        }
+     }
+ 
+     @Override
+diff --git a/src/main/resources/fabric.mod.json b/src/main/resources/fabric.mod.json
+index 890abb7..a6f31c2 100644
+--- a/src/main/resources/fabric.mod.json
++++ b/src/main/resources/fabric.mod.json
+@@ -3,7 +3,7 @@
+   "id": "metallum",
+   "version": "${version}",
+   "name": "Metallum",
+-  "description": "This is an PoC Metal backend for Minecraft on macOS",
++  "description": "This is an PoC Metal backend for Minecraft on macOS. Cofre Metallum: modified iOS build for the Cofre launcher (see COFRE-NOTICE.md).",
+   "authors": [
+     "kokodio"
+   ],
