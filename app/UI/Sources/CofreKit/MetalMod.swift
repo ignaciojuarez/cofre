@@ -42,6 +42,26 @@ public enum MetalMod {
         ),
     ]
 
+    /// Air's Metal agent injects its own Metallum on Fabric 26.3 because MetalUniversal stops at 26.2. With Cofre
+    /// Metallum (`scripts/metallum.sh`, same mod id) in the mods folder, its route-family property makes the agent
+    /// stand aside as it does on 26.2 ("Fabric Loader detected - skipping injection").
+    public static func agentJVMFlags(gameVersion: String, loader: Instance.Loader, gameDirectory: URL?) -> [String] {
+        guard loader == .fabric, gameVersion == "26.3", let gameDirectory,
+            enabledIDs(in: gameDirectory, loader: .fabric).contains(modID)
+        else { return [] }
+        return ["-Dmetallum.route.family=262"]
+    }
+
+    /// The same, from the launch's version metadata (a loader version inherits from the game version).
+    public static func agentJVMFlags(metadata: [String: Any], gameDirectory: URL?) -> [String] {
+        let libraries = (metadata["libraries"] as? [[String: Any]] ?? []).compactMap { $0["name"] as? String }
+        let loader = Instance.Loader.resolve(
+            requested: nil, legacy: metadata["loader"] as? String, versionID: metadata["id"] as? String ?? "",
+            libraries: libraries)
+        let gameVersion = metadata["inheritsFrom"] as? String ?? metadata["id"] as? String ?? ""
+        return agentJVMFlags(gameVersion: gameVersion, loader: loader, gameDirectory: gameDirectory)
+    }
+
     public static func pins(for loader: Instance.Loader) -> [CofrePreset.Mod] {
         loader == .neoforge ? [pin] + neoForgePins : [pin]
     }

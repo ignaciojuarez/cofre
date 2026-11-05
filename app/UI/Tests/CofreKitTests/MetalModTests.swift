@@ -43,6 +43,23 @@ final class MetalModTests: XCTestCase {
         XCTAssertTrue(MetalMod.isEnabled(in: root))
     }
 
+    func testAgentStandsAsideForCofreMetallumOnFabric26Point3() throws {
+        let game = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: game) }
+        let fabric: [String: Any] = [
+            "id": "fabric-loader-0.19.5-26.3", "inheritsFrom": "26.3",
+            "libraries": [["name": "net.fabricmc:fabric-loader:0.19.5"]],
+        ]
+        XCTAssertEqual(MetalMod.agentJVMFlags(metadata: fabric, gameDirectory: game), [])
+        let mods = game.appendingPathComponent("mods")
+        try FileManager.default.createDirectory(at: mods, withIntermediateDirectories: true)
+        try Self.jar(id: "metallum").write(to: mods.appendingPathComponent("metallum-cofre-mc26.3-0.0.25-cofre.1.jar"))
+        XCTAssertEqual(MetalMod.agentJVMFlags(metadata: fabric, gameDirectory: game), ["-Dmetallum.route.family=262"])
+        // 26.2 already hands Fabric to the mod; vanilla 26.3 keeps the agent's own Metallum.
+        XCTAssertEqual(MetalMod.agentJVMFlags(gameVersion: "26.2", loader: .fabric, gameDirectory: game), [])
+        XCTAssertEqual(MetalMod.agentJVMFlags(metadata: ["id": "26.3"], gameDirectory: game), [])
+    }
+
     func testOnlyFabricOnValidatedVersions() {
         XCTAssertTrue(MetalMod.supports(gameVersion: "26.2", loader: .fabric))
         XCTAssertTrue(MetalMod.supports(gameVersion: "26.2", loader: .neoforge))

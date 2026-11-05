@@ -49,6 +49,7 @@ public final class CofreCoreEntry: NSObject {
         let base = metadata["inheritsFrom"] as? String ?? metadata["id"] as? String ?? ""
         let options = EngineOptions.load()
         let jvm = options.jvmFlags(javaMajor: requiredJava(from: metadata), gameDirectory: gameDirectory)
+            + MetalMod.agentJVMFlags(metadata: metadata, gameDirectory: gameDirectory)
         let game = GraphicsBackendArguments.arguments(renderer: RendererID(rawValue: renderer), gameVersion: base)
         return ["jvm": jvm, "game": game, "threadQoS": options.threadQoS]
     }

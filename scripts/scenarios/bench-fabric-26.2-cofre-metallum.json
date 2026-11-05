@@ -1,0 +1,28 @@
+{
+  "name": "bench-fabric-26.2-cofre-metallum",
+  "version": "26.2",
+  "loader": "fabric",
+  "mods": [
+    "fabric-api"
+  ],
+  "files": [
+    {
+      "text": "renderDistance:12\nsimulationDistance:8\nmaxFps:120\nenableVsync:true\npauseOnLostFocus:false\n",
+      "to": "options.txt"
+    },
+    {
+      "from": "metallum-cofre-mc26.2-0.0.25-cofre.1.jar",
+      "to": "mods/metallum-cofre-mc26.2-0.0.25-cofre.1.jar"
+    }
+  ],
+  "renderer": "metallum",
+  "resolution": 1.0,
+  "world": "Bench",
+  "seed": 1337,
+  "launch": true,
+  "fresh": true,
+  "engine": {
+    "logGC": true,
+    "logCodeCache": true
+  }
+}
