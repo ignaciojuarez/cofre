@@ -1,0 +1,1 @@
+[Cofre] scenario name=broken step=world result=fail detail=unsupported scenario world version 26.3

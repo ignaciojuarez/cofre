@@ -1,0 +1,143 @@
+{
+  "name": "bench-fabric-26.2-metal-sodium-30",
+  "version": "26.2",
+  "loader": "fabric",
+  "mods": [],
+  "files": [
+    {
+      "url": "https://github.com/EternityQwQ/MetalUniversal/releases/download/MetalUniversal_1.0.4/metallum-1.0.4.jar",
+      "to": "mods/metallum-1.0.4.jar"
+    },
+    {
+      "url": "https://cdn.modrinth.com/data/AANobbMI/versions/3QgJXuSK/sodium-fabric-0.9.0%2Bmc26.2.jar",
+      "to": "mods/sodium-fabric-0.9.0+mc26.2.jar"
+    },
+    {
+      "url": "https://cdn.modrinth.com/data/P7dR8mSH/versions/ewUK83HI/fabric-api-0.161.0%2B26.2.jar",
+      "to": "mods/fabric-api-0.161.0+26.2.jar"
+    },
+    {
+      "url": "https://cdn.modrinth.com/data/gvQqBUqZ/versions/f7vZ0VWU/lithium-fabric-0.25.3%2Bmc26.2.jar",
+      "to": "mods/lithium-fabric-0.25.3+mc26.2.jar"
+    },
+    {
+      "url": "https://cdn.modrinth.com/data/uXXizFIs/versions/d5ddUdiB/ferritecore-9.0.0-fabric.jar",
+      "to": "mods/ferritecore-9.0.0-fabric.jar"
+    },
+    {
+      "url": "https://cdn.modrinth.com/data/NNAgCjsB/versions/uXe0pIaz/entityculling-fabric-1.11.3-mc26.2.jar",
+      "to": "mods/entityculling-fabric-1.11.3-mc26.2.jar"
+    },
+    {
+      "url": "https://cdn.modrinth.com/data/LQ3K71Q1/versions/pC2JjFw1/dynamic-fps-3.11.9%2Bminecraft-26.2.0-fabric.jar",
+      "to": "mods/dynamic-fps-3.11.9+minecraft-26.2.0-fabric.jar"
+    },
+    {
+      "url": "https://cdn.modrinth.com/data/9s6osm5g/versions/Nv3xnWXd/cloth-config-26.2.155.jar",
+      "to": "mods/cloth-config-26.2.155.jar"
+    },
+    {
+      "url": "https://cdn.modrinth.com/data/EsAfCjCV/versions/uo5bAN1Y/appleskin-fabric-mc26.2-3.0.10.jar",
+      "to": "mods/appleskin-fabric-mc26.2-3.0.10.jar"
+    },
+    {
+      "url": "https://cdn.modrinth.com/data/aC3cM3Vq/versions/jOiTBIaB/MouseTweaks-fabric-mc26.2-2.31.jar",
+      "to": "mods/MouseTweaks-fabric-mc26.2-2.31.jar"
+    },
+    {
+      "url": "https://cdn.modrinth.com/data/qQyHxfxd/versions/aDbxaVTi/NoChatReports-FABRIC-26.2-v2.20.2.jar",
+      "to": "mods/NoChatReports-FABRIC-26.2-v2.20.2.jar"
+    },
+    {
+      "url": "https://cdn.modrinth.com/data/Wb5oqrBJ/versions/rsO6BV1x/chat_heads-1.3.2-fabric-26.1.jar",
+      "to": "mods/chat_heads-1.3.2-fabric-26.1.jar"
+    },
+    {
+      "url": "https://cdn.modrinth.com/data/2M01OLQq/versions/woHKruB1/shulkerboxtooltip-fabric-5.4.3%2B26.2.jar",
+      "to": "mods/shulkerboxtooltip-fabric-5.4.3+26.2.jar"
+    },
+    {
+      "url": "https://cdn.modrinth.com/data/8shC1gFX/versions/TVXtAI9s/BetterF3-19.0.1-Fabric-26.2.jar",
+      "to": "mods/BetterF3-19.0.1-Fabric-26.2.jar"
+    },
+    {
+      "url": "https://cdn.modrinth.com/data/mOgUt4GM/versions/iRo7AZXf/modmenu-20.0.3.jar",
+      "to": "mods/modmenu-20.0.3.jar"
+    },
+    {
+      "url": "https://cdn.modrinth.com/data/eXts2L7r/versions/NDqH16LT/placeholder-api-3.1.0-beta.1%2B26.2.jar",
+      "to": "mods/placeholder-api-3.1.0-beta.1+26.2.jar"
+    },
+    {
+      "url": "https://cdn.modrinth.com/data/fuuu3xnx/versions/bvFby61J/Searchables-fabric-26.2-1.0.1.jar",
+      "to": "mods/Searchables-fabric-26.2-1.0.1.jar"
+    },
+    {
+      "url": "https://cdn.modrinth.com/data/xv94TkTM/versions/sZHXONgm/Controlling-fabric-26.2-26.2.4.jar",
+      "to": "mods/Controlling-fabric-26.2-26.2.4.jar"
+    },
+    {
+      "url": "https://cdn.modrinth.com/data/GNxdLCoP/versions/iDsSBWPv/cullleaves-fabric-4.1.2%2B26.2.jar",
+      "to": "mods/cullleaves-fabric-4.1.2+26.2.jar"
+    },
+    {
+      "url": "https://cdn.modrinth.com/data/x1hIzbuY/versions/ZZ5dfboC/fastquit-3.1.5%2Bmc26.2.jar",
+      "to": "mods/fastquit-3.1.5+mc26.2.jar"
+    },
+    {
+      "url": "https://cdn.modrinth.com/data/fQEb0iXm/versions/5WeL0Nkz/krypton-0.3.1.jar",
+      "to": "mods/krypton-0.3.1.jar"
+    },
+    {
+      "url": "https://cdn.modrinth.com/data/g96Z4WVZ/versions/JmPs4Wie/BadOptimizations-2.4.1-26.2-fabric.jar",
+      "to": "mods/BadOptimizations-2.4.1-26.2-fabric.jar"
+    },
+    {
+      "url": "https://cdn.modrinth.com/data/QwxR6Gcd/versions/p9lCmVmH/debugify-26.2.0.1.jar",
+      "to": "mods/debugify-26.2.0.1.jar"
+    },
+    {
+      "url": "https://cdn.modrinth.com/data/uLbm7CG6/versions/doGx6rSt/language-reload-1.7.8%2B26.2.jar",
+      "to": "mods/language-reload-1.7.8+26.2.jar"
+    },
+    {
+      "url": "https://cdn.modrinth.com/data/ETlrkaYF/versions/ZM0HUAhK/cwb-5.0.0%2B26.2.jar",
+      "to": "mods/cwb-5.0.0+26.2.jar"
+    },
+    {
+      "url": "https://cdn.modrinth.com/data/rcTfTZr3/versions/8TkGmrgl/PresenceFootsteps-1.13.3%2B26.2.jar",
+      "to": "mods/PresenceFootsteps-1.13.3+26.2.jar"
+    },
+    {
+      "url": "https://cdn.modrinth.com/data/MPCX6s5C/versions/PtkLygDD/notenoughanimations-fabric-1.12.7-mc26.2.jar",
+      "to": "mods/notenoughanimations-fabric-1.12.7-mc26.2.jar"
+    },
+    {
+      "url": "https://cdn.modrinth.com/data/n6PXGAoM/versions/ga3HGfK0/betterstats-5.5.6%2Bfn-26.2.jar",
+      "to": "mods/betterstats-5.5.6+fn-26.2.jar"
+    },
+    {
+      "url": "https://cdn.modrinth.com/data/Eldc1g37/versions/NM3aWYRR/tcdcommons-5.5.6%2Bfn-26.2.jar",
+      "to": "mods/tcdcommons-5.5.6+fn-26.2.jar"
+    },
+    {
+      "url": "https://cdn.modrinth.com/data/r0v8vy1s/versions/blSBYnpw/alternate-current-mc26.2-1.9.0.jar",
+      "to": "mods/alternate-current-mc26.2-1.9.0.jar"
+    },
+    {
+      "text": "renderDistance:12\nsimulationDistance:8\nmaxFps:120\nenableVsync:true\npauseOnLostFocus:false\n",
+      "to": "options.txt"
+    }
+  ],
+  "renderer": "metallum",
+  "resolution": 1.0,
+  "world": "Bench",
+  "seed": 1337,
+  "launch": true,
+  "fresh": true,
+  "loaderVersion": "0.19.3",
+  "engine": {
+    "logGC": true,
+    "logCodeCache": true
+  }
+}

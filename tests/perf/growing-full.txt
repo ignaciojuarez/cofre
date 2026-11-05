@@ -1,0 +1,27 @@
+2026-11-05 10:00:00 [Cofre] engine flags=-Xmx4096M -XX:ReservedCodeCacheSize=64M -Xlog:gc -Xlog:codecache
+[Cofre] JIT mode=attached dyld_bypass=on
+[Cofre] memory heap=4096MB requested=4096MB available=6144MB
+[Cofre] dylib outside bundle path=/private/instance/tmp/libexample.dylib
+[Cofre] dylib outside bundle path=/private/instance/tmp/libother.dylib
+[10:00:01] [Render thread/INFO]: Using graphics backend Metal, using drivers: iOS
+[0.100s][info][gc] Using G1
+[1.000s][debug][codecache] CodeCache: size=65536Kb used=20480Kb max_used=32768Kb free=45056Kb
+[Cofre] perf t=5s fps=5 min=0 frameMs.p95=200 renderer=metallum footprintMB=1000 thermal=nominal
+[Cofre] perf t=30s fps=10 min=1 frameMs.p95=100 renderer=metallum footprintMB=1050 thermal=nominal
+[10:00:59] [Server thread/INFO]: BenchPlayer joined the game
+[Cofre] perf t=60s fps=20 min=10 frameMs.p95=50 renderer=metallum footprintMB=1110 thermal=fair
+[Cofre] scenario name=bench step=world result=ok
+[61.000s][info][gc,start] GC(12) Pause Young (Normal) (G1 Evacuation Pause)
+[61.006s][info][gc] GC(12) Pause Young (Normal) (G1 Evacuation Pause) 512M->130M(1024M) 6.123ms
+[62.000s][info][gc] GC(13) Concurrent Mark Cycle 200.000ms
+[63.000s][info][gc] GC(14) Pause Remark 150M->150M(1024M) 2.500ms
+[64.000s][info][gc] GC(15) Pause Full (System.gc()) 512M->120M(1024M) 10.000ms
+[Cofre] perf t=120s fps=1 min=0 frameMs.p95=1000 renderer=metallum footprintMB=1230 thermal=serious
+[Cofre] perf t=125s fps=60 min=50 frameMs.p95=20 renderer=metallum footprintMB=1240 thermal=serious
+2026-11-05 10:02:05 [Cofre] perf t=125s fps=60 min=50 frameMs.p95=20 renderer=metallum footprintMB=1240 thermal=serious
+[Cofre] perf t=130s fps=40 min=30 frameMs.p95=30 renderer=metallum footprintMB=1250 thermal=critical
+[Cofre] perf t=135s fps=50 min=40 frameMs.p95=25 renderer=metallum footprintMB=1260 thermal=critical
+[Cofre] perf t=140s fps=50 min=35 frameMs.p95=22 renderer=metallum footprintMB=1270 thermal=nominal
+[Cofre] perf t=145s fps=1 min=0 frameMs.p95=1000 renderer=metallum footprintMB=1280 thermal=nominal
+[145.000s][debug][codecache] CodeCache: size=65536Kb used=40960Kb max_used=49152Kb free=24576Kb
+[145.001s][warning][codecache] CodeCache is full. Compiler has been disabled.

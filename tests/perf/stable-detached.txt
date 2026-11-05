@@ -1,0 +1,18 @@
+[Cofre] engine flags=-Xmx4096M -XX:ReservedCodeCacheSize=256M
+[Cofre] JIT mode=detached dyld_bypass=off
+[Cofre] memory heap=4096MB requested=4096MB available=6144MB
+[10:00:01] [Render thread/INFO]: Using graphics backend Vulkan, using drivers: MoltenVK
+[Cofre] perf t=5s fps=2 min=0 frameMs.p95=500 renderer=vulkan footprintMB=2000 thermal=nominal
+[Cofre] perf t=30s fps=2 min=0 frameMs.p95=500 renderer=vulkan footprintMB=2000 thermal=nominal
+[Cofre] scenario name=bench step=world result=ok
+[Cofre] perf t=60s fps=2 min=0 frameMs.p95=500 renderer=vulkan footprintMB=2000 thermal=nominal
+[Cofre] perf t=120s fps=1 min=0 frameMs.p95=1000 renderer=vulkan footprintMB=2000 thermal=nominal
+[Cofre] perf t=125s fps=90 min=70 frameMs.p95=20 renderer=vulkan footprintMB=2000 thermal=nominal
+[Cofre] perf t=130s fps=70 min=60 frameMs.p95=25 renderer=vulkan footprintMB=2000 thermal=nominal
+[Cofre] perf t=135s fps=80 min=65 frameMs.p95=22 renderer=vulkan footprintMB=2000 thermal=nominal
+[Cofre] perf t=140s fps=80 min=60 frameMs.p95=20 renderer=vulkan footprintMB=2000 thermal=nominal
+[Cofre] perf t=145s fps=1 min=0 frameMs.p95=1000 renderer=vulkan footprintMB=2000 thermal=nominal
+[145.000s][debug][codecache] CodeHeap 'non-profiled nmethods': size=120000Kb used=8192Kb max_used=10240Kb free=111808Kb
+[145.000s][debug][codecache] CodeHeap 'profiled nmethods': size=120000Kb used=16384Kb max_used=20480Kb free=103616Kb
+[145.000s][debug][codecache] CodeHeap 'non-nmethods': size=6000Kb used=1024Kb max_used=2048Kb free=4976Kb
+[146.000s][debug][codecache] CodeHeap 'non-profiled nmethods': size=120000Kb used=4096Kb max_used=10240Kb free=115904Kb

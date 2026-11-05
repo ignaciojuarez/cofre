@@ -1,5 +1,77 @@
 # Renderer benchmarks on device
 
+## How to run Phase 0
+
+```sh
+# Mac-only verification; dry-run performs no launches, copies or writes.
+bash tests/perf/check.sh
+scripts/bench.sh --dry-run --device "$COFRE_DEVICE_UDID"
+# iPhone 17 Pro attached to this Mac; debug Cofre installed via scripts/run.sh.
+scripts/bench.sh --device "$COFRE_DEVICE_UDID"
+# Optional 30-minute collection, then compare saved logs (delta = B minus A).
+COFRE_WORLD_SECONDS=1870 scripts/bench.sh --device "$COFRE_DEVICE_UDID"
+scripts/perf-summary.sh --skip-seconds 60 --window-seconds 1800 A.txt B.txt
+# Default summary: 60-second warmup + 600-second window; window 0 = all remaining.
+scripts/perf-summary.sh A.txt B.txt
+```
+
+- The suite enables `-cofrePerfLog 1`; waits up to 3600 seconds per install/join;
+  collects **670 seconds after world join** (60 warmup + 600 steady + sampling margin).
+  `--device` / `--timeout` pass through; `COFRE_DEVICE_UDID` also works. `scenario.sh`
+  has **no relay flag**: run on the attached Mac.
+- Evidence: `artifacts/bench/<UTC timestamp>/<scenario>.txt`, `.runner.txt` verdicts,
+  `summary.txt`, `vanilla-ab.txt`. Failures retain logs and the suite continues,
+  exiting nonzero for failed verdicts, game exits, logged backend mismatches,
+  missing logs or incomplete windows.
+- Every case requests **Bench, seed 1337, render 12, simulation 8, resolution 1.0,
+  VSync, 120 FPS cap**, written before launch. Matching seeds/settings do not imply
+  identical terrain across versions/worldgen mods. Keep orientation, brightness,
+  power and starting temperature consistent; cool before repeats. Sequential cases
+  inherit heat: read the thermal timelines.
+
+| Case / A/B | Purpose |
+|---|---|
+| A: vanilla 26.3 Metal | Baseline frame pacing and Metallum memory climb |
+| B: vanilla 26.3 Vulkan/MoltenVK vs A | Isolate the vanilla backend; verify **Vulkan** actually logged |
+| C: Fabric 26.2 Metal + Sodium 0.9.0 + 28 additions | Representative client/performance workload; 30 pinned jars including MetalUniversal/libraries |
+| D: NeoForge 26.2 Metal + existing 100-mod list | Large-pack heap, GC and code-cache pressure; C/D is not a loader-only A/B |
+| Same case/build, change one JIT/GC/cache/heap setting | Compare its two saved logs to isolate that experiment |
+
+Read **FPS average**, **min** (1%-low proxy), **frame p95 proxy**, footprint growth
+MB/s, thermal durations, GC pauses, code cache and outside-bundle dylib count.
+Frame p95 is nearest-rank p95 of logged five-second p95 values, not individual frames.
+Warmup starts at the first post-join perf sample, otherwise perf `t=0`. FPS/frame
+metrics use the steady window; memory/thermal/GC/cache cover the whole log. Thermal
+states persist to the next sample, with no extrapolation; missing instrumentation
+prints **N/A**. Cache peak uses aggregate `max_used` or summed heap peaks (an upper
+bound). **+2–3 MB/s** matches the known leak; **CodeCache is full** means compilation
+stopped. Require **PASS in-world**, **600 observed steady seconds**, expected backend,
+and no game exit.
+
+Fabric's 29 Modrinth builds (Sodium plus 28 additions) were checked on **2026-11-05**
+through `project/<slug>/version?game_versions=["26.2"]&loaders=["fabric"]`, including
+required dependency closure; versioned URLs pin the files. No Iris/shaders or
+applicable broken-Metal catalog entries. Published support still needs an iOS check.
+D reuses all 100 existing NeoForge slugs and its Connector/Launchpad/FFAPI/MetalUniversal
+kit; those slugs resolve current compatible versions.
+
+**Engine experiments (A/B).** Every bench scenario logs GC pauses and code cache (`"engine": {"logGC": true,
+"logCodeCache": true}`). Run one case twice, once with an experiment, and compare:
+
+```sh
+scripts/bench.sh --only bench-vanilla-26.3-metal --device "$COFRE_DEVICE_UDID"                     # A
+scripts/bench.sh --only bench-vanilla-26.3-metal --engine '{"detachJIT": true}' --device "$COFRE_DEVICE_UDID"   # B
+scripts/perf-summary.sh A.txt B.txt
+```
+
+Experiments (`EngineOptions`, all off by default): `codeCacheMB` (Air: 64), `compactHeaders` (Java 25),
+`collector` (`g1` / `zgc` / `parallel`), `flightRecorder` (JFR chunks in `<game>/cofre-jfr/`), `detachJIT`,
+`threadQoS`. 26.3 scenario worlds start from a 26.2-format world that 26.3 upgrades. The Vulkan case forces
+Mojang's backend with `--graphicsBackend vulkan`, so the run must log `Using graphics backend Vulkan`. Still
+missing from the schema: camera paths and the Metal HUD.
+
+## Recorded results
+
 Measured results only: what launched, what rendered, frame rate, memory, limits. Research and policy proposals live in [renderer-matrix.md](renderer-matrix.md); goals in [../renderer-cleanup.md](../renderer-cleanup.md).
 
 **Targets** (popular setups): latest vanilla (26.3), modded 26.x (Fabric 26.2), 1.21.11 (has Metal support), 1.20.1 (most popular for mods: Forge/Fabric). Goal: run as many as possible on Metal.

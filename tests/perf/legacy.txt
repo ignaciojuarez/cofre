@@ -1,0 +1,4 @@
+[Render thread/INFO]: Using graphics backend OpenGL
+[Cofre] perf t=5s fps=20 min=10 renderer=angle footprintMB=100 thermal=fair
+[Cofre] perf t=10s fps=40 min=30 renderer=angle footprintMB=100 thermal=fair
+[Cofre] perf t=15s fps=60 min=50 renderer=angle footprintMB=100 thermal=serious
