@@ -184,6 +184,53 @@ static double CofrePerfFootprintMB(void) {
   return (double)info.phys_footprint / (1024.0 * 1024.0);
 }
 
+static NSDictionary<NSNumber *, NSNumber *> *cofrePerfThreadCPU;
+static uint64_t cofrePerfThreadSampleNs;
+
+/// The busiest threads since the last sample, as "name(priority):percent" (100% = one core). Shows what heats the
+/// phone: HotSpot names its threads ("Java: Render thread", "C2 CompilerThread0", "GC Thread#0"), and the
+/// priority shows the QoS band iOS gave each one.
+static NSString *CofrePerfThreadLine(void) {
+  thread_act_array_t threads = NULL;
+  mach_msg_type_number_t count = 0;
+  if (task_threads(mach_task_self(), &threads, &count) != KERN_SUCCESS) return nil;
+  uint64_t now = clock_gettime_nsec_np(CLOCK_UPTIME_RAW);
+  double wallNs = cofrePerfThreadSampleNs ? (double)(now - cofrePerfThreadSampleNs) : 0;
+  NSMutableDictionary<NSNumber *, NSNumber *> *next = [NSMutableDictionary dictionaryWithCapacity:count];
+  NSMutableArray<NSArray *> *rows = [NSMutableArray array];
+  double total = 0;
+  for (mach_msg_type_number_t i = 0; i < count; i++) {
+    thread_extended_info_data_t info;
+    mach_msg_type_number_t infoCount = THREAD_EXTENDED_INFO_COUNT;
+    thread_identifier_info_data_t ident;
+    mach_msg_type_number_t identCount = THREAD_IDENTIFIER_INFO_COUNT;
+    if (thread_info(threads[i], THREAD_EXTENDED_INFO, (thread_info_t)&info, &infoCount) == KERN_SUCCESS &&
+        thread_info(threads[i], THREAD_IDENTIFIER_INFO, (thread_info_t)&ident, &identCount) == KERN_SUCCESS) {
+      uint64_t cpu = info.pth_user_time + info.pth_system_time;
+      NSNumber *key = @(ident.thread_id);
+      NSNumber *before = cofrePerfThreadCPU[key];
+      next[key] = @(cpu);
+      if (wallNs > 0 && before && cpu >= before.unsignedLongLongValue) {
+        double percent = (double)(cpu - before.unsignedLongLongValue) * 100.0 / wallNs;
+        total += percent;
+        NSString *name = info.pth_name[0] ? @(info.pth_name) : @"?";
+        if (percent >= 2) [rows addObject:@[ @(percent), [NSString stringWithFormat:@"%@(%d)", name, info.pth_curpri] ]];
+      }
+    }
+    mach_port_deallocate(mach_task_self(), threads[i]);
+  }
+  vm_deallocate(mach_task_self(), (vm_address_t)threads, count * sizeof(thread_act_t));
+  cofrePerfThreadCPU = next;
+  cofrePerfThreadSampleNs = now;
+  if (wallNs <= 0) return nil;
+  [rows sortUsingComparator:^NSComparisonResult(NSArray *a, NSArray *b) { return [b[0] compare:a[0]]; }];
+  NSMutableString *line = [NSMutableString stringWithFormat:@"[Cofre] cpu total=%.0f%% threads=%u top=", total, count];
+  for (NSUInteger i = 0; i < MIN(rows.count, (NSUInteger)8); i++) {
+    [line appendFormat:@"%@%@:%.0f%%", i ? @", " : @"", rows[i][1], [rows[i][0] doubleValue]];
+  }
+  return line;
+}
+
 static void CofrePerfDisableAirStatsTimer(SurfaceViewController *surface) {
   @try {
     NSTimer *timer = [surface valueForKey:@"statsTimer"];
@@ -231,6 +278,11 @@ static void CofrePerfTick(void) {
       CofrePerfFootprintMB(), CofrePerfThermalState()];
   NSLog(@"%@", line);
   CofrePerfAppend(line);
+  NSString *threads = CofrePerfThreadLine();
+  if (threads) {
+    NSLog(@"%@", threads);
+    CofrePerfAppend(threads);
+  }
   cofrePerfSampleCount = 0;
   cofrePerfFrameTotal = 0;
   memset(cofrePerfFrameCounts, 0, sizeof(cofrePerfFrameCounts));
@@ -246,6 +298,8 @@ static void CofrePerfLogStop(void) {
       cofrePerfTimer = nil;
     }
     cofrePerfRenderer = nil;
+    cofrePerfThreadCPU = nil;
+    cofrePerfThreadSampleNs = 0;
     cofrePerfElapsedSeconds = 0;
     cofrePerfSampleCount = 0;
     cofrePerfFrameTotal = 0;

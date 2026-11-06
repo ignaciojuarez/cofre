@@ -191,7 +191,8 @@ static void CofreLogOutsideImage(const struct mach_header *header, intptr_t slid
   if (!dladdr(header, &info) || !info.dli_fname) return;
   const char *path = info.dli_fname;
   if (strncmp(path, bundle, bundleLength) == 0 || strncmp(path, "/usr/lib/", 9) == 0 ||
-      strncmp(path, "/System/", 8) == 0 || strncmp(path, "/Developer/", 11) == 0) {
+      strncmp(path, "/System/", 8) == 0 || strncmp(path, "/Developer/", 11) == 0 ||
+      strstr(path, "/Cryptexes/OS/") != NULL) {  // system libraries shipped in the OS cryptex
     return;
   }
   char *copy = strdup(path);
